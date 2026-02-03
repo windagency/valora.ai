@@ -1,0 +1,10 @@
+src/
+tsconfig.json
+.eslintrc.json
+.prettierrc.json
+*.test.ts
+*.spec.ts
+node_modules/
+.DS_Store
+*.log
+

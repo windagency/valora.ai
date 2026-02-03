@@ -1,0 +1,130 @@
+{
+  "capabilities": {
+    "asserter": {
+      "domains": ["accessibility","backend-api","compliance","design","product","quality-assurance","quality-gate","requirements","security","stakeholder-management","static-analysis","testing","threat-detection","typescript-core","typescript-general","user-experience","validation"],
+      "expertise": ["API contract validation","Accessibility standards (WCAG, ARIA)","Architectural patterns","Build system validation","Code coverage analysis","Code quality metrics","Design patterns and anti-patterns","Linting and formatting tools","Requirements traceability","Security scanning (OWASP, CVE)","Static code analysis","Type systems and type checking"],
+      "selectionCriteria": ["accessibility-files","audit-files","authentication-code","code-files","design-files","documentation-files","encryption-code","policy-files","product-docs","requirements-files","roadmap-files","security-files","ui-mockups","user-stories","ux-research"],
+      "priority": 80
+    },
+    "lead": {
+      "domains": ["accessibility","architecture","backend-api","compliance","design","engineering-excellence","infrastructure","leadership","product","quality-assurance","quality-gate","requirements","security","stakeholder-management","static-analysis","testing","threat-detection","typescript-core","typescript-general","user-experience","validation"],
+      "expertise": ["API Gateway and service composition design","Abstract Syntax Tree (AST) analysis for code quality and structure representation","Advanced software modularization and reusability","Alignment between product velocity and technical stability","Architecture Decision Records (ADRs)","Architecture unit testing with arch-unit-ts","Artifact management and versioning","Asynchronous Programming","Atomic design architectural pattern","Back-For-Frontend (BFF) architectural pattern","Behavior-Driven Development (BDD) principles","Build reproducibility and caching optimization","CI/CD lead time and deployment frequency","Centralized logging (ELK, Loki, OpenSearch)","Change management with CI/CD observability hooks","Chaos engineering and system reliability validation","Clean archtecture architectural pattern","Clean code","Client-Server fundamental pattern","Cloud Native architecture design (Kubernetes, Service Mesh, Serverless)","Code review conventions and pair programming advocacy","Command Query Responsibility Segregation (CQRS) architectural pattern","Compliance as Code (CIS, SOC2, ISO27001 alignment)","Configuration and secret management","Continuous Deployment strategies (Blue-Green, Canary, Feature Toggles)","Continuous Integration pipelines (GitHub Actions, Jenkins)","Continuous feedback loops across SDLC","Decoupled architectural pattern","Design review and RFC (Request for Comments) process","Developer Experience (Internal Developer Platforms, Backstage)","Developer onboarding automation and environment reproducibility","Developer productivity and onboarding efficiency","Development environments (devcontainers, Docker Compose for local dev)","Development tooling and IDE configuration (VS Code, JetBrains)","Distributed tracing (OpenTelemetry, Jaeger)","Domain-Driven Development (DDD) principles","Don't repeat yourself (DRY) principles","Edge Side Includes (ESI) performance pattern","Event-Driven architectural pattern","Feature-based architectural pattern","Functional Programming","GitOps methodologies (ArgoCD, Flux)","HLD, LLD, and C4/Mermaid diagrams for clarity and traceability","Headless architectural pattern","Hexagonal architectural pattern","Incident response and postmortem culture","Infrastructure as Code (Terraform, Pulumi, Crossplane)","Island architectural pattern","Keep It Simple, Stupid (KISS) principles","Knowledge base and documentation automation","Layered fundamental pattern","Mean Time to Detect (MTTD) and Mean Time to Recover (MTTR)","Metrics and alerting (Prometheus, Grafana, Alertmanager)","Microfrontend federation architectural pattern","Microservices architectural pattern (sync vs async)","Monolithic architectural pattern","Multi-cloud and hybrid platform strategy","Object-Oriented Programming","Performance optimization and profiling","Pipeline as Code design and standardization","Platform and software engineering roadmaps","Platform uptime and MTTR/MTBF improvements","Policy as Code (OPA, Kyverno)","REST, GraphQL, tRPC, gRPC API design","Reduction in operational toil","Runtime security and policy enforcement","SLO/SLA/SLA dashboards and error budgets","Secrets rotation and identity management","Secure SDLC implementation","Security vulnerabilities trend and compliance coverage","Serverless architectural pattern","Software-as-a-Service (SaaS) architectural pattern","Test automation (unit, integration, contract, e2e)","Test-Driven Development (TDD) principles","Threat modeling and vulnerability scanning","TypeScript/Node.js ecosystem mastery"],
+      "selectionCriteria": ["accessibility-files","architecture-files","audit-files","authentication-code","cloud-config","code-files","config-files","design-files","docker-files","documentation-files","encryption-code","engineering-docs","infrastructure-files","kubernetes-manifests","leadership-docs","policy-files","product-docs","qa-scripts","requirements-files","roadmap-files","security-files","strategy-files","terraform-files","test-files","test-reports","testing-config","type-definitions","typescript-files","ui-mockups","user-stories","ux-research"],
+      "priority": 90
+    },
+    "platform-engineer": {
+      "domains": ["accessibility","backend-api","compliance","design","infrastructure","product","quality-assurance","requirements","security","stakeholder-management","testing","threat-detection","typescript-core","typescript-general","user-experience"],
+      "expertise": [" AKS "," Aqua)"," Azure)"," Datadog)"," Dynatrace "," ECR "," GCP "," GCR)"," GKE "," GitHub Actions "," GitLab CI)"," Grype "," Prometheus)"," SSM "," Sealed Secrets)"," Sentinel)"," on-prem clusters)","APM integration (New Relic ","AWS Fargate and ECS orchestration","Alerting and SLO/SLI/SLA design","Artifact management (JFrog Artifactory ","Automated testing and deployment (unit, integration, canary, blue/green)","Automation as a default","CI/CD pipeline design and governance (Jenkins ","CIS hardening benchmarks for Kubernetes and Linux","Champion DevOps culture and SRE principles","Cloud-native architecture design (AWS ","Collaboration over silos","Container image scanning (Trivy ","Cost optimization and FinOps strategies","Cross-functional communication with developers and stakeholders","Docker image optimization (multi-stage builds, caching, CVE scanning)","Documentation, knowledge sharing, and process standardization","Drive architectural reviews and platform evolution","Environment provisioning (multi-account, multi-region)","Healthpoint and sanity checks for production readiness","Helm, Kustomize, and ArgoCD for GitOps workflows","Identity and access control (RBAC, ABAC, OIDC, IAM)","Kubernetes (EKS ","Linux systems administration (Debian, RHEL, Alpine)","Mentor teams on cloud-native and observability practices","Metrics, logs, and traces instrumentation (OpenTelemetry ","Networking fundamentals (VPC, ingress/egress, DNS, load balancing)","Observability first","Pod autoscaling (HPA/VPA) and node pool management","Policy as Code (OPA ","RUM (Real-User Monitoring) and synthetic testing setup","Release governance and rollback automation","Reliability over complexity","Secrets rotation and zero-trust network enforcement","Secure secret management (Vault ","Secure supply chain (SLSA, SBOM, provenance tracking)","Security by design","State management and drift detection","Terraform / Pulumi (modular, DRY, reusable patterns)","Vulnerability management and incident response"],
+      "selectionCriteria": ["accessibility-files","architecture-files","audit-files","authentication-code","cloud-config","code-files","design-files","docker-files","documentation-files","encryption-code","engineering-docs","infrastructure-files","kubernetes-manifests","leadership-docs","policy-files","product-docs","qa-scripts","requirements-files","roadmap-files","security-files","strategy-files","terraform-files","test-files","test-reports","testing-config","ui-mockups","user-stories","ux-research"],
+      "priority": 90
+    },
+    "product-manager": {
+      "domains": ["accessibility","design","product","requirements","stakeholder-management","typescript-core","typescript-general","user-experience"],
+      "expertise": ["Acceptance Criteria Definition","Agile & Scrum Methodologies","Backlog Management & Prioritization","Data-Driven Decision Making","Documentation Standards & Consistency","Epic and User Story Structuring","Functional Specification Writing","Product Requirements Documentation (PRD)","Requirements Gathering & Analysis","Stakeholder Interviewing & Synthesis","User-Centric Requirements Definition"],
+      "selectionCriteria": ["code-files","documentation-files","product-docs","requirements-files","roadmap-files","user-stories"],
+      "priority": 75
+    },
+    "qa": {
+      "domains": ["accessibility","backend-api","compliance","design","quality-assurance","security","testing","threat-detection","typescript-core","typescript-general","user-experience"],
+      "expertise": ["A/B Testing","API Testing","Acceptance Testing","Accessibility Testing","BrowserStack","Component Testing","Cross-Browser Testing","Cross-Device Testing","Cucumber","End-to-End (e2e) Testing","Fruggr","Functional Testing","GraphQL Schemas Testing","Green Software Testing","Greenspector","Integration Testing","Internationalization (i18n) Testing","Jest, Vitest","Lighthouse","Mocks, Spies, and Stubs","Performance Testing","Playwright","Postman","QA Wolf","Regression Testing","Security Testing","Snapshot Testing","SonarQube","Stress Testing","Sustainability Testing","Unit Testing","Visual Regression Testing","WAVE","Xray","axe, jest-axe","ecoCode"],
+      "selectionCriteria": ["audit-files","authentication-code","code-files","documentation-files","encryption-code","policy-files","qa-scripts","security-files","test-files","test-reports","testing-config"],
+      "priority": 85
+    },
+    "secops-engineer": {
+      "domains": ["accessibility","compliance","design","infrastructure","quality-assurance","security","testing","threat-detection","user-experience"],
+      "expertise": ["Cloud security principles","Compliance frameworks and regulations (PCI-DSS, HIPAA, ISO 27001, SOC 2, GDPR)","Container security principles","Data Structures in Distributed Systems","Data management","Detection engineering","Ethical Hacking","Incident response","Observability","Platform operations","Public Cloud Services (AWS, GCP, Azure)","Python","Risk assessment","Secure architecture design","Security Automation","Shell","Threat modeling","Vulnerability management"],
+      "selectionCriteria": ["accessibility-files","architecture-files","audit-files","authentication-code","cloud-config","code-files","design-files","documentation-files","encryption-code","engineering-docs","leadership-docs","policy-files","security-files","strategy-files","ui-mockups","ux-research"],
+      "priority": 95
+    },
+    "software-engineer-typescript-backend": {
+      "domains": ["accessibility","backend-api","design","quality-assurance","testing","typescript-core","typescript-general","user-experience"],
+      "expertise": ["API rate limiting & throttling","Async I/O and performance implications","Atomicity, consistency, isolation, durability (ACID) Properties for DBMS","Back-For-Frontend (BFF) architectural pattern","BullMQ","Caching (Redis, in-memory)","Cluster & Worker Threads","Command Query Responsibility Segregation (CQRS) architectural pattern","Connection pooling and transaction management","Consistency and CAP theorem awareness","Domain-Driven Development (DDD) principles","Elasticsearch, Logstash, Kibana (ELK) stack","Environment-based setups (12-Factor principles)","Error handling","Express.js","Fastify","Feature flags and rollout strategies","Finite State Machines (FSMs) and & Statecharts (XState, Robot3)","Grafana","GraphQL (with Schema testing)","JSON Web Token (JWT)","Joi","Logging libraries (pino, Winston)","Metadata Reflection","Metrics and tracing","Migrations and schema versioning","Nest.js","NoSQL (MongoDB, DynamoDB, Redis)","Node.js","Node.js Event Loop","OAuth2","OpenAPI / Swagger","OpenTelemetry","Passport.js","Performance optimization","Prometheus","RBAC/ABAC","RESTful API","Redis","Resilience & Reliability","SQL (PostgreSQL, MySQL, SQLite)","SWC","Secrets management (Vault, SSM, dotenv)","Secure headers (Helmet)","Streams and Buffers","TLS/HTTPS ","Task scheduling (cron, bullmq)","Type-safe API contracts","WebSockets / Server-Sent Events (SSE)","Webpack","Zod","esbuild","gRPC / Protobuf","tRPC","tsup"],
+      "selectionCriteria": ["code-files","documentation-files","qa-scripts","test-files","test-reports","testing-config"],
+      "priority": 95
+    },
+    "software-engineer-typescript-frontend-react": {
+      "domains": ["frontend-ui","typescript-core","typescript-general"],
+      "expertise": ["Next.js","React","React Hook Form","Tanstack Query","TypeScript","Zod","Zustand"],
+      "selectionCriteria": ["architecture-files","code-files","config-files","documentation-files","react-imports","type-definitions","typescript-files"],
+      "priority": 70
+    },
+    "software-engineer-typescript-frontend": {
+      "domains": ["accessibility","design","frontend-ui","typescript-core","typescript-general","user-experience"],
+      "expertise": ["Astro.js","Atomic design architectural pattern","Edge Side Includes (ESI) performance pattern","Error handling","Feature-based architectural pattern","Island architectural pattern","Microfrontend federation architectural pattern","Performance optimization","React.js/Next.js","State management","Svelte/SvelteKit","Vite","Vue.js/Nuxt.js","WCAG 2.0","Webpack"],
+      "selectionCriteria": ["accessibility-files","code-files","design-files","documentation-files","react-imports","ui-mockups","ux-research"],
+      "priority": 95
+    },
+    "software-engineer-typescript": {
+      "domains": ["accessibility","backend-api","design","quality-assurance","testing","user-experience"],
+      "expertise": ["Adapter structural design pattern","Asynchronous Programming","Behavior-Driven Development (BDD) principles","Clean archtecture architectural pattern","Clean code","Client-Server fundamental pattern","Decorator structural design pattern","Decoupled architectural pattern","Dependency Injection creational design pattern","Don't repeat yourself (DRY) principles","Event-Driven architectural pattern","Factory creational design pattern","Functional Programming","Headless architectural pattern","Hexagonal architectural pattern","Keep It Simple, Stupid (KISS) principles","Layered fundamental pattern","Lazy initialization creational design pattern","Microservices architectural pattern","Module structural design pattern","Monolithic architectural pattern","Object-Oriented Programming","Observer behavioral design pattern","Path aliases","Proxy structural design pattern","Serverless architectural pattern","Singleton creational design pattern","Software-as-a-Service (SaaS) architectural pattern","Test-Driven Development (TDD) principles","Volta","pnpm workspaces"],
+      "selectionCriteria": ["accessibility-files","code-files","design-files","documentation-files","qa-scripts","test-files","test-reports","testing-config","ui-mockups","ux-research"],
+      "priority": 95
+    },
+    "ui-ux-designer": {
+      "domains": ["accessibility","design","infrastructure","product","quality-assurance","requirements","stakeholder-management","testing","typescript-core","typescript-general","user-experience"],
+      "expertise": ["Accessibility (WCAG Standards)","Adobe Illustrator","Adobe Photoshop","Adobe XD","Agile UX / Lean UX Methodologies","Brand Identity & Product Consistency","Canva","Creative Problem Solving","Cross-Functional Team Collaboration","Data-Driven Design Decisions (A/B Testing, Metrics)","Design Documentation & Handoff","Design Systems & Component Libraries","Design Thinking & Human-Centered Design","Emerging Trends (AI, AR/VR, Voice UI, Spatial Design)","FigJam","Figma","Framer","HTML / CSS (for design feasibility understanding)","High-Fidelity Mockups & UI Design","Iconography & Microinteractions","InVision","Information Architecture (IA)","Interactive Prototyping","Journey Mapping & User Flows","Layout Systems & Grid Design","Mentorship & Design Leadership","Miro","Motion Design & Animation for UI","Notion","Origami Studio","Principle","Responsive & Adaptive Design","Sketch","Stakeholder & Client Communication","Trello / Jira (for Agile Collaboration)","Typography & Color Theory","UX Research & Analysis","Usability Testing & Heuristic Evaluation","User Persona Development","Visual Design & Art Direction","Wireframing & Low-Fidelity Prototyping","Zeplin"],
+      "selectionCriteria": ["accessibility-files","architecture-files","code-files","design-files","documentation-files","engineering-docs","leadership-docs","product-docs","qa-scripts","requirements-files","roadmap-files","strategy-files","test-files","test-reports","testing-config","ui-mockups","user-stories","ux-research"],
+      "priority": 75
+    }
+  },
+  "taskDomains": {
+    "accessibility": "Accessibility and inclusive design",
+    "architecture": "System architecture and technical leadership",
+    "backend-api": "Backend API development, databases, and business logic",
+    "cloud": "Cloud platform management and services",
+    "compliance": "Compliance frameworks and regulatory requirements",
+    "design": "UI/UX design and user interface development",
+    "devops": "DevOps practices, CI/CD, and deployment automation",
+    "engineering-excellence": "Engineering best practices and excellence",
+    "frontend-ui": "Frontend UI development with React/Next.js",
+    "infrastructure": "Infrastructure, DevOps, cloud, and platform engineering tasks",
+    "leadership": "Engineering leadership and team management",
+    "product": "Product management and requirements",
+    "quality-assurance": "Quality assurance and test automation",
+    "quality-gate": "Quality assurance checkpoints",
+    "requirements": "Requirements gathering and specification",
+    "security": "Security, compliance, and threat detection tasks",
+    "stakeholder-management": "Stakeholder communication and management",
+    "static-analysis": "Static code analysis and linting",
+    "testing": "Software testing and quality assurance",
+    "threat-detection": "Threat modeling and security monitoring",
+    "typescript-core": "Core TypeScript development and architecture",
+    "typescript-general": "General TypeScript development patterns",
+    "user-experience": "User experience design and research",
+    "validation": "Code validation and quality gates"
+  },
+  "selectionCriteria": {
+    "accessibility-files": "Accessibility guidelines and tests",
+    "architecture-files": "Architecture and design files",
+    "audit-files": "Audit and compliance related files",
+    "authentication-code": "Authentication and authorization code",
+    "cloud-config": "AWS/GCP/Azure configuration files",
+    "code-files": "General code files for analysis",
+    "config-files": "Configuration and setup files",
+    "design-files": "Design assets and mockups",
+    "docker-files": "Dockerfiles and docker-compose files",
+    "documentation-files": "Documentation and knowledge base files",
+    "encryption-code": "Encryption, hashing, and cryptographic code",
+    "engineering-docs": "Engineering standards and practices",
+    "infrastructure-files": "Files in infrastructure/, *.tf, docker files",
+    "kubernetes-manifests": "Kubernetes YAML manifests",
+    "leadership-docs": "Leadership and team documentation",
+    "policy-files": "Policy as Code files (OPA, Sentinel)",
+    "product-docs": "Product documentation and guides",
+    "qa-scripts": "Quality assurance scripts",
+    "react-imports": "Files importing React or React components",
+    "requirements-files": "Requirements and specification files",
+    "roadmap-files": "Product roadmap and planning files",
+    "security-files": "Security policies, audit logs, encryption code",
+    "strategy-files": "Strategic planning and roadmap files",
+    "terraform-files": "Terraform configuration files (*.tf)",
+    "test-files": "Test files and test suites",
+    "test-reports": "Test execution reports",
+    "testing-config": "Testing configuration and setup",
+    "type-definitions": "Type definition files (*.d.ts)",
+    "typescript-files": "TypeScript source files (*.ts)",
+    "ui-mockups": "UI mockups and wireframes",
+    "user-stories": "User stories and acceptance criteria",
+    "ux-research": "User research and usability files"
+  }
+}

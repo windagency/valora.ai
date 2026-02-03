@@ -1,0 +1,493 @@
+{
+	"$schema": "http://json-schema.org/draft-07/schema#",
+	"type": "object",
+	"version": "1.0.0",
+	"title": "AI Prompt Schema",
+	"description": "Schema for reusable AI prompt definitions",
+	"required": [
+		"id",
+		"version",
+		"category",
+		"status"
+	],
+	"properties": {
+		"id": {
+			"type": "string",
+			"description": "Unique prompt identifier (category.name format)",
+			"pattern": "^[a-z0-9]+\\.[a-z0-9-]+$",
+			"examples": [
+				"plan.analyze-task",
+				"code.implement-feature",
+				"review.security-check"
+			]
+		},
+		"version": {
+			"type": "string",
+			"description": "Semantic version (https://semver.org/spec/v2.0.0.html)",
+			"pattern": "^\\d+\\.\\d+\\.\\d+(-(alpha|beta|rc)\\.\\d+)?$",
+			"examples": [
+				"1.0.0",
+				"1.0.0-beta.1",
+				"1.0.0-rc.1",
+				"1.0.0"
+			]
+		},
+		"category": {
+			"type": "string",
+			"description": "Prompt category (phase in workflow)",
+			"enum": [
+				"generator",
+				"onboard",
+				"context",
+				"plan",
+				"code",
+				"review",
+				"test",
+				"documentation",
+				"deployment",
+				"refactor",
+				"maintenance"
+			]
+		},
+		"experimental": {
+			"type": "boolean",
+			"description": "Whether the agent is experimental",
+			"default": true
+		},
+		"deprecated": {
+			"type": "boolean",
+			"description": "Whether the agent is deprecated",
+			"default": false
+		},
+		"name": {
+			"type": "string",
+			"description": "Human-readable prompt name",
+			"minLength": 3,
+			"maxLength": 50,
+			"examples": [
+				"Analyze Task Complexity",
+				"Generate Implementation Plan",
+				"Security Vulnerability Check"
+			]
+		},
+		"description": {
+			"type": "string",
+			"description": "Brief description of prompt purpose",
+			"minLength": 10,
+			"maxLength": 500
+		},
+		"tags": {
+			"type": "array",
+			"description": "Searchable tags",
+			"items": {
+				"type": "string",
+				"pattern": "^[a-z][a-z0-9-]*$"
+			},
+			"uniqueItems": true,
+			"minItems": 1,
+			"examples": [
+				[
+					"planning",
+					"analysis",
+					"complexity"
+				],
+				[
+					"security",
+					"owasp",
+					"vulnerability-scan"
+				]
+			]
+		},
+		"model_requirements": {
+			"type": "object",
+			"description": "Model compatibility and requirements",
+			"required": [
+				"min_context",
+				"recommended"
+			],
+			"properties": {
+				"min_context": {
+					"type": "integer",
+					"description": "Minimum context window size in tokens",
+					"minimum": 4096,
+					"examples": [
+						128000,
+						1000000
+					]
+				},
+				"recommended": {
+					"type": "array",
+					"description": "Recommended models for this prompt",
+					"items": {
+						"type": "string"
+					},
+					"uniqueItems": true,
+					"minItems": 1,
+					"examples": [
+						"claude-sonnet-4.5",
+						"claude-opus-4.1",
+						"claude-haiku-4.5",
+						"gpt-5-codex",
+						"gpt-5",
+						"gemini-2.5-flash",
+						"gemini-2.5-pro",
+						"o3-pro",
+						"grok-code",
+						"kimi-k2"
+					]
+				},
+				"forbidden": {
+					"type": "array",
+					"description": "Models not compatible with this prompt",
+					"items": {
+						"type": "string"
+					},
+					"uniqueItems": true,
+					"minItems": 1,
+					"examples": [
+						"claude-sonnet-4.5",
+						"claude-opus-4.1",
+						"claude-haiku-4.5",
+						"gpt-5-codex",
+						"gpt-5",
+						"gemini-2.5-flash",
+						"gemini-2.5-pro",
+						"o3-pro",
+						"grok-code",
+						"kimi-k2"
+					]
+				}
+			}
+		},
+		"agents": {
+			"type": "array",
+			"description": "Compatible agent roles",
+			"items": {
+				"type": "string",
+				"pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$"
+			},
+			"uniqueItems": true,
+			"minItems": 1,
+			"examples": [
+				[
+					"product-manager",
+					"lead"
+				],
+				[
+					"software-engineer-typescript-backend",
+					"software-engineer-typescript-frontend",
+					"software-engineer-typescript-frontend-react"
+				]
+			]
+		},
+		"dependencies": {
+			"type": "object",
+			"description": "Prompt dependencies",
+			"properties": {
+				"requires": {
+					"type": "array",
+					"description": "Required prerequisite prompts",
+					"items": {
+						"type": "string",
+						"pattern": "^[a-z0-9]+\\.[a-z0-9-]+$"
+					},
+					"uniqueItems": true,
+					"minItems": 1,
+					"examples": [
+						[
+							"context.gather-knowledge",
+							"plan.analyze-task"
+						]
+					]
+				},
+				"optional": {
+					"type": "array",
+					"description": "Optional enhancement prompts",
+					"items": {
+						"type": "string",
+						"pattern": "^[a-z0-9]+\\.[a-z0-9-]+$"
+					},
+					"uniqueItems": true,
+					"minItems": 1
+				},
+				"conflicts_with": {
+					"type": "array",
+					"description": "Prompts that conflict with this one",
+					"items": {
+						"type": "string",
+						"pattern": "^[a-z0-9]+\\.[a-z0-9-]+$"
+					},
+					"uniqueItems": true,
+					"minItems": 1
+				}
+			}
+		},
+		"inputs": {
+			"type": "array",
+			"description": "Input parameters for this prompt",
+			"items": {
+				"type": "object",
+				"required": [
+					"name",
+					"type",
+					"required"
+				],
+				"properties": {
+					"name": {
+						"type": "string",
+						"pattern": "^[a-z][a-z0-9_]*$",
+						"examples": [
+							"task_description",
+							"complexity_threshold",
+							"file_path"
+						]
+					},
+					"description": {
+						"type": "string",
+						"description": "Input parameter description"
+					},
+					"type": {
+						"type": "string",
+						"enum": [
+							"string",
+							"number",
+							"boolean",
+							"array",
+							"object"
+						],
+						"default": "string"
+					},
+					"required": {
+						"type": "boolean",
+						"default": true
+					},
+					"default": {
+						"description": "Default value if not provided"
+					},
+					"validation": {
+						"type": "object",
+						"description": "Validation rules",
+						"properties": {
+							"min": {
+								"type": "number"
+							},
+							"max": {
+								"type": "number"
+							},
+							"pattern": {
+								"type": "string"
+							},
+							"enum": {
+								"type": "array"
+							}
+						}
+					}
+				}
+			},
+			"uniqueItems": true,
+			"minItems": 1,
+			"examples": [
+				[
+					{
+						"name": "task_description",
+						"description": "Description of the task to analyze",
+						"type": "string",
+						"required": true
+					},
+					{
+						"name": "complexity_threshold",
+						"description": "Threshold for task complexity scoring",
+						"type": "number",
+						"required": false,
+						"default": 5,
+						"validation": {
+							"min": 1,
+							"max": 10
+						}
+					}
+				]
+			]
+		},
+		"outputs": {
+			"type": "array",
+			"description": "Output variables produced by this prompt",
+			"items": {
+				"type": "string",
+				"pattern": "^[a-z][a-z0-9_]*$"
+			},
+			"uniqueItems": true,
+			"minItems": 1,
+			"examples": [
+				[
+					"analysis_summary",
+					"complexity_score",
+					"recommended_steps"
+				]
+			]
+		},
+		"tokens": {
+			"type": "object",
+			"description": "Token usage statistics",
+			"properties": {
+				"avg": {
+					"type": "integer",
+					"description": "Average token count",
+					"minimum": 0
+				},
+				"max": {
+					"type": "integer",
+					"description": "Maximum token count",
+					"minimum": 0
+				},
+				"min": {
+					"type": "integer",
+					"description": "Minimum token count",
+					"minimum": 0
+				}
+			}
+		},
+		"performance": {
+			"type": "object",
+			"description": "Performance metrics",
+			"properties": {
+				"avg_duration_ms": {
+					"type": "integer",
+					"description": "Average execution duration in milliseconds",
+					"minimum": 0
+				},
+				"success_rate": {
+					"type": "number",
+					"description": "Success rate (0.0 to 1.0)",
+					"minimum": 0,
+					"maximum": 1
+				},
+				"usage_count": {
+					"type": "integer",
+					"description": "Number of times this prompt has been executed",
+					"minimum": 0
+				},
+				"last_used": {
+					"type": "string",
+					"description": "ISO 8601 timestamp of last usage",
+					"format": "date-time"
+				}
+			}
+		},
+		"changelog": {
+			"type": "array",
+			"description": "Version history",
+			"items": {
+				"type": "object",
+				"required": [
+					"version",
+					"date",
+					"changes"
+				],
+				"properties": {
+					"version": {
+						"type": "string",
+						"pattern": "^\\d+\\.\\d+\\.\\d+$"
+					},
+					"date": {
+						"type": "string",
+						"format": "date"
+					},
+					"changes": {
+						"type": "string",
+						"description": "Summary of changes in this version"
+					},
+					"breaking": {
+						"type": "boolean",
+						"description": "Whether this is a breaking change",
+						"default": false
+					}
+				}
+			},
+			"uniqueItems": true,
+			"minItems": 1
+		}
+	},
+	"additionalProperties": false,
+	"examples": [
+		{
+			"id": "plan.analyze-task",
+			"version": "1.2.0",
+			"category": "plan",
+			"name": "Analyze Task Complexity",
+			"description": "Analyzes task description and estimates complexity score with recommendations",
+			"tags": [
+				"planning",
+				"analysis",
+				"complexity"
+			],
+			"model_requirements": {
+				"min_context": 128000,
+				"recommended": [
+					"claude-sonnet-4.5",
+					"gpt-4-turbo"
+				],
+				"forbidden": [
+					"gpt-3.5"
+				]
+			},
+			"agents": [
+				"product-manager",
+				"lead"
+			],
+			"dependencies": {
+				"optional": [
+					"context.gather-knowledge"
+				]
+			},
+			"inputs": [
+				{
+					"name": "task_description",
+					"description": "Description of the task to analyze",
+					"type": "string",
+					"required": true
+				},
+				{
+					"name": "complexity_threshold",
+					"description": "Threshold for complexity scoring",
+					"type": "number",
+					"required": false,
+					"default": 5,
+					"validation": {
+						"min": 1,
+						"max": 10
+					}
+				}
+			],
+			"outputs": [
+				"analysis_summary",
+				"complexity_score",
+				"recommended_steps"
+			],
+			"tokens": {
+				"avg": 2400,
+				"max": 5000,
+				"min": 1200
+			},
+			"performance": {
+				"avg_duration_ms": 8500,
+				"success_rate": 0.94,
+				"usage_count": 1247,
+				"last_used": "2025-11-05T12:00:00Z"
+			},
+			"changelog": [
+				{
+					"version": "1.1.0",
+					"date": "2025-11-05",
+					"changes": "Added complexity estimation with scoring",
+					"breaking": false
+				},
+				{
+					"version": "1.0.0",
+					"date": "2025-10-12",
+					"changes": "Restructured for multi-model support",
+					"breaking": true
+				}
+			]
+		}
+	]
+}

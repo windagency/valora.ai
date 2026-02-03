@@ -1,0 +1,12 @@
+# AI Orchestration Engine - Subfolder .gitignore
+# This file ignores files within the .valora directory and below
+# Patterns are relative to this .ai/ directory
+
+# === SENSITIVE CONFIGURATION ===
+config.json
+
+# === LOGS ===
+cache/
+idempotency/
+logs/
+sessions/

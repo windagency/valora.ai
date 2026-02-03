@@ -1,0 +1,55 @@
+---
+id:
+version:
+category:
+experimental:
+deprecated:
+name:
+description:
+tags:
+  - 
+model_requirements:
+  min_context:
+  recommended:
+    - 
+  forbidden:
+    - 
+agents:
+  -
+dependencies:
+  requires:
+    - 
+  optional:
+    - 
+  conflicts_with:
+    - 
+inputs:
+  - name:
+    description:
+    type:
+    required:
+    default:
+    validation:
+      min:
+      max:
+      pattern:
+      enum:
+outputs:
+  -
+tokens:
+  avg:
+  max:
+  min:
+performance:
+  avg_duration_ms:
+  success_rate:
+  usage_count:
+  last_used:
+changelog:
+  - version:
+    date:
+    changes:
+    breaking:
+---
+
+# PROMPT CONTENT HERE

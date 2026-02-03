@@ -1,0 +1,384 @@
+{
+	"$schema": "http://json-schema.org/draft-07/schema#",
+	"type": "object",
+	"version": "1.0.0",
+	"title": "AI Command Schema",
+	"description": "Schema for AI agent command definitions",
+	"required": [
+		"name",
+		"description",
+		"model",
+		"agent"
+	],
+	"properties": {
+		"name": {
+			"type": "string",
+			"description": "Command name (kebab-case)",
+			"pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$",
+			"examples": [
+				"gather-knowledge",
+				"plan",
+				"implement",
+				"review-code",
+				"test",
+				"create-pr"
+			]
+		},
+		"description": {
+			"type": "string",
+			"description": "Brief description of what the command does",
+			"minLength": 10,
+			"maxLength": 200
+		},
+		"experimental": {
+			"type": "boolean",
+			"description": "Whether the command is experimental",
+			"default": true
+		},
+		"deprecated": {
+			"type": "boolean",
+			"description": "Whether the command is deprecated",
+			"default": false
+		},
+		"argument-hint": {
+			"type": "string",
+			"description": "Usage hint for command arguments",
+			"examples": [
+				"<task-description>",
+				"<file-path> [--severity=high]",
+				"<feature-name> [--complexity-threshold=5]"
+			]
+		},
+		"allowed-tools": {
+			"type": "array",
+			"description": "Tools the agent is permitted to use",
+			"items": {
+				"type": "string",
+				"enum": [
+					"codebase_search",
+					"read_file",
+					"write",
+					"search_replace",
+					"grep",
+					"list_dir",
+					"glob_file_search",
+					"run_terminal_cmd",
+					"delete_file",
+					"web_search",
+					"mcp_tool_call"
+				]
+			},
+			"uniqueItems": true,
+			"minItems": 1
+		},
+		"model": {
+			"type": "string",
+			"description": "AI model to use for this command",
+			"enum": [
+				"claude-sonnet-4.5",
+				"claude-opus-4.1",
+				"claude-haiku-4.5",
+				"gpt-5-codex",
+				"gpt-5",
+				"gemini-2.5-flash",
+				"gemini-2.5-pro",
+				"o3-pro",
+				"grok-code",
+				"kimi-k2"
+			],
+			"default": "claude-sonnet-4.5"
+		},
+		"agent": {
+			"type": "string",
+			"description": "Agent role to use for this command",
+			"enum": [
+				"product-manager",
+				"lead",
+				"platform-engineer",
+				"software-engineer-typescript-backend",
+				"ui-ux-designer",
+				"software-engineer-typescript-frontend",
+				"software-engineer-typescript-frontend-react",
+				"secops-engineer",
+				"qa",
+				"asserter"
+			]
+		},
+		"dynamic_agent_selection": {
+			"type": "boolean",
+			"description": "Whether to enable automatic agent selection based on task analysis",
+			"default": false
+		},
+		"fallback_agent": {
+			"type": "string",
+			"description": "Agent role to use when dynamic selection fails",
+			"enum": [
+				"product-manager",
+				"lead",
+				"platform-engineer",
+				"software-engineer-typescript-backend",
+				"ui-ux-designer",
+				"software-engineer-typescript-frontend",
+				"software-engineer-typescript-frontend-react",
+				"secops-engineer",
+				"qa",
+				"asserter"
+			]
+		},
+		"agent_selection_criteria": {
+			"type": "array",
+			"description": "Criteria for dynamic agent selection",
+			"items": {
+				"type": "string",
+				"enum": [
+					"analyze_task_description",
+					"analyze_affected_files",
+					"consider_dependencies"
+				]
+			},
+			"uniqueItems": true
+		},
+		"prompts": {
+			"type": "object",
+			"description": "Prompt orchestration pipeline configuration",
+			"properties": {
+				"pipeline": {
+					"type": "array",
+					"description": "Sequential or parallel stages of prompt execution",
+					"items": {
+						"type": "object",
+						"required": [
+							"stage",
+							"prompt"
+						],
+						"properties": {
+							"stage": {
+								"type": "string",
+								"description": "Stage name (used for referencing outputs)",
+								"enum": [
+									"onboard",
+									"context",
+									"plan",
+									"breakdown",
+									"code",
+									"review",
+									"test",
+									"documentation",
+									"deployment",
+									"refactor",
+									"maintenance"
+								],
+								"default": "context"
+							},
+							"prompt": {
+								"type": "string",
+								"description": "Prompt ID (category.name format)",
+								"pattern": "^[a-z0-9]+\\.[a-z0-9-]+$",
+								"examples": [
+									"context.gather-knowledge",
+									"plan.analyze-task",
+									"plan.breakdown-steps",
+									"code.implement-feature",
+									"test.write-tests",
+									"review.review-code",
+									"review.review-functional",
+									"review.security-check",
+									"documentation.generate-documentation",
+									"deployment.deploy-application"
+								]
+							},
+							"required": {
+								"type": "boolean",
+								"description": "Whether this stage must succeed for pipeline to continue",
+								"default": true
+							},
+							"conditional": {
+								"type": "string",
+								"description": "Expression to evaluate for stage execution",
+								"examples": [
+									"complexity_score > 5",
+									"confidence < 0.8",
+									"test_count > 0"
+								]
+							},
+							"inputs": {
+								"type": "object",
+								"description": "Input variables for this stage",
+								"additionalProperties": {
+									"type": "string"
+								},
+								"examples": [
+									{
+										"task_description": "$ARG_1",
+										"complexity_threshold": "$ARG_complexity_threshold",
+										"previous_analysis": "$STAGE_context.analysis_summary"
+									}
+								]
+							},
+							"outputs": {
+								"type": "array",
+								"description": "Output variable names from this stage",
+								"items": {
+									"type": "string",
+									"pattern": "^[a-z][a-z0-9_]*$"
+								},
+								"uniqueItems": true,
+								"examples": [
+									[
+										"analysis_summary",
+										"complexity_score"
+									],
+									[
+										"implementation_steps",
+										"estimated_time"
+									],
+									[
+										"issues_found",
+										"suggestions"
+									]
+								]
+							},
+							"parallel": {
+								"type": "boolean",
+								"description": "Whether this stage can run in parallel with adjacent stages",
+								"default": false
+							},
+							"timeout_ms": {
+								"type": "integer",
+								"description": "Maximum execution time in milliseconds",
+								"minimum": 1000,
+								"maximum": 300000,
+								"default": 30000
+							}
+						},
+						"additionalProperties": false
+					},
+					"minItems": 1
+				},
+				"merge_strategy": {
+					"type": "string",
+					"description": "How to combine outputs from multiple stages",
+					"enum": [
+						"sequential",
+						"parallel",
+						"conditional",
+						"waterfall"
+					],
+					"default": "sequential"
+				},
+				"rollback_on_failure": {
+					"type": "string",
+					"description": "Stage name to rollback to on failure",
+					"pattern": "^[a-z][a-z0-9_]*$",
+					"examples": [
+						"context",
+						"plan",
+						"review"
+					]
+				},
+				"cache_strategy": {
+					"type": "string",
+					"description": "Caching strategy for pipeline results",
+					"enum": [
+						"none",
+						"stage",
+						"pipeline",
+						"adaptive"
+					],
+					"default": "none"
+				},
+				"retry_policy": {
+					"type": "object",
+					"description": "Retry configuration for failed stages",
+					"properties": {
+						"max_attempts": {
+							"type": "integer",
+							"minimum": 1,
+							"maximum": 5,
+							"default": 1
+						},
+						"backoff_ms": {
+							"type": "integer",
+							"minimum": 0,
+							"default": 0
+						},
+						"retry_on": {
+							"type": "array",
+							"items": {
+								"type": "string",
+								"enum": [
+									"timeout",
+									"error",
+									"validation_failed"
+								]
+							}
+						}
+					}
+				}
+			},
+			"additionalProperties": false
+		}
+	},
+	"additionalProperties": false,
+	"examples": [
+		{
+			"name": "plan",
+			"description": "Analyze task and create detailed implementation plan",
+			"argument-hint": "<task-description> [--complexity-threshold=5]",
+			"allowed-tools": [
+				"codebase_search",
+				"read_file",
+				"grep",
+				"list_dir"
+			],
+			"model": "claude-sonnet-4.5",
+			"agent": "lead",
+			"prompts": {
+				"pipeline": [
+					{
+						"stage": "context",
+						"prompt": "context.gather-knowledge",
+						"required": true,
+						"outputs": [
+							"codebase_structure",
+							"relevant_files"
+						]
+					},
+					{
+						"stage": "plan",
+						"prompt": "plan.analyze-task",
+						"required": true,
+						"inputs": {
+							"task_description": "$ARG_1",
+							"complexity_threshold": "$ARG_complexity_threshold"
+						},
+						"outputs": [
+							"analysis_summary",
+							"complexity_score"
+						]
+					},
+					{
+						"stage": "breakdown",
+						"prompt": "plan.breakdown-steps",
+						"required": true,
+						"conditional": "complexity_score > 5",
+						"inputs": {
+							"analysis": "$STAGE_analysis.analysis_summary"
+						},
+						"outputs": [
+							"implementation_steps"
+						]
+					}
+				],
+				"merge_strategy": "sequential",
+				"rollback_on_failure": "analysis",
+				"cache_strategy": "none",
+				"retry_policy": {
+					"max_attempts": 1,
+					"backoff_ms": 0,
+					"retry_on": []
+				}
+			}
+		}
+	]
+}

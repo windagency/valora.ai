@@ -1,0 +1,172 @@
+{
+  "commands": {
+    "assert": {
+      "name": "assert",
+      "description": "Validate implementation completeness, correctness, and compliance before testing phase through static analysis and requirements verification",
+      "experimental": true,"argument-hint": "'[<scope>] [--severity=<critical|high|all>] [--report-format=<structured|summary|detailed>] [--quick=<completeness|security|typescript|all>]'","allowed-tools": ["codebase_search","read_file","grep","list_dir","glob_file_search","run_terminal_cmd","read_lints"],
+      "model": "claude-haiku-4.5",
+      "agent": "asserter"
+    },
+    "commit": {
+      "name": "commit",
+      "description": "Analyze changes and create atomic, conventional commits with intelligent message generation, version management, changelog updates, and quality insights",
+      "experimental": true,"argument-hint": "'[--scope=<area>] [--breaking] [--message=\"<custom-message>\"] [--amend] [--no-verify] [--version-bump=<auto|major|minor|patch>] [--tag] [--update-changelog] [--interactive] [--insights] [--sign] [--auto-ticket] [--template=<name>]'","allowed-tools": ["codebase_search","read_file","grep","list_dir","glob_file_search","run_terminal_cmd","web_search"],
+      "model": "claude-sonnet-4.5",
+      "agent": "lead"
+    },
+    "create-backlog": {
+      "name": "create-backlog",
+      "description": "Decompose Product Requirements Document into prioritized, actionable task backlog",
+      "experimental": true,"argument-hint": "'[--prd-file=<path>] [--granularity=<fine|medium|coarse>] [--format=<github|jira|markdown>]'","allowed-tools": ["read_file","write","list_dir","glob_file_search","codebase_search","grep"],
+      "model": "claude-haiku-4.5",
+      "agent": "product-manager"
+    },
+    "create-pr": {
+      "name": "create-pr",
+      "description": "Generate and submit pull requests with intelligent title/description generation, automated reviewer assignment, label management, and quality validation",
+      "experimental": true,"argument-hint": "'[--title=\"<custom-title>\"] [--draft] [--base=<branch>] [--reviewers=<user1,user2>] [--labels=<label1,label2>] [--auto-assign] [--template=<name>] [--link-issues] [--require-checks] [--auto-merge] [--squash] [--no-push]'","allowed-tools": ["codebase_search","read_file","grep","list_dir","glob_file_search","run_terminal_cmd","mcp_github_create_pull_request","mcp_github_list_commits","mcp_github_get_commit","mcp_github_search_issues","mcp_github_get_me","mcp_github_get_file_contents","mcp_github_list_branches"],
+      "model": "claude-sonnet-4.5",
+      "agent": "lead"
+    },
+    "create-prd": {
+      "name": "create-prd",
+      "description": "Generate a comprehensive Product Requirements Document from refined specifications",
+      "experimental": true,"argument-hint": "'[--specs-file=<path>] [--template=<standard|technical|business>]'","allowed-tools": ["read_file","write","list_dir","glob_file_search","codebase_search","grep"],
+      "model": "gpt-5-thinking-high",
+      "agent": "product-manager"
+    },
+    "feedback": {
+      "name": "feedback",
+      "description": "Capture outcomes and user feedback to refine agents and prompts through continuous learning and workflow optimization",
+      "experimental": true,"argument-hint": "'[--command=<command-name>] [--pr=<pr-number>] [--satisfaction=<1-10>] [--interactive] [--metrics] [--suggest-improvements] [--export=<format>] [--no-stash]'","allowed-tools": ["codebase_search","read_file","grep","list_dir","glob_file_search","run_terminal_cmd","query_session","mcp_github_get_me","mcp_github_pull_request_read","mcp_github_list_commits","mcp_github_get_commit"],
+      "model": "claude-sonnet-4.5",
+      "agent": "product-manager"
+    },
+    "fetch-task": {
+      "name": "fetch-task",
+      "description": "Retrieve and contextualize a task from the project backlog - either specified or auto-selected next priority",
+      "experimental": true,"argument-hint": "'[--task-id=<id>] [--keywords=<fuzzy-search>] [--priority=<p0|p1|p2>] [--domain=<frontend|backend|infra|data|test|doc>]'","allowed-tools": ["read_file","list_dir","glob_file_search","codebase_search","grep","run_terminal_cmd"],
+      "model": "claude-haiku-4.5",
+      "agent": "product-manager"
+    },
+    "gather-knowledge": {
+      "name": "gather-knowledge",
+      "description": "Analyze codebase, dependencies, patterns, and constraints to build comprehensive technical context for planning or implementation",
+      "experimental": true,"argument-hint": "'[--scope=<project|task>] [--domain=<backend|frontend|infrastructure|data|all>] [--depth=<shallow|deep>]'","allowed-tools": ["codebase_search","read_file","grep","list_dir","glob_file_search","run_terminal_cmd","web_search","write"],
+      "model": "gpt-5-thinking-high",
+      "agent": "lead"
+    },
+    "generate-all-documentation": {
+      "name": "generate-all-documentation",
+      "description": "Orchestrate parallel documentation generation across all domains, saving 5-7 minutes per workflow through aggressive parallelisation",
+      "experimental": true,"argument-hint": "'[--output-dir=<path>] [--skip-review] [--security-context=<path>] [--cache-context]'","allowed-tools": ["read_file","write","list_dir","glob_file_search","codebase_search","grep","run_terminal_cmd"],
+      "model": "claude-sonnet-4.5",
+      "agent": "lead"
+    },
+    "generate-docs": {
+      "name": "generate-docs",
+      "description": "Generate comprehensive technical documentation across infrastructure, backend, and frontend domains using a 7-stage pipeline",
+      "experimental": true,"argument-hint": "'[--domain=<infrastructure|backend|frontend|all>] [--doc-type=<specific>] [--output-dir=<path>] [--quick] [--extract-only]'","allowed-tools": ["read_file","write","list_dir","glob_file_search","codebase_search","grep"],
+      "model": "claude-haiku-4.5",
+      "agent": "lead"
+    },
+    "implement": {
+      "name": "implement",
+      "description": "Execute code changes following approved implementation plan, including code, tests, and documentation",
+      "experimental": true,"argument-hint": "'<implementation-plan> [--agent=<engineer-type>] [--mode=<standard|step-by-step>] [--step=<step-number>]'","allowed-tools": ["codebase_search","read_file","write","search_replace","grep","list_dir","glob_file_search","run_terminal_cmd","delete_file"],"dynamic_agent_selection": true,"fallback_agent": "software-engineer-typescript","agent_selection_criteria": ["analyze_task_description","analyze_affected_files","consider_dependencies"],
+      "model": "claude-sonnet-4.5",
+      "agent": ""
+    },
+    "plan-architecture": {
+      "name": "plan-architecture",
+      "description": "Create high-level architectural plan covering technology choices, component boundaries, and integration strategy (Phase 1 of tiered planning)",
+      "experimental": true,"argument-hint": "'[--task-id=<id>] [--backlog-file=<path>]'","allowed-tools": ["codebase_search","read_file","grep","list_dir","glob_file_search"],
+      "model": "claude-sonnet-4.5",
+      "agent": "lead"
+    },
+    "plan-implementation": {
+      "name": "plan-implementation",
+      "description": "Create detailed implementation plan with step-by-step tasks, dependencies, and rollback procedures (Phase 2 of tiered planning)",
+      "experimental": true,"argument-hint": "'[--arch-plan=<path>] [--task-id=<id>]'","allowed-tools": ["codebase_search","read_file","grep","list_dir","glob_file_search"],
+      "model": "claude-sonnet-4.5",
+      "agent": "lead"
+    },
+    "plan": {
+      "name": "plan",
+      "description": "Analyze task and create detailed implementation plan with steps, dependencies, and risk assessment",
+      "experimental": true,"argument-hint": "'[--task-id=<id>] [--complexity-threshold=5] [--mode=<standard|incremental|tiered>]'","allowed-tools": ["codebase_search","read_file","grep","list_dir","glob_file_search"],
+      "model": "claude-sonnet-4.5",
+      "agent": "lead"
+    },
+    "pre-check": {
+      "name": "pre-check",
+      "description": "Run automated code quality pre-checks (linting, type validation, security audit) before manual review to reduce review time by 50%",
+      "experimental": true,"argument-hint": "'[--fix] [--strict] [--ci] [--report-format=summary|detailed|json]'","allowed-tools": ["read_file","grep","list_dir","glob_file_search","run_terminal_cmd"],
+      "model": "claude-haiku-4.5",
+      "agent": "qa"
+    },
+    "refine-specs": {
+      "name": "refine-specs",
+      "description": "Collaboratively refine product specifications through structured questioning and clarification",
+      "experimental": true,"argument-hint": "'<initial-concept> [--concept-file=<path>] [--domain=<domain>] [--stakeholders=<list>]'","allowed-tools": ["read_file","list_dir","glob_file_search","web_search"],
+      "model": "gpt-5-thinking-high",
+      "agent": "product-manager"
+    },
+    "refine-task": {
+      "name": "refine-task",
+      "description": "Clarify task requirements, acceptance criteria, and implementation details before planning phase",
+      "experimental": true,"argument-hint": "'[--task-id=<id>] [--interactive] [--acceptance-criteria-only]'","allowed-tools": ["read_file","write","codebase_search","grep","list_dir","glob_file_search"],
+      "model": "claude-haiku-4.5",
+      "agent": "product-manager"
+    },
+    "review-code": {
+      "name": "review-code",
+      "description": "Perform comprehensive code quality review including standards, security, maintainability, and best practices validation",
+      "experimental": true,"argument-hint": "'<scope> [--severity=critical|high|medium|low] [--focus=security|performance|maintainability|all] [--checklist] [--auto-only]'","allowed-tools": ["codebase_search","read_file","grep","list_dir","glob_file_search","read_lints"],
+      "model": "claude-sonnet-4.5",
+      "agent": "lead"
+    },
+    "review-functional": {
+      "name": "review-functional",
+      "description": "Validate feature completeness, acceptance criteria, user experience, and functional requirements alignment with PRD/task specifications",
+      "experimental": true,"argument-hint": "'<scope> [--severity=critical|high|medium|low] [--check-a11y=true|false]'","allowed-tools": ["codebase_search","read_file","grep","list_dir","glob_file_search","run_terminal_cmd"],
+      "model": "claude-sonnet-4.5",
+      "agent": "lead"
+    },
+    "review-plan": {
+      "name": "review-plan",
+      "description": "Validate implementation plan quality, completeness, and feasibility before execution begins",
+      "experimental": true,"argument-hint": "'<plan-document-path> [--strict-mode] [--threshold=7.0] [--focus=<completeness|risks|feasibility|actionability|all>] [--checklist]'","allowed-tools": ["codebase_search","read_file","grep","list_dir","glob_file_search","query_session"],
+      "model": "gpt-5-thinking-high",
+      "agent": "lead"
+    },
+    "test": {
+      "name": "test",
+      "description": "Execute comprehensive test suites (unit, integration, e2e) to validate implementation correctness and quality",
+      "experimental": true,"argument-hint": "'[test-scope] [--type=unit|integration|e2e|all] [--coverage-threshold=80]'","allowed-tools": ["codebase_search","read_file","grep","list_dir","glob_file_search","run_terminal_cmd"],
+      "model": "claude-haiku-4.5",
+      "agent": "qa"
+    },
+    "validate-coverage": {
+      "name": "validate-coverage",
+      "description": "Automated test coverage validation gate with specific thresholds and quality scoring",
+      "experimental": true,"argument-hint": "'[--threshold=80] [--strict] [--new-code-only] [--report-format=summary|detailed|json]'","allowed-tools": ["read_file","grep","list_dir","glob_file_search","run_terminal_cmd"],
+      "model": "claude-haiku-4.5",
+      "agent": "qa"
+    },
+    "validate-parallel": {
+      "name": "validate-parallel",
+      "description": "Run assert and review-code commands in parallel to reduce validation time by ~50%",
+      "experimental": true,"argument-hint": "'[--quick] [--severity=<level>] [--focus=<area>]'","allowed-tools": ["codebase_search","read_file","grep","list_dir","glob_file_search","run_terminal_cmd"],
+      "model": "claude-sonnet-4.5",
+      "agent": "lead"
+    },
+    "validate-plan": {
+      "name": "validate-plan",
+      "description": "Automated pre-review validation to catch missing plan parameters early (reduces review-plan time by 60-70%)",
+      "experimental": true,"argument-hint": "'[<plan-path>] [--fix] [--strict]'","allowed-tools": ["read_file","grep","list_dir","glob_file_search"],
+      "model": "claude-haiku-4.5",
+      "agent": "lead"
+    }
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "valora": {
+      "command": "node",
+      "args": [
+        ".ai/.bin/bin/mcp.js"
+      ],
+      "description": "VALORA (Versatile Agent Logic for Orchestrated Response Architecture)"
+    }
+  }
+}

@@ -1,0 +1,405 @@
+{
+	"$schema": "http://json-schema.org/draft-07/schema#",
+	"type": "object",
+	"version": "1.0.0",
+	"title": "AI Agent Schema",
+	"description": "Schema for AI agent role definitions",
+	"required": [
+		"role",
+		"version",
+		"description",
+		"specialization",
+		"tone",
+		"expertise",
+		"responsibilities",
+		"capabilities"
+	],
+	"properties": {
+		"role": {
+			"type": "string",
+			"description": "Agent role identifier (kebab-case)",
+			"pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$",
+			"examples": [
+				"product-manager",
+				"lead",
+				"platform-engineer",
+				"software-engineer-typescript-backend",
+				"ui-ux-designer",
+				"software-engineer-typescript-frontend",
+				"software-engineer-typescript-frontend-react",
+				"secops-engineer",
+				"qa"
+			]
+		},
+		"version": {
+			"type": "string",
+			"description": "Semantic version (https://semver.org/spec/v2.0.0.html)",
+			"pattern": "^\\d+\\.\\d+\\.\\d+(-(alpha|beta|rc)\\.\\d+)?$",
+			"examples": [
+				"1.0.0",
+				"1.0.0-beta.1",
+				"1.0.0-rc.1",
+				"1.0.0"
+			]
+		},
+		"experimental": {
+			"type": "boolean",
+			"description": "Whether the agent is experimental",
+			"default": true
+		},
+		"deprecated": {
+			"type": "boolean",
+			"description": "Whether the agent is deprecated",
+			"default": false
+		},
+		"description": {
+			"type": "string",
+			"description": "Brief description of the agent",
+			"minLength": 10,
+			"maxLength": 500
+		},
+		"inherits": {
+			"type": "string",
+			"description": "Parent agent to inherit from",
+			"pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$",
+			"examples": [
+				"engineer",
+				"reviewer"
+			]
+		},
+		"specialization": {
+			"type": "string",
+			"description": "Specific specialization or focus area",
+			"maxLength": 120,
+			"examples": [
+				"Google Cloud Provider infrastructure expert",
+				"DevOps automation with Terraform and Kubernetes",
+				"Backend microservices architecture",
+				"Frontend React development with focus on performance",
+				"UI/UX design with focus on accessibility",
+				"Security-focused code review with focus on OWASP and SOC 2"
+			]
+		},
+		"tone": {
+			"type": "string",
+			"description": "Communication style and tone",
+			"enum": [
+				"assertive",
+				"collaborative",
+				"concise-technical",
+				"conversational",
+				"detailed-explanatory",
+				"pedagogical"
+			],
+			"default": "concise-technical"
+		},
+		"expertise": {
+			"type": "array",
+			"description": "Areas of expertise",
+			"items": {
+				"type": "string"
+			},
+			"uniqueItems": true,
+			"examples": [
+				[
+					"Google Cloud",
+					"Infratructure as Code",
+					"Containerization",
+					"Kubernetes",
+					"Continuous Integration/Continuous Deployment",
+					"Observability"
+				],
+				[
+					"Node.js",
+					"PostgreSQL",
+					"API design",
+					"Clean architecture"
+				],
+				[
+					"React",
+					"TypeScript",
+					"Feature-based architecture",
+					"Performance optimization"
+				],
+				[
+					"UI/UX design",
+					"Atomic design",
+					"Accessibility",
+					"WCAG 2.0",
+					"ADA compliance"
+				],
+				[
+					"OWASP Top 10",
+					"SOC 2",
+					"Penetration testing",
+					"Security audits"
+				]
+			]
+		},
+		"responsibilities": {
+			"type": "array",
+			"description": "Key responsibilities of this agent",
+			"items": {
+				"type": "string"
+			},
+			"minItems": 1,
+			"examples": [
+				[
+					"Product requirements gathering",
+					"Functional requirements gathering",
+					"User story creation",
+					"User story prioritization",
+					"User story acceptance criteria creation"
+				],
+				[
+					"Technical decision-making",
+					"Architecture decisions",
+					"Conventions enforcement",
+					"Project onboarding",
+					"Project offboarding",
+					"Code review",
+					"Code quality assurance",
+					"Technical debt management"
+				],
+				[
+					"Code implementation",
+					"Smoke testing",
+					"Unit testing",
+					"GraphQL schema testing",
+					"Documentation"
+				],
+				[
+					"Integration testing",
+					"End-to-end testing",
+					"Acceptance testing",
+					"Regression testing"
+				]
+			]
+		},
+		"capabilities": {
+			"type": "object",
+			"description": "Technical capabilities and limitations",
+			"properties": {
+				"can_write_knowledge": {
+					"type": "boolean",
+					"default": true
+				},
+				"can_write_code": {
+					"type": "boolean",
+					"default": false
+				},
+				"can_review_code": {
+					"type": "boolean",
+					"default": false
+				},
+				"can_run_tests": {
+					"type": "boolean",
+					"default": false
+				}
+			}
+		},
+		"constraints": {
+			"type": "object",
+			"description": "Operating constraints and boundaries",
+			"properties": {
+				"requires_approval_for": {
+					"type": "array",
+					"description": "Actions requiring explicit approval",
+					"items": {
+						"type": "string",
+						"enum": [
+							"delete_files",
+							"database_migrations",
+							"commit",
+							"deployment",
+							"infrastructure_changes",
+							"security_changes"
+						]
+					}
+				},
+				"forbidden_paths": {
+					"type": "array",
+					"description": "File paths this agent cannot modify",
+					"items": {
+						"type": "string"
+					},
+					"examples": [
+						[
+							".git/",
+							"node_modules/",
+							".env"
+						]
+					]
+				}
+			}
+		},
+		"decision_making": {
+			"type": "object",
+			"description": "Decision-making guidelines",
+			"properties": {
+				"autonomy_level": {
+					"type": "string",
+					"description": "Level of autonomous decision-making",
+					"enum": [
+						"low",
+						"medium",
+						"high"
+					],
+					"default": "medium"
+				},
+				"escalation_criteria": {
+					"type": "array",
+					"description": "When to escalate to human or lead agent",
+					"items": {
+						"type": "string"
+					},
+					"examples": [
+						[
+							"High-level architectural changes",
+							"High-risk security changes",
+							"Breaking changes in the codebase",
+							"Adding new dependencies",
+							"Removing dependencies",
+							"Updating dependencies",
+							"Confidence < 70%"
+						]
+					]
+				}
+			}
+		},
+		"context_requirements": {
+			"type": "object",
+			"description": "Context needed for effective operation",
+			"properties": {
+				"requires_knowledge_gathering": {
+					"type": "boolean",
+					"default": true
+				},
+				"requires_codebase_analysis": {
+					"type": "boolean",
+					"default": true
+				},
+				"requires_project_history": {
+					"type": "boolean",
+					"default": false
+				},
+				"requires_dependencies_list": {
+					"type": "boolean",
+					"default": false
+				},
+				"requires_test_results": {
+					"type": "boolean",
+					"default": false
+				}
+			}
+		},
+		"output_format": {
+			"type": "object",
+			"description": "Expected output structure",
+			"properties": {
+				"format": {
+					"type": "string",
+					"enum": [
+						"markdown",
+						"structured",
+						"code-only"
+					],
+					"default": "markdown"
+				},
+				"include_reasoning": {
+					"type": "boolean",
+					"description": "Whether to include decision reasoning",
+					"default": true
+				},
+				"include_alternatives": {
+					"type": "boolean",
+					"description": "Whether to include alternative approaches",
+					"default": false
+				}
+			}
+		}
+	},
+	"additionalProperties": false,
+	"examples": [
+		{
+			"role": "engineer-frontend",
+			"version": "1.0.0",
+			"experimental": true,
+			"description": "Frontend engineer React",
+			"inherits": "engineer-frontend",
+			"specialization": "React and TypeScript frontend development with focus on accessibility and performance",
+			"tone": "concise-technical",
+			"expertise": [
+				"React",
+				"TypeScript",
+				"Feature-based architecture",
+				"Atomic design",
+				"State management",
+				"Performance optimization",
+				"WCAG 2.0"
+			],
+			"responsibilities": [
+				"Implement UI components using atomic design",
+				"Ensure WCAG 2.0 compliance",
+				"Implement data fetching using React Query and Tanstack Query",
+				"Implement state management using Zustand",
+				"Implement error handling using React Error Boundaries",
+				"Implement routing using React Router",
+				"Implement form handling using React Hook Form",
+				"Implement validation using React Hook Form and Zod",
+				"Optimize frontend performance",
+				"Write unit and integration tests with mocked data",
+				"Write documentation"
+			],
+			"capabilities": {
+				"can_write_knowledge": true,
+				"can_write_code": true,
+				"can_review_code": true,
+				"can_run_tests": true
+			},
+			"constraints": {
+				"requires_approval_for": [
+					"delete_files",
+					"database_migrations",
+					"commit",
+					"deployment",
+					"infrastructure_changes",
+					"security_changes"
+				],
+				"forbidden_paths": [
+					".ai/",
+					".devcontainer/",
+					".git/",
+					".github/",
+					"infrastructure/",
+					"node_modules/",
+					".env"
+				]
+			},
+			"decision_making": {
+				"autonomy_level": "medium",
+				"escalation_criteria": [
+					"High-level architectural changes",
+					"High-risk security changes",
+					"Breaking changes in the codebase",
+					"Adding new dependencies",
+					"Removing dependencies",
+					"Updating dependencies",
+					"Confidence < 70%"
+				]
+			},
+			"context_requirements": {
+				"requires_knowledge_gathering": true,
+				"requires_codebase_analysis": true,
+				"requires_project_history": false,
+				"requires_dependencies_list": false,
+				"requires_test_results": false
+			},
+			"output_format": {
+				"format": "code-only",
+				"include_reasoning": true,
+				"include_alternatives": false
+			}
+		}
+	]
+}

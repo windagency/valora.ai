@@ -1,0 +1,60 @@
+{
+  "name": "Secure development workspace",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:24",
+  "features": {
+    "ghcr.io/devcontainers/features/git:1": {},
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "username": "node"
+    }
+  },
+  "onCreateCommand": {
+    "git-config": "git config --global --add safe.directory ${containerWorkspaceFolder}"
+  },
+  "postCreateCommand": {
+    "install-tools": "bash ${containerWorkspaceFolder}/.devcontainer/install-dev-tools.sh"
+  },
+  // postAttachCommand runs every time you attach - keep it minimal!
+  "postAttachCommand": {
+    "welcome": "echo '✅ Secure Development Workspace Ready!'",
+    "docker-socket": "[ -S /var/run/docker.sock ] && sudo chmod 666 /var/run/docker.sock || true"
+  },
+  "remoteEnv": {
+    // Enable BuildKit for faster builds
+    "DOCKER_BUILDKIT": "1",
+    "COMPOSE_DOCKER_CLI_BUILD": "1",
+    // Configure pnpm global bin directory (shell-agnostic)
+    "PNPM_HOME": "/home/node/.local/share/pnpm",
+    // Configure npm to use user-local prefix instead of system directory
+    "NPM_CONFIG_PREFIX": "/home/node/.npm-global",
+    "PATH": "/home/node/.npm-global/bin:/home/node/.local/share/pnpm:${containerEnv:PATH}"
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "VisualStudioExptTeam.vscodeintellicode",
+        "christian-kohler.path-intellisense",
+        "eamodio.gitlens",
+        "yzhang.markdown-all-in-one",
+        "bierner.markdown-mermaid",
+        "bpruitt-goddard.mermaid-markdown-syntax-highlighting",
+        "ms-vscode-remote.vscode-remote-extensionpack",
+        "ms-azuretools.vscode-docker",
+        "wayou.vscode-todo-highlight",
+        "gruntfuggly.todo-tree",
+        "editorconfig.editorconfig",
+        "usernamehw.errorlens",
+        "aykutsarac.jsoncrack-vscode",
+        "eriklynd.json-tools"
+      ]
+    }
+  },
+  // Mount docker socket for docker-in-docker scenarios
+  "mounts": [
+    "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"
+  ],
+  "remoteUser": "node",
+  // Enable persistent command history
+  "containerEnv": {
+    "HISTFILE": "/workspace/.devcontainer/.bash_history"
+  }
+}
