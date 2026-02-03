@@ -34,10 +34,10 @@ export async function checkAndRunFirstTimeSetup(): Promise<void> {
 
 	console.log(createWelcomeBanner());
 
-	// Run quick setup
+	// Run full setup
 	const wizard = new SetupWizard(configLoader);
 	try {
-		await wizard.quickSetup();
+		await wizard.run();
 
 		// Show next steps
 
