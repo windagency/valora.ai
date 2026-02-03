@@ -427,6 +427,36 @@ valora review-functional --check-a11y=true
 
 ---
 
+## 🚧 Future Improvements
+
+There are still many improvements to be made. Contributions and suggestions are welcome!
+
+### Token & Context Management
+- Reducing prompt sizes for efficiency
+- Memory management optimisation
+- Distributing context window occupancy across agents
+
+### Metrics & Observability
+- Token usage tracking per agent/command
+- Execution time metrics
+- Cost analysis dashboards
+
+### UI & CLI Experience
+- Buffer management improvements
+- Animations and visual feedback
+- Making the CLI fully autonomous
+- Enhanced progress indicators
+
+### Agent & Command System
+- Ability to add custom agents dynamically
+- Override existing agent behaviours
+- Plugin system for third-party commands
+- Hot-reload for agent definitions
+
+> Have ideas or suggestions? Contributions are welcome!
+
+---
+
 ## 🛠️ Technology Stack
 
 | Category            | Technologies                                         |
