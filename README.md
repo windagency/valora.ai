@@ -273,21 +273,21 @@ export OPENAI_API_KEY=sk-...
 <td align="center" width="33%">
 <h3>👤 User Guide</h3>
 <p>Getting started, workflows,<br>and daily usage</p>
-<a href="./documentation/user-guide/README.md">
+<a href="./.ai/documentation/user-guide/README.md">
 <img src="https://img.shields.io/badge/Read-User%20Guide-6366f1?style=for-the-badge" alt="User Guide" />
 </a>
 </td>
 <td align="center" width="33%">
 <h3>💻 Developer Guide</h3>
 <p>Architecture, codebase,<br>and contributions</p>
-<a href="./documentation/developer-guide/README.md">
+<a href="./.ai/documentation/developer-guide/README.md">
 <img src="https://img.shields.io/badge/Read-Developer%20Guide-10b981?style=for-the-badge" alt="Developer Guide" />
 </a>
 </td>
 <td align="center" width="33%">
 <h3>🏛️ Architecture</h3>
 <p>System design<br>and decisions</p>
-<a href="./documentation/architecture/README.md">
+<a href="./.ai/documentation/architecture/README.md">
 <img src="https://img.shields.io/badge/Read-Architecture-f59e0b?style=for-the-badge" alt="Architecture" />
 </a>
 </td>
@@ -479,7 +479,7 @@ MIT © Damien TIVELET
 ---
 
 <p align="center">
-  <a href="./documentation/user-guide/quick-start.md">Get Started</a> •
-  <a href="./documentation/developer-guide/contributing.md">Contribute</a> •
-  <a href="./documentation/architecture/README.md">Learn More</a>
+  <a href="./.ai/documentation/user-guide/quick-start.md">Get Started</a> •
+  <a href="./.ai/documentation/developer-guide/contributing.md">Contribute</a> •
+  <a href="./.ai/documentation/architecture/README.md">Learn More</a>
 </p>
