@@ -10,6 +10,8 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { CommandExecutor } from 'cli/command-executor';
 import { DocumentApprovalWorkflow } from 'cli/document-approval';
 import { DocumentOutputProcessor } from 'cli/document-output-processor';
+import { ExternalMCPIntegrator } from 'cli/external-mcp-integrator';
+import { MCPApprovalWorkflow } from 'cli/mcp-approval-workflow';
 import { CLIProviderResolver } from 'cli/provider-resolver';
 import { CLISessionManager } from 'cli/session-manager';
 import { getConfigLoader } from 'config/loader';
@@ -24,6 +26,7 @@ import 'llm/providers';
 import type { ToolCallArgs } from 'types/mcp.types';
 
 import { getProviderRegistry } from 'llm/registry';
+import { ExternalMCPToolProxy } from 'mcp/external-client/tool-proxy';
 import { MCPRequestHandler } from 'mcp/request-handler';
 import { MCPSamplingServiceImpl } from 'mcp/sampling-service';
 import { MCPToolRegistry } from 'mcp/tool-registry';
@@ -41,6 +44,9 @@ import {
 	DocumentTemplateService,
 	DocumentWriterService,
 	DynamicAgentResolverService,
+	MCPApprovalCacheService,
+	MCPAuditLoggerService,
+	MCPClientManagerService,
 	TaskClassifierService
 } from 'services/index';
 import { SessionLifecycle } from 'session/lifecycle';
@@ -77,7 +83,13 @@ export const SERVICE_IDENTIFIERS = {
 	// Infrastructure
 	LOGGER: Symbol('Logger'),
 
+	MCP_APPROVAL_CACHE: Symbol('MCPApprovalCacheService'),
+	MCP_APPROVAL_WORKFLOW: Symbol('MCPApprovalWorkflow'),
+	MCP_AUDIT_LOGGER: Symbol('MCPAuditLoggerService'),
+	MCP_CLIENT_MANAGER: Symbol('MCPClientManagerService'),
+	MCP_EXTERNAL_INTEGRATOR: Symbol('ExternalMCPIntegrator'),
 	MCP_SERVER: Symbol('MCPServer'),
+	MCP_TOOL_PROXY: Symbol('ExternalMCPToolProxy'),
 	PIPELINE_EXECUTOR: Symbol('PipelineExecutor'),
 	PROGRESS: Symbol('Progress'),
 	PROMPT_LOADER: Symbol('PromptLoader'),
@@ -349,6 +361,33 @@ function setupDefaultServices(container: DIContainer): void {
 
 	// MCP services - these will be registered when MCP server is created
 	// They depend on the MCP server instance itself
+
+	// External MCP Client Services
+	container.registerFactory(SERVICE_IDENTIFIERS.MCP_APPROVAL_CACHE, () => new MCPApprovalCacheService());
+
+	container.registerFactory(SERVICE_IDENTIFIERS.MCP_AUDIT_LOGGER, () => new MCPAuditLoggerService());
+
+	container.registerFactory(SERVICE_IDENTIFIERS.MCP_APPROVAL_WORKFLOW, () => new MCPApprovalWorkflow());
+
+	container.registerFactory(SERVICE_IDENTIFIERS.MCP_CLIENT_MANAGER, () => {
+		const approvalCache = container.resolve(SERVICE_IDENTIFIERS.MCP_APPROVAL_CACHE) as MCPApprovalCacheService;
+		const auditLogger = container.resolve(SERVICE_IDENTIFIERS.MCP_AUDIT_LOGGER) as MCPAuditLoggerService;
+		return new MCPClientManagerService(approvalCache, auditLogger);
+	});
+
+	container.registerFactory(SERVICE_IDENTIFIERS.MCP_TOOL_PROXY, () => {
+		const clientManager = container.resolve(SERVICE_IDENTIFIERS.MCP_CLIENT_MANAGER) as MCPClientManagerService;
+		const auditLogger = container.resolve(SERVICE_IDENTIFIERS.MCP_AUDIT_LOGGER) as MCPAuditLoggerService;
+		return new ExternalMCPToolProxy(clientManager, auditLogger);
+	});
+
+	container.registerFactory(SERVICE_IDENTIFIERS.MCP_EXTERNAL_INTEGRATOR, () => {
+		const clientManager = container.resolve(SERVICE_IDENTIFIERS.MCP_CLIENT_MANAGER) as MCPClientManagerService;
+		const approvalCache = container.resolve(SERVICE_IDENTIFIERS.MCP_APPROVAL_CACHE) as MCPApprovalCacheService;
+		const auditLogger = container.resolve(SERVICE_IDENTIFIERS.MCP_AUDIT_LOGGER) as MCPAuditLoggerService;
+		const approvalWorkflow = container.resolve(SERVICE_IDENTIFIERS.MCP_APPROVAL_WORKFLOW) as MCPApprovalWorkflow;
+		return new ExternalMCPIntegrator(clientManager, approvalCache, auditLogger, approvalWorkflow);
+	});
 }
 
 /**

@@ -10,13 +10,8 @@ allowed-tools:
   - list_dir
   - glob_file_search
   - run_terminal_cmd
-  - mcp_github_create_pull_request
-  - mcp_github_list_commits
-  - mcp_github_get_commit
-  - mcp_github_search_issues
-  - mcp_github_get_me
-  - mcp_github_get_file_contents
-  - mcp_github_list_branches
+  # MCP: GitHub for PR creation, commits, issues, branches
+  - mcp_github
 model: claude-sonnet-4.5
 agent: lead
 prompts:

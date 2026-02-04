@@ -43,7 +43,7 @@ Execute the project's type checker in strict mode:
 
 **TypeScript**:
 ```bash
-npx tsc --noEmit --strict
+pnpm exec tsc --noEmit --strict
 ```
 
 **Python** (if applicable):
@@ -92,7 +92,7 @@ Estimate type coverage percentage:
 grep -r ":\s*any" src/ --include="*.ts" --include="*.tsx" | wc -l
 
 # Or use type-coverage tool
-npx type-coverage --at-least 95
+pnpm exec type-coverage --at-least 95
 ```
 
 ## Output Format
@@ -121,7 +121,7 @@ npx type-coverage --at-least 95
       }
     ],
     "commands_run": [
-      "npx tsc --noEmit --strict"
+      "pnpm exec tsc --noEmit --strict"
     ]
   },
   "contract_violations": {

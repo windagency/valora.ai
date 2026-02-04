@@ -12,6 +12,12 @@ allowed-tools:
   - run_terminal_cmd
   - web_search
   - write
+  # MCP: Semantic search and context management
+  - mcp_context7
+  # MCP: Comprehensive information gathering
+  - mcp_deep_research
+  # MCP: GitHub repository context
+  - mcp_github
 model: gpt-5-thinking-high
 agent: lead
 prompts:

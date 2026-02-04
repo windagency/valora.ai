@@ -371,20 +371,18 @@ export class ExecutionCoordinator {
 			previousAgent
 		};
 
-		// Determine if we should use dynamic agent selection
-		const useDynamicSelection =
-			resolvedCommand.command.dynamic_agent_selection &&
-			this.dynamicAgentResolver &&
-			this.shouldUseDynamicSelection(commandName, featureFlags);
+		// Resolve agent and configure session
+		const effectiveAgent = await this.resolveEffectiveAgent(
+			commandName,
+			resolvedCommand,
+			options,
+			sessionManager,
+			selectionContext,
+			featureFlags
+		);
 
-		// Resolve agent (dynamic or static)
-		const effectiveAgent = useDynamicSelection
-			? await this.handleDynamicAgentResolution(commandName, resolvedCommand, options, sessionManager, selectionContext)
-			: this.handleStaticAgentAssignment(commandName, resolvedCommand, options, sessionManager, selectionContext);
-
-		// Store feature flags in session context
-		const configLoader = getConfigLoader();
-		sessionManager.updateContext('featureFlags', configLoader.get().features);
+		// Note: External MCP connections are now handled lazily via allowed_tools.
+		// When an mcp_* tool is called, the MCPToolHandler connects on demand.
 
 		// Create execution context and execute
 		const executionContext = this.createExecutionContext(
@@ -422,6 +420,33 @@ export class ExecutionCoordinator {
 			sessionManager,
 			startTime
 		};
+	}
+
+	/**
+	 * Resolve the effective agent for command execution
+	 */
+	private async resolveEffectiveAgent(
+		commandName: string,
+		resolvedCommand: ResolvedCommand,
+		options: CommandExecutionOptions,
+		sessionManager: SessionContextManager,
+		selectionContext: AgentSelectionContext,
+		featureFlags: AgentSelectionFeatureFlags
+	): Promise<AgentRole> {
+		const useDynamicSelection =
+			resolvedCommand.command.dynamic_agent_selection &&
+			this.dynamicAgentResolver &&
+			this.shouldUseDynamicSelection(commandName, featureFlags);
+
+		const effectiveAgent = useDynamicSelection
+			? await this.handleDynamicAgentResolution(commandName, resolvedCommand, options, sessionManager, selectionContext)
+			: this.handleStaticAgentAssignment(commandName, resolvedCommand, options, sessionManager, selectionContext);
+
+		// Store feature flags in session context
+		const configLoader = getConfigLoader();
+		sessionManager.updateContext('featureFlags', configLoader.get().features);
+
+		return effectiveAgent;
 	}
 
 	/**

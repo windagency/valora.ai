@@ -3,15 +3,21 @@
  */
 
 import type { LogLevel, OutputFormat } from './common.types';
+import type { ExternalMCPServerConfig } from './mcp-client.types';
 import type { ProviderName } from './provider-names.types';
 
 export interface Config {
 	defaults: DefaultsConfig;
+	/** External MCP server configurations (overrides from registry) */
+	external_mcp_servers?: ExternalMCPServersConfig;
 	features?: FeatureFlags;
 	paths?: PathsConfig;
 	providers: ProvidersConfig;
 }
 
+/**
+ * Configuration for external MCP servers
+ */
 export interface ConfigValidationError {
 	field: string;
 	message: string;
@@ -28,6 +34,15 @@ export interface DefaultsConfig {
 	log_level?: LogLevel;
 	output_format?: OutputFormat;
 	session_mode?: boolean;
+}
+
+export interface ExternalMCPServersConfig {
+	/** Whether external MCP integration is enabled */
+	enabled?: boolean;
+	/** Path to external MCP registry file (default: .ai/external-mcp.json) */
+	registry_path?: string;
+	/** Server-specific overrides */
+	servers?: Array<Partial<ExternalMCPServerConfig>>;
 }
 
 export interface FeatureFlags {

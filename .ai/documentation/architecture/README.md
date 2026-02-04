@@ -111,6 +111,7 @@ See [Component Architecture](./components.md) for detailed component diagrams.
 | LLM - OpenAI    | openai                    | GPT integration         |
 | LLM - Google    | @google/generative-ai     | Gemini integration      |
 | MCP             | @modelcontextprotocol/sdk | Protocol implementation |
+| External MCP    | MCP Client SDK            | External server connections |
 
 ### Development Tools
 
@@ -122,6 +123,72 @@ See [Component Architecture](./components.md) for detailed component diagrams.
 | Playwright | E2E testing     |
 | Husky      | Git hooks       |
 
+## External MCP Client Integration
+
+VALORA can connect to **15 external MCP servers** as a client, enabling extended capabilities with user approval workflows.
+
+| Category          | Servers                                          |
+| ----------------- | ------------------------------------------------ |
+| **Browser/Testing** | Playwright, Chrome DevTools, BrowserStack      |
+| **Design**        | Figma, Storybook                                 |
+| **Development**   | GitHub, Serena, Context7                         |
+| **Infrastructure**| Terraform, Firebase, Google Cloud                |
+| **Data**          | MongoDB, Elastic                                 |
+| **Observability** | Grafana, DeepResearch                            |
+
+### External MCP Architecture
+
+```mermaid
+flowchart LR
+    subgraph VALORA["VALORA Engine"]
+        Command["Command Executor"]
+        Integrator["MCP Integrator"]
+        Approval["Approval Workflow"]
+        ClientMgr["Client Manager"]
+        AuditLog["Audit Logger"]
+    end
+
+    subgraph External["External MCP Servers (15)"]
+        Browser["Browser: Playwright, Chrome DevTools, BrowserStack"]
+        Dev["Dev: GitHub, Serena, Context7"]
+        Infra["Infra: Terraform, Firebase, GCP"]
+        Data["Data: MongoDB, Elastic"]
+    end
+
+    User["User"]
+
+    Command --> Integrator
+    Integrator --> Approval
+    Approval --> User
+    User --> Approval
+    Integrator --> ClientMgr
+    ClientMgr --> Browser
+    ClientMgr --> Dev
+    ClientMgr --> Infra
+    ClientMgr --> Data
+    ClientMgr --> AuditLog
+```
+
+### External MCP Components
+
+| Component               | Responsibility                                    |
+| ----------------------- | ------------------------------------------------- |
+| **MCP Client Manager**  | Connection lifecycle, tool discovery, caching     |
+| **Approval Workflow**   | Interactive user approval with risk assessment   |
+| **Approval Cache**      | Session/persistent approval memory               |
+| **Audit Logger**        | Security logging of all MCP operations           |
+| **Tool Proxy**          | Timeout enforcement, risk assessment, error handling |
+
+### Security Features
+
+| Feature                 | Description                                       |
+| ----------------------- | ------------------------------------------------- |
+| **Risk Assessment**     | Automatic scoring based on capabilities           |
+| **User Approval**       | Interactive approval before connections           |
+| **Tool Filtering**      | Allowlist/blocklist for sensitive operations     |
+| **Audit Logging**       | Full operation trail for compliance              |
+| **Timeout Enforcement** | Configurable execution limits                    |
+
 ## Key Architectural Decisions
 
 | Decision                 | Rationale                              |
@@ -131,6 +198,7 @@ See [Component Architecture](./components.md) for detailed component diagrams.
 | Session-based state      | Context preservation across commands   |
 | Pipeline-based execution | Composable, testable workflows         |
 | Provider abstraction     | LLM vendor independence                |
+| External MCP with approval | Security-first external tool integration |
 
 See [Architecture Decision Records](../adr/README.md) for detailed decisions.
 

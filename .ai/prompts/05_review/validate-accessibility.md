@@ -46,13 +46,13 @@ Execute accessibility scanning tools:
 
 ```bash
 # axe-core CLI (recommended)
-npx @axe-core/cli http://localhost:3000 --tags wcag2a,wcag2aa
+pnpm exec @axe-core/cli http://localhost:3000 --tags wcag2a,wcag2aa
 
 # Or eslint-plugin-jsx-a11y for React
-npx eslint src/ --ext .jsx,.tsx
+pnpm exec eslint src/ --ext .jsx,.tsx
 
 # Or Pa11y
-npx pa11y http://localhost:3000
+pnpm exec pa11y http://localhost:3000
 ```
 
 **Capture**:
@@ -184,7 +184,7 @@ Check keyboard navigation:
       }
     ],
     "commands_run": [
-      "npx @axe-core/cli http://localhost:3000 --tags wcag2a,wcag2aa"
+      "pnpm exec @axe-core/cli http://localhost:3000 --tags wcag2a,wcag2aa"
     ]
   },
   "aria_issues": {

@@ -1138,6 +1138,92 @@ export class ProcessingFeedback {
 	private isMcpMode(): boolean {
 		return process.env['AI_MCP_ENABLED'] === 'true';
 	}
+
+	/**
+	 * Show MCP availability status
+	 * Displays a summary of available and unavailable MCP servers
+	 */
+	showMCPStatus(
+		results: Array<{
+			error?: string;
+			name: string;
+			riskLevel?: string;
+			serverId: string;
+			status: 'connection_failed' | 'disabled' | 'not_configured' | 'not_installed' | 'ready';
+			toolCount?: number;
+		}>
+	): void {
+		if (!this.enabled || results.length === 0) return;
+		if (this.isMcpMode()) return;
+
+		const color = getColorAdapter();
+
+		// Group by status
+		const ready = results.filter((r) => r.status === 'ready');
+		const unavailable = results.filter((r) => r.status !== 'ready');
+
+		// Print header
+		process.stderr.write(`\n${color.bold(color.cyan('External MCP Status'))}\n`);
+
+		// Print ready servers
+		for (const result of ready) {
+			const tools = result.toolCount !== undefined ? ` (${result.toolCount} tools)` : '';
+			const risk = result.riskLevel ? color.dim(` [${result.riskLevel}]`) : '';
+			process.stderr.write(`  ${color.green('✓')} ${result.name}${tools}${risk}\n`);
+		}
+
+		// Print unavailable servers
+		for (const result of unavailable) {
+			const reason = this.getMCPStatusReason(result.status, result.error);
+			process.stderr.write(`  ${color.yellow('○')} ${result.name}: ${color.dim(reason)}\n`);
+		}
+
+		// Print summary
+		if (ready.length > 0 && unavailable.length > 0) {
+			process.stderr.write(`  ${color.dim(`${ready.length} ready, ${unavailable.length} unavailable`)}\n`);
+		}
+
+		process.stderr.write('\n');
+	}
+
+	/**
+	 * Get human-readable reason for MCP status
+	 */
+	private getMCPStatusReason(
+		status: 'connection_failed' | 'disabled' | 'not_configured' | 'not_installed' | 'ready',
+		error?: string
+	): string {
+		switch (status) {
+			case 'connection_failed':
+				return error ?? 'connection failed';
+			case 'disabled':
+				return 'disabled';
+			case 'not_configured':
+				return error ?? 'not configured';
+			case 'not_installed':
+				return 'not installed';
+			case 'ready':
+				return 'ready';
+			default:
+				return 'unknown';
+		}
+	}
+
+	/**
+	 * Show MCP tool call result
+	 */
+	showMCPToolCall(serverId: string, toolName: string, success: boolean, durationMs?: number): void {
+		if (!this.enabled) return;
+		if (this.isMcpMode()) return;
+
+		const color = getColorAdapter();
+		const icon = success ? color.green('✓') : color.red('✗');
+		const duration = durationMs !== undefined ? ` ${color.dim(`(${durationMs}ms)`)}` : '';
+		const indent = this.getIndent();
+		const isFirstChild = this.isFirstChildMessage();
+
+		this.printAboveStatusBar(`${indent}${icon} ${color.cyan('MCP')} ${serverId}.${toolName}${duration}`, isFirstChild);
+	}
 }
 
 // Singleton instance

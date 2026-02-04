@@ -48,7 +48,7 @@ Run security analysis tools:
 
 ```bash
 # Semgrep for pattern-based security scanning
-npx semgrep --config auto src/
+pnpm exec semgrep --config auto src/
 
 # Or CodeQL/Snyk if configured
 ```
@@ -74,7 +74,7 @@ Check for exposed credentials:
 
 ```bash
 # Use detect-secrets or similar
-npx detect-secrets scan --all-files
+pnpm exec detect-secrets scan --all-files
 
 # Or grep for common patterns
 grep -r "password\s*=\s*['\"]" src/ --include="*.ts" --include="*.js"
@@ -160,7 +160,7 @@ Verify common security patterns:
       }
     ],
     "commands_run": [
-      "npx semgrep --config auto src/"
+      "pnpm exec semgrep --config auto src/"
     ]
   },
   "secrets_found": {
@@ -168,7 +168,7 @@ Verify common security patterns:
     "secrets_count": 0,
     "secrets": [],
     "commands_run": [
-      "npx detect-secrets scan --all-files"
+      "pnpm exec detect-secrets scan --all-files"
     ]
   },
   "owasp_violations": {

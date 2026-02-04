@@ -142,7 +142,7 @@ Or parse from PR status checks.
 ### Step 6: Assess Test Coverage (if available)
 
 **Look for coverage tools:**
-- Jest: `npx jest --coverage --json`
+- Jest: `pnpm exec jest --coverage --json`
 - Pytest: `.coverage` file
 - Coverage.py: `coverage report`
 

@@ -446,6 +446,130 @@ const TARGETS = {
 }
 ```
 
+## External MCP Configuration
+
+VALORA can connect to external MCP servers with user approval workflows. The registry includes 15 pre-configured servers across various categories:
+
+| Category            | Servers                                   |
+| ------------------- | ----------------------------------------- |
+| **Browser/Testing** | Playwright, Chrome DevTools, BrowserStack |
+| **Design**          | Figma, Storybook                          |
+| **Development**     | GitHub, Serena, Context7                  |
+| **Infrastructure**  | Terraform, Firebase, Google Cloud         |
+| **Data**            | MongoDB, Elastic                          |
+| **Observability**   | Grafana                                   |
+| **Research**        | DeepResearch                              |
+
+### External MCP Registry
+
+The external MCP servers are defined in `.ai/external-mcp.json`:
+
+```json
+{
+  "schema_version": "1.0.0",
+  "servers": [
+    {
+      "id": "playwright",
+      "name": "Playwright MCP",
+      "description": "Browser automation for web testing and interaction",
+      "connection": {
+        "type": "stdio",
+        "command": "pnpm exec",
+        "args": ["@playwright/mcp@latest"]
+      },
+      "security": {
+        "risk_level": "medium",
+        "capabilities": ["browser_automation", "screen_capture", "network_requests"],
+        "audit_logging": true,
+        "max_execution_ms": 60000
+      },
+      "requires_approval": true,
+      "remember_approval": "session",
+      "enabled": true,
+      "tags": ["browser", "testing", "automation"]
+    }
+  ]
+}
+```
+
+### External MCP in Config
+
+Configure external MCP integration in `.ai/config.json`:
+
+```json
+{
+  "external_mcp_servers": {
+    "enabled": true,
+    "registry_path": ".ai/external-mcp.json"
+  }
+}
+```
+
+### Server Configuration Options
+
+| Option                      | Description                                            |
+| --------------------------- | ------------------------------------------------------ |
+| `id`                        | Unique server identifier                               |
+| `name`                      | Display name for approval UI                           |
+| `description`               | Server description                                     |
+| `connection.type`           | Connection type: `stdio`, `sse`, or `websocket`        |
+| `connection.command`        | Command to execute (for stdio)                         |
+| `connection.args`           | Command arguments                                      |
+| `security.risk_level`       | Risk level: `low`, `medium`, `high`, `critical`        |
+| `security.capabilities`     | Capability tags for risk assessment                    |
+| `security.audit_logging`    | Enable audit logging                                   |
+| `security.max_execution_ms` | Maximum execution time                                 |
+| `security.tool_blocklist`   | Tools to block                                         |
+| `requires_approval`         | Require user approval before connecting                |
+| `remember_approval`         | Approval memory: `always_ask`, `session`, `persistent` |
+
+### Approval Options
+
+When a command requires an external MCP, users see an approval prompt:
+
+```
+┌─────────────────────────────────────────────────────────┐
+│         External MCP Server Request                     │
+│                 Playwright MCP                          │
+└─────────────────────────────────────────────────────────┘
+
+Security Assessment:
+  Risk Level:   MEDIUM
+  Capabilities: browser_automation, screen_capture
+
+? Allow connection to Playwright MCP?
+  [A]pprove - Connect and remember for future sessions
+  [S]ession - Approve for this session only
+  [C]onfigure - Review and filter tools
+  [D]eny - Block this connection
+```
+
+### Declaring MCP Requirements in Commands
+
+Commands can declare external MCP requirements in their definition:
+
+```json
+{
+  "external_mcp": [
+    {
+      "serverId": "playwright",
+      "reason": "E2E testing requires browser automation",
+      "optional": false
+    }
+  ]
+}
+```
+
+### Audit Logging
+
+All external MCP operations are logged to `.ai/logs/mcp-audit.jsonl`:
+
+```json
+{"operation":"approval","serverId":"playwright","success":true,"timestamp":"2024-01-15T10:30:00Z"}
+{"operation":"connect","serverId":"playwright","success":true,"timestamp":"2024-01-15T10:30:01Z"}
+{"operation":"tool_call","serverId":"playwright","toolName":"navigate","success":true,"duration_ms":1500}
+```
+
 ## Advanced Customization
 
 ### Custom Templates

@@ -79,10 +79,10 @@ Execute linter based on project configuration:
 **Node.js/TypeScript**:
 ```bash
 # ESLint
-npx eslint . --ext .ts,.tsx,.js,.jsx
+pnpm exec eslint . --ext .ts,.tsx,.js,.jsx
 
 # With auto-fix (read-only check first)
-npx eslint . --ext .ts,.tsx,.js,.jsx --max-warnings 0
+pnpm exec eslint . --ext .ts,.tsx,.js,.jsx --max-warnings 0
 ```
 
 **Python**:
@@ -149,10 +149,10 @@ Execute type checker if applicable:
 **TypeScript**:
 ```bash
 # Type check only (no emit)
-npx tsc --noEmit
+pnpm exec tsc --noEmit
 
 # With specific config
-npx tsc --noEmit --project tsconfig.json
+pnpm exec tsc --noEmit --project tsconfig.json
 ```
 
 **Python**:
@@ -348,7 +348,7 @@ Attempt to build the project:
 npm run build
 
 # Or with specific command
-npx tsc && npx vite build
+pnpm exec tsc && pnpm exec vite build
 ```
 
 **Python**:
@@ -535,7 +535,7 @@ END
       "category": "linter",
       "severity": "error",
       "message": "3 linting errors in src/services/email.ts",
-      "resolution": "Run: npx eslint --fix src/services/email.ts"
+      "resolution": "Run: pnpm exec eslint --fix src/services/email.ts"
     },
     {
       "category": "coverage",

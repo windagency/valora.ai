@@ -10,6 +10,10 @@ allowed-tools:
   - list_dir
   - glob_file_search
   - read_lints
+  # MCP: GitHub for PR review context
+  - mcp_github
+  # MCP: AI-powered code analysis
+  - mcp_serena
 model: claude-sonnet-4.5
 agent: lead
 prompts:

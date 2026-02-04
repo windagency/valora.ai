@@ -72,15 +72,15 @@ Write production-quality code following the implementation plan, applying langua
 
 When executing (not dry-run), use these tools:
 
-| Tool | Purpose |
-|------|---------|
-| `read_file` | Read existing file contents before modifying |
-| `write` | Create new files or completely rewrite existing files |
-| `search_replace` | Make targeted edits to existing files (preferred for modifications) |
-| `delete_file` | Remove files that are no longer needed |
-| `run_terminal_cmd` | Run commands (npm install, etc.) |
-| `glob_file_search` | Find files by pattern |
-| `grep` | Search file contents |
+| Tool               | Purpose                                                             |
+| ------------------ | ------------------------------------------------------------------- |
+| `read_file`        | Read existing file contents before modifying                        |
+| `write`            | Create new files or completely rewrite existing files               |
+| `search_replace`   | Make targeted edits to existing files (preferred for modifications) |
+| `delete_file`      | Remove files that are no longer needed                              |
+| `run_terminal_cmd` | Run commands (npm install, etc.)                                    |
+| `glob_file_search` | Find files by pattern                                               |
+| `grep`             | Search file contents                                                |
 
 **Important**: Always read a file before modifying it with `search_replace` to understand context.
 
@@ -285,7 +285,7 @@ After writing/modifying each file, run quality checks:
 
 **Execute with `run_terminal_cmd` tool**:
 ```bash
-npx eslint <file-path> --format json
+pnpm exec eslint <file-path> --format json
 ```
 
 **Parse results**:
@@ -312,7 +312,7 @@ npx eslint <file-path> --format json
 If fixable violations exist, run auto-fix:
 
 ```bash
-npx eslint <file-path> --fix
+pnpm exec eslint <file-path> --fix
 ```
 
 **Common auto-fixable issues**:
@@ -353,7 +353,7 @@ async function sendEmail(to: string): Promise<EmailResult> {
 
 **Execute**:
 ```bash
-npx tsc --noEmit
+pnpm exec tsc --noEmit
 ```
 
 **Parse errors**:

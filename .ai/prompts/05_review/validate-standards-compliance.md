@@ -50,10 +50,10 @@ Execute the project's configured linters:
 npm run lint -- --max-warnings 0
 
 # Or directly
-npx eslint . --ext .ts,.tsx,.js,.jsx --max-warnings 0
+pnpm exec eslint . --ext .ts,.tsx,.js,.jsx --max-warnings 0
 
 # CSS/SCSS
-npx stylelint "**/*.{css,scss}"
+pnpm exec stylelint "**/*.{css,scss}"
 ```
 
 **Capture**:
@@ -68,7 +68,7 @@ Verify formatting consistency:
 
 ```bash
 # Prettier
-npx prettier --check "**/*.{ts,tsx,js,jsx,css,scss,md,json}"
+pnpm exec prettier --check "**/*.{ts,tsx,js,jsx,css,scss,md,json}"
 ```
 
 **Capture**:
@@ -132,7 +132,7 @@ Check structural conventions:
     "files_with_issues": 0,
     "issues": [],
     "commands_run": [
-      "npx prettier --check \"**/*.{ts,tsx,js,jsx}\""
+      "pnpm exec prettier --check \"**/*.{ts,tsx,js,jsx}\""
     ]
   },
   "convention_violations": {

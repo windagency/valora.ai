@@ -48,6 +48,9 @@
 		"beautify": "prettier --check \"**/*.+(js|ts|json)\"",
 		"beautify:fix": "prettier --write \"**/*.+(js|ts|json)\"",
 		"format": "pnpm beautify:fix && pnpm lint:fix",
+		"mcp:validate-types": "pnpm exec tsx scripts/generate-mcp-types.ts",
+		"mcp:fix-types": "pnpm exec tsx scripts/generate-mcp-types.ts --fix",
+		"mcp:test": "pnpm exec tsx scripts/test-mcp-integration.ts",
 		"predev": "pnpm clean:build",
 		"dev": "tsx src/cli/index.ts",
 		"dev:mcp": "tsx src/mcp/server.ts",
@@ -132,6 +135,7 @@
 		"testcontainers": "^10.7.0",
 		"ts-node": "^10.9.0",
 		"tsc-alias": "^1.8.16",
+		"tsx": "^4.21.0",
 		"typescript": "^5.3.3",
 		"vitest": "^1.0.0"
 	}

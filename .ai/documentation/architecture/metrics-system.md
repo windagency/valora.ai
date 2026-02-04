@@ -572,7 +572,7 @@ exec "$PROJECT_ROOT/.ai/.bin/node_modules/.bin/tsx" \
   "$SCRIPT_DIR/extract-metrics.ts" "$@"
 ```
 
-These avoid the need for `npx tsx` and handle path resolution.
+These avoid the need for `pnpm exec tsx` and handle path resolution.
 
 ## Performance Considerations
 

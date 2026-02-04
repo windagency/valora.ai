@@ -10,6 +10,12 @@ allowed-tools:
   - list_dir
   - glob_file_search
   - run_terminal_cmd
+  # MCP: Browser automation for functional validation
+  - mcp_playwright
+  # MCP: Design validation against Figma specs
+  - mcp_figma
+  # MCP: Component documentation verification
+  - mcp_storybook
 model: claude-sonnet-4.5
 agent: lead
 prompts:

@@ -9,6 +9,10 @@ allowed-tools:
   - grep
   - list_dir
   - glob_file_search
+  # MCP: GitHub for issue/PR context
+  - mcp_github
+  # MCP: Semantic context search
+  - mcp_context7
 model: claude-sonnet-4.5
 agent: lead
 prompts:

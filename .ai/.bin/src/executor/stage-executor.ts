@@ -28,8 +28,16 @@ import type { AgentLoader } from './agent-loader';
 import type { ExecutionContext } from './execution-context';
 import type { PromptLoader } from './prompt-loader';
 
+import { MCPApprovalCacheService } from 'services/mcp-approval-cache.service';
+import { MCPAuditLoggerService } from 'services/mcp-audit-logger.service';
+import { MCPAvailabilityService } from 'services/mcp-availability.service';
+import { MCPClientManagerService } from 'services/mcp-client-manager.service';
+
+import { MCPApprovalWorkflow } from 'cli/mcp-approval-workflow';
+
 import { type EscalationDetectionService, getEscalationDetectionService } from './escalation-detection.service';
 import { type EscalationHandlerService, getEscalationHandlerService } from './escalation-handler.service';
+import { getMCPToolHandler, type MCPToolHandler } from './mcp-tool-handler';
 import { getMessageBuilderService, type MessageBuilderService } from './message-builder.service';
 import { getOutputParsingService, type OutputParsingService } from './output-parsing.service';
 import { getPipelineEmitter, type PipelineEventEmitter } from './pipeline-events';
@@ -71,6 +79,8 @@ export class StageExecutor {
 	private escalationDetectionService: EscalationDetectionService;
 	private escalationHandlerService: EscalationHandlerService;
 	private eventEmitter: PipelineEventEmitter;
+	private mcpClientManager: MCPClientManagerService;
+	private mcpToolHandler: MCPToolHandler;
 	private messageBuilderService: MessageBuilderService;
 	private outputParsingService: OutputParsingService;
 	private stageOutputCache: StageOutputCache;
@@ -90,6 +100,24 @@ export class StageExecutor {
 		this.outputParsingService = getOutputParsingService();
 		this.messageBuilderService = getMessageBuilderService();
 		this.stageOutputCache = getStageOutputCache();
+
+		// Initialize MCP services for external tool calls
+		const approvalCache = new MCPApprovalCacheService();
+		const auditLogger = new MCPAuditLoggerService();
+		this.mcpClientManager = new MCPClientManagerService(approvalCache, auditLogger);
+		const availabilityService = new MCPAvailabilityService(this.mcpClientManager);
+		const approvalWorkflow = new MCPApprovalWorkflow();
+		this.mcpToolHandler = getMCPToolHandler(
+			this.mcpClientManager,
+			availabilityService,
+			approvalCache,
+			auditLogger,
+			approvalWorkflow
+		);
+
+		// Wire up MCP services to tool execution service
+		this.toolExecutionService.setMCPClientManager(this.mcpClientManager);
+		this.toolExecutionService.setMCPToolHandler(this.mcpToolHandler);
 	}
 
 	/**

@@ -20,6 +20,7 @@ VALORA (Versatile Agent Logic for Orchestrated Response Architecture) is a softw
 
 - **Multi-Agent Collaboration**: 11 specialised AI agents with distinct roles and expertise
 - **Three-Tier Execution**: MCP Sampling, Guided Completion, and API Fallback modes
+- **External MCP Integration**: Connect to 15 external MCP servers (Playwright, GitHub, Terraform, etc.) with user approval
 - **Session-Based State**: Persistent context across command executions
 - **Interactive Clarification**: Pipelines pause to collect user answers, ensuring decisions are documented
 - **Model Optimisation**: Cost-efficient AI model selection (GPT-5, Claude Sonnet, Claude Haiku)
@@ -41,11 +42,13 @@ C4Context
     System_Ext(llm_providers, "LLM Providers", "Anthropic, OpenAI, Google AI")
     System_Ext(github, "GitHub", "Version control and collaboration")
     System_Ext(mcp, "MCP Protocol", "Model Context Protocol for tool integration")
+    System_Ext(ext_mcp, "External MCP Servers", "Playwright, Fetch, Filesystem")
 
     Rel(developer, orchestrator, "Uses", "CLI / MCP")
     Rel(orchestrator, cursor, "Integrates with", "MCP Server")
     Rel(orchestrator, llm_providers, "Sends prompts to", "API")
     Rel(orchestrator, github, "Creates PRs", "GitHub API")
+    Rel(orchestrator, ext_mcp, "Connects to", "MCP Client")
     Rel(cursor, mcp, "Implements", "MCP Protocol")
 ```
 
@@ -53,13 +56,14 @@ C4Context
 
 The engine follows a modular, layered architecture:
 
-| Layer                   | Components                      | Responsibility                            |
-| ----------------------- | ------------------------------- | ----------------------------------------- |
-| **CLI Layer**           | Commands, Flags, Wizard         | User interaction and command parsing      |
-| **Orchestration Layer** | Pipeline, Executor, Coordinator | Workflow execution and state management   |
-| **Agent Layer**         | Registry, Loader, Selection     | AI agent management and dynamic selection |
-| **LLM Layer**           | Providers, Registry             | Multi-provider LLM integration            |
-| **Service Layer**       | Session, Config, Cleanup        | Cross-cutting concerns                    |
+| Layer                   | Components                       | Responsibility                            |
+| ----------------------- | -------------------------------- | ----------------------------------------- |
+| **CLI Layer**           | Commands, Flags, Wizard          | User interaction and command parsing      |
+| **Orchestration Layer** | Pipeline, Executor, Coordinator  | Workflow execution and state management   |
+| **Agent Layer**         | Registry, Loader, Selection      | AI agent management and dynamic selection |
+| **LLM Layer**           | Providers, Registry              | Multi-provider LLM integration            |
+| **External MCP Layer**  | Client Manager, Approval, Audit  | External MCP server integration           |
+| **Service Layer**       | Session, Config, Cleanup         | Cross-cutting concerns                    |
 
 ## Development Lifecycle
 
@@ -167,7 +171,7 @@ documentation/
 │   ├── metrics.md                 # Workflow optimisation metrics
 │   ├── metrics-quickstart.md      # 5-minute metrics setup
 │   ├── workflow-optimizations.md  # Detailed optimisation reference
-│   ├── configuration.md           # Configuration and customisation
+│   ├── configuration.md           # Configuration and customisation (incl. External MCP)
 │   ├── best-practices.md          # Recommended usage patterns
 │   └── troubleshooting.md         # Common issues and solutions
 ├── developer-guide/                # Developer-focused documentation

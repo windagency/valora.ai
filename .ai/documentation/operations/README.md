@@ -67,8 +67,8 @@ valora --version
 # Install globally
 pnpm add -g valora
 
-# Or use npx
-npx valora plan "task"
+# Or use pnpm exec
+pnpm exec valora plan "task"
 ```
 
 ### Configuration

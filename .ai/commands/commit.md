@@ -11,6 +11,8 @@ allowed-tools:
   - glob_file_search
   - run_terminal_cmd
   - web_search
+  # MCP: GitHub for issue/ticket linking
+  - mcp_github
 model: claude-sonnet-4.5
 agent: lead
 prompts:

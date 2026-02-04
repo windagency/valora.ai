@@ -2,6 +2,7 @@
  * Command type definitions
  */
 
+import type { MCPTool } from './mcp-registry.types';
 import type { ModelNameValue } from './provider-names.types';
 
 export type AgentRole =
@@ -23,13 +24,15 @@ export type AgentRole =
  */
 export type AIModel = 'gpt-5-codex' | 'gpt-5-thinking-high' | ModelNameValue;
 
-export type AllowedTool =
+/**
+ * Built-in tools available to commands
+ */
+export type BuiltInTool =
 	| 'codebase_search'
 	| 'delete_file'
 	| 'glob_file_search'
 	| 'grep'
 	| 'list_dir'
-	| 'mcp_tool_call'
 	| 'query_session'
 	| 'read_file'
 	| 'run_terminal_cmd'
@@ -37,6 +40,30 @@ export type AllowedTool =
 	| 'web_search'
 	| 'write';
 
+/**
+ * External MCP tools available to commands.
+ * Derived from external-mcp.json registry for maintainability.
+ * @see mcp-registry.types.ts
+ */
+export type { MCPTool } from './mcp-registry.types';
+export { getServerIdFromTool, isValidMCPTool } from './mcp-registry.types';
+
+/**
+ * All tools available to commands (built-in + MCP)
+ */
+export type AllowedTool = BuiltInTool | MCPTool;
+
+/**
+ * Check if a tool is an MCP tool (starts with mcp_ prefix)
+ */
+export function isMCPTool(tool: string): tool is MCPTool {
+	return tool.startsWith('mcp_');
+}
+
+/**
+ * Extract server ID from MCP tool name
+ * e.g., 'mcp_playwright' -> 'playwright'
+ */
 export type CacheStrategy = 'adaptive' | 'none' | 'pipeline' | 'stage';
 
 export interface CommandDefinition extends CommandMetadata {
@@ -131,6 +158,15 @@ export interface IsolatedExecutionOptions {
 }
 
 export type MergeStrategy = 'conditional' | 'parallel' | 'sequential' | 'waterfall';
+
+/**
+ * Extract server ID from MCP tool name
+ * e.g., 'mcp_playwright' -> 'playwright'
+ * e.g., 'mcp_chrome_devtools' -> 'chrome-devtools'
+ */
+export function extractMCPServerId(tool: MCPTool): string {
+	return tool.replace('mcp_', '').replace(/_/g, '-');
+}
 
 /**
  * Cache configuration for a pipeline stage

@@ -5,7 +5,13 @@ experimental:
 deprecated:
 argument-hint:
 allowed-tools:
-  -
+  # Built-in tools
+  - read_file
+  - run_terminal_cmd
+  # MCP tools (mcp_<server-id> format, see external-mcp.json)
+  # - mcp_playwright
+  # - mcp_github
+  # - mcp_chrome_devtools
 model:
 agent:
 dynamic_agent_selection:

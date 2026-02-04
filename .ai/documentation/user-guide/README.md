@@ -55,6 +55,37 @@ The engine supports three execution modes:
 - **Setup**: Configure API keys via `valora config setup`
 - **Use Case**: Autonomous execution
 
+## External MCP Integration
+
+VALORA can connect to external MCP servers to extend capabilities:
+
+| Server              | Risk   | Capabilities                                     |
+| ------------------- | ------ | ------------------------------------------------ |
+| **Playwright**      | Medium | Browser automation, screenshots, E2E testing    |
+| **Figma**           | Low    | Design tool integration for UI/UX workflows     |
+| **GitHub**          | Medium | Repository, issues, and PR management            |
+| **Chrome DevTools** | Medium | Browser debugging and inspection                 |
+| **Context7**        | Low    | Semantic search and context management           |
+| **Serena**          | Medium | AI-powered code analysis and refactoring         |
+| **Terraform**       | High   | Infrastructure as code management                |
+| **MongoDB**         | Medium | Document database operations and queries         |
+| **Elastic**         | Medium | Search and analytics operations                  |
+| **BrowserStack**    | Medium | Cross-browser testing automation                 |
+| **DeepResearch**    | Low    | Comprehensive information gathering              |
+| **Firebase**        | High   | Google Firebase app development services         |
+| **Google Cloud**    | High   | Cloud resource management                        |
+| **Grafana**         | Low    | Observability and monitoring dashboards          |
+| **Storybook**       | Low    | Component documentation and testing              |
+
+### Security Features
+
+- **User Approval**: Interactive prompt before connecting to external servers
+- **Risk Assessment**: Automatic risk scoring based on server capabilities
+- **Tool Filtering**: Configure allowlist/blocklist for sensitive operations
+- **Audit Logging**: Complete operation trail in `.ai/logs/mcp-audit.jsonl`
+
+See [Configuration](./configuration.md#external-mcp-configuration) for setup details.
+
 ## Prerequisites
 
 Before using the engine:

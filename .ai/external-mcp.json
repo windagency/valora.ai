@@ -1,0 +1,483 @@
+{
+	"$schema": "./schemas/external-mcp.schema.json",
+	"schema_version": "1.0.0",
+	"servers": [
+		{
+			"id": "playwright",
+			"name": "Playwright MCP",
+			"description": "Browser automation for web testing and interaction",
+			"connection": {
+				"type": "stdio",
+				"command": "npx",
+				"args": [
+					"@playwright/mcp@latest"
+				]
+			},
+			"security": {
+				"risk_level": "medium",
+				"capabilities": [
+					"browser_automation",
+					"screen_capture",
+					"network_requests"
+				],
+				"audit_logging": true,
+				"max_execution_ms": 60000
+			},
+			"requires_approval": true,
+			"remember_approval": "session",
+			"enabled": true,
+			"tags": [
+				"browser",
+				"testing",
+				"automation"
+			],
+			"version": "1.0.0"
+		},
+		{
+			"id": "figma",
+			"name": "Figma MCP",
+			"description": "Design tool integration for Figma file access and manipulation",
+			"connection": {
+				"type": "stdio",
+				"command": "npx",
+				"args": [
+					"@anthropic/mcp-figma"
+				]
+			},
+			"security": {
+				"risk_level": "low",
+				"capabilities": [
+					"network_requests"
+				],
+				"audit_logging": true,
+				"max_execution_ms": 30000
+			},
+			"requires_approval": true,
+			"remember_approval": "session",
+			"enabled": true,
+			"tags": [
+				"design",
+				"figma",
+				"ui"
+			],
+			"version": "1.0.0"
+		},
+		{
+			"id": "github",
+			"name": "GitHub MCP",
+			"description": "GitHub API integration for repository, issues, and PR management",
+			"connection": {
+				"type": "stdio",
+				"command": "npx",
+				"args": [
+					"@modelcontextprotocol/server-github"
+				]
+			},
+			"security": {
+				"risk_level": "medium",
+				"capabilities": [
+					"network_requests"
+				],
+				"audit_logging": true,
+				"max_execution_ms": 60000
+			},
+			"requires_approval": true,
+			"remember_approval": "session",
+			"enabled": true,
+			"tags": [
+				"github",
+				"git",
+				"vcs",
+				"api"
+			],
+			"version": "1.0.0"
+		},
+		{
+			"id": "chrome-devtools",
+			"name": "Chrome DevTools MCP",
+			"description": "Chrome DevTools Protocol integration for browser debugging and inspection",
+			"connection": {
+				"type": "stdio",
+				"command": "npx",
+				"args": [
+					"chrome-devtools-mcp"
+				]
+			},
+			"security": {
+				"risk_level": "medium",
+				"capabilities": [
+					"browser_automation",
+					"screen_capture",
+					"network_requests"
+				],
+				"audit_logging": true,
+				"max_execution_ms": 60000
+			},
+			"requires_approval": true,
+			"remember_approval": "session",
+			"enabled": true,
+			"tags": [
+				"browser",
+				"chrome",
+				"devtools",
+				"debugging"
+			],
+			"version": "1.0.0"
+		},
+		{
+			"id": "context7",
+			"name": "Context7 MCP",
+			"description": "Upstash Context7 for semantic search and context management",
+			"connection": {
+				"type": "stdio",
+				"command": "npx",
+				"args": [
+					"@upstash/context7-mcp"
+				]
+			},
+			"security": {
+				"risk_level": "low",
+				"capabilities": [
+					"network_requests"
+				],
+				"audit_logging": true,
+				"max_execution_ms": 30000
+			},
+			"requires_approval": true,
+			"remember_approval": "session",
+			"enabled": true,
+			"tags": [
+				"search",
+				"context",
+				"semantic",
+				"upstash"
+			],
+			"version": "1.0.0"
+		},
+		{
+			"id": "serena",
+			"name": "Serena MCP",
+			"description": "Oraios Serena for AI-powered code analysis and refactoring",
+			"connection": {
+				"type": "stdio",
+				"command": "npx",
+				"args": [
+					"@oraios/serena-mcp"
+				]
+			},
+			"security": {
+				"risk_level": "medium",
+				"capabilities": [
+					"code_execution",
+					"file_system"
+				],
+				"audit_logging": true,
+				"max_execution_ms": 120000
+			},
+			"requires_approval": true,
+			"remember_approval": "session",
+			"enabled": true,
+			"tags": [
+				"code",
+				"analysis",
+				"refactoring",
+				"ai"
+			],
+			"version": "1.0.0"
+		},
+		{
+			"id": "terraform",
+			"name": "Terraform MCP",
+			"description": "HashiCorp Terraform integration for infrastructure as code management",
+			"connection": {
+				"type": "stdio",
+				"command": "npx",
+				"args": [
+					"@hashicorp/terraform-mcp-server"
+				]
+			},
+			"security": {
+				"risk_level": "high",
+				"capabilities": [
+					"system_access",
+					"network_requests"
+				],
+				"audit_logging": true,
+				"max_execution_ms": 300000,
+				"tool_blocklist": [
+					"destroy",
+					"force-unlock"
+				]
+			},
+			"requires_approval": true,
+			"remember_approval": "always_ask",
+			"enabled": true,
+			"tags": [
+				"infrastructure",
+				"terraform",
+				"iac",
+				"devops"
+			],
+			"version": "1.0.0"
+		},
+		{
+			"id": "mongodb",
+			"name": "MongoDB MCP",
+			"description": "MongoDB database integration for document operations and queries",
+			"connection": {
+				"type": "stdio",
+				"command": "npx",
+				"args": [
+					"@mongodb-js/mongodb-mcp-server"
+				]
+			},
+			"security": {
+				"risk_level": "medium",
+				"capabilities": [
+					"database_access",
+					"network_requests"
+				],
+				"audit_logging": true,
+				"max_execution_ms": 60000,
+				"tool_blocklist": [
+					"dropDatabase",
+					"dropCollection"
+				]
+			},
+			"requires_approval": true,
+			"remember_approval": "session",
+			"enabled": true,
+			"tags": [
+				"database",
+				"mongodb",
+				"nosql"
+			],
+			"version": "1.0.0"
+		},
+		{
+			"id": "elastic",
+			"name": "Elastic MCP",
+			"description": "Elasticsearch integration for search and analytics operations",
+			"connection": {
+				"type": "stdio",
+				"command": "npx",
+				"args": [
+					"@elastic/mcp-server"
+				]
+			},
+			"security": {
+				"risk_level": "medium",
+				"capabilities": [
+					"database_access",
+					"network_requests"
+				],
+				"audit_logging": true,
+				"max_execution_ms": 60000,
+				"tool_blocklist": [
+					"deleteIndex"
+				]
+			},
+			"requires_approval": true,
+			"remember_approval": "session",
+			"enabled": true,
+			"tags": [
+				"search",
+				"elasticsearch",
+				"analytics"
+			],
+			"version": "1.0.0"
+		},
+		{
+			"id": "browserstack",
+			"name": "BrowserStack MCP",
+			"description": "BrowserStack integration for cross-browser testing automation",
+			"connection": {
+				"type": "stdio",
+				"command": "npx",
+				"args": [
+					"@browserstack/mcp-server"
+				]
+			},
+			"security": {
+				"risk_level": "medium",
+				"capabilities": [
+					"browser_automation",
+					"screen_capture",
+					"network_requests"
+				],
+				"audit_logging": true,
+				"max_execution_ms": 180000
+			},
+			"requires_approval": true,
+			"remember_approval": "session",
+			"enabled": true,
+			"tags": [
+				"testing",
+				"browser",
+				"cross-browser",
+				"automation"
+			],
+			"version": "1.0.0"
+		},
+		{
+			"id": "deep-research",
+			"name": "DeepResearch MCP",
+			"description": "Octagon AI deep research for comprehensive information gathering",
+			"connection": {
+				"type": "stdio",
+				"command": "npx",
+				"args": [
+					"@octagonai/deep-research-mcp"
+				]
+			},
+			"security": {
+				"risk_level": "low",
+				"capabilities": [
+					"network_requests"
+				],
+				"audit_logging": true,
+				"max_execution_ms": 120000
+			},
+			"requires_approval": true,
+			"remember_approval": "session",
+			"enabled": true,
+			"tags": [
+				"research",
+				"ai",
+				"information"
+			],
+			"version": "1.0.0"
+		},
+		{
+			"id": "firebase",
+			"name": "Firebase MCP",
+			"description": "Google Firebase integration for app development services",
+			"connection": {
+				"type": "stdio",
+				"command": "npx",
+				"args": [
+					"firebase-tools",
+					"mcp"
+				]
+			},
+			"security": {
+				"risk_level": "high",
+				"capabilities": [
+					"database_access",
+					"network_requests",
+					"system_access"
+				],
+				"audit_logging": true,
+				"max_execution_ms": 120000,
+				"tool_blocklist": [
+					"deleteProject"
+				]
+			},
+			"requires_approval": true,
+			"remember_approval": "always_ask",
+			"enabled": true,
+			"tags": [
+				"firebase",
+				"google",
+				"cloud",
+				"backend"
+			],
+			"version": "1.0.0"
+		},
+		{
+			"id": "gcloud",
+			"name": "Google Cloud MCP",
+			"description": "Google Cloud Platform integration for cloud resource management",
+			"connection": {
+				"type": "stdio",
+				"command": "npx",
+				"args": [
+					"@googleapis/gcloud-mcp"
+				]
+			},
+			"security": {
+				"risk_level": "high",
+				"capabilities": [
+					"system_access",
+					"network_requests"
+				],
+				"audit_logging": true,
+				"max_execution_ms": 180000,
+				"tool_blocklist": [
+					"deleteProject",
+					"deleteInstance"
+				]
+			},
+			"requires_approval": true,
+			"remember_approval": "always_ask",
+			"enabled": true,
+			"tags": [
+				"gcp",
+				"google",
+				"cloud",
+				"infrastructure"
+			],
+			"version": "1.0.0"
+		},
+		{
+			"id": "grafana",
+			"name": "Grafana MCP",
+			"description": "Grafana integration for observability and monitoring dashboards",
+			"connection": {
+				"type": "stdio",
+				"command": "npx",
+				"args": [
+					"@grafana/mcp-grafana"
+				]
+			},
+			"security": {
+				"risk_level": "low",
+				"capabilities": [
+					"network_requests"
+				],
+				"audit_logging": true,
+				"max_execution_ms": 60000
+			},
+			"requires_approval": true,
+			"remember_approval": "session",
+			"enabled": true,
+			"tags": [
+				"monitoring",
+				"observability",
+				"dashboards",
+				"grafana"
+			],
+			"version": "1.0.0"
+		},
+		{
+			"id": "storybook",
+			"name": "Storybook MCP",
+			"description": "Storybook integration for component documentation and testing",
+			"connection": {
+				"type": "stdio",
+				"command": "npx",
+				"args": [
+					"@storybook/addon-mcp"
+				]
+			},
+			"security": {
+				"risk_level": "low",
+				"capabilities": [
+					"file_system"
+				],
+				"audit_logging": true,
+				"max_execution_ms": 60000
+			},
+			"requires_approval": true,
+			"remember_approval": "session",
+			"enabled": true,
+			"tags": [
+				"storybook",
+				"components",
+				"documentation",
+				"ui"
+			],
+			"version": "1.0.0"
+		}
+	]
+}

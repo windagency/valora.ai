@@ -74,7 +74,7 @@ Check layer and module separation:
 **Detection**:
 ```bash
 # Check for circular dependencies
-npx madge --circular src/
+pnpm exec madge --circular src/
 
 # Check imports violating layers
 # Example: search for data imports in UI
@@ -169,7 +169,7 @@ Verify dependency organization:
       }
     ],
     "commands_run": [
-      "npx madge --circular src/"
+      "pnpm exec madge --circular src/"
     ]
   },
   "pattern_violations": {

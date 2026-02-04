@@ -50,7 +50,7 @@
 
 ## ✨ Features
 
-<table>
+<table width="100%">
 <tr valign="top">
 <td width="50%">
 
@@ -116,6 +116,37 @@ Strategic AI model assignment for cost efficiency:
 | **Claude Haiku**   | Fast tasks, validation  |
 
 **31% strategic • 31% execution • 38% fast**  
+
+</td>
+</tr>
+<tr valign="top">
+<td width="50%">
+
+### 🔌 External MCP Integration
+
+Connect to **15 external MCP servers** with user approval:
+
+| Category       | Servers                                   |
+| -------------- | ----------------------------------------- |
+| Browser/Test   | Playwright, Chrome DevTools, BrowserStack |
+| Design         | Figma, Storybook                          |
+| Development    | GitHub, Serena, Context7                  |
+| Infrastructure | Terraform, Firebase, Google Cloud         |
+| Data           | MongoDB, Elastic                          |
+| Observability  | Grafana, DeepResearch                     |
+
+</td>
+<td width="50%">
+
+### 🔒 Security & Compliance
+
+Enterprise-grade security controls:
+
+- **User Approval Flow** — Interactive consent before connections
+- **Risk Assessment** — Low/Medium/High/Critical classification
+- **Tool Filtering** — Allowlist and blocklist per server
+- **Audit Logging** — Complete operation trail
+- **Session Caching** — Remember approvals per session
 
 </td>
 </tr>
@@ -268,7 +299,7 @@ export OPENAI_API_KEY=sk-...
 
 ## 📚 Documentation
 
-<table>
+<table width="100%">
 <tr valign="top">
 <td align="center" width="33%">
 <h3>👤 User Guide</h3>
@@ -373,6 +404,7 @@ valora review-functional --check-a11y=true
 │   ├── plan.md
 │   └── ...
 ├── documentation/               # Comprehensive docs
+├── external-mcp.json            # External MCP server registry
 ├── logs/                        # Execution logs
 ├── prompts/                     # Structured prompts by phase
 │   ├── 01_onboard/
@@ -388,7 +420,7 @@ valora review-functional --check-a11y=true
 
 ## 🌟 Why VALORA?
 
-<table>
+<table width="100%">
 <tr valign="top">
 <td>
 

@@ -10,6 +10,10 @@ allowed-tools:
   - list_dir
   - glob_file_search
   - run_terminal_cmd
+  # MCP: Browser automation for E2E tests
+  - mcp_playwright
+  # MCP: Cross-browser testing (optional)
+  - mcp_browserstack
 model: claude-haiku-4.5
 agent: qa
 prompts:

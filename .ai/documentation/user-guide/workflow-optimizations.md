@@ -187,9 +187,9 @@
 **Implementation**:
 
 - Added Step 3 to `implement-changes.md`: "Validate Code Quality (Real-Time)"
-- Run ESLint validation after each file: `npx eslint <file-path> --format json`
-- Auto-fix common issues: `npx eslint <file-path> --fix`
-- Run TypeScript type check: `npx tsc --noEmit`
+- Run ESLint validation after each file: `pnpm exec eslint <file-path> --format json`
+- Auto-fix common issues: `pnpm exec eslint <file-path> --fix`
+- Run TypeScript type check: `pnpm exec tsc --noEmit`
 - **Blocking requirement**: Cannot proceed to next file until validations pass
 
 **Decision Logic**:

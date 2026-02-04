@@ -13,6 +13,14 @@ allowed-tools:
   - glob_file_search
   - run_terminal_cmd
   - delete_file
+  # MCP: Design integration for UI implementation
+  - mcp_figma
+  # MCP: Component documentation
+  - mcp_storybook
+  # MCP: Browser automation for E2E tests
+  - mcp_playwright
+  # MCP: Cross-browser testing (optional)
+  - mcp_browserstack
 dynamic_agent_selection: true
 fallback_agent: software-engineer-typescript
 agent_selection_criteria:

@@ -17,7 +17,7 @@
  * - query_session: Query previous session data for context reuse
  */
 
-import type { AllowedTool } from 'types/command.types';
+import type { ExternalMCPServerConfig } from 'types/mcp-client.types';
 import type { LLMToolCall, LLMToolDefinition, LLMToolResult } from 'types/llm.types';
 
 import { exec } from 'child_process';
@@ -27,6 +27,9 @@ import { getColorAdapter } from 'output/color-adapter.interface';
 import { getConsoleOutput } from 'output/console-output';
 import { getLogger } from 'output/logger';
 import { getIdempotencyStore, type IdempotencyStoreService } from 'services/idempotency-store.service';
+import type { MCPClientManagerService } from 'services/mcp-client-manager.service';
+import { type AllowedTool, type BuiltInTool, isMCPTool, type MCPTool } from 'types/command.types';
+import { getServerIdFromTool } from 'types/mcp-registry.types';
 import { type IdempotencyOptions, isIdempotentTool } from 'types/idempotency.types';
 import { SemanticAttributes, SpanKind, type TraceContext } from 'types/tracing.types';
 import { getPromptAdapter } from 'ui/prompt-adapter.interface';
@@ -35,6 +38,7 @@ import { formatErrorMessage } from 'utils/error-utils';
 import { readFile, writeFile } from 'utils/file-utils';
 import { getTracer, type Span } from 'utils/tracing';
 
+import { type MCPToolHandler } from './mcp-tool-handler';
 import {
 	type DryRunToolSimulator,
 	getDryRunSimulator,
@@ -47,10 +51,11 @@ import { getSessionToolsService, type SessionToolsService } from './tools/sessio
 const execAsync = promisify(exec);
 
 /**
- * Tool definitions for the LLM
- * These are passed to the LLM so it knows what tools are available
+ * Tool definitions for the LLM (built-in tools only)
+ * These are passed to the LLM so it knows what tools are available.
+ * MCP tool definitions are generated dynamically based on connected MCP servers.
  */
-const TOOL_DEFINITIONS: Record<AllowedTool, LLMToolDefinition> = {
+const BUILT_IN_TOOL_DEFINITIONS: Record<BuiltInTool, LLMToolDefinition> = {
 	codebase_search: {
 		description: 'Semantic search across the codebase to find relevant code snippets',
 		name: 'codebase_search',
@@ -122,24 +127,6 @@ const TOOL_DEFINITIONS: Record<AllowedTool, LLMToolDefinition> = {
 				}
 			},
 			required: ['path'],
-			type: 'object'
-		}
-	},
-	mcp_tool_call: {
-		description: 'Call an MCP tool by name',
-		name: 'mcp_tool_call',
-		parameters: {
-			properties: {
-				arguments: {
-					description: 'Arguments to pass to the tool',
-					type: 'object'
-				},
-				tool_name: {
-					description: 'Name of the MCP tool to call',
-					type: 'string'
-				}
-			},
-			required: ['tool_name'],
 			type: 'object'
 		}
 	},
@@ -260,6 +247,8 @@ const TOOL_DEFINITIONS: Record<AllowedTool, LLMToolDefinition> = {
 export class ToolExecutionService {
 	private readonly idempotencyStore: IdempotencyStoreService;
 	private readonly logger = getLogger();
+	private mcpClientManager: MCPClientManagerService | null = null;
+	private mcpToolHandler: MCPToolHandler | null = null;
 	private readonly searchToolsService: SearchToolsService;
 	private readonly sessionToolsService: SessionToolsService;
 	private readonly tracer = getTracer();
@@ -339,6 +328,20 @@ export class ToolExecutionService {
 	}
 
 	/**
+	 * Set the MCP tool handler for executing MCP tools
+	 */
+	setMCPToolHandler(handler: MCPToolHandler): void {
+		this.mcpToolHandler = handler;
+	}
+
+	/**
+	 * Set the MCP client manager for generating MCP tool definitions
+	 */
+	setMCPClientManager(clientManager: MCPClientManagerService): void {
+		this.mcpClientManager = clientManager;
+	}
+
+	/**
 	 * Disable idempotency for the current execution
 	 * Useful when you want to force re-execution of all tools
 	 */
@@ -393,9 +396,97 @@ export class ToolExecutionService {
 
 	/**
 	 * Get tool definitions for the specified allowed tools
+	 * Built-in tools are returned from static definitions.
+	 * MCP tools are generated as gateway tools that route to external MCP servers.
 	 */
 	getToolDefinitions(allowedTools: AllowedTool[]): LLMToolDefinition[] {
-		return allowedTools.filter((tool) => TOOL_DEFINITIONS[tool]).map((tool) => TOOL_DEFINITIONS[tool]);
+		const definitions: LLMToolDefinition[] = [];
+
+		for (const tool of allowedTools) {
+			if (isMCPTool(tool)) {
+				// Generate MCP gateway tool definition
+				const mcpDefinition = this.generateMCPToolDefinition(tool);
+				if (mcpDefinition) {
+					definitions.push(mcpDefinition);
+				}
+				continue;
+			}
+
+			const definition = BUILT_IN_TOOL_DEFINITIONS[tool as BuiltInTool];
+			if (definition) {
+				definitions.push(definition);
+			}
+		}
+
+		return definitions;
+	}
+
+	/**
+	 * Generate a gateway tool definition for an MCP tool
+	 * This creates a tool that accepts tool_name and arguments parameters,
+	 * allowing the LLM to call any tool on the connected MCP server.
+	 */
+	private generateMCPToolDefinition(mcpTool: MCPTool): LLMToolDefinition | null {
+		const serverId = getServerIdFromTool(mcpTool);
+		if (!serverId) {
+			this.logger.warn(`Invalid MCP tool name: ${mcpTool}`);
+			return null;
+		}
+
+		// Get server config for description (if client manager available)
+		let serverDescription = `External MCP server: ${serverId}`;
+		let serverConfig: ExternalMCPServerConfig | null = null;
+
+		if (this.mcpClientManager) {
+			// Note: getServerConfig is async, but we need sync access here
+			// The description will be generic until server is connected
+			const connectedServer = this.mcpClientManager.getConnectedServer(serverId);
+			if (connectedServer) {
+				serverConfig = connectedServer.config;
+				serverDescription = connectedServer.config.description;
+			}
+		}
+
+		// Check if server is already connected and has tools
+		const connectedServer = this.mcpClientManager?.getConnectedServer(serverId);
+		const availableToolNames = connectedServer?.availableTools.map((t) => t.name) ?? [];
+
+		// Build description with available tools if known
+		let description = `Call tools on the ${serverId} MCP server. ${serverDescription}`;
+		if (availableToolNames.length > 0) {
+			description += `\n\nAvailable tools: ${availableToolNames.join(', ')}`;
+		} else {
+			description += '\n\nThe server will be connected on first use, and available tools will be discovered.';
+		}
+
+		// Add capabilities info if available
+		if (serverConfig?.security.capabilities) {
+			description += `\n\nCapabilities: ${serverConfig.security.capabilities.join(', ')}`;
+		}
+
+		return {
+			description,
+			name: mcpTool,
+			parameters: {
+				additionalProperties: false,
+				properties: {
+					arguments: {
+						additionalProperties: true,
+						description: 'Arguments to pass to the tool (varies by tool)',
+						type: 'object'
+					},
+					tool_name: {
+						description:
+							availableToolNames.length > 0
+								? `The name of the tool to call. Available: ${availableToolNames.join(', ')}`
+								: 'The name of the tool to call on this MCP server',
+						type: 'string'
+					}
+				},
+				required: ['tool_name'],
+				type: 'object'
+			}
+		};
 	}
 
 	/**
@@ -591,13 +682,18 @@ export class ToolExecutionService {
 	 * Route tool execution to the appropriate handler
 	 */
 	private async executeToolByName(name: AllowedTool, args: Record<string, unknown>): Promise<string> {
-		const toolHandlers: Record<AllowedTool, (args: Record<string, unknown>) => Promise<string>> = {
+		// Check if this is an MCP tool (handled separately in Phase 2)
+		if (isMCPTool(name)) {
+			return this.executeMcpTool(name, args);
+		}
+
+		// Built-in tool handlers
+		const toolHandlers: Record<BuiltInTool, (args: Record<string, unknown>) => Promise<string>> = {
 			['codebase_search']: (a) => this.searchToolsService.executeCodebaseSearch(a),
 			['delete_file']: (a) => this.executeDeleteFile(a),
 			['glob_file_search']: (a) => this.searchToolsService.executeGlobSearch(a),
 			['grep']: (a) => this.searchToolsService.executeGrep(a),
 			['list_dir']: (a) => this.executeListDir(a),
-			['mcp_tool_call']: (a) => this.executeMcpToolCall(a),
 			['query_session']: (a) => this.sessionToolsService.executeQuerySession(a),
 			['read_file']: (a) => this.executeReadFile(a),
 			['run_terminal_cmd']: (a) => this.executeTerminalCmd(a),
@@ -606,12 +702,63 @@ export class ToolExecutionService {
 			['write']: (a) => this.executeWrite(a)
 		};
 
-		const handler = toolHandlers[name];
+		const handler = toolHandlers[name as BuiltInTool];
 		if (!handler) {
 			throw new Error(`Unknown tool: ${name}`);
 		}
 
 		return handler(args);
+	}
+
+	/**
+	 * Execute an MCP tool call
+	 * Routes the call to MCPToolHandler for connection management and execution
+	 */
+	private async executeMcpTool(mcpToolName: string, args: Record<string, unknown>): Promise<string> {
+		// Check if MCP handler is available
+		if (!this.mcpToolHandler) {
+			this.logger.warn('MCP tool handler not configured', { mcpToolName });
+			return JSON.stringify({
+				error: 'MCP tool handler not configured. MCP tools are not available.',
+				status: 'not_configured'
+			});
+		}
+
+		// Extract the actual tool name from args (e.g., playwright_navigate)
+		// The mcpToolName is the MCP identifier (e.g., mcp_playwright)
+		// The actual tool to call should be in args.tool_name or we use the full name
+		const actualToolName = (args['tool_name'] as string) ?? mcpToolName;
+		const toolArgs = (args['arguments'] as Record<string, unknown>) ?? args;
+
+		try {
+			const result = await this.mcpToolHandler.executeTool(mcpToolName as MCPTool, actualToolName, toolArgs);
+
+			if (result.success) {
+				return JSON.stringify({
+					duration_ms: result.durationMs,
+					output: result.output,
+					server: result.serverId,
+					status: 'success',
+					tool: result.toolName
+				});
+			} else {
+				return JSON.stringify({
+					duration_ms: result.durationMs,
+					error: result.error,
+					server: result.serverId,
+					status: 'error',
+					tool: result.toolName
+				});
+			}
+		} catch (error) {
+			const errorMessage = (error as Error).message;
+			this.logger.error(`MCP tool execution failed: ${mcpToolName}`, error as Error);
+			return JSON.stringify({
+				error: errorMessage,
+				status: 'error',
+				tool: mcpToolName
+			});
+		}
 	}
 
 	/**
@@ -913,19 +1060,6 @@ export class ToolExecutionService {
 		}
 
 		return Promise.resolve(`Web search not implemented. Query: ${query}`);
-	}
-
-	/**
-	 * MCP tool call (placeholder)
-	 */
-	private executeMcpToolCall(args: Record<string, unknown>): Promise<string> {
-		const toolName = args['tool_name'] as string;
-
-		if (!toolName) {
-			throw new Error('mcp_tool_call requires tool_name argument');
-		}
-
-		return Promise.resolve(`MCP tool call not implemented. Tool: ${toolName}`);
 	}
 
 	/**
