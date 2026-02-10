@@ -35,6 +35,7 @@ import { getPromptAdapter } from 'ui/prompt-adapter.interface';
 import { promisify } from 'util';
 import { formatErrorMessage } from 'utils/error-utils';
 import { readFile, writeFile } from 'utils/file-utils';
+import { validateNotForbiddenPath } from 'utils/input-validator';
 import { getTracer, type Span } from 'utils/tracing';
 
 import { type MCPToolHandler } from './mcp-tool-handler';
@@ -790,7 +791,13 @@ export class ToolExecutionService {
 			throw new Error('write requires path and content arguments');
 		}
 
+		// Validate path is not in forbidden paths (.ai/ folder)
+		validateNotForbiddenPath(path, 'write to');
+
 		const fullPath = this.resolvePath(path);
+
+		// Also validate the resolved full path
+		validateNotForbiddenPath(fullPath, 'write to');
 
 		// Check if this is a protected file that already exists
 		const fileName = path.split('/').pop() ?? path;
@@ -955,7 +962,13 @@ export class ToolExecutionService {
 			throw new Error('search_replace requires path, old_str, and new_str arguments');
 		}
 
+		// Validate path is not in forbidden paths (.ai/ folder)
+		validateNotForbiddenPath(path, 'modify');
+
 		const fullPath = this.resolvePath(path);
+
+		// Also validate the resolved full path
+		validateNotForbiddenPath(fullPath, 'modify');
 
 		if (!existsSync(fullPath)) {
 			throw new Error(`File not found: ${path}`);
@@ -988,7 +1001,21 @@ export class ToolExecutionService {
 			return Promise.reject(new Error('delete_file requires path argument'));
 		}
 
+		// Validate path is not in forbidden paths (.ai/ folder)
+		try {
+			validateNotForbiddenPath(path, 'delete');
+		} catch (error) {
+			return Promise.reject(error);
+		}
+
 		const fullPath = this.resolvePath(path);
+
+		// Also validate the resolved full path
+		try {
+			validateNotForbiddenPath(fullPath, 'delete');
+		} catch (error) {
+			return Promise.reject(error);
+		}
 
 		if (!existsSync(fullPath)) {
 			return Promise.reject(new Error(`File not found: ${path}`));

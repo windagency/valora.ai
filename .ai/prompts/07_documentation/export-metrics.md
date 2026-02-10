@@ -109,7 +109,7 @@ Collect all metrics to export:
 }
 ```
 
-**File path:** `.ai/feedback/<timestamp>-<workflow-type>.json`
+**File path:** `knowledge-base/feedback/<timestamp>-<workflow-type>.json`
 
 #### CSV Export (`export_format = "csv"`)
 
@@ -131,7 +131,7 @@ Recommendation: Parallelize tests,N/A,Optimization,High
 ...
 ```
 
-**File path:** `.ai/feedback/<timestamp>-<workflow-type>.csv`
+**File path:** `knowledge-base/feedback/<timestamp>-<workflow-type>.csv`
 
 #### HTML Export (`export_format = "html"`)
 
@@ -172,7 +172,7 @@ Recommendation: Parallelize tests,N/A,Optimization,High
 </html>
 ```
 
-**File path:** `.ai/feedback/<timestamp>-<workflow-type>.html`
+**File path:** `knowledge-base/feedback/<timestamp>-<workflow-type>.html`
 
 #### Markdown Export (`export_format = "markdown"`)
 
@@ -180,7 +180,7 @@ Recommendation: Parallelize tests,N/A,Optimization,High
 
 Use the markdown report already generated.
 
-**File path:** `.ai/feedback/<timestamp>-<workflow-type>.md`
+**File path:** `knowledge-base/feedback/<timestamp>-<workflow-type>.md`
 
 ### Step 3: Write to File
 
@@ -190,7 +190,7 @@ Use the markdown report already generated.
 If output_path provided:
   use output_path
 Else:
-  use default: .ai/feedback/<timestamp>-<workflow-type>.<extension>
+  use default: knowledge-base/feedback/<timestamp>-<workflow-type>.<extension>
 ```
 
 **Ensure directory exists:**
@@ -222,7 +222,7 @@ stat -c%s <file-path>  # Linux
 
 ```json
 {
-  "exported_file_path": ".ai/feedback/20251115-1430-feature-implementation.json",
+  "exported_file_path": "knowledge-base/feedback/20251115-1430-feature-implementation.json",
   "export_status": "success",
   "export_format": "json",
   "file_size_kb": 45,

@@ -39,6 +39,7 @@ outputs:
   - operational_risks
   - mitigation_strategies
   - risk_score
+  - clarifying_questions
 tokens:
   avg: 3000
   max: 6000
@@ -465,6 +466,46 @@ Low Severity + High Likelihood = Priority 3 (nice to fix)
 Low Severity + Low Likelihood = Priority 4 (accept)
 ```
 
+## Clarifying Questions
+
+When risk mitigation decisions require user input, generate clarifying questions. Questions will be presented interactively before proceeding.
+
+### When to Include Questions
+
+Include `clarifying_questions` when:
+- Risk mitigation strategies have significant trade-offs
+- Rollback approach options affect implementation
+- Acceptable risk thresholds need user confirmation
+- Business impact decisions require stakeholder input
+
+### Question Format
+
+Each question must have:
+- `id`: Unique identifier (e.g., "risk_q1")
+- `question`: Clear question text
+- `options`: Array of 2-4 predefined answer choices
+- `priority`: "P0" (Critical), "P1" (Important), or "P2" (Minor)
+- `context`: Optional explanation of risk implications
+
+**Example**:
+```json
+{
+  "clarifying_questions": [
+    {
+      "id": "risk_q1",
+      "question": "What is the acceptable downtime during deployment?",
+      "options": [
+        "Zero downtime required (blue-green deployment)",
+        "Brief maintenance window acceptable (< 5 min)",
+        "Extended maintenance window OK (< 30 min)"
+      ],
+      "priority": "P0",
+      "context": "Affects deployment strategy and rollback complexity"
+    }
+  ]
+}
+```
+
 ## Output Format
 
 ```json
@@ -576,9 +617,12 @@ Low Severity + Low Likelihood = Priority 4 (accept)
     "1 critical risk identified",
     "4 high-severity risks require mitigation"
   ],
-  "recommendation": "Address Priority 1 risks before proceeding. Consider phased rollout with feature flag to limit blast radius."
+  "recommendation": "Address Priority 1 risks before proceeding. Consider phased rollout with feature flag to limit blast radius.",
+  "clarifying_questions": []
 }
 ```
+
+**Note**: Include `clarifying_questions` array even if empty. Populate when risk decisions require user preference.
 
 ## Success Criteria
 

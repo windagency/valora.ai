@@ -11,6 +11,7 @@ import { copyFileSync, existsSync, mkdirSync, writeFileSync } from 'fs';
 import { getLogger } from 'output/logger';
 import { dirname } from 'path';
 import { formatErrorMessage } from 'utils/error-utils';
+import { validateNotForbiddenPath } from 'utils/input-validator';
 
 import type { DocumentPathResolverService } from './document-path-resolver.service';
 
@@ -46,6 +47,10 @@ export class DocumentWriterService {
 
 			// Resolve path
 			const path = this.pathResolver.resolvePath(type, category);
+
+			// Validate path is not in forbidden paths (.ai/ folder)
+			validateNotForbiddenPath(path, 'write to');
+
 			const isUpdate = this.pathResolver.exists(type, category);
 
 			// Ensure directory exists
@@ -92,6 +97,9 @@ export class DocumentWriterService {
 		this.logger.info('Writing document to custom path', { customPath });
 
 		try {
+			// Validate path is not in forbidden paths (.ai/ folder)
+			validateNotForbiddenPath(customPath, 'write to');
+
 			const isUpdate = existsSync(customPath);
 
 			// Ensure directory exists

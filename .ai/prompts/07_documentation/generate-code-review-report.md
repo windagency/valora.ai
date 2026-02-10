@@ -376,5 +376,5 @@ The complete report as markdown string:
 - **Code examples** should show both problem and solution
 - **Effort estimates** help developers prioritize work
 - **Positive observations** make reviews feel collaborative, not adversarial
-- Report is **final artifact** saved to `.ai/.history/review-code/` for reference
+- Report is **final artifact** saved to `knowledge-base/reviews/` for reference
 

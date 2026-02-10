@@ -73,23 +73,6 @@ prompts:
         - mitigation_strategies
         - risk_score
         - clarifying_questions
-    - stage: user_answers
-      prompt: onboard.collect-clarifications
-      required: true
-      interactive: true
-      condition: ($STAGE_complexity.clarifying_questions.length > 0) OR ($STAGE_dependencies.clarifying_questions.length > 0) OR ($STAGE_risks.clarifying_questions.length > 0)
-      inputs:
-        clarifying_questions:
-          - $STAGE_complexity.clarifying_questions
-          - $STAGE_dependencies.clarifying_questions
-          - $STAGE_risks.clarifying_questions
-        refined_specifications: $STAGE_load.task_details
-        clarity_score: 0.80
-      outputs:
-        - answers
-        - summary
-        - questions_answered
-        - questions_skipped
     - stage: breakdown
       prompt: plan.breakdown-implementation
       required: true

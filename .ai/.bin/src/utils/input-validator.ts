@@ -533,3 +533,41 @@ export function validateInput(input: unknown): ValidationResult {
 	const validator = new InputValidator();
 	return validator.validate(input);
 }
+
+/**
+ * Paths that are forbidden from any write, delete, or modification operations.
+ * These paths contain system configuration and should never be modified by commands, agents, or prompts.
+ */
+const FORBIDDEN_WRITE_PATHS = ['.ai/', '.ai\\'];
+
+/**
+ * Validate that a path is not in the forbidden write paths.
+ * Throws an error if the path targets the .ai/ folder or other protected system paths.
+ *
+ * @param path - The path to validate (can be relative or absolute)
+ * @param operation - The operation being attempted (e.g., "write to", "delete", "modify")
+ * @throws Error if the path is forbidden
+ */
+export function validateNotForbiddenPath(path: string, operation: string): void {
+	const normalizedPath = path.replace(/\\/g, '/');
+
+	for (const forbidden of FORBIDDEN_WRITE_PATHS) {
+		const normalizedForbidden = forbidden.replace(/\\/g, '/');
+
+		// Check if path starts with forbidden path (relative path)
+		if (normalizedPath.startsWith(normalizedForbidden)) {
+			throw new Error(
+				`Cannot ${operation} files in ${forbidden} - this folder contains system configuration ` +
+					`for VALORA commands, agents, and prompts. Path: ${path}`
+			);
+		}
+
+		// Check if path contains the forbidden path anywhere (for absolute paths)
+		if (normalizedPath.includes(`/${normalizedForbidden}`)) {
+			throw new Error(
+				`Cannot ${operation} files in ${forbidden} - this folder contains system configuration ` +
+					`for VALORA commands, agents, and prompts. Path: ${path}`
+			);
+		}
+	}
+}

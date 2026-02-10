@@ -237,7 +237,7 @@ Group by priority:
 
 ### Step 5: Save Report
 
-**Path:** `.ai/feedback/<timestamp>-<workflow-type>.md`
+**Path:** `knowledge-base/feedback/<timestamp>-<workflow-type>.md`
 
 **Filename format:** `YYYYMMDD-HHMM-<workflow-name>.md`
 
@@ -248,7 +248,7 @@ Example: `20251115-1430-feature-implementation.md`
 ```json
 {
   "feedback_report": "<full markdown report content>",
-  "report_path": ".ai/feedback/20251115-1430-feature-implementation.md",
+  "report_path": "knowledge-base/feedback/20251115-1430-feature-implementation.md",
   "summary_statistics": {
     "satisfaction_score": 8,
     "efficiency_score": 75,

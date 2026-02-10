@@ -32,6 +32,18 @@ responsibilities:
   - Monitoring of the threat to security
   - Ensuring regulatory compliance for standards of security
   - Early detection of security vulnerabilities
+constraints:
+  - requires_approval_for:
+    - policy_changes
+    - access_control_modifications
+    - security_control_disablement
+    - encryption_key_operations
+    - production_data_access
+    - penetration_testing_production
+  - forbidden_paths:
+    - .ai/
+    - .git/
+    - node_modules/
 ---
 
 # Senior Security Operations Engineer

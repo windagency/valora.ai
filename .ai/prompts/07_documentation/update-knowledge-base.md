@@ -56,7 +56,7 @@ Integrate feedback learnings into the persistent knowledge base, extract pattern
 
 ### Step 1: Store Feedback Report
 
-**Location:** `.ai/feedback/<timestamp>-<workflow-type>.md`
+**Location:** `knowledge-base/feedback/<timestamp>-<workflow-type>.md`
 
 **Index metadata:**
 ```json
@@ -89,7 +89,7 @@ Integrate feedback learnings into the persistent knowledge base, extract pattern
 
 **Document patterns:**
 
-Create entry in `.ai/knowledge/patterns/success/`:
+Create entry in `knowledge-base/patterns/success/`:
 
 ```markdown
 ## Pattern: <Pattern Name>
@@ -121,7 +121,7 @@ Create entry in `.ai/knowledge/patterns/success/`:
 
 **Document anti-patterns:**
 
-Create entry in `.ai/knowledge/patterns/avoid/`:
+Create entry in `knowledge-base/patterns/avoid/`:
 
 ```markdown
 ## Anti-Pattern: <Pattern Name>
@@ -142,44 +142,69 @@ Create entry in `.ai/knowledge/patterns/avoid/`:
 <better way>
 ```
 
-### Step 4: Update Agent Profiles
+### Step 4: Document Agent Improvement Recommendations
 
-For each agent improvement:
+For each agent improvement identified:
 
-**Update agent file:** `.ai/agents/<agent-name>.md`
+**IMPORTANT:** Do NOT modify files in the `.ai/` folder directly. Instead, document recommendations in the knowledge-base.
 
-**Add to relevant sections:**
-- Best practices
-- Common issues
-- Context requirements
-- Tool usage patterns
+**Create recommendation file:** `knowledge-base/improvements/agents/<agent-name>-<date>.md`
 
-**Example addition:**
+**Document the following:**
+- Best practices learned
+- Common issues identified
+- Context requirements discovered
+- Tool usage pattern recommendations
+
+**Example recommendation:**
 
 ```markdown
-### Learned from Feedback (2025-11-15)
+# Agent Improvement Recommendation: <agent-name>
 
-**Issue:** Test execution was slow (15 min vs 5 min expected)
-**Solution:** Parallelize test suites, use mocks for external dependencies
-**Impact:** Reduced test time by 66%
+**Date:** 2025-11-15
+**Source:** Feedback from feature-implementation workflow
+
+## Issue Identified
+
+Test execution was slow (15 min vs 5 min expected)
+
+## Recommended Solution
+
+Parallelize test suites, use mocks for external dependencies
+
+## Expected Impact
+
+Reduced test time by 66%
+
+## Action Required
+
+Submit this recommendation for review by a system administrator.
 ```
 
-### Step 5: Refine Prompt Templates
+### Step 5: Document Prompt Refinement Recommendations
 
-For each prompt refinement:
+For each prompt refinement identified:
 
-**Update prompt file:** `.ai/prompts/<category>/<prompt-name>.md`
+**IMPORTANT:** Do NOT modify files in the `.ai/` folder directly. Instead, document recommendations in the knowledge-base.
 
-**Suggested changes:**
-- Add clarifications to instructions
-- Include additional validation rules
-- Improve output format specifications
-- Add examples for common scenarios
+**Create recommendation file:** `knowledge-base/improvements/prompts/<prompt-name>-<date>.md`
 
-**Document change:**
+**Suggested changes to document:**
+- Clarifications needed in instructions
+- Additional validation rules to add
+- Output format specification improvements
+- Examples for common scenarios
+
+**Example recommendation:**
 
 ```markdown
-## Changelog
+# Prompt Refinement Recommendation
+
+**Prompt:** <category>/<prompt-name>
+**Date:** 2025-11-15
+**Source:** Feedback from feature-implementation workflow
+
+## Suggested Changes
 
 ### 2025-11-15 - v1.1.0
 - Added real-time linting validation instruction
@@ -191,7 +216,7 @@ For each prompt refinement:
 
 Create or update best practices guides:
 
-**Location:** `.ai/knowledge/best-practices/`
+**Location:** `knowledge-base/best-practices/`
 
 **Categories:**
 - Agent usage
@@ -262,21 +287,21 @@ Create or update best practices guides:
 ```json
 {
   "knowledge_base_updated": true,
-  "feedback_report_stored": ".ai/feedback/20251115-1430-feature-implementation.md",
+  "feedback_report_stored": "knowledge-base/feedback/20251115-1430-feature-implementation.md",
   "patterns_learned": [
     {
       "pattern": "linter-errors-during-implementation",
       "type": "failure",
       "frequency": "common",
       "recommendation": "Add real-time linter validation to prevent post-implementation fixes",
-      "stored_at": ".ai/knowledge/patterns/avoid/linter-errors-post-implementation.md"
+      "stored_at": "knowledge-base/patterns/avoid/linter-errors-post-implementation.md"
     },
     {
       "pattern": "slow-test-execution",
       "type": "failure",
       "frequency": "occasional",
       "recommendation": "Optimize test suites, use parallelization and caching",
-      "stored_at": ".ai/knowledge/patterns/avoid/slow-test-execution.md"
+      "stored_at": "knowledge-base/patterns/avoid/slow-test-execution.md"
     }
   ],
   "best_practices_added": [
@@ -284,13 +309,13 @@ Create or update best practices guides:
       "practice": "real-time-linting",
       "description": "Validate code against linter rules during generation to prevent errors",
       "applicable_to": ["backend-engineer-api", "frontend-engineer-react"],
-      "stored_at": ".ai/knowledge/best-practices/real-time-linting.md"
+      "stored_at": "knowledge-base/best-practices/real-time-linting.md"
     },
     {
       "practice": "test-performance-optimization",
       "description": "Use mocks, parallelize suites, cache dependencies for faster test execution",
       "applicable_to": ["qa"],
-      "stored_at": ".ai/knowledge/best-practices/test-performance-optimization.md"
+      "stored_at": "knowledge-base/best-practices/test-performance-optimization.md"
     }
   ],
   "agents_updated": ["qa", "backend-engineer-api"],

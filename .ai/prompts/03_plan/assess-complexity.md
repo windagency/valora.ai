@@ -41,6 +41,7 @@ outputs:
   - complexity_factors
   - implementation_mode
   - confidence_level
+  - clarifying_questions
 tokens:
   avg: 2500
   max: 5000
@@ -338,6 +339,53 @@ ELSE:
   → Use full planning process
 ```
 
+## Clarifying Questions
+
+When critical information is missing or ambiguous, generate clarifying questions to prompt the user for input. Questions will be presented interactively before proceeding to the next stage.
+
+### When to Include Questions
+
+Include `clarifying_questions` when:
+- A complexity dimension cannot be accurately scored due to missing information
+- Multiple valid interpretations exist for implementation approach
+- Technical decisions have significant trade-offs that require user preference
+- The task description is ambiguous about scope or requirements
+
+### Question Format
+
+Each question must have:
+- `id`: Unique identifier (e.g., "complexity_q1")
+- `question`: Clear question text
+- `options`: Array of 2-4 predefined answer choices
+- `priority`: "P0" (Critical - blocks assessment), "P1" (Important), or "P2" (Minor)
+- `context`: Optional explanation of why this question matters
+
+**Example**:
+```json
+{
+  "clarifying_questions": [
+    {
+      "id": "complexity_q1",
+      "question": "Should we include E2E tests in the initial implementation?",
+      "options": [
+        "Yes, full E2E coverage required",
+        "Basic E2E for critical paths only",
+        "No E2E tests in initial implementation"
+      ],
+      "priority": "P1",
+      "context": "Affects testing complexity score and overall effort estimate"
+    }
+  ]
+}
+```
+
+### When NOT to Include Questions
+
+Do NOT include questions when:
+- Information can be reasonably inferred from codebase patterns
+- The question is about implementation details (not planning decisions)
+- All complexity dimensions can be scored with confidence
+
 ## Output Format
 
 ```json
@@ -380,9 +428,12 @@ ELSE:
     "standard_range": "≤ 5.0",
     "incremental_range": "> 5.0"
   },
-  "confidence_level": "high"
+  "confidence_level": "high",
+  "clarifying_questions": []
 }
 ```
+
+**Note**: Include `clarifying_questions` array even if empty. Populate with questions when critical decisions require user input.
 
 ## Success Criteria
 

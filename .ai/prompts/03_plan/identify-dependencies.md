@@ -36,6 +36,7 @@ outputs:
   - data_dependencies
   - integration_dependencies
   - execution_order
+  - clarifying_questions
 tokens:
   avg: 3000
   max: 6000
@@ -509,6 +510,46 @@ Flag security vulnerabilities or license issues in dependencies.
 }
 ```
 
+## Clarifying Questions
+
+When critical dependency decisions require user input, generate clarifying questions. Questions will be presented interactively before proceeding.
+
+### When to Include Questions
+
+Include `clarifying_questions` when:
+- Multiple package alternatives exist with significant trade-offs
+- External API choices need to be made (e.g., which email provider)
+- Database or storage decisions affect architecture
+- Version pinning decisions have security/stability trade-offs
+
+### Question Format
+
+Each question must have:
+- `id`: Unique identifier (e.g., "deps_q1")
+- `question`: Clear question text
+- `options`: Array of 2-4 predefined answer choices
+- `priority`: "P0" (Critical), "P1" (Important), or "P2" (Minor)
+- `context`: Optional explanation of impact
+
+**Example**:
+```json
+{
+  "clarifying_questions": [
+    {
+      "id": "deps_q1",
+      "question": "Which email service provider should be used?",
+      "options": [
+        "SendGrid (current team experience)",
+        "AWS SES (lower cost, AWS integration)",
+        "Mailgun (simpler API)"
+      ],
+      "priority": "P0",
+      "context": "Affects package dependencies and integration complexity"
+    }
+  ]
+}
+```
+
 ## Output Format
 
 ```json
@@ -601,9 +642,12 @@ Flag security vulnerabilities or license issues in dependencies.
     "version_conflicts": [],
     "security_issues": [],
     "license_issues": []
-  }
+  },
+  "clarifying_questions": []
 }
 ```
+
+**Note**: Include `clarifying_questions` array even if empty. Populate when dependency decisions require user preference.
 
 ## Success Criteria
 

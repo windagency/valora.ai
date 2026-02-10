@@ -26,6 +26,20 @@ capabilities:
   can_write_code: true
   can_review_code: true
   can_run_tests: true
+constraints:
+  - requires_approval_for:
+    - delete_files
+    - database_migrations
+    - commit
+    - deployment
+    - infrastructure_changes
+  - forbidden_paths:
+    - .ai/
+    - .devcontainer/
+    - .git/
+    - .github/
+    - infrastructure/
+    - node_modules/
 ---
 
 # Senior Frontend React Software Engineer
