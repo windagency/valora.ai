@@ -19,6 +19,7 @@ agents:
   - product-manager
 dependencies:
   requires:
+    - context.use-modern-cli-tools
     - onboard.refine-specifications
 inputs:
   - name: clarifying_questions

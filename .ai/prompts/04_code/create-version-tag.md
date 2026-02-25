@@ -18,6 +18,7 @@ agents:
   - software-engineer
 dependencies:
   requires:
+    - context.use-modern-cli-tools
     - code.calculate-version-bump
     - code.stage-and-commit
 inputs:

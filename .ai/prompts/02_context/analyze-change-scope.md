@@ -18,6 +18,7 @@ agents:
   - software-engineer
 dependencies:
   requires:
+    - context.use-modern-cli-tools
     - context.analyze-git-status
 inputs:
   - name: changed_files

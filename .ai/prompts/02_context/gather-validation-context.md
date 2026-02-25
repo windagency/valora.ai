@@ -17,7 +17,8 @@ model_requirements:
 agents:
   - asserter
 dependencies:
-  requires: []
+  requires:
+    - context.use-modern-cli-tools
 inputs:
   - name: implementation_details
     description: Recent changes, modified files, commit context

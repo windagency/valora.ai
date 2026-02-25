@@ -7,6 +7,7 @@ allowed-tools:
   - read_file
   - list_dir
   - glob_file_search
+  - run_terminal_cmd  # Required for modern CLI tools (jq, yq, rg, fd)
   - web_search
 model: gpt-5-thinking-high
 agent: product-manager

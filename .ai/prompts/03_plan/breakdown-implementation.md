@@ -18,6 +18,7 @@ agents:
   - lead
 dependencies:
   requires:
+    - context.use-modern-cli-tools
     - context.analyze-task-context
     - plan.assess-complexity
     - plan.identify-dependencies

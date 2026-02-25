@@ -17,6 +17,7 @@ agents:
   - product-manager
 dependencies:
   requires:
+    - context.use-modern-cli-tools
     - documentation.generate-feedback-report
     - review.identify-improvement-areas
 inputs:

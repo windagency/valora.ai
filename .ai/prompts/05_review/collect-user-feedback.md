@@ -17,6 +17,7 @@ agents:
   - product-manager
 dependencies:
   requires:
+    - context.use-modern-cli-tools
     - context.identify-completed-workflow
 inputs:
   - name: workflow_executed

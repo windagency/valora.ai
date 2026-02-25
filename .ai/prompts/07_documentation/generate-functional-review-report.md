@@ -17,6 +17,7 @@ agents:
   - lead
 dependencies:
   requires:
+    - context.use-modern-cli-tools
     - review.validate-functional-requirements
 inputs:
   - name: completeness_score

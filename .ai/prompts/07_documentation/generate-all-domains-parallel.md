@@ -18,6 +18,7 @@ agents:
   - lead
 dependencies:
   requires:
+    - context.use-modern-cli-tools
     - context.load-and-analyze-parallel
 inputs:
   - name: documentation_plan

@@ -18,6 +18,7 @@ agents:
   - qa
 dependencies:
   requires:
+    - context.use-modern-cli-tools
     - test.analyze-test-infrastructure
 inputs:
   - name: test_scope
@@ -63,6 +64,28 @@ tokens:
 ## Objective
 
 Run test suites in the appropriate order, capture comprehensive results including failures and stack traces, generate coverage reports, and determine pass/fail status against thresholds.
+
+## CLI Tools for Output Processing
+
+When processing terminal output from test commands, use modern CLI tools:
+
+- **`jq`** to parse JSON test results and coverage reports (e.g., `--reporter=json` output). Extract specific fields instead of dumping entire JSON.
+- **`rg`** to search test output for failure patterns, stack traces, or specific error messages.
+- **`fd`** to locate test files, coverage reports, or configuration files by extension or name.
+
+```bash
+# Parse test results JSON for failures only
+jq '[.testResults[] | select(.numFailedTests > 0) | {file: .testFilePath, failed: .numFailedTests}]' test-results.json
+
+# Parse coverage summary for threshold check
+jq '.total | {lines: .lines.pct, branches: .branches.pct, functions: .functions.pct}' coverage/coverage-summary.json
+
+# Find all test result files
+fd -g 'test-results*.json' --type f
+
+# Search test output for specific error patterns
+rg "FAIL|Error:|TypeError:" test-output.log
+```
 
 ## Instructions
 
@@ -259,6 +282,15 @@ npm run test:e2e -- --reporter=json --outputFile=test-results-e2e.json
 ```
 
 ### Step 6: Aggregate Coverage Metrics
+
+**Use `jq` to merge coverage from JSON reports:**
+```bash
+# Extract overall coverage from the report
+jq '.total | {statements: .statements.pct, branches: .branches.pct, functions: .functions.pct, lines: .lines.pct}' coverage/coverage-summary.json
+
+# Find files below threshold
+jq --arg threshold 80 '[to_entries[] | select(.key != "total") | select(.value.lines.pct < ($threshold | tonumber)) | {file: .key, coverage: .value.lines.pct}]' coverage/coverage-summary.json
+```
 
 **Merge coverage from all test types**:
 ```json

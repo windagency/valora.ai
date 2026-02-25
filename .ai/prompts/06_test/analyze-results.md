@@ -18,6 +18,7 @@ agents:
   - qa
 dependencies:
   requires:
+    - context.use-modern-cli-tools
     - test.execute-tests
   optional:
     - review.validate-completeness
@@ -49,6 +50,21 @@ tokens:
 ## Objective
 
 Assess test quality, evaluate coverage adequacy, classify failures by severity, identify patterns, and provide prioritized, actionable recommendations for improvement.
+
+## CLI Tools for Result Analysis
+
+When processing test results and coverage data, use modern CLI tools:
+
+- **`jq`** to extract and transform JSON test results (filter failures, aggregate metrics, compare thresholds)
+- **`rg`** to search stack traces for common error patterns and identify failure clusters across test suites
+
+```bash
+# Extract only failed tests from JSON results
+jq '[.testResults[] | .testResults[] | select(.status == "failed") | {name: .fullName, file: .ancestorTitles[0], error: .failureMessages[0][:200]}]' test-results.json
+
+# Search for common failure patterns across test output
+rg "TypeError:|ReferenceError:|timeout|ECONNREFUSED" test-output.log
+```
 
 ## Instructions
 

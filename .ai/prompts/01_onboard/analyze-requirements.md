@@ -17,7 +17,8 @@ model_requirements:
 agents:
   - product-manager
 dependencies:
-  requires: []
+  requires:
+    - context.use-modern-cli-tools
 inputs:
   - name: source_document
     description: Source document to analyze (specifications or PRD)

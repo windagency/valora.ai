@@ -18,6 +18,7 @@ agents:
   - software-engineer
 dependencies:
   requires:
+    - context.use-modern-cli-tools
     - code.determine-commit-strategy
 inputs:
   - name: commit_groups

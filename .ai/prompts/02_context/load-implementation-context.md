@@ -20,7 +20,8 @@ agents:
   - platform-engineer
   - secops-engineer
 dependencies:
-  requires: []
+  requires:
+    - context.use-modern-cli-tools
 inputs:
   - name: implementation_plan
     description: Path to implementation plan or plan content

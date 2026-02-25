@@ -18,7 +18,8 @@ model_requirements:
 agents:
   - lead
 dependencies:
-  requires: []
+  requires:
+    - context.use-modern-cli-tools
 inputs:
   - name: output_dir_arg
     description: Optional output directory from --output-dir argument

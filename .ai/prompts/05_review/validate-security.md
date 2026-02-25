@@ -18,6 +18,7 @@ agents:
   - asserter
 dependencies:
   requires:
+    - context.use-modern-cli-tools
     - context.gather-validation-context
 inputs:
   - name: quality_gates
@@ -85,9 +86,9 @@ Check for exposed credentials in **project source only**:
 # Use detect-secrets or similar
 pnpm exec detect-secrets scan --all-files --exclude-files ".ai/.*"
 
-# Or grep for common patterns in project source
-grep -r "password\s*=\s*['\"]" src/ --include="*.ts" --include="*.js"
-grep -r "api[_-]?key\s*=\s*['\"]" src/ --include="*.ts" --include="*.js"
+# Or search for common patterns in project source
+rg "password\s*=\s*['\"]" src/ -t ts -t js
+rg "api[_-]?key\s*=\s*['\"]" src/ -t ts -t js
 ```
 
 **Look for**:

@@ -18,6 +18,7 @@ agents:
   - software-engineer
 dependencies:
   requires:
+    - context.use-modern-cli-tools
     - code.stage-and-commit
 inputs:
   - name: commits_created
@@ -207,7 +208,7 @@ Recommend next actions:
 6. Push with tags: `git push origin <branch> --follow-tags`
 
 **If changelog updated**:
-7. Review changelog: `cat CHANGELOG.md`
+7. Review changelog: `head -50 CHANGELOG.md`
 
 **If breaking changes**:
 8. Create migration guide
@@ -269,7 +270,7 @@ Recommend next actions:
   },
   "next_steps": [
     "Review commits: git log --oneline -2",
-    "Review changelog: cat CHANGELOG.md",
+    "Review changelog: head -50 CHANGELOG.md",
     "Run tests: npm test",
     "Push changes: git push origin feature/oauth2 --follow-tags"
   ],
@@ -373,7 +374,7 @@ a3f8c2e feat(auth): implement OAuth2 refresh token rotation
 Next steps:
 1. Run tests: npm test
 2. Review commits: git log --oneline -2
-3. Review changelog: cat CHANGELOG.md
+3. Review changelog: head -50 CHANGELOG.md
 4. Push changes: git push origin feature/oauth2 --follow-tags
 5. Or continue implementation and commit again
 ```

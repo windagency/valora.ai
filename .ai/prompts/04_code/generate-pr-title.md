@@ -17,6 +17,7 @@ agents:
   - lead
 dependencies:
   requires:
+    - context.use-modern-cli-tools
     - context.analyze-commits-for-pr
 inputs:
   - name: custom_title

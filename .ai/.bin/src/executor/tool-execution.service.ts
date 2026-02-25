@@ -85,7 +85,24 @@ const BUILT_IN_TOOL_DEFINITIONS: Record<BuiltInTool, LLMToolDefinition> = {
 		}
 	},
 	glob_file_search: {
-		description: 'Find files matching a glob pattern',
+		description: `Find files matching a glob pattern.
+
+⚠️ RECOMMENDED: Use run_terminal_cmd with 'fd' for better performance.
+
+This tool uses basic glob matching.
+
+PREFERRED: Use run_terminal_cmd with modern 'fd' tool for:
+  • 5-10x faster file discovery
+  • .gitignore awareness (skips node_modules, .git, build/)
+  • Better pattern matching
+
+Examples:
+  ✅ run_terminal_cmd("fd -e ts src/")  # Find all .ts files in src/
+  ✅ run_terminal_cmd("fd -e tsx -e jsx .")  # Multiple extensions
+  ✅ run_terminal_cmd("fd --type f 'test' .")  # Files containing 'test'
+  ✅ run_terminal_cmd("fd --glob '**/*.config.js'")  # Glob pattern
+
+This tool (glob_file_search) is acceptable for simple patterns, but fd is faster and more powerful.`,
 		name: 'glob_file_search',
 		parameters: {
 			properties: {
@@ -99,7 +116,32 @@ const BUILT_IN_TOOL_DEFINITIONS: Record<BuiltInTool, LLMToolDefinition> = {
 		}
 	},
 	grep: {
-		description: 'Search file contents using regex pattern',
+		description: `⚠️ DEPRECATED: Use run_terminal_cmd with 'rg' (ripgrep) instead.
+
+This tool uses legacy grep which:
+  ❌ Searches node_modules, .git, and other ignored directories (wastes tokens)
+  ❌ Produces verbose, unstructured output
+  ❌ Lacks .gitignore awareness
+  ❌ Slower on large codebases
+
+PREFERRED: Use run_terminal_cmd with modern 'rg' (ripgrep) tool:
+
+Examples:
+  ✅ run_terminal_cmd("rg 'pattern' src/")  # Fast, .gitignore-aware
+  ✅ run_terminal_cmd("rg -A 5 'pattern' file.ts")  # With 5 lines of context
+  ✅ run_terminal_cmd("rg --json 'pattern' .")  # Structured output for parsing
+  ✅ run_terminal_cmd("rg -l 'pattern' .")  # List matching files only
+
+Benefits of rg over grep:
+  • 5-10x faster
+  • Respects .gitignore by default (skips node_modules, .git, build artifacts)
+  • Structured JSON output available (--json flag)
+  • Better regex engine
+  • Saves 60-80% tokens by excluding irrelevant files
+
+Only use this legacy grep tool if:
+  • You need to search in .gitignore'd directories
+  • rg is not available (rare)`,
 		name: 'grep',
 		parameters: {
 			properties: {
@@ -157,7 +199,28 @@ const BUILT_IN_TOOL_DEFINITIONS: Record<BuiltInTool, LLMToolDefinition> = {
 		}
 	},
 	read_file: {
-		description: 'Read the contents of a file',
+		description: `Read SMALL files only (max 100 lines).
+
+⚠️ CRITICAL RESTRICTIONS:
+
+NEVER use this tool for files >100 lines - this wastes 80-90% of your context window.
+NEVER use this tool for JSON/YAML/TOML/XML files - use jq/yq via run_terminal_cmd instead.
+
+DO NOT USE for these files (use run_terminal_cmd with rg instead):
+  ❌ PRD.md, BACKLOG.md, FUNCTIONAL.md (150-500 lines)
+  ❌ package.json, tsconfig.json (use jq)
+  ❌ docker-compose.yml, *.yaml (use yq)
+
+CORRECT usage examples:
+  ✅ read_file("README.md") - if < 100 lines
+  ✅ read_file("CONTRIBUTING.md") - if < 100 lines
+
+INCORRECT usage (use run_terminal_cmd instead):
+  ❌ read_file("knowledge-base/PRD.md") → use: run_terminal_cmd("rg '^## ' knowledge-base/PRD.md")
+  ❌ read_file("package.json") → use: run_terminal_cmd("jq '.dependencies' package.json")
+  ❌ read_file("knowledge-base/BACKLOG.md") → use: run_terminal_cmd("rg -A 5 'TASK-ID' knowledge-base/BACKLOG.md")
+
+Violating these restrictions wastes tokens and degrades performance.`,
 		name: 'read_file',
 		parameters: {
 			properties: {
@@ -936,7 +999,44 @@ export class ToolExecutionService {
 			);
 		}
 
+		// Enforce modern CLI tool usage: Block structured files
+		const structuredFileExtensions = ['.json', '.yaml', '.yml', '.toml', '.xml'];
+		const isStructuredFile = structuredFileExtensions.some((ext) => path.toLowerCase().endsWith(ext));
+		if (isStructuredFile) {
+			const tool = path.endsWith('.json') ? 'jq' : 'yq';
+			throw new Error(
+				`Cannot use read_file for structured files: ${path}\n\n` +
+					`Structured files (JSON/YAML/TOML/XML) must be read with ${tool} via run_terminal_cmd.\n\n` +
+					`Use instead:\n` +
+					`  run_terminal_cmd("${tool} '.' ${path}")  # Read entire file\n` +
+					`  run_terminal_cmd("${tool} '.key' ${path}")  # Extract specific field\n\n` +
+					`This saves 85-95% of tokens compared to read_file.`
+			);
+		}
+
+		// Enforce modern CLI tool usage: Block files with >100 lines
 		const content = await readFile(fullPath);
+		const lineCount = content.split('\n').length;
+		if (lineCount > 100) {
+			// Provide helpful suggestions based on file type
+			const fileName = path.split('/').pop() || path;
+			let suggestion = `run_terminal_cmd("rg '^## ' ${path}")  # Get markdown structure`;
+
+			if (fileName.includes('PRD') || fileName.includes('BACKLOG') || fileName.includes('FUNCTIONAL')) {
+				suggestion =
+					`run_terminal_cmd("rg '^## ' ${path}")  # Get document structure\n` +
+					`  run_terminal_cmd("rg -A 50 '^## Functional Requirements' ${path}")  # Extract section`;
+			} else if (fileName.endsWith('.ts') || fileName.endsWith('.tsx') || fileName.endsWith('.js')) {
+				suggestion = `run_terminal_cmd("rg -A 10 'class|function|export' ${path}")  # Extract key definitions`;
+			}
+
+			throw new Error(
+				`File too large: ${path} (${lineCount} lines > 100 line limit)\n\n` +
+					`Files with >100 lines must be read with selective extraction via run_terminal_cmd.\n\n` +
+					`Use instead:\n  ${suggestion}\n\n` +
+					`This saves 80-90% of tokens compared to reading the entire file.`
+			);
+		}
 
 		// Track that this file was read (enables writes to protected files)
 		this.readFiles.add(fullPath);

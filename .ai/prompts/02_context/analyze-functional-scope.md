@@ -16,7 +16,8 @@ model_requirements:
 agents:
   - lead
 dependencies:
-  requires: []
+  requires:
+    - context.use-modern-cli-tools
   optional:
     - context.load-prd
     - context.load-task

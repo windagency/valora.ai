@@ -17,6 +17,7 @@ agents:
   - lead
 dependencies:
   requires:
+    - context.use-modern-cli-tools
     - context.analyze-git-branch
 inputs:
   - name: current_branch

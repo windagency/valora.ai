@@ -185,8 +185,8 @@ pnpm vitest run --coverage
 # Jest
 pnpm jest --coverage --coverageReporters=json-summary
 
-# Check coverage report
-cat coverage/coverage-summary.json
+# Check coverage report (extract key metrics)
+jq '.total | {lines: .lines.pct, branches: .branches.pct, functions: .functions.pct, statements: .statements.pct}' coverage/coverage-summary.json
 ```
 
 ### Step 3: Validate Against Thresholds

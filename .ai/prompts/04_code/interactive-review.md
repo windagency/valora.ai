@@ -18,6 +18,7 @@ agents:
   - software-engineer
 dependencies:
   requires:
+    - context.use-modern-cli-tools
     - code.generate-commit-messages
 inputs:
   - name: commit_messages

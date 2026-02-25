@@ -17,6 +17,7 @@ agents:
   - lead
 dependencies:
   requires:
+    - context.use-modern-cli-tools
     - documentation.generate-infrastructure-docs
     - documentation.generate-backend-docs
     - documentation.generate-frontend-docs

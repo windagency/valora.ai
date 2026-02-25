@@ -16,7 +16,8 @@ model_requirements:
 agents:
   - product-manager
 dependencies:
-  requires: []
+  requires:
+    - context.use-modern-cli-tools
 inputs:
   - name: command_name
     description: Optional command name to start from (e.g., create-pr, implement)

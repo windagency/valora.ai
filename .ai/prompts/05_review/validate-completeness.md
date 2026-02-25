@@ -18,7 +18,8 @@ agents:
   - product-manager
   - lead
 dependencies:
-  requires: []
+  requires:
+    - context.use-modern-cli-tools
 inputs:
   - name: document
     description: The document to validate (specifications, PRD, or plan structure)

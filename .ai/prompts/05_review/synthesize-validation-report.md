@@ -18,6 +18,7 @@ agents:
   - asserter
 dependencies:
   requires:
+    - context.use-modern-cli-tools
     - review.validate-completeness
     - review.validate-standards-compliance
     - review.validate-type-safety

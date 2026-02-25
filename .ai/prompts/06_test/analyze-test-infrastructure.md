@@ -17,7 +17,8 @@ model_requirements:
 agents:
   - qa
 dependencies:
-  requires: []
+  requires:
+    - context.use-modern-cli-tools
   optional:
     - context.scan-codebase
 inputs:
@@ -42,13 +43,30 @@ tokens:
 
 Understand the testing setup, identify test framework(s), map test organization, and determine relevant tests based on scope.
 
+## CLI Tools for Infrastructure Detection
+
+Use modern CLI tools to discover test infrastructure efficiently:
+
+- **`jq`** to extract dependencies and scripts from `package.json` (instead of reading the entire file)
+- **`fd`** to locate test files, config files, and fixture directories by pattern
+- **`rg`** to search for test framework imports or configuration patterns across the codebase
+- **`yq`** to parse YAML-based test configs (`pyproject.toml`, `.github/workflows/*.yml`)
+
 ## Instructions
 
 ### Step 1: Detect Test Framework(s)
 
-**Check package managers and configuration files**:
+**Use `jq` to check package managers and configuration files**:
 
 For JavaScript/TypeScript:
+```bash
+# Extract test-related devDependencies
+jq '{devDeps: (.devDependencies // {} | to_entries | map(select(.key | test("jest|vitest|mocha|jasmine|ava|playwright|cypress"))) | from_entries), scripts: (.scripts // {} | to_entries | map(select(.key | test("test"))) | from_entries)}' package.json
+
+# Find test config files
+fd -g '{jest,vitest}.config.*' --type f
+fd -g '.mocharc.*' --type f
+```
 - `package.json`: Check devDependencies for Jest, Vitest, Mocha, Jasmine, AVA, etc.
 - Look for `jest.config.js`, `vitest.config.ts`, `.mocharc.json`
 - Check test scripts in `package.json` (e.g., `"test": "vitest"`)
@@ -88,7 +106,23 @@ For other languages:
 
 ### Step 2: Map Test Directory Structure
 
-**Identify test file conventions**:
+**Use `fd` to discover test files by convention**:
+```bash
+# JavaScript/TypeScript test files
+fd -e test.ts -e spec.ts -e test.tsx -e spec.tsx -e test.js -e spec.js --type f
+
+# Count test files by directory
+fd -e test.ts -e spec.ts --type f | rg -o '^[^/]+(/[^/]+)?' | sort | uniq -c | sort -rn
+
+# Python test files
+fd -g 'test_*.py' --type f
+fd -g '*_test.py' --type f
+
+# Go test files
+fd -g '*_test.go' --type f
+```
+
+**Test file conventions**:
 - `*.test.ts`, `*.spec.ts`, `*.test.js` (JavaScript/TypeScript)
 - `test_*.py`, `*_test.py` (Python)
 - `*_test.go` (Go)

@@ -17,7 +17,8 @@ agents:
   - lead
   - software-engineer
 dependencies:
-  requires: []
+  requires:
+    - context.use-modern-cli-tools
 inputs:
   - name: template_name
     description: Template name specified by user (e.g., "feature", "bugfix")

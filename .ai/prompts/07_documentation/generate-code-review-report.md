@@ -17,6 +17,7 @@ agents:
   - lead
 dependencies:
   requires:
+    - context.use-modern-cli-tools
     - review.assess-code-quality
 inputs:
   - name: quality_score

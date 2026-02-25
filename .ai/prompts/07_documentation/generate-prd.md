@@ -20,6 +20,7 @@ dependencies:
   requires:
     - context.load-specifications
     - onboard.analyze-requirements
+    - context.use-modern-cli-tools
 inputs:
   - name: specifications
     description: Loaded specifications

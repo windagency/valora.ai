@@ -22,6 +22,7 @@ dependencies:
   requires:
     - context.load-implementation-context
     - code.validate-prerequisites
+    - context.use-modern-cli-tools
 inputs:
   - name: implementation_scope
     description: Scope from load-implementation-context

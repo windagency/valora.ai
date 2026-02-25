@@ -10,6 +10,7 @@ allowed-tools:
   - glob_file_search
   - codebase_search
   - grep
+  - run_terminal_cmd  # Required for modern CLI tools (jq, yq, rg, fd)
 model: gpt-5-thinking-high
 agent: product-manager
 prompts:

@@ -18,7 +18,8 @@ model_requirements:
 agents:
   - asserter
 dependencies:
-  requires: []
+  requires:
+    - context.use-modern-cli-tools
 inputs:
   - name: acceptance_criteria
     description: Acceptance criteria to validate against

@@ -167,6 +167,15 @@
       "experimental": true,"argument-hint": "'[<plan-path>] [--fix] [--strict]'","allowed-tools": ["read_file","grep","list_dir","glob_file_search"],
       "model": "claude-haiku-4.5",
       "agent": "lead"
+    },
+    "setup-cli-toolkit": {
+      "name": "setup-cli-toolkit",
+      "description": "Install and verify the modern CLI toolkit (rg, fd, jq, yq, fzf, eza, zoxide, lazygit)",
+      "experimental": true,
+      "argument-hint": "'[--all | --check | tool1 tool2 ...]'",
+      "allowed-tools": ["run_terminal_cmd", "read_file"],
+      "model": "claude-haiku-4.5",
+      "agent": "platform-engineer"
     }
   }
 }

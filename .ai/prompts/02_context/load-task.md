@@ -16,7 +16,8 @@ model_requirements:
 agents:
   - product-manager
 dependencies:
-  requires: []
+  requires:
+    - context.use-modern-cli-tools
 inputs:
   - name: task_id
     description: Optional explicit task ID parameter

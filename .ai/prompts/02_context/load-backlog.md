@@ -16,7 +16,8 @@ model_requirements:
 agents:
   - product-manager
 dependencies:
-  requires: []
+  requires:
+    - context.use-modern-cli-tools
 inputs:
   - name: backlog_file_arg
     description: Optional path to backlog file from --backlog-file argument

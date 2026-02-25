@@ -19,6 +19,7 @@ agents:
   - lead
 dependencies:
   requires:
+    - context.use-modern-cli-tools
     - review.load-plan-context
 inputs:
   - name: plan_structure

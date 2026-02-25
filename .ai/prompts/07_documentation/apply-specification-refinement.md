@@ -18,6 +18,7 @@ agents:
   - product-manager
 dependencies:
   requires:
+    - context.use-modern-cli-tools
     - context.understand-intent
     - onboard.refine-specifications
     - review.validate-completeness

@@ -17,7 +17,8 @@ model_requirements:
 agents:
   - product-manager
 dependencies:
-  requires: []
+  requires:
+    - context.use-modern-cli-tools
 inputs:
   - name: pr_number
     description: Optional PR number for detailed metrics
@@ -50,15 +51,26 @@ Collect quantitative metrics from version control and CI/CD systems to objective
 
 1. **Git commands** via `run_terminal_cmd`:
    - `git rev-list`, `git diff`, `git log`, `git show`
+   - Use `--numstat`, `--format=`, `--porcelain` for machine-readable output
    - These are the primary tools for gathering git metrics
 
-2. **query_session** - For execution timing data:
+2. **`jq`** - For parsing JSON output from GitHub API or coverage reports:
+   - Extract specific fields instead of dumping entire JSON files
+   - Example: `jq '.total.lines.pct' coverage/coverage-summary.json`
+
+3. **`rg`** - For searching through git output or log files:
+   - Pattern matching across commit messages or diff output
+   - Example: `git log --format='%s' | rg "fix|feat|breaking"`
+
+4. **query_session** - For execution timing data:
    - `action: "get", session_id: "<id>"` - Get command durations
 
 **DO NOT use:**
 - `npm test`, `npm run test:coverage`, `pnpm test` - too slow, set coverage to null
 - `npm run lint`, `pnpm lint` - not needed for metrics
 - `read_file` on `.ai/sessions/` - use `query_session` instead
+- `grep` - use `rg` instead for faster, `.gitignore`-aware search
+- `cat file.json` - use `jq '.' file.json` to extract specific fields
 
 **For test coverage:** Set to `null` - do not attempt to run tests.
 
@@ -79,6 +91,7 @@ git rev-list --count main..HEAD
 ### Step 2: Calculate Files Modified
 
 ```bash
+# Count files changed (machine-readable numstat)
 git diff --numstat main...HEAD | wc -l
 ```
 
@@ -93,7 +106,8 @@ git diff --stat main...HEAD
 ### Step 3: Measure Lines Changed
 
 ```bash
-git diff --numstat main...HEAD | awk '{add+=$1; del+=$2} END {print add, del, add+del}'
+# Extract additions, deletions, and total from structured numstat output
+git diff --numstat main...HEAD | awk '{add+=$1; del+=$2} END {print "additions=" add, "deletions=" del, "total=" add+del}'
 ```
 
 **Output**:
@@ -143,10 +157,23 @@ Or parse from PR status checks.
 
 ### Step 6: Assess Test Coverage (if available)
 
-**Look for coverage tools:**
-- Jest: `pnpm exec jest --coverage --json`
-- Pytest: `.coverage` file
-- Coverage.py: `coverage report`
+**Look for existing coverage reports (do NOT run tests):**
+
+Use `jq` to extract coverage metrics from existing JSON reports:
+```bash
+# Parse Jest/Vitest coverage-summary.json
+jq '{
+  statements: .total.statements.pct,
+  branches: .total.branches.pct,
+  functions: .total.functions.pct,
+  lines: .total.lines.pct
+}' coverage/coverage-summary.json
+```
+
+Use `fd` to locate coverage report files:
+```bash
+fd -g 'coverage-summary.json' --type f
+```
 
 Compare before/after if possible.
 

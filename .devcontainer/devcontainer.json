@@ -26,7 +26,7 @@
     "PNPM_HOME": "/home/node/.local/share/pnpm",
     // Configure npm to use user-local prefix instead of system directory
     "NPM_CONFIG_PREFIX": "/home/node/.npm-global",
-    "PATH": "/home/node/.npm-global/bin:/home/node/.local/share/pnpm:${containerEnv:PATH}"
+    "PATH": "/home/node/.local/bin:/home/node/.npm-global/bin:/home/node/.local/share/pnpm:${containerEnv:PATH}"
   },
   "customizations": {
     "vscode": {

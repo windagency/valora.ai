@@ -18,6 +18,7 @@ agents:
 dependencies:
   requires:
     - onboard.analyze-requirements
+    - context.use-modern-cli-tools
 inputs:
   - name: analysis
     description: Requirements analysis from onboard stage

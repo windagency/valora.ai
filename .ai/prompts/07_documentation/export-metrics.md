@@ -18,6 +18,7 @@ agents:
   - product-manager
 dependencies:
   requires:
+    - context.use-modern-cli-tools
     - documentation.generate-feedback-report
 inputs:
   - name: summary_statistics

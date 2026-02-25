@@ -18,6 +18,7 @@ agents:
   - lead
 dependencies:
   requires:
+    - context.use-modern-cli-tools
     - context.analyze-functional-scope
   optional:
     - review.validate-accessibility

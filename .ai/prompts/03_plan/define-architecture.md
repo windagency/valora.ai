@@ -18,6 +18,7 @@ agents:
   - lead
 dependencies:
   requires:
+    - context.use-modern-cli-tools
     - context.analyze-task-context
 inputs:
   - name: task_details

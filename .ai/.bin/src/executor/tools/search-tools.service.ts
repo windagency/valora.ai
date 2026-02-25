@@ -37,6 +37,7 @@ export class SearchToolsService {
 
 	/**
 	 * Search for files using glob pattern
+	 * Uses fd for fast, .gitignore-aware file discovery with find as fallback
 	 */
 	async executeGlobSearch(args: Record<string, unknown>): Promise<string> {
 		const pattern = args['pattern'] as string;
@@ -46,7 +47,9 @@ export class SearchToolsService {
 		}
 
 		try {
-			const { stdout } = await execAsync(`find . -path "${pattern}" -type f 2>/dev/null | head -100`, {
+			// Use fd for better performance and .gitignore awareness, fall back to find
+			const command = `fd --glob "${pattern}" --type f --max-results 100 2>/dev/null || find . -path "${pattern}" -type f 2>/dev/null | head -100`;
+			const { stdout } = await execAsync(command, {
 				cwd: this.workingDir,
 				timeout: DEFAULT_TIMEOUT_MS
 			});

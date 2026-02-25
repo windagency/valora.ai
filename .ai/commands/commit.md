@@ -897,7 +897,7 @@ Closes #234
 
 Next steps:
 1. Review: git show v2.0.0
-2. Review changelog: cat CHANGELOG.md
+2. Review changelog: head -50 CHANGELOG.md
 3. Create migration guide: docs/migration/v2.0.md
 4. Notify stakeholders before pushing
 ```

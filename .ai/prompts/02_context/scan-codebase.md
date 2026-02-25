@@ -17,7 +17,8 @@ model_requirements:
 agents:
   - lead
 dependencies:
-  requires: []
+  requires:
+    - context.use-modern-cli-tools
 inputs:
   - name: scope
     description: Analysis scope (project or task)

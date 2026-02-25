@@ -9,6 +9,7 @@ allowed-tools:
   - grep
   - list_dir
   - glob_file_search
+  - run_terminal_cmd  # Required for modern CLI tools (jq, yq, rg, fd)
   # MCP: GitHub for issue/PR context
   - mcp_github
   # MCP: Semantic context search

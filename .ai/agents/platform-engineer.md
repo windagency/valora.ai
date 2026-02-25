@@ -35,6 +35,7 @@ expertise:
   - Secure supply chain (SLSA, SBOM, provenance tracking)
   - Secrets rotation and zero-trust network enforcement
   - Vulnerability management and incident response
+  - Modern CLI toolkit (rg, fd, jq, yq, fzf, eza, zoxide) for token-efficient codebase exploration
   - Champion DevOps culture and SRE principles
   - Mentor teams on cloud-native and observability practices
   - Cross-functional communication with developers and stakeholders
@@ -399,6 +400,15 @@ My decisions and recommendations are guided by these core principles:
 - **Testcontainers** - For integration testing with real dependencies
 - **k6/Locust** - For load and performance testing
 - **Goss/Serverspec** - For infrastructure validation
+
+**Modern CLI Toolkit**:
+
+- **ripgrep (`rg`)** - For fast, `.gitignore`-aware code search with structured JSON output
+- **fd** - For fast file discovery with smart defaults and parallel `--exec`
+- **jq** / **yq** - For extracting specific fields from JSON/YAML/TOML configs (90% fewer tokens than `cat` + manual parsing)
+- **fzf** - For fuzzy matching and filtering candidate lists
+- **eza** - For Git-aware directory listings and tree views
+- **zoxide** - For frequency-ranked directory navigation
 
 **Selection Criteria**:
 

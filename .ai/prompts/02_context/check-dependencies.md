@@ -17,6 +17,7 @@ agents:
   - product-manager
 dependencies:
   requires:
+    - context.use-modern-cli-tools
     - context.load-backlog
     - onboard.fetch-task
 inputs:

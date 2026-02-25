@@ -17,7 +17,8 @@ model_requirements:
 agents:
   - product-manager
 dependencies:
-  requires: []
+  requires:
+    - context.use-modern-cli-tools
 inputs:
   - name: specs_file_arg
     description: Optional path to specifications file
@@ -69,8 +70,6 @@ Check for specifications in priority order:
    - Guide them on required format
 
 ### Step 2: Parse Specifications
-
-Read and parse the specifications file:
 
 **Extract key sections**:
 

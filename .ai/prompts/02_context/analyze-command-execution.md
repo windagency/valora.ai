@@ -18,6 +18,7 @@ agents:
 dependencies:
   requires:
     - context.identify-completed-workflow
+    - context.use-modern-cli-tools
 inputs:
   - name: workflow_executed
     description: Workflow type from previous stage
@@ -82,16 +83,27 @@ For each command in `commands_chain`:
 
 ### Step 2: Analyze Tool Usage
 
-Parse git diff and commit messages to infer tools used:
+Parse git diff and commit messages to infer tools used.
+
+**Use modern CLI tools for parsing:**
+- **`rg`** to search commit messages for tool-usage patterns (instead of `grep`)
+- **`jq`** to extract structured data from any JSON output
+- **`git log --format=...`** with structured format strings for machine-readable git data
 
 **Read operations:**
 ```bash
-git log --stat --oneline | grep -E "read|search|grep"
+rg "read|search|codebase_search" <(git log --stat --oneline HEAD~<n>..HEAD)
 ```
 
 **Write operations:**
 ```bash
-git diff --stat HEAD~<n>..HEAD
+git diff --numstat HEAD~<n>..HEAD | awk '{print $1, $2, $3}'
+```
+
+**Structured commit analysis:**
+```bash
+# Machine-readable commit data for programmatic processing
+git log --format='%H|%an|%s' HEAD~<n>..HEAD
 ```
 
 Count by tool category:
@@ -104,6 +116,7 @@ Count by tool category:
 ### Step 3: Track File Changes
 
 ```bash
+# Structured output for categorization
 git diff --name-status HEAD~<n>..HEAD
 ```
 
@@ -117,7 +130,11 @@ Group by directory to identify affected areas.
 
 ### Step 4: Detect Errors and Retries
 
-**From commit messages:**
+**From commit messages (use `rg` for pattern matching):**
+```bash
+# Detect error-resolution patterns in commit messages
+git log --format='%s' HEAD~<n>..HEAD | rg -i "fix|resolve|correct|retry|revert"
+```
 - Look for "fix", "resolve", "correct" keywords
 - Identify fixup/amend commits
 - Count retry patterns

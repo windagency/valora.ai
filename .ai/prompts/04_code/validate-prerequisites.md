@@ -20,6 +20,7 @@ agents:
   - secops-engineer
 dependencies:
   requires:
+    - context.use-modern-cli-tools
     - context.load-implementation-context
 inputs:
   - name: plan_summary

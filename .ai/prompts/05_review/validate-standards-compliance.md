@@ -17,6 +17,7 @@ agents:
   - asserter
 dependencies:
   requires:
+    - context.use-modern-cli-tools
     - context.gather-validation-context
 inputs:
   - name: coding_standards

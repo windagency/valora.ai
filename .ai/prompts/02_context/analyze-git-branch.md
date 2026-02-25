@@ -17,7 +17,8 @@ agents:
   - lead
   - software-engineer
 dependencies:
-  requires: []
+  requires:
+    - context.use-modern-cli-tools
 inputs:
   - name: base_branch_arg
     description: Optional user-specified base branch

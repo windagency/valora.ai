@@ -19,6 +19,7 @@ agents:
   - lead
 dependencies:
   requires:
+    - context.use-modern-cli-tools
     - context.load-plan-context
     - review.validate-completeness
     - review.validate-technical-feasibility

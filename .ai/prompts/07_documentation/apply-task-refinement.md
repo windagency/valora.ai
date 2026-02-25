@@ -21,6 +21,7 @@ dependencies:
     - context.load-task
     - onboard.refine-requirements
     - review.validate-testability
+    - context.use-modern-cli-tools
 inputs:
   - name: task_context
     description: Original task details from context.load-task

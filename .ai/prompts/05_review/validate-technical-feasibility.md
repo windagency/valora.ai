@@ -20,6 +20,7 @@ agents:
 dependencies:
   requires:
     - review.load-plan-context
+    - context.use-modern-cli-tools
 allowed_tools:
   - codebase_search
   - grep

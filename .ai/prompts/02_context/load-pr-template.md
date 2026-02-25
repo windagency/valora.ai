@@ -16,7 +16,8 @@ model_requirements:
 agents:
   - lead
 dependencies:
-  requires: []
+  requires:
+    - context.use-modern-cli-tools
 inputs:
   - name: template_name
     description: Optional custom template name

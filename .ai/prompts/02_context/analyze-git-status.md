@@ -17,7 +17,8 @@ agents:
   - lead
   - software-engineer
 dependencies:
-  requires: []
+  requires:
+    - context.use-modern-cli-tools
 inputs: []
 outputs:
   - changed_files

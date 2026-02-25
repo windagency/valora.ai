@@ -17,6 +17,7 @@ agents:
   - lead
 dependencies:
   requires:
+    - context.use-modern-cli-tools
     - code.push-and-create-pr
 inputs:
   - name: pr_url

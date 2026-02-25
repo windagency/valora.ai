@@ -18,6 +18,7 @@ agents:
 dependencies:
   requires:
     - onboard.analyze-documentation-requirements
+    - context.use-modern-cli-tools
 inputs:
   - name: documentation_plan
     description: Full documentation plan object (extract backend domain)

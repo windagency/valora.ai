@@ -18,6 +18,7 @@ agents:
   - product-manager
 dependencies:
   requires:
+    - context.use-modern-cli-tools
     - context.analyze-command-execution
     - review.calculate-performance-metrics
     - review.collect-user-feedback

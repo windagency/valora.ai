@@ -19,6 +19,7 @@ agents:
   - lead
 dependencies:
   requires:
+    - context.use-modern-cli-tools
     - documentation.generate-all-domains-parallel
 inputs:
   - name: infrastructure_docs

@@ -20,6 +20,7 @@ agents:
   - secops-engineer
 dependencies:
   requires:
+    - context.use-modern-cli-tools
     - code.implement-changes
     - code.implement-tests
     - documentation.update-inline-docs

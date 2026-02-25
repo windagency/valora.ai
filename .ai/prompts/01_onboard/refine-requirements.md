@@ -18,6 +18,7 @@ agents:
   - product-manager
 dependencies:
   requires:
+    - context.use-modern-cli-tools
     - context.load-task
     - onboard.analyze-clarity
 inputs:

@@ -18,6 +18,7 @@ agents:
 dependencies:
   requires:
     - review.validate-documentation
+    - context.use-modern-cli-tools
 inputs:
   - name: infrastructure_docs
     description: Infrastructure generation metadata (files already written)

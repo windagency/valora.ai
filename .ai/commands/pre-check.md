@@ -152,7 +152,17 @@ wait
 
 ### Step 2: Collect Results
 
-Aggregate results from all checks.
+Aggregate results from all checks. Use `jq` to parse JSON output from linters and test runners instead of reading raw text:
+
+```bash
+# Parse ESLint JSON output for error/warning counts
+pnpm lint --format json | jq '[.[] | {file: .filePath, errors: .errorCount, warnings: .warningCount}] | {total_errors: (map(.errors) | add), total_warnings: (map(.warnings) | add), files_with_issues: length}'
+
+# Parse security audit JSON
+pnpm audit --json | jq '{vulnerabilities: .metadata.vulnerabilities}'
+```
+
+**Expected result structure:**
 
 ```json
 {

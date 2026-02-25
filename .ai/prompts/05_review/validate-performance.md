@@ -18,6 +18,7 @@ agents:
   - lead
 dependencies:
   requires:
+    - context.use-modern-cli-tools
     - context.analyze-changes-for-review
 inputs:
   - name: changed_files
@@ -100,10 +101,10 @@ data.filter(x => x.active)
 
 ```bash
 # Check for SELECT * patterns
-grep -r "SELECT \*" src/ --include="*.ts" --include="*.sql"
+rg "SELECT \*" src/ -t ts -g '*.sql'
 
 # Check for queries in loops
-grep -rB 5 "await.*find\|query" src/ | grep -A 5 "for\|while"
+rg -B 5 "await.*(find|query)" src/ -t ts | rg -A 5 "for|while"
 ```
 
 ### Step 3: Identify Resource Management Issues

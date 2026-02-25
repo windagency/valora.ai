@@ -17,6 +17,7 @@ agents:
   - lead
 dependencies:
   requires:
+    - context.use-modern-cli-tools
     - context.analyze-commits-for-pr
     - context.analyze-codebase-changes
 inputs:

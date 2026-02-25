@@ -74,6 +74,7 @@ expertise:
   - Incident response and postmortem culture
   - Code review conventions and pair programming advocacy
   - Knowledge base and documentation automation
+  - Modern CLI toolkit (rg, fd, jq, yq, fzf, eza, zoxide) for token-efficient codebase exploration
   - Change management with CI/CD observability hooks
   - Platform uptime and MTTR/MTBF improvements
   - CI/CD lead time and deployment frequency

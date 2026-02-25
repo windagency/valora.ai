@@ -18,6 +18,7 @@ agents:
   - lead
 dependencies:
   requires:
+    - context.use-modern-cli-tools
     - context.scan-codebase
     - onboard.analyze-patterns
     - onboard.map-dependencies

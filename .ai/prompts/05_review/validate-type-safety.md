@@ -17,6 +17,7 @@ agents:
   - asserter
 dependencies:
   requires:
+    - context.use-modern-cli-tools
     - context.gather-validation-context
 inputs: []
 outputs:
@@ -102,7 +103,7 @@ Estimate type coverage percentage on **project source files only**:
 
 ```bash
 # TypeScript - check for 'any' usage in project source (exclude .ai/)
-grep -r ":\s*any" src/ --include="*.ts" --include="*.tsx" | wc -l
+rg ":\s*any" src/ -t ts -c | rg -o '\d+$' | paste -sd+ | bc
 
 # Or use type-coverage tool on project source
 pnpm exec type-coverage --at-least 95 --project tsconfig.json

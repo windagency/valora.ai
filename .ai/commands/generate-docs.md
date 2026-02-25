@@ -10,6 +10,7 @@ allowed-tools:
   - glob_file_search
   - codebase_search
   - grep
+  - run_terminal_cmd  # Required for modern CLI tools (jq, yq, rg, fd)
 model: claude-opus-4.5
 agent: lead
 prompts:
@@ -568,16 +569,16 @@ Full documentation generated from extraction
 
 ```bash
 # Find all route definitions
-grep -rn "router\.\|app\.\(get\|post\|put\|patch\|delete\)" src/ --include="*.ts"
+rg -n "router\.|app\.(get|post|put|patch|delete)" src/ -t ts
 
 # Find all interfaces/types
-grep -rn "^export interface\|^export type" src/ --include="*.ts"
+rg -n "^export (interface|type) " src/ -t ts
 
 # Find all service classes
-grep -rn "^export class.*Service" src/ --include="*.ts"
+rg -n "^export class.*Service" src/ -t ts
 
 # Find environment variables
-grep -rn "process\.env\." src/ --include="*.ts"
+rg -n "process\.env\." src/ -t ts
 ```
 
 ---

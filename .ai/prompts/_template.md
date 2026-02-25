@@ -18,6 +18,7 @@ agents:
   -
 dependencies:
   requires:
+    - context.use-modern-cli-tools
     - 
   optional:
     - 

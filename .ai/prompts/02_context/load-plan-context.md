@@ -17,7 +17,8 @@ model_requirements:
 agents:
   - lead
 dependencies:
-  requires: []
+  requires:
+    - context.use-modern-cli-tools
 inputs:
   - name: plan_document
     description: Path to the implementation plan document

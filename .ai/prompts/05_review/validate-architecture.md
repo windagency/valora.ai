@@ -17,6 +17,7 @@ agents:
   - asserter
 dependencies:
   requires:
+    - context.use-modern-cli-tools
     - context.gather-validation-context
 inputs:
   - name: architectural_guidelines
@@ -87,7 +88,7 @@ pnpm exec madge --circular src/ --exclude ".ai"
 
 # Check imports violating layers in project source
 # Example: search for data imports in UI
-grep -r "import.*from.*data" src/components/
+rg "import.*from.*data" src/components/
 ```
 
 **Note**: Always target `src/` or specific project directories rather than the repository root.

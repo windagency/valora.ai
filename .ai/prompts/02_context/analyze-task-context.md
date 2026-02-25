@@ -19,6 +19,7 @@ agents:
 dependencies:
   requires:
     - context.scan-codebase
+    - context.use-modern-cli-tools
   optional:
     - context.understand-intent
 inputs:

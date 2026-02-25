@@ -18,6 +18,7 @@ agents:
   - lead
 dependencies:
   requires:
+    - context.use-modern-cli-tools
     - context.analyze-changes-for-review
 inputs:
   - name: changed_files
@@ -201,13 +202,13 @@ if (user) {
 
 ```bash
 # Find TODOs and FIXMEs
-grep -r "TODO\|FIXME\|HACK\|XXX" src/ --include="*.ts" --include="*.tsx"
+rg "TODO|FIXME|HACK|XXX" src/ -t ts
 
 # Find commented code
-grep -r "^\s*//.*[{};]" src/ --include="*.ts"
+rg "^\s*//.*[{};]" src/ -t ts
 
 # Check for deprecated usage
-grep -r "@deprecated" src/ --include="*.ts"
+rg "@deprecated" src/ -t ts
 ```
 
 ### Step 4: Assess Error Handling

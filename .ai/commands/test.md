@@ -72,6 +72,14 @@ Execute comprehensive automated test suites to validate implementation correctne
 
 ## Rules
 
+### Modern CLI Tools for Test Output Processing
+
+When processing test output, coverage reports, and test infrastructure data, use modern CLI tools:
+
+- **`jq`** to parse JSON test results and coverage reports (extract specific metrics instead of reading raw output)
+- **`fd`** to discover test files by naming convention (e.g., `fd -e test.ts -e spec.ts --type f`)
+- **`rg`** to search test output for failure patterns, stack traces, or flaky test indicators
+
 ### Command Orchestration
 
 1. **Execution Flow**

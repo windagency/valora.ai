@@ -16,7 +16,8 @@ model_requirements:
 agents:
   - lead
 dependencies:
-  requires: []
+  requires:
+    - context.use-modern-cli-tools
 inputs:
   - name: scope
     description: Review scope (file path, directory, or git diff)
