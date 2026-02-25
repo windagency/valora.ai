@@ -102,15 +102,15 @@ See [Component Architecture](./components.md) for detailed component diagrams.
 
 ### Dependencies
 
-| Category        | Library                   | Purpose                 |
-| --------------- | ------------------------- | ----------------------- |
-| CLI             | Commander                 | Command parsing         |
-| UI              | Ink, Chalk                | Terminal UI             |
-| Validation      | Zod                       | Schema validation       |
-| LLM - Anthropic | @anthropic-ai/sdk         | Claude integration      |
-| LLM - OpenAI    | openai                    | GPT integration         |
-| LLM - Google    | @google/generative-ai     | Gemini integration      |
-| MCP             | @modelcontextprotocol/sdk | Protocol implementation |
+| Category        | Library                   | Purpose                     |
+| --------------- | ------------------------- | --------------------------- |
+| CLI             | Commander                 | Command parsing             |
+| UI              | Ink, Chalk                | Terminal UI                 |
+| Validation      | Zod                       | Schema validation           |
+| LLM - Anthropic | @anthropic-ai/sdk         | Claude integration          |
+| LLM - OpenAI    | openai                    | GPT integration             |
+| LLM - Google    | @google/generative-ai     | Gemini integration          |
+| MCP             | @modelcontextprotocol/sdk | Protocol implementation     |
 | External MCP    | MCP Client SDK            | External server connections |
 
 ### Development Tools
@@ -127,14 +127,14 @@ See [Component Architecture](./components.md) for detailed component diagrams.
 
 VALORA can connect to **15 external MCP servers** as a client, enabling extended capabilities with user approval workflows.
 
-| Category          | Servers                                          |
-| ----------------- | ------------------------------------------------ |
-| **Browser/Testing** | Playwright, Chrome DevTools, BrowserStack      |
-| **Design**        | Figma, Storybook                                 |
-| **Development**   | GitHub, Serena, Context7                         |
-| **Infrastructure**| Terraform, Firebase, Google Cloud                |
-| **Data**          | MongoDB, Elastic                                 |
-| **Observability** | Grafana, DeepResearch                            |
+| Category            | Servers                                   |
+| ------------------- | ----------------------------------------- |
+| **Browser/Testing** | Playwright, Chrome DevTools, BrowserStack |
+| **Design**          | Figma, Storybook                          |
+| **Development**     | GitHub, Serena, Context7                  |
+| **Infrastructure**  | Terraform, Firebase, Google Cloud         |
+| **Data**            | MongoDB, Elastic                          |
+| **Observability**   | Grafana, DeepResearch                     |
 
 ### External MCP Architecture
 
@@ -171,33 +171,33 @@ flowchart LR
 
 ### External MCP Components
 
-| Component               | Responsibility                                    |
-| ----------------------- | ------------------------------------------------- |
-| **MCP Client Manager**  | Connection lifecycle, tool discovery, caching     |
-| **Approval Workflow**   | Interactive user approval with risk assessment   |
-| **Approval Cache**      | Session/persistent approval memory               |
-| **Audit Logger**        | Security logging of all MCP operations           |
-| **Tool Proxy**          | Timeout enforcement, risk assessment, error handling |
+| Component              | Responsibility                                       |
+| ---------------------- | ---------------------------------------------------- |
+| **MCP Client Manager** | Connection lifecycle, tool discovery, caching        |
+| **Approval Workflow**  | Interactive user approval with risk assessment       |
+| **Approval Cache**     | Session/persistent approval memory                   |
+| **Audit Logger**       | Security logging of all MCP operations               |
+| **Tool Proxy**         | Timeout enforcement, risk assessment, error handling |
 
 ### Security Features
 
-| Feature                 | Description                                       |
-| ----------------------- | ------------------------------------------------- |
-| **Risk Assessment**     | Automatic scoring based on capabilities           |
-| **User Approval**       | Interactive approval before connections           |
-| **Tool Filtering**      | Allowlist/blocklist for sensitive operations     |
-| **Audit Logging**       | Full operation trail for compliance              |
-| **Timeout Enforcement** | Configurable execution limits                    |
+| Feature                 | Description                                  |
+| ----------------------- | -------------------------------------------- |
+| **Risk Assessment**     | Automatic scoring based on capabilities      |
+| **User Approval**       | Interactive approval before connections      |
+| **Tool Filtering**      | Allowlist/blocklist for sensitive operations |
+| **Audit Logging**       | Full operation trail for compliance          |
+| **Timeout Enforcement** | Configurable execution limits                |
 
 ## Key Architectural Decisions
 
-| Decision                 | Rationale                              |
-| ------------------------ | -------------------------------------- |
-| Multi-agent architecture | Specialisation improves output quality |
-| Three-tier execution     | Flexibility for different use cases    |
-| Session-based state      | Context preservation across commands   |
-| Pipeline-based execution | Composable, testable workflows         |
-| Provider abstraction     | LLM vendor independence                |
+| Decision                   | Rationale                                |
+| -------------------------- | ---------------------------------------- |
+| Multi-agent architecture   | Specialisation improves output quality   |
+| Three-tier execution       | Flexibility for different use cases      |
+| Session-based state        | Context preservation across commands     |
+| Pipeline-based execution   | Composable, testable workflows           |
+| Provider abstraction       | LLM vendor independence                  |
 | External MCP with approval | Security-first external tool integration |
 
 See [Architecture Decision Records](../adr/README.md) for detailed decisions.
@@ -231,7 +231,7 @@ See [Architecture Decision Records](../adr/README.md) for detailed decisions.
 
 ## Evolution Strategy
 
-### Current State (v1.0.0-alpha)
+### Current State
 
 - Core CLI functionality
 - Basic MCP integration

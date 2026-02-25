@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.0.0--alpha.1-blue?style=flat-square" alt="Version" />
+  <img src="https://img.shields.io/badge/version-1.1.0-blue?style=flat-square" alt="Version" />
   <img src="https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen?style=flat-square&logo=node.js" alt="Node" />
   <img src="https://img.shields.io/badge/typescript-5.x-3178c6?style=flat-square&logo=typescript" alt="TypeScript" />
   <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="License" />
