@@ -12,6 +12,7 @@ export * from './document.types';
 export * from './error.types';
 export * from './escalation.types';
 export * from './exploration.types';
+export * from './hook.types';
 export * from './llm.types';
 export * from './logger.types';
 export * from './mcp-client.types';

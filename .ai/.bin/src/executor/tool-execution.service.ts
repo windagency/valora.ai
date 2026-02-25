@@ -38,6 +38,7 @@ import { readFile, writeFile } from 'utils/file-utils';
 import { validateNotForbiddenPath } from 'utils/input-validator';
 import { getTracer, type Span } from 'utils/tracing';
 
+import { getHookExecutionService } from './hook-execution.service';
 import { type MCPToolHandler } from './mcp-tool-handler';
 import {
 	type DryRunToolSimulator,
@@ -308,6 +309,7 @@ Violating these restrictions wastes tokens and degrades performance.`,
 };
 
 export class ToolExecutionService {
+	private readonly hookExecutionService = getHookExecutionService();
 	private readonly idempotencyStore: IdempotencyStoreService;
 	private readonly logger = getLogger();
 	private mcpClientManager: MCPClientManagerService | null = null;
@@ -381,6 +383,7 @@ export class ToolExecutionService {
 	setSessionId(sessionId: string): void {
 		this.sessionId = sessionId;
 		this.idempotencyOptions.session_id = sessionId;
+		this.hookExecutionService.setSessionId(sessionId);
 	}
 
 	/**
@@ -620,6 +623,25 @@ export class ToolExecutionService {
 			return simulated.result;
 		}
 
+		// === PreToolUse hooks (before span, can block/modify) ===
+		if (this.hookExecutionService.hasHooks('PreToolUse')) {
+			const hookResult = await this.hookExecutionService.executePreToolUseHooks(toolCall);
+
+			if (!hookResult.allowed) {
+				this.logger.info(`Tool blocked by PreToolUse hook: ${name}`, {
+					reason: hookResult.blockReason
+				});
+				return {
+					output: `Tool call blocked by hook: ${hookResult.blockReason ?? 'No reason provided'}`,
+					tool_call_id: toolCall.id
+				};
+			}
+
+			if (hookResult.updatedArgs) {
+				toolCall = { ...toolCall, arguments: { ...toolCall.arguments, ...hookResult.updatedArgs } };
+			}
+		}
+
 		// Start a span for this tool execution
 		const span = this.tracer.startSpan(`tool.${name}`, {
 			attributes: {
@@ -686,6 +708,14 @@ export class ToolExecutionService {
 			// Store result for idempotent tools
 			if (isIdempotentTool(name)) {
 				await this.idempotencyStore.store(toolCall, { output, success: true }, this.idempotencyOptions);
+			}
+
+			// === PostToolUse hooks (after execution, non-blocking) ===
+			if (this.hookExecutionService.hasHooks('PostToolUse')) {
+				// Fire-and-forget: do not await, do not block
+				this.hookExecutionService.executePostToolUseHooks(toolCall, output).catch((err) => {
+					this.logger.warn('PostToolUse hook error', { error: formatErrorMessage(err) });
+				});
 			}
 
 			return {

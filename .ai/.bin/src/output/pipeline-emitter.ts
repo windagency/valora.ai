@@ -18,7 +18,10 @@ import {
 	type PipelineStartData,
 	type StageCompleteData,
 	type StageProgressData,
-	type StageStartData
+	type StageStartData,
+	type ToolHookBlockedData,
+	type ToolHookPostData,
+	type ToolHookTriggeredData
 } from 'types/pipeline.types';
 
 export class PipelineEventEmitter extends EventEmitter {
@@ -166,6 +169,39 @@ export class PipelineEventEmitter extends EventEmitter {
 			...data,
 			timestamp: Date.now(),
 			type: PipelineEventType.ESCALATION_ABORTED
+		} as PipelineEventData);
+	}
+
+	/**
+	 * Emit tool hook triggered event
+	 */
+	emitToolHookTriggered(data: ToolHookTriggeredData): void {
+		this.emit(PipelineEventType.TOOL_HOOK_TRIGGERED, {
+			...data,
+			timestamp: Date.now(),
+			type: PipelineEventType.TOOL_HOOK_TRIGGERED
+		} as PipelineEventData);
+	}
+
+	/**
+	 * Emit tool hook blocked event
+	 */
+	emitToolHookBlocked(data: ToolHookBlockedData): void {
+		this.emit(PipelineEventType.TOOL_HOOK_BLOCKED, {
+			...data,
+			timestamp: Date.now(),
+			type: PipelineEventType.TOOL_HOOK_BLOCKED
+		} as PipelineEventData);
+	}
+
+	/**
+	 * Emit tool hook post event
+	 */
+	emitToolHookPost(data: ToolHookPostData): void {
+		this.emit(PipelineEventType.TOOL_HOOK_POST, {
+			...data,
+			timestamp: Date.now(),
+			type: PipelineEventType.TOOL_HOOK_POST
 		} as PipelineEventData);
 	}
 

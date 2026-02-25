@@ -104,6 +104,27 @@ export const FEATURE_FLAGS_SCHEMA = z.object({
 	dynamic_agent_selection_implement_only: z.boolean().default(true)
 });
 
+// Hook command configuration schema
+export const HOOK_COMMAND_SCHEMA = z.object({
+	async: z.boolean().optional(),
+	command: z.string().min(1),
+	statusMessage: z.string().optional(),
+	timeout: z.number().min(100).max(600_000).optional(),
+	type: z.literal('command')
+});
+
+// Hook matcher configuration schema
+export const HOOK_MATCHER_SCHEMA = z.object({
+	hooks: z.array(HOOK_COMMAND_SCHEMA).min(1),
+	matcher: z.string().min(1)
+});
+
+// Hooks configuration schema
+export const HOOKS_CONFIG_SCHEMA = z.object({
+	PostToolUse: z.array(HOOK_MATCHER_SCHEMA).optional(),
+	PreToolUse: z.array(HOOK_MATCHER_SCHEMA).optional()
+});
+
 // Paths configuration schema
 export const PATHS_CONFIG_SCHEMA = z.object({
 	agents_dir: z.string().optional(),
@@ -118,6 +139,7 @@ export const PATHS_CONFIG_SCHEMA = z.object({
 export const CONFIG_SCHEMA = z.object({
 	defaults: DEFAULTS_CONFIG_SCHEMA,
 	features: FEATURE_FLAGS_SCHEMA.optional(),
+	hooks: HOOKS_CONFIG_SCHEMA.optional(),
 	logging: LOGGING_RETENTION_CONFIG_SCHEMA.optional(),
 	paths: PATHS_CONFIG_SCHEMA.optional(),
 	providers: PROVIDERS_CONFIG_SCHEMA,
@@ -128,6 +150,7 @@ export const CONFIG_SCHEMA = z.object({
 export type Config = z.infer<typeof CONFIG_SCHEMA>;
 export type DefaultsConfig = z.infer<typeof DEFAULTS_CONFIG_SCHEMA>;
 export type FeatureFlags = z.infer<typeof FEATURE_FLAGS_SCHEMA>;
+export type HooksConfigSchema = z.infer<typeof HOOKS_CONFIG_SCHEMA>;
 export type LoggingRetentionConfig = z.infer<typeof LOGGING_RETENTION_CONFIG_SCHEMA>;
 export type PathsConfig = z.infer<typeof PATHS_CONFIG_SCHEMA>;
 export type ProviderConfig = z.infer<typeof PROVIDER_CONFIG_SCHEMA>;

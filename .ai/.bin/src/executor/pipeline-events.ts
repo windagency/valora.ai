@@ -24,6 +24,9 @@ export type {
 	StageCompleteData,
 	StageProgressData,
 	StageStartData,
+	ToolHookBlockedData,
+	ToolHookPostData,
+	ToolHookTriggeredData,
 	WorktreeInfoData
 } from 'types/pipeline.types';
 export { PipelineEventType } from 'types/pipeline.types';

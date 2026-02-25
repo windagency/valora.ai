@@ -5,6 +5,8 @@
  * These types are used by both the executor and output layers.
  */
 
+import type { HookEventName } from './hook.types';
+
 export enum PipelineEventType {
 	AGENT_THINKING = 'agent:thinking',
 	ESCALATION_ABORTED = 'escalation:aborted',
@@ -18,7 +20,10 @@ export enum PipelineEventType {
 	STAGE_COMPLETE = 'stage:complete',
 	STAGE_ERROR = 'stage:error',
 	STAGE_PROGRESS = 'stage:progress',
-	STAGE_START = 'stage:start'
+	STAGE_START = 'stage:start',
+	TOOL_HOOK_BLOCKED = 'tool:hook:blocked',
+	TOOL_HOOK_POST = 'tool:hook:post',
+	TOOL_HOOK_TRIGGERED = 'tool:hook:triggered'
 }
 
 export interface AgentThinkingData {
@@ -131,4 +136,21 @@ export interface StageStartData {
 	stage: string;
 	totalStages: number;
 	worktreeInfo?: WorktreeInfoData;
+}
+
+export interface ToolHookBlockedData {
+	reason: string;
+	toolName: string;
+}
+
+export interface ToolHookPostData {
+	hookCommand: string;
+	success: boolean;
+	toolName: string;
+}
+
+export interface ToolHookTriggeredData {
+	eventName: HookEventName;
+	hookCommand: string;
+	toolName: string;
 }

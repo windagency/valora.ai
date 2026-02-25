@@ -12,6 +12,7 @@
  */
 
 import { getLogger } from 'output/logger';
+import { escapeRegExp } from 'utils/safe-regex';
 
 type Logger = ReturnType<typeof getLogger>;
 
@@ -538,7 +539,7 @@ export class OutputParsingService {
 	 * Try to extract a value for a given key from content
 	 */
 	private tryExtractValue(outputName: string, searchTarget: string): unknown {
-		const keyPattern = `"${outputName}"\\s*:\\s*`;
+		const keyPattern = `"${escapeRegExp(outputName)}"\\s*:\\s*`;
 		const keyIndex = searchTarget.search(new RegExp(keyPattern));
 
 		if (keyIndex === -1) {
@@ -656,9 +657,10 @@ export class OutputParsingService {
 	 * Try to extract a value using simple pattern matching
 	 */
 	private tryPatternMatching(outputName: string, content: string): unknown {
+		const escaped = escapeRegExp(outputName);
 		const patterns = [
-			new RegExp(`"${outputName}"\\s*:\\s*(\\d+\\.?\\d*|true|false|null)`, 'i'),
-			new RegExp(`"${outputName}"\\s*:\\s*"([^"]{1,200})"`, 'i')
+			new RegExp(`"${escaped}"\\s*:\\s*(\\d+\\.?\\d*|true|false|null)`, 'i'),
+			new RegExp(`"${escaped}"\\s*:\\s*"([^"]{1,200})"`, 'i')
 		];
 
 		for (const pattern of patterns) {

@@ -316,6 +316,9 @@ export class ConfigLoader {
 		if (config.features) {
 			result.features = this.mergeFeatures(config.features, result.features!);
 		}
+		if (config.hooks) {
+			result.hooks = { ...result.hooks, ...config.hooks };
+		}
 		return result;
 	}
 
