@@ -1,0 +1,23 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "^run_terminal_cmd$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .ai/hooks/enforce-modern-cli.sh",
+            "timeout": 5000
+          }
+        ]
+      }
+    ]
+  },
+  "enforcement": {
+    "package_manager": {
+      "enabled": true,
+      "blocked": "npm",
+      "replacement": "pnpm"
+    }
+  }
+}

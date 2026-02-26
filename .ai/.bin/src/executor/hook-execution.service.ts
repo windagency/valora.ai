@@ -5,7 +5,7 @@
  * running user-configured shell commands that can validate, block, modify, or
  * observe tool operations.
  *
- * Hooks are configured in .ai/config.json under the "hooks" key.
+ * Hooks are configured in .ai/hooks.json (primary) or .ai/config.json (fallback).
  * Hook commands receive tool call info via stdin JSON and control execution
  * via exit codes (0=allow, 2=deny for PreToolUse; PostToolUse is non-blocking).
  */
@@ -22,15 +22,21 @@ import type {
 import type { LLMToolCall } from 'types/llm.types';
 
 import { exec } from 'child_process';
+import { HOOKS_CONFIG_FILE } from 'config/constants';
 import { getConfigLoader } from 'config/loader';
+import fs from 'fs';
 import { getLogger } from 'output/logger';
 import { getPipelineEmitter } from 'output/pipeline-emitter';
+import path from 'path';
 import { formatErrorMessage } from 'utils/error-utils';
+import { getAIRoot } from 'utils/file-utils';
 import { checkReDoSRisk, safeRegexTest } from 'utils/safe-regex';
 
 const DEFAULT_HOOK_TIMEOUT_MS = 10_000;
 
 export class HookExecutionService {
+	private hooksFileCache: null | { hooks?: HooksConfig } = null;
+	private hooksFileMtime: number = 0;
 	private readonly logger = getLogger();
 	private sessionId?: string;
 
@@ -334,16 +340,73 @@ export class HookExecutionService {
 	}
 
 	/**
-	 * Read hooks config from the config loader singleton.
-	 * Reads directly on each call so config reloads are picked up automatically.
+	 * Load hooks from .ai/hooks.json with mtime-based caching.
+	 * Returns null if the file doesn't exist or can't be parsed.
+	 */
+	private loadHooksFile(): null | { hooks?: HooksConfig } {
+		try {
+			const hooksPath = path.join(getAIRoot(), HOOKS_CONFIG_FILE);
+			const stat = fs.statSync(hooksPath);
+			const mtime = stat.mtimeMs;
+
+			if (this.hooksFileCache && mtime === this.hooksFileMtime) {
+				return this.hooksFileCache;
+			}
+
+			const content = fs.readFileSync(hooksPath, 'utf-8');
+			const parsed = JSON.parse(content) as { hooks?: HooksConfig };
+			this.hooksFileCache = parsed;
+			this.hooksFileMtime = mtime;
+			return parsed;
+		} catch {
+			// File missing or invalid — no hooks from hooks.json
+			return null;
+		}
+	}
+
+	/**
+	 * Read hooks config, merging .ai/hooks.json (primary) with config.json (fallback).
+	 * For each event name, hooks.json matchers come first; duplicates by matcher pattern
+	 * are resolved in favour of hooks.json.
 	 */
 	private getHooksConfig(): HooksConfig | undefined {
+		const hooksFromFile = this.loadHooksFile()?.hooks;
+
+		let hooksFromConfig: HooksConfig | undefined;
 		try {
-			return getConfigLoader().get().hooks as HooksConfig | undefined;
+			hooksFromConfig = getConfigLoader().get().hooks as HooksConfig | undefined;
 		} catch {
-			// Config not yet loaded — no hooks available
-			return undefined;
+			// Config not yet loaded
 		}
+
+		if (hooksFromFile && hooksFromConfig) {
+			return this.mergeHooksConfigs(hooksFromFile, hooksFromConfig);
+		}
+
+		return hooksFromFile ?? hooksFromConfig;
+	}
+
+	/**
+	 * Merge two HooksConfig objects. Primary (hooks.json) takes priority;
+	 * config.json matchers with the same pattern are skipped.
+	 */
+	private mergeHooksConfigs(primary: HooksConfig, fallback: HooksConfig): HooksConfig | undefined {
+		const merged: HooksConfig = {};
+		const eventNames = new Set([...Object.keys(fallback), ...Object.keys(primary)]) as Set<HookEventName>;
+
+		for (const eventName of eventNames) {
+			const primaryMatchers = (primary as Record<string, HookMatcher[]>)[eventName] ?? [];
+			const fallbackMatchers = (fallback as Record<string, HookMatcher[]>)[eventName] ?? [];
+
+			const primaryPatterns = new Set(primaryMatchers.map((m) => m.matcher));
+			const deduped = [...primaryMatchers, ...fallbackMatchers.filter((m) => !primaryPatterns.has(m.matcher))];
+
+			if (deduped.length > 0) {
+				merged[eventName] = deduped;
+			}
+		}
+
+		return Object.keys(merged).length > 0 ? merged : undefined;
 	}
 
 	/**

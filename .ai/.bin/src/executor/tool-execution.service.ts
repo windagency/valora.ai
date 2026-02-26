@@ -1029,49 +1029,64 @@ export class ToolExecutionService {
 			);
 		}
 
-		// Enforce modern CLI tool usage: Block structured files
-		const structuredFileExtensions = ['.json', '.yaml', '.yml', '.toml', '.xml'];
-		const isStructuredFile = structuredFileExtensions.some((ext) => path.toLowerCase().endsWith(ext));
-		if (isStructuredFile) {
-			const tool = path.endsWith('.json') ? 'jq' : 'yq';
-			throw new Error(
-				`Cannot use read_file for structured files: ${path}\n\n` +
-					`Structured files (JSON/YAML/TOML/XML) must be read with ${tool} via run_terminal_cmd.\n\n` +
-					`Use instead:\n` +
-					`  run_terminal_cmd("${tool} '.' ${path}")  # Read entire file\n` +
-					`  run_terminal_cmd("${tool} '.key' ${path}")  # Extract specific field\n\n` +
-					`This saves 85-95% of tokens compared to read_file.`
-			);
-		}
+		this.validateNotStructuredFile(path);
 
-		// Enforce modern CLI tool usage: Block files with >100 lines
 		const content = await readFile(fullPath);
-		const lineCount = content.split('\n').length;
-		if (lineCount > 100) {
-			// Provide helpful suggestions based on file type
-			const fileName = path.split('/').pop() || path;
-			let suggestion = `run_terminal_cmd("rg '^## ' ${path}")  # Get markdown structure`;
-
-			if (fileName.includes('PRD') || fileName.includes('BACKLOG') || fileName.includes('FUNCTIONAL')) {
-				suggestion =
-					`run_terminal_cmd("rg '^## ' ${path}")  # Get document structure\n` +
-					`  run_terminal_cmd("rg -A 50 '^## Functional Requirements' ${path}")  # Extract section`;
-			} else if (fileName.endsWith('.ts') || fileName.endsWith('.tsx') || fileName.endsWith('.js')) {
-				suggestion = `run_terminal_cmd("rg -A 10 'class|function|export' ${path}")  # Extract key definitions`;
-			}
-
-			throw new Error(
-				`File too large: ${path} (${lineCount} lines > 100 line limit)\n\n` +
-					`Files with >100 lines must be read with selective extraction via run_terminal_cmd.\n\n` +
-					`Use instead:\n  ${suggestion}\n\n` +
-					`This saves 80-90% of tokens compared to reading the entire file.`
-			);
-		}
+		this.validateFileLineCount(path, content);
 
 		// Track that this file was read (enables writes to protected files)
 		this.readFiles.add(fullPath);
 
 		return content;
+	}
+
+	/**
+	 * Enforce modern CLI tool usage: block structured files (JSON/YAML/TOML/XML).
+	 */
+	private validateNotStructuredFile(path: string): void {
+		const structuredFileExtensions = ['.json', '.yaml', '.yml', '.toml', '.xml'];
+		const isStructuredFile = structuredFileExtensions.some((ext) => path.toLowerCase().endsWith(ext));
+		if (!isStructuredFile) {
+			return;
+		}
+
+		const tool = path.endsWith('.json') ? 'jq' : 'yq';
+		throw new Error(
+			`Cannot use read_file for structured files: ${path}\n\n` +
+				`Structured files (JSON/YAML/TOML/XML) must be read with ${tool} via run_terminal_cmd.\n\n` +
+				`Use instead:\n` +
+				`  run_terminal_cmd("${tool} '.' ${path}")  # Read entire file\n` +
+				`  run_terminal_cmd("${tool} '.key' ${path}")  # Extract specific field\n\n` +
+				`This saves 85-95% of tokens compared to read_file.`
+		);
+	}
+
+	/**
+	 * Enforce modern CLI tool usage: block files with >100 lines.
+	 */
+	private validateFileLineCount(path: string, content: string): void {
+		const lineCount = content.split('\n').length;
+		if (lineCount <= 100) {
+			return;
+		}
+
+		const fileName = path.split('/').pop() ?? path;
+		let suggestion = `run_terminal_cmd("rg '^## ' ${path}")  # Get markdown structure`;
+
+		if (fileName.includes('PRD') || fileName.includes('BACKLOG') || fileName.includes('FUNCTIONAL')) {
+			suggestion =
+				`run_terminal_cmd("rg '^## ' ${path}")  # Get document structure\n` +
+				`  run_terminal_cmd("rg -A 50 '^## Functional Requirements' ${path}")  # Extract section`;
+		} else if (fileName.endsWith('.ts') || fileName.endsWith('.tsx') || fileName.endsWith('.js')) {
+			suggestion = `run_terminal_cmd("rg -A 10 'class|function|export' ${path}")  # Extract key definitions`;
+		}
+
+		throw new Error(
+			`File too large: ${path} (${lineCount} lines > 100 line limit)\n\n` +
+				`Files with >100 lines must be read with selective extraction via run_terminal_cmd.\n\n` +
+				`Use instead:\n  ${suggestion}\n\n` +
+				`This saves 80-90% of tokens compared to reading the entire file.`
+		);
 	}
 
 	/**

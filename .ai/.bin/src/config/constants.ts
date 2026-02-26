@@ -209,3 +209,8 @@ export const MAX_SEQUENCE_ATTEMPTS = 1000;
  * Idempotency Constants
  */
 export const IDEMPOTENCY_CLEANUP_INTERVAL_MS = MS_PER_HOUR;
+
+/**
+ * Hooks Configuration File
+ */
+export const HOOKS_CONFIG_FILE = 'hooks.json';

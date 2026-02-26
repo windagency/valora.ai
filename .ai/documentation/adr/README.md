@@ -17,6 +17,7 @@ Architecture Decision Records (ADRs) capture important architectural decisions m
 | [005](./005-llm-provider-abstraction.md)        | LLM Provider Abstraction           | Accepted | 2024-09 |
 | [006](./006-automatic-context-flush.md)         | Automatic Context Flush and Resume | Accepted | 2026-01 |
 | [007](./007-persistent-stage-output-caching.md) | Persistent Stage Output Caching    | Accepted | 2026-01 |
+| [008](./008-pretooluse-cli-enforcement.md)      | PreToolUse CLI Enforcement         | Accepted | 2026-02 |
 
 ## ADR Status
 

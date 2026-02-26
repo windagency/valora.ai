@@ -544,14 +544,14 @@ const FORBIDDEN_WRITE_PATHS = ['.ai/'] as const;
 /**
  * Normalise a file path to use forward slashes consistently
  */
-function normalisePath(filePath: string) {
+function normalisePath(filePath: string): string {
 	return filePath.replace(/\\/g, '/');
 }
 
 /**
  * Check if a normalised path matches a forbidden pattern
  */
-function matchesForbiddenPath(normalizedPath: string, forbiddenPattern: string) {
+function matchesForbiddenPath(normalizedPath: string, forbiddenPattern: string): boolean {
 	// Check if path starts with forbidden path (relative path)
 	// or contains the forbidden path anywhere (for absolute paths)
 	return normalizedPath.startsWith(forbiddenPattern) || normalizedPath.includes(`/${forbiddenPattern}`);
@@ -560,7 +560,7 @@ function matchesForbiddenPath(normalizedPath: string, forbiddenPattern: string) 
 /**
  * Create a forbidden path error with consistent messaging
  */
-function createForbiddenPathError(operation: string, originalPath: string) {
+function createForbiddenPathError(operation: string, originalPath: string): Error {
 	return new Error(
 		`Cannot ${operation} files in .ai/ - this folder contains system configuration ` +
 			`for VALORA commands, agents, and prompts. Path: ${originalPath}`

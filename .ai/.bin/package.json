@@ -1,6 +1,6 @@
 {
 	"name": "valora",
-	"version": "1.1.0",
+	"version": "1.2.0",
 	"description": "VALORA - AI-assisted development workflow orchestration with agnostic multi-LLM support, session-based state, and Cursor MCP integration",
 	"keywords": [
 		"valora",

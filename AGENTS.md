@@ -26,46 +26,6 @@ All agents are mandated to follow the project's [CODE-QUALITY-GUIDELINES.md](./k
 * **Architecture Validation:** Every architectural decision **must** be validated via `arch-unit-ts` tests.
 * **Safety First:** No agent has the authority to `delete_files`, `commit`, or `deploy` without explicit human approval.
 
-### Critical File Reading and Search Policy
-
-**All agents MUST follow these policies:**
-
-#### File Reading
-1. **Files >100 lines**: NEVER use `read_file`. Use `run_terminal_cmd` with `rg`/`jq`/`yq` for selective extraction.
-2. **JSON/YAML files**: NEVER use `read_file` regardless of size. Always use `jq` for JSON, `yq` for YAML via `run_terminal_cmd`.
-3. **Known large files**: PRD.md, BACKLOG.md, FUNCTIONAL.md are 150-500 lines - use `run_terminal_cmd` with `rg` to extract sections.
-
-#### Content Searching
-4. **Use `rg` (ripgrep) NOT `grep`**: NEVER use the `grep` tool. Use `run_terminal_cmd` with `rg` instead.
-   - `rg` is 5-10x faster and respects .gitignore (skips node_modules, .git, etc.)
-   - `grep` wastes tokens by searching irrelevant files
-   - Example: `run_terminal_cmd("rg 'pattern' src/")` instead of `grep("pattern", "src/")`
-
-**Examples:**
-
-```bash
-# ❌ WRONG (wastes 800 tokens):
-read_file("knowledge-base/PRD.md")
-
-# ✅ CORRECT (uses 150 tokens):
-run_terminal_cmd("rg '^## ' knowledge-base/PRD.md")  # Get structure
-run_terminal_cmd("rg -A 50 '^## Functional Requirements' knowledge-base/PRD.md")  # Extract section
-
-# ❌ WRONG:
-read_file("package.json")
-
-# ✅ CORRECT:
-run_terminal_cmd("jq '{name, version, dependencies: .dependencies | keys}' package.json")
-
-# ❌ WRONG (searches node_modules, wastes tokens):
-grep("pattern", "src/")
-
-# ✅ CORRECT (respects .gitignore):
-run_terminal_cmd("rg 'pattern' src/")
-```
-
-**Rationale:** Violating this policy wastes 80-90% of the context window, degrading agent performance and increasing costs.
-
 ### Mandatory Development Environment & Tooling
 
 The following tools and practices are **strictly enforced** across all agents and workstreams:

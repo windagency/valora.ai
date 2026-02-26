@@ -570,6 +570,83 @@ All external MCP operations are logged to `.ai/logs/mcp-audit.jsonl`:
 {"operation":"tool_call","serverId":"playwright","toolName":"navigate","success":true,"duration_ms":1500}
 ```
 
+## Hooks Configuration
+
+VALORA supports PreToolUse hooks that intercept tool calls before execution. Hooks are configured in a dedicated `.ai/hooks.json` file, separate from `.ai/config.json`. This ensures that `valora config setup` does not overwrite hook configuration.
+
+### PreToolUse Hooks
+
+PreToolUse hooks run before a tool is executed. Each hook has a `matcher` (regex against the tool name) and a list of hook commands.
+
+**`.ai/hooks.json`:**
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "^run_terminal_cmd$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .ai/hooks/enforce-modern-cli.sh",
+            "timeout": 5000
+          }
+        ]
+      }
+    ]
+  },
+  "enforcement": {
+    "package_manager": {
+      "enabled": true,
+      "blocked": "npm",
+      "replacement": "pnpm"
+    }
+  }
+}
+```
+
+| Field | Description |
+|---|---|
+| `matcher` | Regex pattern matched against the tool name |
+| `hooks[].type` | Hook type (`command`) |
+| `hooks[].command` | Shell command to execute |
+| `hooks[].timeout` | Maximum execution time in milliseconds |
+
+Hook scripts receive the tool call JSON on stdin and can:
+- **Allow** the call by exiting with code 0
+- **Block** the call by outputting a JSON object with `hookSpecificOutput` containing `permissionDecision` and `permissionDecisionReason` fields, then exiting with code 2
+
+If a hook errors or times out, the tool call is allowed (fail-open).
+
+> **Backward compatibility:** Hooks defined in `.ai/config.json` under the `hooks` key are still supported as a fallback. If both files define hooks, `.ai/hooks.json` takes priority and duplicate matcher patterns from `config.json` are skipped.
+
+### CLI Enforcement Rules
+
+The built-in `enforce-modern-cli.sh` hook blocks legacy CLI commands and suggests modern alternatives. See the [Modern CLI Toolkit](../developer-guide/modern-cli-toolkit/README.md) for the full list of enforced rules.
+
+The package manager enforcement is configurable in `.ai/hooks.json`:
+
+```json
+{
+  "enforcement": {
+    "package_manager": {
+      "enabled": true,
+      "blocked": "npm",
+      "replacement": "pnpm"
+    }
+  }
+}
+```
+
+| Field | Description | Default |
+|---|---|---|
+| `enabled` | Enable/disable the package manager rule | `true` |
+| `blocked` | Package manager command to block | `"npm"` |
+| `replacement` | Suggested replacement | `"pnpm"` |
+
+For the architectural rationale, see [ADR-008: PreToolUse CLI Enforcement](../adr/008-pretooluse-cli-enforcement.md).
+
 ## Advanced Customization
 
 ### Custom Templates

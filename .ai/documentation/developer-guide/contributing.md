@@ -56,6 +56,18 @@ git checkout -b fix/your-bug-fix
 3. **Update documentation** if needed
 4. **Run quality checks** before committing
 
+### CLI Tool Enforcement
+
+VALORA enforces the use of modern CLI tools via a PreToolUse hook. Legacy commands like `grep`, `find`, `ls`, and `npm` are automatically blocked when run through `run_terminal_cmd`. Use the modern equivalents instead:
+
+- `rg` instead of `grep` / `egrep` / `fgrep`
+- `fd` instead of `find`
+- `jq` / `yq` instead of `cat` on JSON/YAML files
+- `eza` instead of `ls` or `tree`
+- `pnpm` instead of `npm`
+
+See the [Modern CLI Toolkit](./modern-cli-toolkit/README.md) for full details and the [ADR-008](../adr/008-pretooluse-cli-enforcement.md) for the architectural rationale.
+
 ### Quality Checks
 
 Run these before every commit:

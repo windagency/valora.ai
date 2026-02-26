@@ -167,15 +167,6 @@ Use the [agent] profile
 
 ## Rules
 
-### Modern CLI Tools for Output Processing
-
-When processing terminal output, git data, or structured files during feedback collection, use modern CLI tools:
-
-- **`jq`** to extract fields from JSON reports (coverage, test results, audit output) instead of reading entire files
-- **`rg`** to search commit messages and log output for patterns (errors, retries, keywords) instead of `grep`
-- **`fd`** to locate feedback files, coverage reports, or session data by name/extension instead of `find`
-- **`git log --format=...`** with structured format strings for machine-readable git data instead of `git log | grep`
-
 ### Feedback Collection
 
 1. **MUST reconstruct workflow execution**:
@@ -186,9 +177,9 @@ When processing terminal output, git data, or structured files during feedback c
 
 2. **MUST gather comprehensive metrics**:
    - Git and repository metrics (commits, files, lines) — use structured `git` output
-   - CI/CD status and test results — use `jq` to parse JSON reports
-   - Performance metrics (time, errors, retries) — use `rg` to detect patterns in commit messages
-   - Quality metrics (code, tests, reviews) — use `jq` to extract from coverage/lint JSON
+   - CI/CD status and test results
+   - Performance metrics (time, errors, retries)
+   - Quality metrics (code, tests, reviews)
 
 3. **SHOULD collect user feedback** (when possible):
    - Use `--interactive` for guided feedback session

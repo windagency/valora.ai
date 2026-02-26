@@ -436,9 +436,7 @@ describe('Forbidden Path Validation', () => {
 
 	describe('validateNotForbiddenPath', () => {
 		it('should throw error for paths in .ai folder', () => {
-			expect(() => validateNotForbiddenPath('.ai/config.json', 'write to')).toThrow(
-				/Cannot write to files in \.ai\//
-			);
+			expect(() => validateNotForbiddenPath('.ai/config.json', 'write to')).toThrow(/Cannot write to files in \.ai\//);
 		});
 
 		it('should include the operation type in error message', () => {

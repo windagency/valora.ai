@@ -85,11 +85,6 @@ For each command in `commands_chain`:
 
 Parse git diff and commit messages to infer tools used.
 
-**Use modern CLI tools for parsing:**
-- **`rg`** to search commit messages for tool-usage patterns (instead of `grep`)
-- **`jq`** to extract structured data from any JSON output
-- **`git log --format=...`** with structured format strings for machine-readable git data
-
 **Read operations:**
 ```bash
 rg "read|search|codebase_search" <(git log --stat --oneline HEAD~<n>..HEAD)

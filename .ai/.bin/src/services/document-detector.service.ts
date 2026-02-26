@@ -178,6 +178,12 @@ export class DocumentDetectorService {
 	 * API schema documentation (e.g., "error": null in response schemas). The
 	 * checkForErrors() method already properly checks for outputs['error'] as a
 	 * top-level error field.
+	 *
+	 * NOTE: '[Pending' was removed because it's a valid status marker in Open
+	 * Questions sections (e.g., "[Pending - recommend 2xx range]"). Placeholder
+	 * detection via PLACEHOLDER_PATTERNS handles actual incomplete content, and
+	 * the context-aware filtering in checkContentQuality() excludes matches
+	 * inside tracked sections like "Open Questions".
 	 */
 	private static readonly ERROR_INDICATORS = [
 		'INSUFFICIENT_SPECIFICATIONS',
@@ -190,7 +196,7 @@ export class DocumentDetectorService {
 		'no PRD content provided',
 		// 'missing_information' - Removed: valid JSON field in prompt outputs
 		// '"error":' - Removed: valid JSON field in API schemas (e.g., "error": null)
-		'[Pending',
+		// '[Pending' - Removed: valid status marker in Open Questions sections
 		'[TBD]',
 		'[To be defined]',
 		'PRD is empty or missing',
@@ -216,6 +222,20 @@ export class DocumentDetectorService {
 		/pending stakeholder/gi,
 		/pending user research/gi,
 		/pending analysis/gi
+	];
+
+	/**
+	 * Section headers where placeholder-like markers (e.g., "[Pending - ...]")
+	 * are valid status annotations rather than incomplete content.
+	 */
+	private static readonly STATUS_MARKER_SECTIONS = [
+		'open questions',
+		'open items',
+		'known issues',
+		'remaining questions',
+		'version history',
+		'user clarifications',
+		'changelog'
 	];
 
 	/**
@@ -358,12 +378,17 @@ export class DocumentDetectorService {
 			}
 		}
 
-		// Count placeholder patterns
+		// Count placeholder patterns, excluding matches inside status-tracking sections
+		const statusMarkerLines = this.getStatusMarkerLines(content);
 		let placeholderCount = 0;
 		for (const pattern of DocumentDetectorService.PLACEHOLDER_PATTERNS) {
-			const matches = content.match(pattern);
-			if (matches) {
-				placeholderCount += matches.length;
+			// Reset regex lastIndex for global patterns
+			pattern.lastIndex = 0;
+			let match: null | RegExpExecArray;
+			while ((match = pattern.exec(content)) !== null) {
+				if (!statusMarkerLines.has(this.getLineNumber(content, match.index))) {
+					placeholderCount++;
+				}
 			}
 		}
 
@@ -381,6 +406,65 @@ export class DocumentDetectorService {
 		}
 
 		return { confidence, hasErrors, placeholderCount, reasons };
+	}
+
+	/**
+	 * Identify line numbers that fall within status-tracking sections
+	 * where placeholder-like markers are valid annotations.
+	 *
+	 * A status-tracking section starts at a markdown heading (##, ###, etc.)
+	 * whose text matches STATUS_MARKER_SECTIONS and ends at the next heading
+	 * of equal or higher level (or end of content).
+	 */
+	private getStatusMarkerLines(content: string): Set<number> {
+		const lines = content.split('\n');
+		const statusLines = new Set<number>();
+		let inStatusSection = false;
+		let sectionLevel = 0;
+
+		for (let i = 0; i < lines.length; i++) {
+			const line = lines[i];
+			if (!line) continue;
+			const headingMatch = line.match(/^(#{1,6})\s+(.*)$/);
+			if (headingMatch?.[1] && headingMatch[2] !== undefined) {
+				const level = headingMatch[1].length;
+				const headerText = headingMatch[2].toLowerCase().trim();
+				const isStatusHeader = DocumentDetectorService.STATUS_MARKER_SECTIONS.some((section) =>
+					headerText.includes(section)
+				);
+
+				if (isStatusHeader) {
+					inStatusSection = true;
+					sectionLevel = level;
+					statusLines.add(i);
+					continue;
+				}
+
+				// A heading at equal or higher level ends the status section
+				if (inStatusSection && level <= sectionLevel) {
+					inStatusSection = false;
+				}
+			}
+
+			if (inStatusSection) {
+				statusLines.add(i);
+			}
+		}
+
+		return statusLines;
+	}
+
+	/**
+	 * Get the 0-based line number for a character offset in a string
+	 */
+	private getLineNumber(content: string, offset: number): number {
+		let line = 0;
+		for (let i = 0; i < offset && i < content.length; i++) {
+			if (content[i] === '\n') {
+				line++;
+			}
+		}
+		return line;
 	}
 
 	/**

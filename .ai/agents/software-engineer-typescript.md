@@ -37,7 +37,6 @@ expertise:
   - pnpm workspaces
   - Volta
   - Path aliases
-  - Modern CLI toolkit (rg, fd, jq, yq, fzf, eza, zoxide) for token-efficient codebase exploration
 responsibilities:
   - Contribute to architectural decisions depending on context
   - Design clean, modular, and extensible solutions using SOLID principles, OOP, and functional programming

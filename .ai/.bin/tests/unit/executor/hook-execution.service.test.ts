@@ -18,6 +18,7 @@ import { HookExecutionService } from 'executor/hook-execution.service';
 import type { HookCommand, HookInput, HookMatcher } from 'types/hook.types';
 import type { LLMToolCall } from 'types/llm.types';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import fs from 'fs';
 
 // Mock dependencies
 vi.mock('output/logger', () => ({
@@ -40,6 +41,10 @@ vi.mock('output/pipeline-emitter', () => ({
 const mockGetConfigLoader = vi.fn();
 vi.mock('config/loader', () => ({
 	getConfigLoader: (...args: unknown[]) => mockGetConfigLoader(...args)
+}));
+
+vi.mock('utils/file-utils', () => ({
+	getAIRoot: () => '/fake/ai/root'
 }));
 
 function makeToolCall(name: string, args: Record<string, unknown> = {}): LLMToolCall {
@@ -85,9 +90,7 @@ describe('HookExecutionService', () => {
 
 		it('should return true when PreToolUse matchers exist', () => {
 			setupConfig({
-				PreToolUse: [
-					{ matcher: 'write', hooks: [{ type: 'command', command: 'echo ok' }] }
-				]
+				PreToolUse: [{ matcher: 'write', hooks: [{ type: 'command', command: 'echo ok' }] }]
 			});
 
 			expect(service.hasHooks('PreToolUse')).toBe(true);
@@ -96,9 +99,7 @@ describe('HookExecutionService', () => {
 
 		it('should return true when PostToolUse matchers exist', () => {
 			setupConfig({
-				PostToolUse: [
-					{ matcher: 'write', hooks: [{ type: 'command', command: 'echo ok' }] }
-				]
+				PostToolUse: [{ matcher: 'write', hooks: [{ type: 'command', command: 'echo ok' }] }]
 			});
 
 			expect(service.hasHooks('PreToolUse')).toBe(false);
@@ -107,7 +108,9 @@ describe('HookExecutionService', () => {
 
 		it('should return false when config loader throws', () => {
 			mockGetConfigLoader.mockReturnValue({
-				get: () => { throw new Error('Config not loaded'); }
+				get: () => {
+					throw new Error('Config not loaded');
+				}
 			});
 
 			expect(service.hasHooks('PreToolUse')).toBe(false);
@@ -317,9 +320,7 @@ describe('HookExecutionService', () => {
 
 		it('should allow when no matchers match the tool', async () => {
 			setupConfig({
-				PreToolUse: [
-					{ matcher: 'delete_file', hooks: [{ type: 'command', command: 'exit 2' }] }
-				]
+				PreToolUse: [{ matcher: 'delete_file', hooks: [{ type: 'command', command: 'exit 2' }] }]
 			});
 
 			const result = await service.executePreToolUseHooks(makeToolCall('write'));
@@ -329,9 +330,7 @@ describe('HookExecutionService', () => {
 
 		it('should block when hook exits with code 2', async () => {
 			setupConfig({
-				PreToolUse: [
-					{ matcher: 'write', hooks: [{ type: 'command', command: 'exit 2' }] }
-				]
+				PreToolUse: [{ matcher: 'write', hooks: [{ type: 'command', command: 'exit 2' }] }]
 			});
 
 			const result = await service.executePreToolUseHooks(makeToolCall('write'));
@@ -342,9 +341,7 @@ describe('HookExecutionService', () => {
 
 		it('should allow when hook exits with code 0', async () => {
 			setupConfig({
-				PreToolUse: [
-					{ matcher: 'write', hooks: [{ type: 'command', command: 'echo ok' }] }
-				]
+				PreToolUse: [{ matcher: 'write', hooks: [{ type: 'command', command: 'echo ok' }] }]
 			});
 
 			const result = await service.executePreToolUseHooks(makeToolCall('write'));
@@ -354,9 +351,7 @@ describe('HookExecutionService', () => {
 
 		it('should fail-open on non-0/2 exit codes', async () => {
 			setupConfig({
-				PreToolUse: [
-					{ matcher: 'write', hooks: [{ type: 'command', command: 'exit 1' }] }
-				]
+				PreToolUse: [{ matcher: 'write', hooks: [{ type: 'command', command: 'exit 1' }] }]
 			});
 
 			const result = await service.executePreToolUseHooks(makeToolCall('write'));
@@ -367,9 +362,7 @@ describe('HookExecutionService', () => {
 
 		it('should fail-open on timeout', async () => {
 			setupConfig({
-				PreToolUse: [
-					{ matcher: 'write', hooks: [{ type: 'command', command: 'sleep 10', timeout: 200 }] }
-				]
+				PreToolUse: [{ matcher: 'write', hooks: [{ type: 'command', command: 'sleep 10', timeout: 200 }] }]
 			});
 
 			const result = await service.executePreToolUseHooks(makeToolCall('write'));
@@ -394,9 +387,7 @@ describe('HookExecutionService', () => {
 				]
 			});
 
-			const result = await service.executePreToolUseHooks(
-				makeToolCall('write', { path: '/old', content: 'hello' })
-			);
+			const result = await service.executePreToolUseHooks(makeToolCall('write', { path: '/old', content: 'hello' }));
 			expect(result.allowed).toBe(true);
 			expect(result.updatedArgs).toEqual({ path: '/new/path' });
 		});
@@ -431,10 +422,12 @@ describe('HookExecutionService', () => {
 				PreToolUse: [
 					{
 						matcher: 'write',
-						hooks: [{
-							type: 'command',
-							command: `echo '${jsonOutput}'; exit 2`
-						}]
+						hooks: [
+							{
+								type: 'command',
+								command: `echo '${jsonOutput}'; exit 2`
+							}
+						]
 					}
 				]
 			});
@@ -446,9 +439,7 @@ describe('HookExecutionService', () => {
 
 		it('should handle malformed JSON output gracefully', async () => {
 			setupConfig({
-				PreToolUse: [
-					{ matcher: 'write', hooks: [{ type: 'command', command: 'echo "not json"' }] }
-				]
+				PreToolUse: [{ matcher: 'write', hooks: [{ type: 'command', command: 'echo "not json"' }] }]
 			});
 
 			const result = await service.executePreToolUseHooks(makeToolCall('write'));
@@ -466,9 +457,7 @@ describe('HookExecutionService', () => {
 
 		it('should execute matching hooks and not block', async () => {
 			setupConfig({
-				PostToolUse: [
-					{ matcher: 'write', hooks: [{ type: 'command', command: 'echo post' }] }
-				]
+				PostToolUse: [{ matcher: 'write', hooks: [{ type: 'command', command: 'echo post' }] }]
 			});
 
 			await service.executePostToolUseHooks(makeToolCall('write'), 'File written successfully');
@@ -476,9 +465,7 @@ describe('HookExecutionService', () => {
 
 		it('should pass tool_result in input', async () => {
 			setupConfig({
-				PostToolUse: [
-					{ matcher: 'write', hooks: [{ type: 'command', command: 'cat' }] }
-				]
+				PostToolUse: [{ matcher: 'write', hooks: [{ type: 'command', command: 'cat' }] }]
 			});
 
 			let capturedInput: HookInput | null = null;
@@ -497,9 +484,7 @@ describe('HookExecutionService', () => {
 
 		it('should not block on hook exit code 2', async () => {
 			setupConfig({
-				PostToolUse: [
-					{ matcher: 'write', hooks: [{ type: 'command', command: 'exit 2' }] }
-				]
+				PostToolUse: [{ matcher: 'write', hooks: [{ type: 'command', command: 'exit 2' }] }]
 			});
 
 			// PostToolUse never blocks
@@ -511,11 +496,13 @@ describe('HookExecutionService', () => {
 				PostToolUse: [
 					{
 						matcher: 'write',
-						hooks: [{
-							type: 'command',
-							command: 'echo async-hook',
-							async: true
-						}]
+						hooks: [
+							{
+								type: 'command',
+								command: 'echo async-hook',
+								async: true
+							}
+						]
 					}
 				]
 			});
@@ -531,11 +518,13 @@ describe('HookExecutionService', () => {
 				PostToolUse: [
 					{
 						matcher: 'write',
-						hooks: [{
-							type: 'command',
-							command: 'exit 1',
-							async: true
-						}]
+						hooks: [
+							{
+								type: 'command',
+								command: 'exit 1',
+								async: true
+							}
+						]
 					}
 				]
 			});
@@ -550,9 +539,7 @@ describe('HookExecutionService', () => {
 	describe('setSessionId()', () => {
 		it('should include session_id in hook input after being set', async () => {
 			setupConfig({
-				PreToolUse: [
-					{ matcher: 'write', hooks: [{ type: 'command', command: 'cat' }] }
-				]
+				PreToolUse: [{ matcher: 'write', hooks: [{ type: 'command', command: 'cat' }] }]
 			});
 
 			service.setSessionId('sess-abc-123');
@@ -572,9 +559,7 @@ describe('HookExecutionService', () => {
 
 		it('should send undefined session_id when not set', async () => {
 			setupConfig({
-				PreToolUse: [
-					{ matcher: 'write', hooks: [{ type: 'command', command: 'cat' }] }
-				]
+				PreToolUse: [{ matcher: 'write', hooks: [{ type: 'command', command: 'cat' }] }]
 			});
 
 			let capturedInput: HookInput | null = null;
@@ -599,9 +584,7 @@ describe('HookExecutionService', () => {
 
 			// Config changes (e.g. via ConfigLoader.reload())
 			setupConfig({
-				PreToolUse: [
-					{ matcher: 'write', hooks: [{ type: 'command', command: 'echo ok' }] }
-				]
+				PreToolUse: [{ matcher: 'write', hooks: [{ type: 'command', command: 'echo ok' }] }]
 			});
 
 			// Should see the new hooks immediately
@@ -610,15 +593,127 @@ describe('HookExecutionService', () => {
 
 		it('should reflect hooks being removed from config', () => {
 			setupConfig({
-				PreToolUse: [
-					{ matcher: 'write', hooks: [{ type: 'command', command: 'echo ok' }] }
-				]
+				PreToolUse: [{ matcher: 'write', hooks: [{ type: 'command', command: 'echo ok' }] }]
 			});
 			expect(service.hasHooks('PreToolUse')).toBe(true);
 
 			// Hooks removed from config
 			setupConfig({});
 			expect(service.hasHooks('PreToolUse')).toBe(false);
+		});
+	});
+
+	describe('hooks.json loading', () => {
+		function mockHooksFile(content: Record<string, unknown> | null, mtime: number = 1000): void {
+			if (content === null) {
+				vi.spyOn(fs, 'statSync').mockImplementation(() => {
+					throw new Error('ENOENT: no such file or directory');
+				});
+			} else {
+				vi.spyOn(fs, 'statSync').mockReturnValue({ mtimeMs: mtime } as fs.Stats);
+				vi.spyOn(fs, 'readFileSync').mockReturnValue(JSON.stringify(content));
+			}
+		}
+
+		it('should load hooks from hooks.json when available', () => {
+			setupConfig(undefined);
+			mockHooksFile({
+				hooks: {
+					PreToolUse: [{ matcher: 'write', hooks: [{ type: 'command', command: 'echo from-hooks-json' }] }]
+				}
+			});
+
+			expect(service.hasHooks('PreToolUse')).toBe(true);
+		});
+
+		it('should prefer hooks.json over config.json for same matcher pattern', () => {
+			setupConfig({
+				PreToolUse: [{ matcher: 'write', hooks: [{ type: 'command', command: 'echo from-config' }] }]
+			});
+			mockHooksFile({
+				hooks: {
+					PreToolUse: [{ matcher: 'write', hooks: [{ type: 'command', command: 'echo from-hooks-json' }] }]
+				}
+			});
+
+			const matchers = service.findMatchingHooks('write', [
+				{ matcher: 'write', hooks: [{ type: 'command', command: 'echo from-hooks-json' }] }
+			]);
+			expect(matchers).toHaveLength(1);
+			expect(matchers[0]!.command).toBe('echo from-hooks-json');
+		});
+
+		it('should fall back to config.json when hooks.json does not exist', () => {
+			setupConfig({
+				PreToolUse: [{ matcher: 'write', hooks: [{ type: 'command', command: 'echo from-config' }] }]
+			});
+			mockHooksFile(null);
+
+			expect(service.hasHooks('PreToolUse')).toBe(true);
+		});
+
+		it('should merge hooks from both sources with different matcher patterns', () => {
+			setupConfig({
+				PreToolUse: [{ matcher: 'delete_file', hooks: [{ type: 'command', command: 'echo config-delete' }] }]
+			});
+			mockHooksFile({
+				hooks: {
+					PreToolUse: [{ matcher: 'write', hooks: [{ type: 'command', command: 'echo hooks-write' }] }]
+				}
+			});
+
+			expect(service.hasHooks('PreToolUse')).toBe(true);
+
+			// Both matchers should be available — test via executePreToolUseHooks indirectly
+			// Write should match (from hooks.json)
+			const writeHooks = service.findMatchingHooks('write', [
+				{ matcher: 'write', hooks: [{ type: 'command', command: 'echo hooks-write' }] },
+				{ matcher: 'delete_file', hooks: [{ type: 'command', command: 'echo config-delete' }] }
+			]);
+			expect(writeHooks).toHaveLength(1);
+			expect(writeHooks[0]!.command).toBe('echo hooks-write');
+
+			// Delete should match (from config.json)
+			const deleteHooks = service.findMatchingHooks('delete_file', [
+				{ matcher: 'write', hooks: [{ type: 'command', command: 'echo hooks-write' }] },
+				{ matcher: 'delete_file', hooks: [{ type: 'command', command: 'echo config-delete' }] }
+			]);
+			expect(deleteHooks).toHaveLength(1);
+			expect(deleteHooks[0]!.command).toBe('echo config-delete');
+		});
+
+		it('should cache hooks.json and re-read only when mtime changes', () => {
+			setupConfig(undefined);
+			const statSpy = vi.spyOn(fs, 'statSync').mockReturnValue({ mtimeMs: 1000 } as fs.Stats);
+			const readSpy = vi.spyOn(fs, 'readFileSync').mockReturnValue(
+				JSON.stringify({
+					hooks: {
+						PreToolUse: [{ matcher: 'write', hooks: [{ type: 'command', command: 'echo cached' }] }]
+					}
+				})
+			);
+
+			// First call reads the file
+			expect(service.hasHooks('PreToolUse')).toBe(true);
+			expect(readSpy).toHaveBeenCalledTimes(1);
+
+			// Second call with same mtime uses cache
+			expect(service.hasHooks('PreToolUse')).toBe(true);
+			expect(readSpy).toHaveBeenCalledTimes(1);
+
+			// Mtime changes — file should be re-read
+			statSpy.mockReturnValue({ mtimeMs: 2000 } as fs.Stats);
+			readSpy.mockReturnValue(
+				JSON.stringify({
+					hooks: {
+						PostToolUse: [{ matcher: 'write', hooks: [{ type: 'command', command: 'echo updated' }] }]
+					}
+				})
+			);
+
+			expect(service.hasHooks('PreToolUse')).toBe(false);
+			expect(service.hasHooks('PostToolUse')).toBe(true);
+			expect(readSpy).toHaveBeenCalledTimes(2);
 		});
 	});
 });

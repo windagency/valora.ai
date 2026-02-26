@@ -234,26 +234,6 @@ The assertion process can leverage:
 
 ## Rules
 
-### Modern CLI Tools for Validation Output
-
-When running validation checks and processing their output, use modern CLI tools:
-
-- **`rg`** to search source files for patterns (secrets, anti-patterns, TODO markers) instead of `grep -r`
-- **`fd`** to discover files by extension or naming pattern (e.g., find all `.ts` files in scope) instead of `find`
-- **`jq`** to parse JSON output from linters (`pnpm lint --format json`), security audits (`pnpm audit --json`), and type checkers
-- **`yq`** to parse YAML configs (Kubernetes manifests, CI/CD workflows) if validating infrastructure
-
-```bash
-# Parse ESLint JSON output for actionable issues
-pnpm lint --format json | jq '[.[] | select(.errorCount > 0) | {file: .filePath, errors: [.messages[] | select(.severity == 2) | {line: .line, rule: .ruleId, message: .message}]}]'
-
-# Search for hard-coded secrets with rg
-rg "password\s*=\s*['\"]|api[_-]?key\s*=\s*['\"]" src/ -t ts -t js
-
-# Find files modified in scope
-fd -e ts -e tsx . src/ --changed-within 1d
-```
-
 ### Quality Gate Standards
 
 1. **Zero tolerance for critical issues** - Security vulnerabilities, build failures, type errors are blockers
