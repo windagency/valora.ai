@@ -278,5 +278,9 @@ build/
 dist/
 *.tsbuildinfo
 
-# Sessions
-sessions/
+# AI tools
+.claude/
+.cursor/
+
+# Project-local VALORA config
+.valora/

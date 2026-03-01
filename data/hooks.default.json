@@ -1,0 +1,17 @@
+{
+	"hooks": {
+		"PreToolUse": [
+			{
+				"matcher": "^run_terminal_cmd$",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "bash data/hooks/enforce-modern-cli.sh",
+						"timeout": 5000
+					}
+				]
+			}
+		]
+	},
+	"enforcement": {}
+}

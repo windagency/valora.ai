@@ -1,0 +1,18 @@
+{
+	"compilerOptions": {
+		"baseUrl": ".",
+		"paths": {
+			"src/*": ["./*"],
+			"cleanup/*": ["./cleanup/*"],
+			"cli/*": ["./cli/*"],
+			"config/*": ["./config/*"],
+			"executor/*": ["./executor/*"],
+			"llm/*": ["./llm/*"],
+			"mcp/*": ["./mcp/*"],
+			"output/*": ["./output/*"],
+			"session/*": ["./session/*"],
+			"types/*": ["./types/*"],
+			"utils/*": ["./utils/*"]
+		}
+	}
+}

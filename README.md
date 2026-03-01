@@ -2,28 +2,28 @@
   <img src="https://img.shields.io/badge/VALORA-6366f1?style=for-the-badge&logo=openai&logoColor=white" alt="VALORA" />
 </p>
 
-<h2 align="center">Orchestrated AI for Building Software, Safely, Predictably, at Scale</h2>
+<h1 align="center">VALORA</h1>
 
 <p align="center">
-  <q><i>The future of software development is not about replacing developers, but amplifying their capabilities with intelligent AI collaboration.</i></q>
+  <strong>The future of software development is not about replacing developers, but amplifying their capabilities with intelligent AI collaboration.</strong>
 </p>
 
 <p align="center">
-  <a href="#️-about-valora">About</a> •
-  <a href="#-the-valora-approach">Approach</a> •
+  <a href="#-features">Features</a> •
   <a href="#-quick-start">Quick Start</a> •
   <a href="#-architecture">Architecture</a> •
   <a href="#-commands">Commands</a> •
-  <a href="#-use-cases">Use Cases</a> •
   <a href="#-documentation">Documentation</a>
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.1.0-blue?style=flat-square" alt="Version" />
-  <img src="https://img.shields.io/badge/node-%3E%3D22.0.0-brightgreen?style=flat-square&logo=node.js" alt="Node" />
+  <img src="https://img.shields.io/badge/version-2.0.0-blue?style=flat-square" alt="Version" />
+  <img src="https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen?style=flat-square&logo=node.js" alt="Node" />
   <img src="https://img.shields.io/badge/typescript-5.x-3178c6?style=flat-square&logo=typescript" alt="TypeScript" />
   <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="License" />
-  <br>
+</p>
+
+<p align="center">
   <img src="https://img.shields.io/badge/Anthropic-Claude-d97706?style=flat-square" alt="Anthropic" />
   <img src="https://img.shields.io/badge/OpenAI-GPT--5-412991?style=flat-square" alt="OpenAI" />
   <img src="https://img.shields.io/badge/Google-Gemini-4285f4?style=flat-square" alt="Google" />
@@ -34,48 +34,21 @@
 
 ## 🏛️ About VALORA
 
-**VALORA (Versatile Agent Logic for Orchestrated Response Architecture)** is a next-generation TypeScript-based platform designed to orchestrate a sophisticated network of AI agents to automate the complete software development lifecycle. 
-VALORA is an **AI orchestration engine for software development**.
-
-It doesn’t try to replace developers or magically “write the whole app for you”.  
-Instead, it **coordinates multiple specialised AI agents across the entire development lifecycle**, while keeping humans firmly in control.
-
-Think of VALORA as **a development operating system for AI-assisted engineering**.
-
-Where most AI tools help you write _code_, VALORA helps you deliver _software_.  
-VALORA is not about writing more code faster. It’s about:
-
-- Making **better decisions earlier**
-- Capturing knowledge automatically
-- **Scaling engineering quality** with AI
-- Turning AI from a tool into an **operating model**
+**VALORA (Versatile Agent Logic for Orchestrated Response Architecture)** is a next-generation TypeScript-based platform designed to orchestrate a sophisticated network of AI agents to automate the complete software development lifecycle. By moving beyond simple "code generation", VALORA manages the delicate interplay between requirements, architecture, and deployment. VALORA provides intelligent automation while maintaining human oversight.
 
 ### Why VALORA?
 
-**Intelligent Orchestration**: VALORA coordinates **11 specialised AI agents**, from **@product-manager** functional oversight to **@secops-engineer** compliance, ensuring the right expert is assigned to every task.
+**Intelligent Orchestration**: VALORA coordinates **11 specialised AI agents**, from **@lead** technical oversight to **@secops-engineer** compliance, ensuring the right expert is assigned to every task.
 
 **Three-Tier Flexibility**: The engine adapts to your resources, offering **MCP Sampling**, **Guided Completion**, or **API Fallback** modes.
 
 **Phased Governance**: Every project follows a rigorous **8-phase lifecycle**, moving from initialisation and planning through implementation to validation and PR creation.
 
-**Strategic Optimisation**: To balance depth and speed, VALORA assigns specific LLMs (like **GPT-5** for planning or **Claude Haiku** for execution) based on the task's complexity.
+**Strategic Optimisation**: To balance depth and speed, VALORA assigns specific LLMs (like **GPT-5** for planning or **Claude Haiku** for validation) based on the task's complexity.
 
 > VALORA is not a replacement for the developer; it is the high-fidelity instrument through which the developer conducts a full symphony of AI agents.
 
-### The Problem VALORA Solves
-
-Modern software delivery is broken in subtle but expensive ways:
-
-- AI tools are **stateless**, they forget decisions
-- Planning happens in docs, execution happens in code, reviews happen in PRs
-- Governance, security, and quality are bolted on late
-- Developers spend time *re-explaining context* instead of building
-
-AI makes typing faster. But **coordination, risk, and rework still dominate cost**.
-
-## ✨ The VALORA Approach
-
-VALORA treats software development like a **repeatable, governed workflow**, not a sequence of prompts.
+## ✨ Features
 
 <table width="100%">
 <tr valign="top">
@@ -85,28 +58,30 @@ VALORA treats software development like a **repeatable, governed workflow**, not
 
 **11 specialised AI agents** with distinct expertise:
 
-- **@product-manager** — Requirements & prioritisation
-- **@ui-ux-designer** — Design & accessibility
 - **@lead** — Technical oversight & architecture
+- **@product-manager** — Requirements & prioritisation
+- **@software-engineer-\*** — Implementation specialists
 - **@platform-engineer** — Infrastructure & DevOps
-- **@software-engineer-*** — Implementation specialists
-- **@secops-engineer** — Security & compliance
 - **@qa** — Testing & quality assurance
+- **@secops-engineer** — Security & compliance
+- **@ui-ux-designer** — Design & accessibility
 
 </td>
 <td width="50%">
 
-### 👤 Human-in-the-Loop by Design
+### ⚡ Three-Tier Execution
 
-When decisions matter, VALORA **stops and asks you**:
+Flexible execution modes for every use case:
 
-- Clarifies requirements
-- Surfaces risks
-- Captures trade-offs
-- Escalation criteria
-- Documents decisions automatically
+| Tier | Mode              | Cost        |
+| ---- | ----------------- | ----------- |
+| 1    | MCP Sampling      | Free\*      |
+| 2    | Guided Completion | Free        |
+| 3    | API Fallback      | Pay-per-use |
 
-Those decisions are written into plans, specs, and docs, permanently.
+_\*When available in Cursor_
+
+**Zero configuration required** — works immediately with your Cursor subscription.
 
 </td>
 </tr>
@@ -138,9 +113,9 @@ Strategic AI model assignment for cost efficiency:
 | ------------------ | ----------------------- |
 | **GPT-5 Thinking** | Deep analysis, planning |
 | **Claude Sonnet**  | Implementation, reviews |
-| **Claude Haiku**   | Fast tasks, execution   |
+| **Claude Haiku**   | Fast tasks, validation  |
 
-**31% strategic • 31% execution • 38% fast**  
+**31% strategic • 31% execution • 38% fast**
 
 </td>
 </tr>
@@ -149,13 +124,7 @@ Strategic AI model assignment for cost efficiency:
 
 ### 🔌 External MCP Integration
 
-Connect to **15 external MCP servers** with:
-
-- Explicit user approval
-- Risk classification
-- Audit logs
-
-Nothing runs silently. Nothing runs unchecked.
+Connect to **15 external MCP servers** with user approval:
 
 | Category       | Servers                                   |
 | -------------- | ----------------------------------------- |
@@ -173,6 +142,7 @@ Nothing runs silently. Nothing runs unchecked.
 
 Enterprise-grade security controls:
 
+- **Supply Chain Hardening** — Frozen lockfile, blocked install scripts, vulnerability overrides, Dependabot
 - **User Approval Flow** — Interactive consent before connections
 - **Risk Assessment** — Low/Medium/High/Critical classification
 - **Tool Filtering** — Allowlist and blocklist per server
@@ -183,135 +153,74 @@ Enterprise-grade security controls:
 </tr>
 </table>
 
-## What You Can Actually Do With VALORA
-
-### 📝 Define & Refine Requirements (Before Anything Breaks)
-
-```bash
-valora refine-specs "Add OAuth authentication"
-```
-
-- Clarifies requirements through structured questions  
-- Captures your answers as explicit decisions  
-- Produces a clean, shared understanding of *what* to build  
-
-```bash
-valora create-prd
-```
-
-- Generates a full Product Requirements Document (PRD)
-- Identifies edge cases, constraints, and open questions
-- Ensures product, tech, and business are aligned early
-
-```bash
-valora create-backlog
-```
-
-- Breaks the PRD into prioritised, actionable tasks
-- Establishes clear scope boundaries
-- Prevents “hidden work” from surfacing mid-implementation
-
-```bash
-valora refine-task
-```
-
-- Pulls the next highest-priority task
-- Refines acceptance criteria and implementation expectations
-- Locks clarity *before* planning or coding begins
-
-### ✨ Plan Before You Code
-
-```bash
-valora plan
-```
-
-- Analyses your codebase
-- Identifies risks and dependencies
-- Produces a clear, reviewable implementation plan
-
-### 🧱 Build With Context
-
-```bash
-valora implement
-```
-
-- Uses the approved plan
-- Maintains architectural consistency
-- Applies project conventions automatically
-
-### 🧪 Validate Continuously
-
-```bash
-valora assert
-valora test
-valora review-code
-```
-
-- Automated checks
-- AI-assisted reviews
-- Human oversight where it matters
-
-### 🚀 Deliver Cleanly
-
-```bash
-valora commit
-valora create-pr
-```
-
-- Conventional commits
-- Clear PR descriptions
-- Full traceability back to requirements
+---
 
 ## 🚀 Quick Start
 
 ### Prerequisites
 
-<table width="100%">
-<tr valign="top">
-<td width="50%">
-
-**Option 1: devcontainer (Recommended)**
-- Containerised application runner  
-  _(e.g., Docker, Rancher, Podman)_
-
-> **Image Details:**
-> - Base: `node:22.21.0-alpine` (multi-stage build)
-> - Size: optimized with layer caching
-> - Security: Non-root user, dumb-init, latest security updates
-> - Health check: Built-in endpoint monitoring
-
-</td>
-<td width="50%">
-
-Option 2: Local Development
-- Node.js 22.21.0+ (managed via Volta)
-- pnpm 10.19.0 (enabled via Corepack)
-
-</td>
-</tr>
-</table>
+- Node.js 18+
 
 ### Installation
 
 ```bash
-# Navigate to the engine directory
-cd .ai/.bin
-
-# Install dependencies
-pnpm install
-
-# Build the project
-pnpm build
-
 # Install globally
-pnpm link
+pnpm add -g valora          # pnpm
+yarn global add valora      # yarn
+npm install -g valora       # npm
 
 # Verify installation
 valora --version
-
-# Set up
-valora config setup
+# Should output: 2.0.0
 ```
+
+### Project Setup
+
+Initialise VALORA in your project:
+
+```bash
+cd your-project
+valora init         # Minimal setup (.valora/config.json)
+valora init --full  # Full setup with override directories
+```
+
+### Your First Command
+
+```bash
+# Create an implementation plan
+valora plan "Add user authentication with OAuth"
+```
+
+The engine will:
+
+1. Select the appropriate agent (`@lead`)
+2. Gather codebase context
+3. Generate a detailed implementation plan
+4. Provide step-by-step guidance
+
+### Zero-Config Usage with Cursor subscription
+
+No API keys? No problem. The engine works immediately using **Guided Completion Mode**:
+
+```bash
+valora plan "Add dark mode toggle"
+# → Generates structured prompt for Cursor AI
+# → Uses your Cursor subscription (free)
+```
+
+### Optional: API Configuration
+
+For fully autonomous execution:
+
+```bash
+valora config setup --quick
+
+# Or set environment variables
+export ANTHROPIC_API_KEY=sk-ant-...
+export OPENAI_API_KEY=sk-...
+```
+
+---
 
 ## 🏗️ Architecture
 
@@ -349,19 +258,7 @@ valora config setup
 | **Observability** | Structured logging and session tracking             |
 | **Resilience**    | Graceful fallbacks and error recovery               |
 
-## 🛠️ Technology Stack
-
-| Category            | Technologies                                     |
-| ------------------- | ------------------------------------------------ |
-| **Runtime**         | Node.js 22.21.0+, TypeScript 5.x                 |
-| **Package Manager** | pnpm 10.19.0 (via Corepack)                      |
-| **Build**           | tsc, tsc-alias                                   |
-| **Testing**         | Vitest, Playwright, Testcontainers               |
-| **LLM SDKs**        | @anthropic-ai/sdk, openai, @google/generative-ai |
-| **CLI UI**          | Ink (React), Chalk, Commander                    |
-| **Validation**      | Zod                                              |
-| **MCP**             | @modelcontextprotocol/sdk                        |
-| **Deployment**      | Docker (multi-stage), Cloud Run compatible       |
+---
 
 ## 📋 Commands
 
@@ -400,6 +297,8 @@ valora config setup
 └─────────────────────┘  └─────────────────────┘  └─────────────────────┘
 ```
 
+---
+
 ## 📚 Documentation
 
 <table width="100%">
@@ -407,26 +306,52 @@ valora config setup
 <td align="center" width="33%">
 <h3>👤 User Guide</h3>
 <p>Getting started, workflows,<br>and daily usage</p>
-<a href="./.ai/documentation/user-guide/README.md">
+<a href="./documentation/user-guide/README.md">
 <img src="https://img.shields.io/badge/Read-User%20Guide-6366f1?style=for-the-badge" alt="User Guide" />
 </a>
 </td>
 <td align="center" width="33%">
 <h3>💻 Developer Guide</h3>
 <p>Architecture, codebase,<br>and contributions</p>
-<a href="./.ai/documentation/developer-guide/README.md">
+<a href="./documentation/developer-guide/README.md">
 <img src="https://img.shields.io/badge/Read-Developer%20Guide-10b981?style=for-the-badge" alt="Developer Guide" />
 </a>
 </td>
 <td align="center" width="33%">
 <h3>🏛️ Architecture</h3>
 <p>System design<br>and decisions</p>
-<a href="./.ai/documentation/architecture/README.md">
+<a href="./documentation/architecture/README.md">
 <img src="https://img.shields.io/badge/Read-Architecture-f59e0b?style=for-the-badge" alt="Architecture" />
 </a>
 </td>
 </tr>
 </table>
+
+### Documentation Structure
+
+```plaintext
+documentation/
+├── README.md                    # Documentation entry point
+├── user-guide/                  # For users
+│   ├── quick-start.md           # 5-minute getting started
+│   ├── workflows.md             # Common patterns
+│   └── commands.md              # Command reference
+├── developer-guide/             # For developers
+│   ├── setup.md                 # Development environment
+│   ├── codebase.md              # Code structure
+│   └── contributing.md          # How to contribute
+├── architecture/                # For architects
+│   ├── system-architecture.md   # C4 diagrams
+│   ├── components.md            # Component design
+│   └── data-flow.md             # Data flow patterns
+└── adr/                         # Decision records
+    ├── 001-multi-agent-architecture.md
+    ├── ...
+    ├── 008-pretooluse-cli-enforcement.md
+    └── 009-supply-chain-hardening.md
+```
+
+---
 
 ## 🎯 Use Cases
 
@@ -458,37 +383,58 @@ valora review-code --focus=security
 valora review-functional --check-a11y=true
 ```
 
+---
+
 ## 🔧 Project Structure
 
 ```plaintext
-.ai/
-├── .bin/                        # TypeScript implementation
-│   ├── dist/                    # Built artefacts
-│   ├── src/                     # Source code
-│   └── tests/                   # Test suites
-├── agents/                      # Agent definitions (11 agents)
-│   ├── registry.json            # Agent definitions
-│   ├── lead.md
-│   ├── product-manager.md
-│   ├── software-engineer-*.md
+valora/                          # npm package root
+├── bin/                         # CLI entry points
+│   ├── valora.js                # Main CLI
+│   └── mcp.js                   # MCP server
+├── src/                         # TypeScript source
+│   ├── cli/                     # Command-line interface
+│   ├── config/                  # Configuration management
+│   ├── executor/                # Pipeline execution
+│   ├── llm/                     # LLM provider integrations
+│   ├── mcp/                     # MCP server implementation
+│   ├── session/                 # Session management
+│   ├── utils/                   # Utilities & path resolution
 │   └── ...
-├── commands/                    # Command specifications (16 commands)
-│   ├── registry.json            # Command definitions
-│   ├── implement.md
-│   ├── plan.md
-│   └── ...
+├── data/                        # Built-in resources (shipped with package)
+│   ├── agents/                  # Agent definitions (11 agents)
+│   ├── commands/                # Command specifications (24 commands)
+│   ├── prompts/                 # Structured prompts by phase
+│   ├── templates/               # Document templates
+│   ├── hooks/                   # Hook scripts
+│   ├── config.default.json      # Default configuration
+│   ├── hooks.default.json       # Default hooks config
+│   └── external-mcp.default.json # External MCP server registry
+├── dist/                        # Compiled output (gitignored)
+├── tests/                       # Test suites
 ├── documentation/               # Comprehensive docs
-├── logs/                        # Execution logs
-├── prompts/                     # Structured prompts by phase
-│   ├── 01_onboard/
-│   ├── 02_context/
-│   ├── 03_plan/
-│   └── ...
-├── sessions/                    # Persistent session state
-├── templates/                   # Document templates
-├── config.json                  # Engine configuration
-└── external-mcp.json            # External MCP server registry
+└── package.json
 ```
+
+### Project-Level Overrides (`.valora/`)
+
+When installed in a project, VALORA supports a `.valora/` directory for local overrides:
+
+```plaintext
+.valora/                         # Project-specific configuration
+├── config.json                  # Project settings (overrides defaults)
+├── agents/                      # Custom/override agent definitions
+├── commands/                    # Custom/override command specs
+├── prompts/                     # Custom/override prompts
+├── templates/                   # Custom/override templates
+├── sessions/                    # Session state (gitignored)
+├── logs/                        # Execution logs (gitignored)
+└── cache/                       # Cache data (gitignored)
+```
+
+Resources in `.valora/` take precedence over built-in `data/` resources.
+
+---
 
 ## 🌟 Why VALORA?
 
@@ -496,7 +442,7 @@ valora review-functional --check-a11y=true
 <tr valign="top">
 <td>
 
-**Traditional Development**  
+### Traditional Development
 
 - ❌ Context switching between tools
 - ❌ Manual documentation
@@ -507,7 +453,7 @@ valora review-functional --check-a11y=true
 </td>
 <td>
 
-**With AI Orchestration**  
+### With AI Orchestration
 
 - ✅ Unified workflow automation
 - ✅ Auto-generated documentation
@@ -529,45 +475,22 @@ valora review-functional --check-a11y=true
 | **Dynamic Agent Selection**   | Right expert for every task                    |
 | **Quality Gates**             | Multiple checkpoints prevent technical debt    |
 
-### What Makes VALORA Different
+---
 
-| Traditional AI Tools | VALORA                  |
-| -------------------- | ----------------------- |
-| Prompt-based         | Process-driven          |
-| Stateless            | Persistent memory       |
-| Single-model         | Multi-agent             |
-| Code-focused         | Lifecycle-focused       |
-| Fast but risky       | Fast **and** controlled |
+## 🛠️ Technology Stack
 
-VALORA optimises **outcomes**, not just outputs.
+| Category            | Technologies                                     |
+| ------------------- | ------------------------------------------------ |
+| **Runtime**         | Node.js 18+, TypeScript 5.x                      |
+| **Package Manager** | pnpm 10.x                                        |
+| **Build**           | tsc, tsc-alias                                   |
+| **Testing**         | Vitest, Playwright                               |
+| **LLM SDKs**        | @anthropic-ai/sdk, openai, @google/generative-ai |
+| **CLI UI**          | Ink (React), Chalk, Commander                    |
+| **Validation**      | Zod                                              |
+| **MCP**             | @modelcontextprotocol/sdk                        |
 
-## 🚧 Future Improvements
-
-There are still many improvements to be made. Contributions and suggestions are welcome!
-
-### Token & Context Management
-- Reducing prompt sizes for efficiency
-- Memory management optimisation
-- Distributing context window occupancy across agents
-
-### Metrics & Observability
-- Token usage tracking per agent/command
-- Execution time metrics
-- Cost analysis dashboards
-
-### UI & CLI Experience
-- Buffer management improvements
-- Animations and visual feedback
-- Making the CLI fully autonomous
-- Enhanced progress indicators
-
-### Agent & Command System
-- Ability to add custom agents dynamically
-- Override existing agent behaviours
-- Plugin system for third-party commands
-- Hot-reload for agent definitions
-
-> Have ideas or suggestions? Contributions are welcome!
+---
 
 ## 📄 Licence
 
@@ -576,7 +499,7 @@ MIT © Damien TIVELET
 ---
 
 <p align="center">
-  <a href="./.ai/documentation/user-guide/quick-start.md">Get Started</a> •
-  <a href="./.ai/documentation/developer-guide/contributing.md">Contribute</a> •
-  <a href="./.ai/documentation/architecture/README.md">Learn More</a>
+  <a href="./documentation/user-guide/quick-start.md">Get Started</a> •
+  <a href="./documentation/developer-guide/contributing.md">Contribute</a> •
+  <a href="./documentation/architecture/README.md">Learn More</a>
 </p>
