@@ -32,17 +32,33 @@
 		"vscode": {
 			"extensions": [
 				"eamodio.gitlens",
+				"mhutchie.git-graph",
 				"yzhang.markdown-all-in-one",
 				"bierner.markdown-mermaid",
 				"bpruitt-goddard.mermaid-markdown-syntax-highlighting",
+				"hediet.vscode-drawio",
+				"xiaoluoboding.vscode-folder-size",
+				"christian-kohler.path-intellisense",
 				"ms-vscode-remote.vscode-remote-extensionpack",
 				"ms-azuretools.vscode-docker",
 				"wayou.vscode-todo-highlight",
 				"gruntfuggly.todo-tree",
-				"editorconfig.editorconfig",
 				"usernamehw.errorlens",
+				"editorconfig.editorconfig",
+				"mikestead.dotenv",
 				"aykutsarac.jsoncrack-vscode",
-				"eriklynd.json-tools"
+				"eriklynd.json-tools",
+				"GregorBiswanger.json2ts",
+				"codeandstuff.package-json-upgrade",
+				"pflannery.vscode-versionlens",
+				"dbaeumer.vscode-eslint",
+				"esbenp.prettier-vscode",
+				"wix.vscode-import-cost",
+				"vitest.explorer",
+				"mgmcdermott.vscode-language-babel",
+				"oouo-diogo-perdigao.docthis",
+				"YoavBls.pretty-ts-errors",
+				"mattpocock.ts-error-translator"
 			]
 		}
 	},
