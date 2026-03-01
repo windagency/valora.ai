@@ -1,0 +1,40 @@
+{
+	"defaults": {
+		"log_level": "warn"
+	},
+	"features": {
+		"agent_selection_analytics": false,
+		"agent_selection_fallback_reporting": false,
+		"agent_selection_monitoring": false,
+		"dynamic_agent_selection": false,
+		"dynamic_agent_selection_implement_only": true
+	},
+	"logging": {
+		"cleanup_interval_hours": 24,
+		"compress_after_days": 7,
+		"daily_file_max_size_mb": 50,
+		"dry_run": false,
+		"enabled": true,
+		"max_age_days": 30,
+		"max_files": 100,
+		"max_size_mb": 100
+	},
+	"paths": {
+		"agents_dir": "agents",
+		"commands_dir": "commands",
+		"config_file": "config.json",
+		"logs_dir": "logs",
+		"prompts_dir": "prompts",
+		"sessions_dir": "sessions"
+	},
+	"providers": {},
+	"sessions": {
+		"cleanup_interval_hours": 24,
+		"compress_after_days": 30,
+		"dry_run": false,
+		"enabled": true,
+		"max_age_days": 90,
+		"max_count": 100,
+		"max_size_mb": 50
+	}
+}

@@ -47,7 +47,7 @@ if [ -S /var/run/docker.sock ]; then
     sudo chmod 666 /var/run/docker.sock
 fi
 
-# Install modern CLI tools (from .ai modern-cli-toolkit)
+# Install modern CLI tools (from documentation modern-cli-toolkit)
 echo "Installing modern CLI tools..."
 SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 bash "${SCRIPT_DIR}/.devcontainer/install-cli-tools.sh" jq yq rg fd
