@@ -29,7 +29,7 @@ import { getLogger } from 'output/logger';
 import { getPipelineEmitter } from 'output/pipeline-emitter';
 import path from 'path';
 import { formatErrorMessage } from 'utils/error-utils';
-import { getPackageDataDir } from 'utils/paths';
+import { getPackageDataDir, getPackageRoot } from 'utils/paths';
 import { checkReDoSRisk, safeRegexTest } from 'utils/safe-regex';
 
 const DEFAULT_HOOK_TIMEOUT_MS = 10_000;
@@ -264,21 +264,33 @@ export class HookExecutionService {
 		const inputJson = JSON.stringify(input);
 
 		return new Promise((resolve, reject) => {
-			const child = exec(hook.command, { cwd: input.cwd, timeout }, (error, stdout, stderr) => {
-				if (error && 'killed' in error && error.killed) {
-					// Timeout
-					reject(new Error(`Hook command timed out after ${timeout}ms: ${hook.command}`));
-					return;
-				}
+			const child = exec(
+				hook.command,
+				{
+					cwd: input.cwd,
+					env: {
+						...process.env,
+						VALORA_DATA_DIR: getPackageDataDir(),
+						VALORA_PKG_ROOT: getPackageRoot()
+					},
+					timeout
+				},
+				(error, stdout, stderr) => {
+					if (error && 'killed' in error && error.killed) {
+						// Timeout
+						reject(new Error(`Hook command timed out after ${timeout}ms: ${hook.command}`));
+						return;
+					}
 
-				// exec error with exit code is not a fatal error — the hook ran but exited non-zero
-				const exitCode = error?.code ?? 0;
-				resolve({
-					exitCode: typeof exitCode === 'number' ? exitCode : 1,
-					stderr: stderr ?? '',
-					stdout: stdout ?? ''
-				});
-			});
+					// exec error with exit code is not a fatal error — the hook ran but exited non-zero
+					const exitCode = error?.code ?? 0;
+					resolve({
+						exitCode: typeof exitCode === 'number' ? exitCode : 1,
+						stderr: stderr ?? '',
+						stdout: stdout ?? ''
+					});
+				}
+			);
 
 			// Write input JSON to stdin
 			if (child.stdin) {

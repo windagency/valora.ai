@@ -67,6 +67,11 @@ describe('HookExecutionService', () => {
 	beforeEach(() => {
 		service = new HookExecutionService();
 		vi.clearAllMocks();
+		// Suppress loadHooksFile() reading the real data/hooks.default.json from disk.
+		// Tests that need file-based hooks override this with their own fs mocks.
+		vi.spyOn(fs, 'statSync').mockImplementation(() => {
+			throw new Error('ENOENT: no such file or directory');
+		});
 	});
 
 	afterEach(() => {
@@ -280,6 +285,27 @@ describe('HookExecutionService', () => {
 			};
 
 			await expect(service.executeHookCommand(hook, input)).rejects.toThrow('timed out');
+		});
+
+		it('should pass VALORA_DATA_DIR and VALORA_PKG_ROOT env vars to hook process', async () => {
+			const hook: HookCommand = { type: 'command', command: 'echo "$VALORA_DATA_DIR|$VALORA_PKG_ROOT"' };
+			const input: HookInput = {
+				session_id: undefined,
+				hook_event_name: 'PreToolUse',
+				tool_name: 'write',
+				tool_input: {},
+				cwd: process.cwd()
+			};
+
+			const result = await service.executeHookCommand(hook, input);
+			expect(result.exitCode).toBe(0);
+
+			const parts = result.stdout.trim().split('|');
+			expect(parts).toHaveLength(2);
+			expect(parts[0]).not.toBe('');
+			expect(parts[1]).not.toBe('');
+			// VALORA_DATA_DIR should end with /data
+			expect(parts[0]).toMatch(/\/data$/);
 		});
 
 		it('should output JSON with updatedInput on exit 0', async () => {

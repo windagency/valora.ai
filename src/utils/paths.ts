@@ -30,7 +30,7 @@ export function getPackageRoot(): string {
 		if (fs.existsSync(pkgPath) && fs.existsSync(dataDir)) {
 			try {
 				const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8')) as { name?: string };
-				if (pkg.name === 'valora') {
+				if (pkg.name === 'valora' || pkg.name === '@windagency/valora') {
 					return dir;
 				}
 			} catch {

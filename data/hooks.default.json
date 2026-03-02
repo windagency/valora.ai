@@ -6,7 +6,7 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "bash data/hooks/enforce-modern-cli.sh",
+						"command": "bash \"$VALORA_DATA_DIR/hooks/enforce-modern-cli.sh\"",
 						"timeout": 5000
 					}
 				]
