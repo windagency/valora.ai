@@ -169,9 +169,9 @@ Query session context.
 ### Installation
 
 ```bash
-pnpm add valora             # pnpm
-yarn add valora             # yarn
-npm install valora          # npm
+pnpm add @windagency/valora             # pnpm
+yarn add @windagency/valora             # yarn
+npm install @windagency/valora          # npm
 ```
 
 ### Basic Usage

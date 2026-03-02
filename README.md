@@ -165,9 +165,9 @@ Enterprise-grade security controls:
 
 ```bash
 # Install globally
-pnpm add -g valora          # pnpm
-yarn global add valora      # yarn
-npm install -g valora       # npm
+pnpm add -g @windagency/valora          # pnpm
+yarn global add @windagency/valora      # yarn
+npm install -g @windagency/valora       # npm
 
 # Verify installation
 valora --version

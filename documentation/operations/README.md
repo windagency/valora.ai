@@ -46,9 +46,9 @@ This guide covers:
 
 ```bash
 # Install globally
-pnpm add -g valora          # pnpm
-yarn global add valora      # yarn
-npm install -g valora       # npm
+pnpm add -g @windagency/valora          # pnpm
+yarn global add @windagency/valora      # yarn
+npm install -g @windagency/valora       # npm
 
 # Verify
 valora --version
@@ -120,7 +120,7 @@ FROM node:20-alpine
 WORKDIR /app
 
 # Install VALORA
-RUN npm install -g valora
+RUN npm install -g @windagency/valora
 
 # Set environment
 ENV NODE_ENV=production
@@ -150,7 +150,7 @@ jobs:
           node-version: '20'
 
       - name: Install VALORA
-        run: npm install -g valora
+        run: npm install -g @windagency/valora
 
       - name: Verify
         run: valora --version

@@ -1,5 +1,5 @@
 {
-	"name": "valora",
+	"name": "@windagency/valora",
 	"version": "2.0.0",
 	"description": "VALORA - AI-assisted development workflow orchestration with agnostic multi-LLM support, session-based state, and Cursor MCP integration",
 	"keywords": [
@@ -34,8 +34,14 @@
 		"pnpm": "10.19.0"
 	},
 	"bin": {
-		"valora": "./bin/valora.js",
-		"valora-mcp": "./bin/mcp.js"
+		"valora": "bin/valora.js",
+		"valora-mcp": "bin/mcp.js"
+	},
+	"main": "dist/",
+	"directories": {
+		"documentation": "documentation",
+		"example": "examples",
+		"test": "tests"
 	},
 	"files": [
 		"dist/",

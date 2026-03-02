@@ -14,9 +14,9 @@ Ensure you have the following installed:
 ### Step 1: Install VALORA
 
 ```bash
-pnpm add -g valora          # pnpm
-yarn global add valora      # yarn
-npm install -g valora       # npm
+pnpm add -g @windagency/valora          # pnpm
+yarn global add @windagency/valora      # yarn
+npm install -g @windagency/valora       # npm
 ```
 
 ### Step 2: Verify Installation
@@ -220,9 +220,9 @@ valora session clean
 Ensure VALORA is installed globally:
 
 ```bash
-pnpm add -g valora          # pnpm
-yarn global add valora      # yarn
-npm install -g valora       # npm
+pnpm add -g @windagency/valora          # pnpm
+yarn global add @windagency/valora      # yarn
+npm install -g @windagency/valora       # npm
 ```
 
 ### No Output
@@ -252,10 +252,10 @@ Now that you're set up:
 
 ## Summary
 
-| Step | Action                                                                                 |
-| ---- | -------------------------------------------------------------------------------------- |
-| 1    | Install with `pnpm add -g valora` / `yarn global add valora` / `npm install -g valora` |
-| 2    | Verify with `valora --version`                                                         |
-| 3    | Initialise project with `valora init` (optional)                                       |
-| 4    | Configure (optional) with `valora config setup`                                        |
-| 5    | Start using with `valora plan "<task>"`                                                |
+| Step | Action                                                                                                                     |
+| ---- | -------------------------------------------------------------------------------------------------------------------------- |
+| 1    | Install with `pnpm add -g @windagency/valora` / `yarn global add @windagency/valora` / `npm install -g @windagency/valora` |
+| 2    | Verify with `valora --version`                                                                                             |
+| 3    | Initialise project with `valora init` (optional)                                                                           |
+| 4    | Configure (optional) with `valora config setup`                                                                            |
+| 5    | Start using with `valora plan "<task>"`                                                                                    |
