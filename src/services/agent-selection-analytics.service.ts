@@ -297,3 +297,23 @@ export class AgentSelectionAnalyticsService {
 		return this.events.length;
 	}
 }
+
+/**
+ * Singleton instance for global access (matches pattern of getMetricsCollector, getMCPAuditLogger, etc.)
+ */
+let globalInstance: AgentSelectionAnalyticsService | null = null;
+
+/**
+ * Get the global AgentSelectionAnalytics service instance
+ */
+export function getAgentSelectionAnalytics(): AgentSelectionAnalyticsService {
+	globalInstance ??= new AgentSelectionAnalyticsService();
+	return globalInstance;
+}
+
+/**
+ * Set a custom global instance (for testing or DI)
+ */
+export function setAgentSelectionAnalytics(service: AgentSelectionAnalyticsService): void {
+	globalInstance = service;
+}

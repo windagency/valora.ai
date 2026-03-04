@@ -1,10 +1,10 @@
 # Automated Metrics Reporting
 
-This document describes the automated weekly metrics reporting system for tracking workflow optimization effectiveness.
+This document describes the automated weekly metrics reporting system for tracking workflow optimisation effectiveness.
 
 ## Overview
 
-The system automatically collects, analyzes, and reports on workflow optimization metrics every week, providing insights into:
+The system automatically collects, analyses, and reports on workflow optimisation metrics every week, providing insights into:
 
 - Template usage and time savings
 - Early exit review effectiveness
@@ -181,7 +181,7 @@ The system automatically collects, analyzes, and reports on workflow optimizatio
 **Report Sections**:
 
 1. Executive Summary - Key metrics at a glance
-2. Optimization Performance - Detailed breakdown by optimization
+2. Optimisation Performance - Detailed breakdown by optimisation
 3. Phase Breakdown - Time spent per workflow phase
 4. Quality Metrics - Code/test/review quality scores
 5. Time Savings Distribution - Where time is being saved
@@ -241,7 +241,7 @@ permissions:
 
 - Extracts metrics for specified period
 - Generates dashboard report
-- Displays colorful terminal summary
+- Displays colourful terminal summary
 - Optionally creates GitHub issue (requires `gh` CLI)
 - Provides next steps for committing
 
@@ -428,7 +428,7 @@ gh workflow view "Weekly Metrics Dashboard"
 
 - Full Documentation: `documentation/architecture/metrics-dashboard.md`
 - Scripts Documentation: `scripts/README.md`
-- Optimization Details: `documentation/user-guide/workflow-optimizations.md`
+- Optimisation Details: `documentation/user-guide/workflow-optimisations.md`
 - Workflow Configuration: `.github/workflows/metrics-dashboard.yml`
 
 ---

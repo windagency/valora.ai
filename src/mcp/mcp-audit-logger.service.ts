@@ -5,13 +5,31 @@
  * Tracks approval decisions, connections, tool calls, and errors.
  */
 
-import type { MCPAuditLogEntry } from 'types/mcp-client.types';
+import type {
+	MCPAuditLogEntry,
+	MCPDashboardMetrics,
+	MCPRecentToolCall,
+	MCPServerMetrics,
+	MCPToolBreakdown
+} from 'types/mcp-client.types';
 
 import { existsSync, mkdirSync } from 'fs';
 import { getLogger } from 'output/logger';
 import { dirname, join, resolve } from 'path';
 import { appendFile, readFile } from 'utils/file-utils';
 import { getRuntimeDataDir } from 'utils/paths';
+
+/**
+ * Accumulator for per-server tool call stats during aggregation
+ */
+interface ServerAccumulator {
+	durations: number[];
+	errorCount: number;
+	lastActivity: Date;
+	successCount: number;
+	toolMap: Map<string, { durations: number[]; errorCount: number; successCount: number }>;
+	totalCalls: number;
+}
 
 /**
  * Default path for the audit log
@@ -241,6 +259,180 @@ export class MCPAuditLoggerService {
 			});
 			return [];
 		}
+	}
+
+	/**
+	 * Get aggregated metrics for dashboard display.
+	 * Pure in-memory, synchronous computation.
+	 */
+	getDashboardMetrics(): MCPDashboardMetrics {
+		const connectionState = this.getConnectionState();
+		const toolCalls = this.memoryLog.filter((e) => e.operation === 'tool_call');
+		const activeServerCount = [...connectionState.values()].filter(Boolean).length;
+
+		if (toolCalls.length === 0) {
+			return {
+				activeServerCount,
+				avgDurationMs: 0,
+				durationTrend: [],
+				overallSuccessRate: 1,
+				recentToolCalls: [],
+				servers: [],
+				totalErrors: 0,
+				totalToolCalls: 0
+			};
+		}
+
+		const { serverMap, totalDurationSum, totalErrorCount, totalSuccessCount } = this.groupToolCalls(toolCalls);
+
+		const servers = this.buildServerMetrics(serverMap, connectionState);
+		const recentToolCalls = this.buildRecentToolCalls(toolCalls);
+		const durationTrend = toolCalls.slice(-30).map((e) => e.duration_ms ?? 0);
+
+		return {
+			activeServerCount,
+			avgDurationMs: totalDurationSum / toolCalls.length,
+			durationTrend,
+			overallSuccessRate: totalSuccessCount / toolCalls.length,
+			recentToolCalls,
+			servers,
+			totalErrors: totalErrorCount,
+			totalToolCalls: toolCalls.length
+		};
+	}
+
+	private accumulateServerEntry(
+		serverMap: Map<string, ServerAccumulator>,
+		entry: MCPAuditLogEntry,
+		duration: number
+	): void {
+		let serverStats = serverMap.get(entry.serverId);
+		if (!serverStats) {
+			serverStats = {
+				durations: [],
+				errorCount: 0,
+				lastActivity: entry.timestamp,
+				successCount: 0,
+				toolMap: new Map(),
+				totalCalls: 0
+			};
+			serverMap.set(entry.serverId, serverStats);
+		}
+
+		serverStats.totalCalls++;
+		serverStats.durations.push(duration);
+		serverStats.lastActivity = entry.timestamp;
+
+		if (entry.success) {
+			serverStats.successCount++;
+		} else {
+			serverStats.errorCount++;
+		}
+
+		const toolName = entry.toolName ?? 'unknown';
+		let toolStats = serverStats.toolMap.get(toolName);
+		if (!toolStats) {
+			toolStats = { durations: [], errorCount: 0, successCount: 0 };
+			serverStats.toolMap.set(toolName, toolStats);
+		}
+		toolStats.durations.push(duration);
+		if (entry.success) {
+			toolStats.successCount++;
+		} else {
+			toolStats.errorCount++;
+		}
+	}
+
+	private buildRecentToolCalls(toolCalls: MCPAuditLogEntry[]): MCPRecentToolCall[] {
+		return toolCalls
+			.slice(-10)
+			.reverse()
+			.map(
+				(entry): MCPRecentToolCall => ({
+					durationMs: entry.duration_ms ?? 0,
+					error: entry.error,
+					serverId: entry.serverId,
+					success: entry.success,
+					timestamp: entry.timestamp,
+					toolName: entry.toolName ?? 'unknown'
+				})
+			);
+	}
+
+	private buildServerMetrics(
+		serverMap: Map<string, ServerAccumulator>,
+		connectionState: Map<string, boolean>
+	): MCPServerMetrics[] {
+		return [...serverMap.entries()]
+			.map(([serverId, stats]): MCPServerMetrics => {
+				const toolBreakdown: MCPToolBreakdown[] = [...stats.toolMap.entries()]
+					.map(([toolName, tStats]): MCPToolBreakdown => {
+						const totalCalls = tStats.successCount + tStats.errorCount;
+						return {
+							avgDurationMs:
+								tStats.durations.length > 0 ? tStats.durations.reduce((a, b) => a + b, 0) / tStats.durations.length : 0,
+							calls: totalCalls,
+							successRate: totalCalls > 0 ? tStats.successCount / totalCalls : 1,
+							toolName
+						};
+					})
+					.sort((a, b) => b.calls - a.calls);
+
+				const durationSum = stats.durations.reduce((a, b) => a + b, 0);
+
+				return {
+					avgDurationMs: stats.totalCalls > 0 ? durationSum / stats.totalCalls : 0,
+					errorCount: stats.errorCount,
+					isConnected: connectionState.get(serverId) ?? false,
+					lastActivity: stats.lastActivity,
+					recentDurations: stats.durations.slice(-20),
+					serverId,
+					successCount: stats.successCount,
+					successRate: stats.totalCalls > 0 ? stats.successCount / stats.totalCalls : 1,
+					toolBreakdown,
+					totalCalls: stats.totalCalls
+				};
+			})
+			.sort((a, b) => b.totalCalls - a.totalCalls);
+	}
+
+	private getConnectionState(): Map<string, boolean> {
+		const connectionState = new Map<string, boolean>();
+		for (const entry of this.memoryLog) {
+			if (entry.operation === 'connect' && entry.success) {
+				connectionState.set(entry.serverId, true);
+			} else if (entry.operation === 'disconnect') {
+				connectionState.set(entry.serverId, false);
+			}
+		}
+		return connectionState;
+	}
+
+	private groupToolCalls(toolCalls: MCPAuditLogEntry[]): {
+		serverMap: Map<string, ServerAccumulator>;
+		totalDurationSum: number;
+		totalErrorCount: number;
+		totalSuccessCount: number;
+	} {
+		const serverMap = new Map<string, ServerAccumulator>();
+		let totalDurationSum = 0;
+		let totalSuccessCount = 0;
+		let totalErrorCount = 0;
+
+		for (const entry of toolCalls) {
+			const duration = entry.duration_ms ?? 0;
+			totalDurationSum += duration;
+
+			if (entry.success) {
+				totalSuccessCount++;
+			} else {
+				totalErrorCount++;
+			}
+
+			this.accumulateServerEntry(serverMap, entry, duration);
+		}
+
+		return { serverMap, totalDurationSum, totalErrorCount, totalSuccessCount };
 	}
 
 	/**

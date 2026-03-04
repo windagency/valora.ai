@@ -2,9 +2,9 @@
  * Session store - file-based persistence
  */
 
+import type * as CleanupCoordinatorModule from 'cleanup/coordinator';
 import type { Session, SessionCommand, SessionSummary } from 'types/session.types';
 
-import { getSessionCleanupScheduler } from 'cleanup/coordinator';
 import { SESSION_CLEANUP_DAYS } from 'config/constants';
 import { getLogger } from 'output/logger';
 import * as path from 'path';
@@ -395,7 +395,9 @@ export class SessionStore {
 	 * Note: Scheduler is now initialized via cleanup/coordinator.ts
 	 */
 	getCleanupScheduler(): null | SessionCleanupScheduler {
-		// Import and delegate to coordinator
+		// Lazy import to break circular dependency: session/store -> cleanup/coordinator -> session/store
+		// eslint-disable-next-line @typescript-eslint/no-require-imports -- lazy import to break circular dependency
+		const { getSessionCleanupScheduler } = require('cleanup/coordinator') as typeof CleanupCoordinatorModule;
 		return getSessionCleanupScheduler();
 	}
 

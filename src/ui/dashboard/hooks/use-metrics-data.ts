@@ -1,0 +1,292 @@
+/**
+ * Metrics data fetching hook - per-tab data with tiered refresh rates
+ */
+
+import { getDryRunCache } from 'executor/dry-run-cache';
+import { getStageOutputCache } from 'executor/stage-output-cache';
+import { getMCPAuditLogger } from 'mcp/mcp-audit-logger.service';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { type AgentSelectionMetrics, getAgentSelectionAnalytics } from 'services/agent-selection-analytics.service';
+import { SessionStore } from 'session/store';
+import {
+	type CounterMetric,
+	type GaugeMetric,
+	getMetricsCollector,
+	type HistogramMetric,
+	type MetricsSnapshot
+} from 'utils/metrics-collector';
+
+import type { DashboardTab, MetricsSummary } from '../types';
+
+export interface AgentAnalyticsData {
+	metrics: AgentSelectionMetrics | null;
+	successMetrics: null | {
+		accuracy: number;
+		completionRate: number;
+		insights: string[];
+		performance: number;
+		userSatisfaction: number;
+	};
+}
+
+export interface AuditData {
+	entries: Array<{
+		details?: Record<string, unknown>;
+		duration_ms?: number;
+		error?: string;
+		operation: string;
+		serverId: string;
+		success: boolean;
+		timestamp: Date;
+		toolName?: string;
+	}>;
+	stats: {
+		byOperation: Record<string, number>;
+		byServer: Record<string, number>;
+		successRate: number;
+		totalEntries: number;
+	};
+}
+
+export interface CacheData {
+	dryRunCache: { entries: Array<{ ageMs: number; commandName: string; key: string }>; size: number };
+	stageOutputCache: { entries: Array<{ ageMs: number; savedTime_ms: number; stageId: string }>; size: number };
+}
+
+export interface PerformanceData {
+	counters: CounterMetric[];
+	gauges: GaugeMetric[];
+	histograms: HistogramMetric[];
+	snapshot: MetricsSnapshot | null;
+}
+
+const REFRESH_RATES: Record<DashboardTab, number> = {
+	agents: 5000,
+	audit: 3000,
+	cache: 5000,
+	overview: 1000,
+	performance: 2000
+};
+
+interface SessionAggregates {
+	earlyExits: number;
+	errors: number;
+	patterns: number;
+	reviewScoreCount: number;
+	reviewScoreSum: number;
+	timeSavedMinutes: number;
+}
+
+export function useMetricsData(activeTab: DashboardTab): {
+	agentData: AgentAnalyticsData;
+	auditData: AuditData;
+	cacheData: CacheData;
+	computeMetricsSummary: () => Promise<MetricsSummary | null>;
+	performanceData: PerformanceData;
+} {
+	const [performanceData, setPerformanceData] = useState<PerformanceData>({
+		counters: [],
+		gauges: [],
+		histograms: [],
+		snapshot: null
+	});
+
+	const [agentData, setAgentData] = useState<AgentAnalyticsData>({
+		metrics: null,
+		successMetrics: null
+	});
+
+	const [cacheData, setCacheData] = useState<CacheData>({
+		dryRunCache: { entries: [], size: 0 },
+		stageOutputCache: { entries: [], size: 0 }
+	});
+
+	const [auditData, setAuditData] = useState<AuditData>({
+		entries: [],
+		stats: { byOperation: {}, byServer: {}, successRate: 0, totalEntries: 0 }
+	});
+
+	const intervalRef = useRef<NodeJS.Timeout | null>(null);
+
+	const fetchPerformance = useCallback(() => {
+		try {
+			const snapshot = getMetricsCollector().getSnapshot();
+			setPerformanceData({
+				counters: snapshot.counters,
+				gauges: snapshot.gauges,
+				histograms: snapshot.histograms,
+				snapshot
+			});
+		} catch {
+			// Silent fail
+		}
+	}, []);
+
+	const fetchAgents = useCallback(() => {
+		try {
+			const analytics = getAgentSelectionAnalytics();
+			const metrics = analytics.getMetrics(24);
+			const successMetrics = analytics.getSuccessMetrics(168);
+			setAgentData({ metrics, successMetrics });
+		} catch {
+			// Silent fail
+		}
+	}, []);
+
+	const fetchCache = useCallback(() => {
+		try {
+			const dryRunStats = getDryRunCache().getStats();
+			const stageStats = getStageOutputCache().getStats();
+			setCacheData({
+				dryRunCache: dryRunStats,
+				stageOutputCache: stageStats
+			});
+		} catch {
+			// Silent fail
+		}
+	}, []);
+
+	const fetchAudit = useCallback(() => {
+		try {
+			const logger = getMCPAuditLogger();
+			const entries = logger.getRecentEntries(100);
+			const stats = logger.getStats();
+			setAuditData({ entries, stats });
+		} catch {
+			// Silent fail
+		}
+	}, []);
+
+	const computeMetricsSummary = useCallback((): Promise<MetricsSummary | null> => {
+		return buildMetricsSummary();
+	}, []);
+
+	// Set up polling for active tab
+	useEffect(() => {
+		if (intervalRef.current) {
+			clearInterval(intervalRef.current);
+			intervalRef.current = null;
+		}
+
+		const fetchForTab = (): void => {
+			switch (activeTab) {
+				case 'agents':
+					fetchAgents();
+					break;
+				case 'audit':
+					fetchAudit();
+					break;
+				case 'cache':
+					fetchCache();
+					break;
+				case 'performance':
+					fetchPerformance();
+					break;
+				default:
+					break;
+			}
+		};
+
+		// Fetch immediately
+		fetchForTab();
+
+		// Set up interval
+		const rate = REFRESH_RATES[activeTab];
+		if (activeTab !== 'overview') {
+			intervalRef.current = setInterval(fetchForTab, rate);
+		}
+
+		return () => {
+			if (intervalRef.current) {
+				clearInterval(intervalRef.current);
+				intervalRef.current = null;
+			}
+		};
+	}, [activeTab, fetchPerformance, fetchAgents, fetchCache, fetchAudit]);
+
+	return { agentData, auditData, cacheData, computeMetricsSummary, performanceData };
+}
+
+function accumulateCommandMetrics(
+	cmd: {
+		error?: string;
+		optimization_metrics?: { early_exit_triggered?: boolean; pattern_detected?: string; time_saved_minutes?: number };
+		quality_metrics?: { review_score?: number };
+	},
+	acc: SessionAggregates
+): void {
+	if (cmd.optimization_metrics) {
+		if (cmd.optimization_metrics.early_exit_triggered) acc.earlyExits++;
+		if (cmd.optimization_metrics.pattern_detected) acc.patterns++;
+		acc.timeSavedMinutes += cmd.optimization_metrics.time_saved_minutes ?? 0;
+	}
+	if (cmd.quality_metrics?.review_score != null) {
+		acc.reviewScoreSum += cmd.quality_metrics.review_score;
+		acc.reviewScoreCount++;
+	}
+	if (cmd.error) acc.errors++;
+}
+
+async function aggregateSessionMetrics(
+	sessionStore: SessionStore,
+	recentSessions: Array<{ session_id: string }>
+): Promise<SessionAggregates> {
+	const acc: SessionAggregates = {
+		earlyExits: 0,
+		errors: 0,
+		patterns: 0,
+		reviewScoreCount: 0,
+		reviewScoreSum: 0,
+		timeSavedMinutes: 0
+	};
+
+	for (const s of recentSessions.slice(0, 5)) {
+		try {
+			const full = await sessionStore.loadSession(s.session_id);
+			for (const cmd of full.commands) {
+				accumulateCommandMetrics(cmd, acc);
+			}
+		} catch {
+			// Skip sessions that fail to load
+		}
+	}
+	return acc;
+}
+
+async function buildMetricsSummary(): Promise<MetricsSummary | null> {
+	try {
+		const sessionStore = new SessionStore();
+		const sessions = await sessionStore.listSessions();
+		const recentSessions = sessions.slice(0, 20);
+
+		let totalCommands = 0;
+		let totalTokens = 0;
+		let summaryErrors = 0;
+
+		for (const s of recentSessions) {
+			totalCommands += s.command_count;
+			totalTokens += s.total_tokens_used ?? 0;
+			if (s.status === 'failed') summaryErrors++;
+		}
+
+		const detailed = await aggregateSessionMetrics(sessionStore, recentSessions);
+
+		const dryRunStats = getDryRunCache().getStats();
+		const stageStats = getStageOutputCache().getStats();
+		const totalCacheEntries = dryRunStats.size + stageStats.size;
+		const cacheHitRate = totalCacheEntries > 0 ? Math.min(100, totalCacheEntries * 10) : 0;
+
+		return {
+			avgReviewScore: detailed.reviewScoreCount > 0 ? detailed.reviewScoreSum / detailed.reviewScoreCount : 0,
+			cacheHitRate,
+			earlyExits: detailed.earlyExits,
+			errors: summaryErrors + detailed.errors,
+			patterns: detailed.patterns,
+			timeSavedMinutes: detailed.timeSavedMinutes,
+			totalCommands,
+			totalTokens
+		};
+	} catch {
+		return null;
+	}
+}

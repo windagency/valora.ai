@@ -4,7 +4,11 @@
 
 export { AgentCapabilityMatcherService } from './agent-capability-matcher.service';
 export { AgentCapabilityRegistryService } from './agent-capability-registry.service';
-export { AgentSelectionAnalyticsService } from './agent-selection-analytics.service';
+export {
+	AgentSelectionAnalyticsService,
+	getAgentSelectionAnalytics,
+	setAgentSelectionAnalytics
+} from './agent-selection-analytics.service';
 export { ContextAnalyzerService } from './context-analyzer.service';
 export { DocumentDetectorService } from './document-detector.service';
 export { DocumentPathResolverService } from './document-path-resolver.service';

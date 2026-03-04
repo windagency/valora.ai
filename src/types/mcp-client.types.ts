@@ -254,3 +254,83 @@ export interface ExternalMCPToolCallResult {
 	/** Whether the call succeeded */
 	success: boolean;
 }
+
+/**
+ * Per-tool breakdown stats within a server
+ */
+export interface MCPToolBreakdown {
+	/** Average duration in milliseconds */
+	avgDurationMs: number;
+	/** Number of calls for this tool */
+	calls: number;
+	/** Success rate (0-1) */
+	successRate: number;
+	/** Tool name */
+	toolName: string;
+}
+
+/**
+ * Per-server metrics for dashboard display
+ */
+export interface MCPServerMetrics {
+	/** Average duration in milliseconds */
+	avgDurationMs: number;
+	/** Number of errors */
+	errorCount: number;
+	/** Whether the server is currently connected */
+	isConnected: boolean;
+	/** Timestamp of last activity */
+	lastActivity: Date;
+	/** Recent durations for sparkline (last 20) */
+	recentDurations: number[];
+	/** Server identifier */
+	serverId: string;
+	/** Number of successful calls */
+	successCount: number;
+	/** Success rate (0-1) */
+	successRate: number;
+	/** Per-tool breakdown */
+	toolBreakdown: MCPToolBreakdown[];
+	/** Total number of tool calls */
+	totalCalls: number;
+}
+
+/**
+ * Recent tool call entry for activity feed
+ */
+export interface MCPRecentToolCall {
+	/** Duration in milliseconds */
+	durationMs: number;
+	/** Error message if failed */
+	error?: string;
+	/** Server identifier */
+	serverId: string;
+	/** Whether the call succeeded */
+	success: boolean;
+	/** Timestamp of the call */
+	timestamp: Date;
+	/** Tool name */
+	toolName: string;
+}
+
+/**
+ * Aggregated MCP metrics for dashboard display
+ */
+export interface MCPDashboardMetrics {
+	/** Number of currently active/connected servers */
+	activeServerCount: number;
+	/** Average duration in milliseconds across all calls */
+	avgDurationMs: number;
+	/** Duration trend for sparkline (last 30 values) */
+	durationTrend: number[];
+	/** Overall success rate (0-1) */
+	overallSuccessRate: number;
+	/** Recent tool calls for activity feed (last 10, newest first) */
+	recentToolCalls: MCPRecentToolCall[];
+	/** Per-server metrics sorted by totalCalls descending */
+	servers: MCPServerMetrics[];
+	/** Total number of errors across all servers */
+	totalErrors: number;
+	/** Total number of tool calls across all servers */
+	totalToolCalls: number;
+}

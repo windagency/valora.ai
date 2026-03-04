@@ -20,12 +20,13 @@ import { getConsoleOutput } from 'output/console-output';
 import { getRenderer } from 'output/markdown';
 import { createGitStashProtection, type GitStashProtectionService } from 'services/git-stash-protection.service';
 import {
-	AgentSelectionAnalyticsService,
+	type AgentSelectionAnalyticsService,
 	DocumentDetectorService,
 	DocumentPathResolverService,
 	DocumentTemplateService,
 	DocumentWriterService,
-	type DynamicAgentResolverService
+	type DynamicAgentResolverService,
+	getAgentSelectionAnalytics
 } from 'services/index';
 import { SessionLifecycle } from 'session/lifecycle';
 import { SessionStore } from 'session/store';
@@ -248,7 +249,7 @@ export class CommandExecutor {
 			const analyticsEnabled = config.features?.agent_selection_analytics ?? true;
 
 			if (analyticsEnabled) {
-				const analyticsService = new AgentSelectionAnalyticsService();
+				const analyticsService = getAgentSelectionAnalytics();
 				this.analyticsService = analyticsService;
 				// Update coordinator with analytics service
 				if (this.executionCoordinator) {
@@ -576,7 +577,7 @@ export class CommandExecutor {
 		tokenBreakdown: TokenBreakdown,
 		sessionManager: Awaited<ReturnType<CLISessionManager['getOrCreateSession']>>
 	): void {
-		// Extract optimization and quality metrics from outputs
+		// Extract optimisation and quality metrics from outputs
 		const optimizationMetrics = result.outputs['optimization_metrics'] as OptimizationMetrics | undefined;
 		const qualityMetrics = result.outputs['quality_metrics'] as QualityMetrics | undefined;
 

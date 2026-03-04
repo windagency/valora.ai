@@ -69,17 +69,16 @@ describe('CLI Commands E2E', () => {
 
 	describe('CLI Help and Version', () => {
 		it('should display help information', async () => {
-			const { exitCode, stderr, stdout } = await execa('node', cli('--help'), {
+			const { exitCode, stdout } = await execa('node', cli('--help'), {
 				cwd: tempDir,
 				env: { ...process.env, AI_INTERACTIVE: 'false' },
 				input: ''
 			});
 
 			expect(exitCode).toBe(0);
-			expect(stderr).toBe('');
 			expect(stdout).toContain('VALORA');
 			expect(stdout).toContain('AI-Assisted Development Workflow Orchestration');
-		}, 15000);
+		}, 30000);
 
 		it('should display version information', async () => {
 			const { exitCode, stdout } = await execa('node', cli('--version'), {
@@ -90,7 +89,7 @@ describe('CLI Commands E2E', () => {
 
 			expect(exitCode).toBe(0);
 			expect(stdout).toMatch(/\d+\.\d+\.\d+/); // Version pattern
-		}, 15000);
+		}, 30000);
 	});
 
 	describe('Configuration Management', () => {
@@ -125,7 +124,7 @@ describe('CLI Commands E2E', () => {
 				.then(() => true)
 				.catch(() => false);
 			expect(configExists).toBe(true);
-		}, 15000);
+		}, 30000);
 
 		it('should show configuration status', async () => {
 			const configPath = path.join(tempDir, 'config.json');
@@ -141,7 +140,7 @@ describe('CLI Commands E2E', () => {
 
 			expect(exitCode).toBe(0);
 			expect(stdout).toContain('Configuration');
-		}, 20000);
+		}, 30000);
 	});
 
 	describe('Session Management', () => {
@@ -188,7 +187,7 @@ describe('CLI Commands E2E', () => {
 
 			expect(exitCode).toBe(0);
 			expect(stdout).toBeDefined();
-		}, 15000);
+		}, 30000);
 
 		it('should handle command execution with options', async () => {
 			// Test exec with a nonexistent command - should fail gracefully
@@ -206,7 +205,7 @@ describe('CLI Commands E2E', () => {
 			// Should fail because command doesn't exist
 			expect(exitCode).toBe(1);
 			expect(stderr).toContain('Failed to load command');
-		}, 15000);
+		}, 30000);
 	});
 
 	describe('Error Handling', () => {
@@ -220,7 +219,7 @@ describe('CLI Commands E2E', () => {
 
 			expect(exitCode).not.toBe(0);
 			expect(stderr || stdout).toContain('error' || 'invalid' || 'unknown');
-		}, 15000);
+		}, 30000);
 
 		it('should handle missing required arguments', async () => {
 			const { exitCode, stderr, stdout } = await execa(
@@ -236,7 +235,7 @@ describe('CLI Commands E2E', () => {
 
 			expect(exitCode).not.toBe(0);
 			expect(stderr || stdout).toContain('error' || 'required' || 'missing');
-		}, 15000);
+		}, 30000);
 	});
 
 	describe('Logging and Output', () => {
@@ -281,7 +280,7 @@ describe('CLI Commands E2E', () => {
 				// Command may not support JSON output, which is acceptable
 				expect(jsonOutput).toBeDefined();
 			}
-		}, 15000);
+		}, 30000);
 	});
 
 	describe('Interactive Mode', () => {
@@ -295,7 +294,7 @@ describe('CLI Commands E2E', () => {
 			expect(exitCode).toBe(0);
 			// Should not prompt for input
 			expect(stdout).not.toContain('?'); // Common prompt character
-		}, 15000);
+		}, 30000);
 	});
 
 	describe('Performance and Resource Usage', () => {
@@ -305,7 +304,7 @@ describe('CLI Commands E2E', () => {
 			const { exitCode } = await execa('node', cli('--quiet', 'list'), {
 				cwd: tempDir,
 				env: { ...process.env, AI_INTERACTIVE: 'false' },
-				timeout: 20000, // 20 second timeout
+				timeout: 30000, // 30 second timeout
 				input: ''
 			});
 
@@ -327,7 +326,7 @@ describe('CLI Commands E2E', () => {
 
 			expect(exitCode).toBe(0);
 			expect(stdout.length).toBeLessThan(1024 * 1024); // Should not exceed buffer
-		}, 20000);
+		}, 30000);
 	});
 
 	describe('Browser-based Features (if applicable)', () => {

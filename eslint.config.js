@@ -23,6 +23,7 @@ export default [
 			'**/*.spec.ts',
 			'**/*.test.ts',
 			'**/*.config.ts',
+			'**/*.config.cjs',
 			'**/*.config.js',
 			'**/*.config.mjs'
 		]

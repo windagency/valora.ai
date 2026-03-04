@@ -171,7 +171,7 @@ documentation/
 │   ├── dry-run-mode.md            # Preview changes
 │   ├── metrics.md                 # Workflow optimisation metrics
 │   ├── metrics-quickstart.md      # 5-minute metrics setup
-│   ├── workflow-optimizations.md  # Detailed optimisation reference
+│   ├── workflow-optimisations.md  # Detailed optimisation reference
 │   ├── configuration.md           # Configuration and customisation (incl. External MCP)
 │   ├── best-practices.md          # Recommended usage patterns
 │   └── troubleshooting.md         # Common issues and solutions
