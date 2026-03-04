@@ -209,8 +209,10 @@ export class WorktreeManager {
 	 * Delete branch after worktree removal
 	 */
 	async deleteBranch(branchName: string, force: boolean = false): Promise<void> {
+		// Strip refs/heads/ prefix if present — git branch expects short names
+		const shortName = branchName.replace(/^refs\/heads\//, '');
 		const forceFlag = force ? '-D' : '-d';
-		const command = `git branch ${forceFlag} ${branchName}`;
+		const command = `git branch ${forceFlag} ${shortName}`;
 
 		try {
 			await execAsync(command, {
@@ -220,7 +222,7 @@ export class WorktreeManager {
 			const typedError = error as Error;
 			// If branch doesn't exist, that's okay
 			if (typedError.message.includes('not found')) {
-				console.warn(`Branch ${branchName} does not exist, skipping deletion`);
+				console.warn(`Branch ${shortName} does not exist, skipping deletion`);
 				return;
 			}
 			throw new Error(`Failed to delete branch: ${typedError.message}`);

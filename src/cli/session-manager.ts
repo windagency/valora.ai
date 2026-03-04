@@ -8,6 +8,7 @@ import type { ContextWindowUsage } from 'types/session.types';
 
 import { getModelContextWindow } from 'config/providers.config';
 import { getLogger } from 'output/logger';
+import { WorktreeStatsTracker } from 'session/worktree-stats-tracker';
 
 import type { CommandExecutionOptions } from './command-executor';
 
@@ -24,6 +25,9 @@ export interface SessionAcquisitionResult {
 export class CLISessionManager {
 	/** Track whether last session was resumed */
 	private lastSessionResumed = false;
+
+	/** Worktree stats tracker for the current session */
+	private worktreeStatsTracker: null | WorktreeStatsTracker = null;
 
 	constructor(private sessionLifecycle: SessionLifecycle) {}
 
@@ -48,12 +52,14 @@ export class CLISessionManager {
 			try {
 				const sessionManager = await this.sessionLifecycle.resume({ sessionId: options.sessionId });
 				this.lastSessionResumed = true;
+				this.setupWorktreeStatsTracker();
 				return { isResumed: true, sessionManager };
 			} catch (error) {
 				if (error instanceof Error && error.message.includes('Session not found')) {
 					logger.debug(`Session ${options.sessionId} not found, creating new session`);
 					const sessionManager = await this.sessionLifecycle.create({ sessionId: options.sessionId });
 					this.lastSessionResumed = false;
+					this.setupWorktreeStatsTracker();
 					return { isResumed: false, sessionManager };
 				}
 				throw error;
@@ -67,6 +73,7 @@ export class CLISessionManager {
 			// Check if we actually resumed (session has commands)
 			const isResumed = sessionManager.getSession().commands.length > 0;
 			this.lastSessionResumed = isResumed;
+			this.setupWorktreeStatsTracker();
 			return { isResumed, sessionManager };
 		}
 
@@ -74,7 +81,21 @@ export class CLISessionManager {
 		logger.debug('Creating new session');
 		const sessionManager = await this.sessionLifecycle.create();
 		this.lastSessionResumed = false;
+		this.setupWorktreeStatsTracker();
 		return { isResumed: false, sessionManager };
+	}
+
+	/**
+	 * Set up worktree stats tracker for the current session
+	 */
+	private setupWorktreeStatsTracker(): void {
+		// Clean up any existing tracker
+		if (this.worktreeStatsTracker) {
+			this.worktreeStatsTracker.unsubscribe();
+		}
+
+		this.worktreeStatsTracker = new WorktreeStatsTracker();
+		this.worktreeStatsTracker.subscribe();
 	}
 
 	/**
@@ -184,6 +205,20 @@ export class CLISessionManager {
 	 * Complete the active session
 	 */
 	async completeSession(): Promise<void> {
+		// Collect worktree stats before completing
+		if (this.worktreeStatsTracker) {
+			const stats = this.worktreeStatsTracker.getStats();
+			if (stats.total_created > 0) {
+				const sessionManager = this.sessionLifecycle.getCurrentSession();
+				if (sessionManager) {
+					const session = sessionManager.getSession();
+					session.context['worktree_stats'] = stats;
+				}
+			}
+			this.worktreeStatsTracker.unsubscribe();
+			this.worktreeStatsTracker = null;
+		}
+
 		await this.sessionLifecycle.complete();
 	}
 }

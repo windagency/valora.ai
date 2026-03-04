@@ -512,7 +512,7 @@ export class CommandExecutor {
 		);
 
 		if (ctx.isDryRun) {
-			await this.sessionLifecycle.complete();
+			await this.sessionManager.completeSession();
 			return ctx.result;
 		}
 
@@ -539,7 +539,7 @@ export class CommandExecutor {
 			return failedResult;
 		}
 
-		await this.sessionLifecycle.complete();
+		await this.sessionManager.completeSession();
 		return ctx.result;
 	}
 

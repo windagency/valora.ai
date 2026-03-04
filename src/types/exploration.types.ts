@@ -19,6 +19,7 @@ export interface Exploration {
 	id: string; // exp-{nanoid}
 	mode: ExecutionMode;
 	results?: ExplorationResults;
+	session_id?: string; // Linked CLI session ID
 	started_at?: string;
 	status: ExplorationStatus;
 	task: string; // User's task description

@@ -1099,6 +1099,172 @@ valora feedback --command=implement --satisfaction=8 --suggest-improvements
 
 ---
 
+## Monitoring & Dashboard
+
+### dash
+
+Launch the real-time TUI dashboard for monitoring sessions, system health, and git worktrees.
+
+```bash
+valora dash
+```
+
+**Dashboard Layout:**
+
+```plaintext
+┌─────────────────────────────────────────────────────────────────┐
+│                    VALORA - Real-Time Dashboard                  │
+├───────────────────────────────┬──────────────────────────────────┤
+│ Recent Sessions (65%)        │ System Health                    │
+│ ▶ ● abc123...  2m ago  3 cmd │ API Status: ✓ HEALTHY           │
+│   ● def456...  5m ago  1 cmd │ Total Sessions: 12              │
+│                              │ Disk Usage: 4.2 MB              │
+│ Background Tasks             │                                  │
+│ ⟳ abc123: implement (2m 3s) │ Git Worktrees (3)          NEW  │
+│                              │ ● main  abc1234                 │
+│                              │ ├── exploration/exp-abc-jwt     │
+│                              │ │   def5678  ▶ RUNNING          │
+│                              │ └── feature/new-api             │
+│                              │     ghi9012                     │
+│                              │                                  │
+│                              │ Recent Commands                  │
+│                              │ ✓ implement  2m ago              │
+│                              │ ✓ plan       5m ago              │
+├───────────────────────────────┴──────────────────────────────────┤
+│ j/k: Navigate  Enter: View Details  r: Refresh  q: Quit        │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Panels:**
+
+| Panel             | Location    | Description                                        |
+| ----------------- | ----------- | -------------------------------------------------- |
+| Recent Sessions   | Left (65%)  | Top 10 sessions with status, age, commands, tokens |
+| Background Tasks  | Left (65%)  | Currently running sessions with progress bars      |
+| System Health     | Right (35%) | API status, session count, disk usage, uptime      |
+| **Git Worktrees** | Right (35%) | Live tree diagram of git worktrees (new)           |
+| Recent Commands   | Right (35%) | Last 5 commands with success/failure indicators    |
+
+**Worktree Diagram Panel:**
+
+The Git Worktrees panel displays a live tree structure of all git worktrees in the repository:
+
+- **Main worktree**: Shown with `●` prefix in cyan
+- **Child worktrees**: Connected with `├──` / `└──` tree-drawing characters
+- **Exploration branches**: Highlighted in yellow with status icons
+- **Prunable worktrees**: Shown in red
+- **Status icons**: `▶` running, `✓` completed, `✗` failed, `○` pending
+- **Overflow**: Maximum 4 worktrees displayed, with `...and N more` for additional
+
+The panel fetches data from `WorktreeManager.listWorktrees()` and enriches exploration worktrees with active exploration metadata from `ExplorationStateManager.getActiveExplorations()`.
+
+**Session Details View:**
+
+Press `Enter` on a session to view details.
+
+If the session is linked to an exploration (via `explore parallel` or `explore sequential`), an **Exploration** panel appears showing the exploration task, status, branch completion, and per-worktree details:
+
+```plaintext
+┌─ Exploration ────────────────────────┐
+│ Exploration ID: exp-u7PXOCjNYh       │
+│ Task: Implement user authentication  │
+│ Status: COMPLETED                    │
+│ Branches: 3/3                        │
+│ Duration: 12m 34s                    │
+│                                      │
+│ Worktrees:                           │
+│  1. [completed] jwt                  │
+│  2. [completed] session              │
+│  3. [failed] oauth                   │
+└──────────────────────────────────────┘
+```
+
+If the session also has aggregate worktree stats (from the `WorktreeStatsTracker`), a **Worktree Usage** panel shows:
+
+- Total worktrees created during the session
+- Maximum concurrent worktrees running at any point
+- Aggregate duration across all worktrees
+- Per-worktree history with status and duration
+
+**Keyboard Controls:**
+
+| Key       | Action                   |
+| --------- | ------------------------ |
+| `j` / `k` | Navigate session list    |
+| `Enter`   | View session details     |
+| `r`       | Refresh data             |
+| `q`       | Quit dashboard           |
+| `Esc`     | Back (from details view) |
+| `Ctrl+C`  | Force quit               |
+
+**Edge Cases:**
+
+- **No git repository**: Worktree panel shows "No git repository detected"
+- **No worktrees**: Shows "No additional worktrees" under the main entry
+- **No exploration data**: Worktrees render without status icons
+- **Session without worktrees**: Worktree Usage panel is hidden in session details
+- **Session without exploration**: Exploration panel is hidden in session details
+
+---
+
+### explore parallel
+
+Start multiple parallel explorations with different strategies using Docker containers and git worktrees.
+
+```bash
+valora explore parallel <task> [options]
+```
+
+**Options:**
+
+| Flag                      | Description                     | Default                                              |
+| ------------------------- | ------------------------------- | ---------------------------------------------------- |
+| `-b, --branches <n>`      | Number of parallel explorations | `3`                                                  |
+| `-s, --strategies <list>` | Comma-separated approach tags   | —                                                    |
+| `-t, --timeout <minutes>` | Max duration per exploration    | `60`                                                 |
+| `--docker-image <image>`  | Custom Docker image             | `mcr.microsoft.com/devcontainers/javascript-node:24` |
+| `--cpu-limit <cores>`     | CPU limit per container         | `1.5`                                                |
+| `--memory-limit <size>`   | Memory limit per container      | `2g`                                                 |
+| `--auto-merge`            | Auto-merge winning exploration  | `false`                                              |
+| `--no-cleanup`            | Keep explorations for debugging | `false`                                              |
+| `--skip-safety`           | Skip pre-flight safety checks   | `false`                                              |
+
+**Safety checks** verify sufficient memory (1GB per branch), disk space (5GB), Docker availability, and clean git state before starting. Use `--skip-safety` to bypass these checks in constrained environments.
+
+**Example:**
+
+```bash
+# Explore 3 authentication approaches
+valora explore parallel "Implement user authentication" \
+  --branches 3 \
+  --strategies "jwt,session,oauth" \
+  --timeout 30
+
+# Skip safety checks in dev environment
+valora explore parallel "Add caching" --skip-safety
+```
+
+### explore cleanup
+
+Clean up exploration resources (containers, worktrees, branches).
+
+```bash
+valora explore cleanup [exploration-id] [options]
+```
+
+**Options:**
+
+| Flag               | Description                               |
+| ------------------ | ----------------------------------------- |
+| `--all`            | Clean up all explorations                 |
+| `--failed-only`    | Clean up only failed explorations         |
+| `--older-than <h>` | Clean up explorations older than N hours  |
+| `--dry-run`        | Preview cleanup without actually removing |
+
+If the exploration state has already been removed (e.g., from a previous partial cleanup), the command falls back to pattern-based cleanup of leftover git branches and worktrees.
+
+---
+
 ## Allowed Tools by Command
 
 Each command has access to specific tools:

@@ -3,8 +3,11 @@
  * Built with Ink (modern React-based TUI framework)
  */
 
-import type { Session, SessionSummary } from 'types/session.types';
+import type { Exploration } from 'types/exploration.types';
+import type { Session, SessionSummary, WorktreeUsageStats } from 'types/session.types';
 
+import { ExplorationStateManager } from 'exploration/exploration-state';
+import { WorktreeManager } from 'exploration/worktree-manager';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { SessionStore } from 'session/store';
 import { formatNumber } from 'utils/number-format';
@@ -31,6 +34,7 @@ export interface DashboardData {
 	backgroundTasks: BackgroundTask[];
 	recentCommands: RecentCommand[];
 	systemHealth: SystemHealth;
+	worktrees: WorktreeDiagramEntry[];
 }
 
 export interface RecentCommand {
@@ -45,6 +49,18 @@ export interface SystemHealth {
 	diskUsage: string;
 	sessionsCount: number;
 	uptime: number;
+}
+
+export interface WorktreeDiagramEntry {
+	branch: string;
+	commit: string;
+	explorationId?: string;
+	explorationStatus?: string;
+	explorationTask?: string;
+	isExploration: boolean;
+	isMainWorktree: boolean;
+	path: string;
+	prunable: boolean;
 }
 
 function formatDurationMs(ms: number): string {
@@ -230,7 +246,7 @@ function SystemHealthPanel({ health }: { health: SystemHealth }): React.JSX.Elem
 // eslint-disable-next-line @typescript-eslint/naming-convention -- React components must use PascalCase
 function RecentCommandsPanel({ commands }: { commands: RecentCommand[] }): React.JSX.Element {
 	return (
-		<Box borderColor="yellow" borderStyle="round" flexDirection="column" height={10} paddingX={1}>
+		<Box borderColor="yellow" borderStyle="round" flexDirection="column" height={8} paddingX={1}>
 			<Text bold color="yellow">
 				Recent Commands
 			</Text>
@@ -254,6 +270,116 @@ function RecentCommandsPanel({ commands }: { commands: RecentCommand[] }): React
 							</Box>
 						);
 					})
+				)}
+			</Box>
+		</Box>
+	);
+}
+
+/**
+ * Get worktree status icon
+ */
+function getWorktreeStatusIcon(status?: string): string {
+	switch (status) {
+		case 'completed':
+			return '\u2713';
+		case 'failed':
+			return '\u2717';
+		case 'running':
+			return '\u25b6';
+		default:
+			return '\u25cb';
+	}
+}
+
+/**
+ * Get exploration status color
+ */
+function getExplorationStatusColor(status: string): 'green' | 'red' | 'yellow' {
+	if (status === 'running') return 'yellow';
+	if (status === 'completed') return 'green';
+	return 'red';
+}
+
+/**
+ * Worktree child row in the diagram tree
+ */
+// eslint-disable-next-line @typescript-eslint/naming-convention -- React components must use PascalCase
+function WorktreeChildRow({
+	isLast,
+	worktree
+}: {
+	isLast: boolean;
+	worktree: WorktreeDiagramEntry;
+}): React.JSX.Element {
+	const connector = isLast ? '\u2514\u2500\u2500' : '\u251c\u2500\u2500';
+	const branchColor = worktree.prunable ? 'red' : worktree.isExploration ? 'yellow' : 'white';
+	const truncatedTask =
+		worktree.explorationTask && worktree.explorationTask.length > 20
+			? worktree.explorationTask.substring(0, 17) + '...'
+			: worktree.explorationTask;
+
+	return (
+		<Box flexDirection="column">
+			<Box>
+				<Text dimColor>{connector} </Text>
+				<Text color={branchColor}>{worktree.branch}</Text>
+			</Box>
+			<Box>
+				<Text dimColor>{isLast ? '    ' : '\u2502   '}</Text>
+				<Text dimColor>{worktree.commit}</Text>
+				{worktree.explorationStatus && (
+					<Text color={getExplorationStatusColor(worktree.explorationStatus)}>
+						{' '}
+						{getWorktreeStatusIcon(worktree.explorationStatus)} {worktree.explorationStatus.toUpperCase()}
+					</Text>
+				)}
+				{truncatedTask && <Text dimColor> {truncatedTask}</Text>}
+			</Box>
+		</Box>
+	);
+}
+
+/**
+ * Worktree Diagram Panel - Shows git worktree tree structure
+ */
+// eslint-disable-next-line @typescript-eslint/naming-convention -- React components must use PascalCase
+function WorktreeDiagramPanel({ worktrees }: { worktrees: WorktreeDiagramEntry[] }): React.JSX.Element {
+	const mainWorktree = worktrees.find((wt) => wt.isMainWorktree);
+	const childWorktrees = worktrees.filter((wt) => !wt.isMainWorktree);
+	const maxDisplay = 4;
+	const displayChildren = childWorktrees.slice(0, maxDisplay);
+	const overflowCount = childWorktrees.length - maxDisplay;
+
+	return (
+		<Box borderColor="green" borderStyle="round" flexDirection="column" paddingX={1}>
+			<Text bold color="green">
+				Git Worktrees ({worktrees.length})
+			</Text>
+			<Box flexDirection="column" marginTop={1}>
+				{mainWorktree ? (
+					<>
+						<Box>
+							<Text color="cyan">
+								{'\u25cf'} {mainWorktree.branch || 'main'}
+							</Text>
+							<Text dimColor> {mainWorktree.commit}</Text>
+						</Box>
+						{displayChildren.length === 0 ? (
+							<Text dimColor>No additional worktrees</Text>
+						) : (
+							displayChildren.map((wt, index) => (
+								<WorktreeChildRow
+									isLast={index === displayChildren.length - 1 && overflowCount <= 0}
+									key={wt.path}
+									worktree={wt}
+								/>
+							))
+						)}
+						{overflowCount > 0 && <Text dimColor>...and {overflowCount} more</Text>}
+					</>
+				) : (
+					<Text dimColor>No git repository detected</Text>
 				)}
 			</Box>
 		</Box>
@@ -416,6 +542,166 @@ function CommandHistoryPanel({ session }: { session: Session }): React.JSX.Eleme
 }
 
 /**
+ * Worktree Stats Panel - Shows worktree usage statistics for a session
+ */
+// eslint-disable-next-line @typescript-eslint/naming-convention -- React components must use PascalCase
+function WorktreeStatsPanel({ stats }: { stats: WorktreeUsageStats }): React.JSX.Element {
+	return (
+		<Box borderColor="yellow" borderStyle="round" flexDirection="column" marginBottom={1} paddingX={1}>
+			<Text bold color="yellow">
+				Worktree Usage
+			</Text>
+			<Box flexDirection="column" marginTop={1}>
+				<Box>
+					<Text dimColor>Created: </Text>
+					<Text bold>{stats.total_created}</Text>
+					<Text> </Text>
+					<Text dimColor>Max Concurrent: </Text>
+					<Text bold>{stats.max_concurrent}</Text>
+				</Box>
+				<Box>
+					<Text dimColor>Total Duration: </Text>
+					<Text bold color="cyan">
+						{formatDurationMs(stats.total_duration_ms)}
+					</Text>
+				</Box>
+				{stats.exploration_ids.length > 0 && (
+					<Box>
+						<Text dimColor>Explorations: </Text>
+						<Text color="cyan">{stats.exploration_ids.join(', ')}</Text>
+					</Box>
+				)}
+			</Box>
+			{stats.worktree_summaries.length > 0 && (
+				<Box flexDirection="column" marginTop={1}>
+					{stats.worktree_summaries.map((summary, index) => {
+						const statusIcon =
+							summary.status === 'completed' ? '\u2713' : summary.status === 'failed' ? '\u2717' : '\u25cb';
+						const statusColor =
+							summary.status === 'completed' ? 'green' : summary.status === 'failed' ? 'red' : 'yellow';
+						const duration =
+							summary.duration_ms != null
+								? formatDurationMs(summary.duration_ms)
+								: summary.status === 'failed'
+									? 'fail'
+									: '';
+
+						return (
+							<Box key={index}>
+								<Text color={statusColor}>{statusIcon}</Text>
+								<Text> </Text>
+								<Text>{summary.branch_name}</Text>
+								{duration && <Text dimColor> {duration}</Text>}
+							</Box>
+						);
+					})}
+				</Box>
+			)}
+		</Box>
+	);
+}
+
+/**
+ * Exploration Worktree Row
+ */
+// eslint-disable-next-line @typescript-eslint/naming-convention -- React components must use PascalCase
+function ExplorationWorktreeRow({ worktree }: { worktree: Exploration['worktrees'][number] }): React.JSX.Element {
+	return (
+		<Box key={worktree.index}>
+			<Text dimColor> {worktree.index}. </Text>
+			<Text color={getExplorationStatusColor(worktree.status)}>[{worktree.status}]</Text>
+			<Text> {worktree.strategy ?? `branch-${worktree.index}`}</Text>
+			<Text dimColor> ({worktree.branch_name.replace(/^refs\/heads\//, '')})</Text>
+		</Box>
+	);
+}
+
+/**
+ * Exploration Info Panel - Shows linked exploration details in session view.
+ * Looks up the exploration by explorationId (from session context) or by sessionId match.
+ */
+// eslint-disable-next-line @typescript-eslint/naming-convention -- React components must use PascalCase
+function ExplorationInfoPanel({
+	explorationId,
+	sessionId
+}: {
+	explorationId?: string;
+	sessionId: string;
+}): React.JSX.Element {
+	const [exploration, setExploration] = useState<Exploration | null>(null);
+	const [stateManager] = useState(() => new ExplorationStateManager());
+
+	useEffect(() => {
+		if (explorationId) {
+			stateManager
+				.loadExploration(explorationId)
+				.then(setExploration)
+				.catch(() => setExploration(null));
+		} else {
+			stateManager
+				.findBySessionId(sessionId)
+				.then(setExploration)
+				.catch(() => setExploration(null));
+		}
+	}, [explorationId, sessionId, stateManager]);
+
+	// Don't render if no exploration found and no explicit ID
+	if (!exploration && !explorationId) {
+		return <></>;
+	}
+
+	return (
+		<Box borderColor="magenta" borderStyle="round" flexDirection="column" marginBottom={1} paddingX={1}>
+			<Text bold color="magenta">
+				Exploration
+			</Text>
+			<Box flexDirection="column" marginTop={1}>
+				<Box>
+					<Text dimColor>Exploration ID: </Text>
+					<Text bold color="cyan">
+						{exploration?.id ?? explorationId}
+					</Text>
+				</Box>
+				{exploration && (
+					<>
+						<Box>
+							<Text dimColor>Task: </Text>
+							<Text>{exploration.task}</Text>
+						</Box>
+						<Box>
+							<Text dimColor>Status: </Text>
+							<Text bold color={getExplorationStatusColor(exploration.status)}>
+								{exploration.status.toUpperCase()}
+							</Text>
+						</Box>
+						<Box>
+							<Text dimColor>Branches: </Text>
+							<Text>
+								{exploration.completed_branches}/{exploration.branches}
+							</Text>
+						</Box>
+						{exploration.duration_ms != null && (
+							<Box>
+								<Text dimColor>Duration: </Text>
+								<Text>{formatDurationMs(exploration.duration_ms)}</Text>
+							</Box>
+						)}
+						{exploration.worktrees.length > 0 && (
+							<Box flexDirection="column" marginTop={1}>
+								<Text dimColor>Worktrees:</Text>
+								{exploration.worktrees.map((wt) => (
+									<ExplorationWorktreeRow key={wt.index} worktree={wt} />
+								))}
+							</Box>
+						)}
+					</>
+				)}
+			</Box>
+		</Box>
+	);
+}
+
+/**
  * Session Details View
  */
 // eslint-disable-next-line @typescript-eslint/naming-convention -- React components must use PascalCase
@@ -447,6 +733,8 @@ function SessionDetailsView({
 
 	const isRunning = session.status === 'active';
 	const elapsedMs = isRunning ? Date.now() - new Date(session.updated_at).getTime() : 0;
+	const worktreeStats = session.context?.['worktree_stats'] as undefined | WorktreeUsageStats;
+	const explorationId = session.context?.['exploration_id'] as string | undefined;
 
 	return (
 		<Box flexDirection="column" paddingX={1}>
@@ -462,7 +750,11 @@ function SessionDetailsView({
 				<RunningTaskPanel command={session.current_command} elapsedMs={elapsedMs} />
 			)}
 
+			<ExplorationInfoPanel explorationId={explorationId} sessionId={session.session_id} />
+
 			<CommandHistoryPanel session={session} />
+
+			{worktreeStats && worktreeStats.total_created > 0 && <WorktreeStatsPanel stats={worktreeStats} />}
 
 			<Box borderColor="white" borderStyle="round" paddingX={1}>
 				<Text dimColor>Press q or Esc to go back</Text>
@@ -509,12 +801,15 @@ function Dashboard(): React.JSX.Element {
 			diskUsage: '0 MB',
 			sessionsCount: 0,
 			uptime: 0
-		}
+		},
+		worktrees: []
 	});
 	const [selectedIndex, setSelectedIndex] = useState(0);
 	const [viewMode, setViewMode] = useState<'dashboard' | 'details'>('dashboard');
 	const [selectedSession, setSelectedSession] = useState<null | Session>(null);
 	const [sessionStore] = useState(() => new SessionStore());
+	const [worktreeManager] = useState(() => new WorktreeManager());
+	const [explorationStateManager] = useState(() => new ExplorationStateManager());
 
 	// Refs to track timers for cleanup (prevents memory leaks)
 	const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -527,7 +822,31 @@ function Dashboard(): React.JSX.Element {
 	// Fetch dashboard data (memoised to avoid stale closures)
 	const fetchData = useCallback(async (): Promise<void> => {
 		try {
-			const sessions = await sessionStore.listSessions();
+			const [sessions, rawWorktrees, activeExplorations] = await Promise.all([
+				sessionStore.listSessions(),
+				worktreeManager.listWorktrees().catch(() => []),
+				explorationStateManager.getActiveExplorations().catch(() => [])
+			]);
+
+			// Transform worktrees into diagram entries
+			const worktreeEntries: WorktreeDiagramEntry[] = rawWorktrees.map((wt, index) => {
+				const isExploration = wt.branch?.startsWith('exploration/') ?? false;
+				const matchingExploration = isExploration
+					? activeExplorations.find((exp) => wt.branch?.includes(exp.id))
+					: undefined;
+
+				return {
+					branch: wt.branch ?? '(detached)',
+					commit: wt.commit?.substring(0, 7) ?? '',
+					explorationId: matchingExploration?.id,
+					explorationStatus: matchingExploration?.status,
+					explorationTask: matchingExploration?.task,
+					isExploration,
+					isMainWorktree: index === 0,
+					path: wt.path,
+					prunable: wt.prunable
+				};
+			});
 
 			// Show recent sessions (top 10 most recent, regardless of status)
 			const activeSessions = sessions.slice(0, 10);
@@ -578,7 +897,8 @@ function Dashboard(): React.JSX.Element {
 					diskUsage: `${mb} MB`,
 					sessionsCount: sessions.length,
 					uptime: Date.now() - startTime
-				}
+				},
+				worktrees: worktreeEntries
 			});
 
 			// Reset selection if out of bounds
@@ -588,7 +908,7 @@ function Dashboard(): React.JSX.Element {
 		} catch {
 			// Silent fail for refresh errors
 		}
-	}, [sessionStore, startTime, selectedIndex]);
+	}, [sessionStore, worktreeManager, explorationStateManager, startTime, selectedIndex]);
 
 	// Auto-refresh every second
 	useEffect(() => {
@@ -761,6 +1081,9 @@ function Dashboard(): React.JSX.Element {
 				</Box>
 				<Box flexDirection="column" marginLeft={1} width="35%">
 					<SystemHealthPanel health={data.systemHealth} />
+					<Box marginTop={1}>
+						<WorktreeDiagramPanel worktrees={data.worktrees} />
+					</Box>
 					<Box marginTop={1}>
 						<RecentCommandsPanel commands={data.recentCommands} />
 					</Box>

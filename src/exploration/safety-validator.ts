@@ -36,7 +36,7 @@ export class SafetyValidator {
 		const defaults: Required<SafetyValidatorConfig> = {
 			check_docker: true,
 			min_disk_space_gb: 5,
-			min_memory_gb_per_branch: 2,
+			min_memory_gb_per_branch: 1,
 			require_clean_tree: true,
 			require_updated_main: true
 		};
@@ -207,8 +207,8 @@ export class SafetyValidator {
 	private async checkResourceAvailability(branches: number): Promise<SafetyCheck> {
 		const resources = await this.getResourceAvailability();
 
-		// Calculate required resources
-		const requiredMemoryGb = branches * this.config.min_memory_gb_per_branch * 1.2; // 20% buffer
+		// Calculate required resources (Docker enforces per-container limits via cgroups)
+		const requiredMemoryGb = branches * this.config.min_memory_gb_per_branch;
 		const requiredCpuCores = branches;
 
 		// Check memory

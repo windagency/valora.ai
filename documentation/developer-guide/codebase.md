@@ -185,58 +185,63 @@ class LLMRegistry {
 
 ### Exploration Layer (`src/exploration/`)
 
-The exploration layer enables parallel agent collaboration.
+The exploration layer enables parallel agent collaboration using git worktrees.
 
 ```plaintext
 src/exploration/
 ├── collaboration-coordinator.ts  # Coordinate agent collaboration
 ├── container-manager.ts          # Manage exploration containers
-├── dashboard-controls.ts         # Dashboard interaction
-├── dashboard-metrics.ts          # Metrics collection
-├── dashboard-ui.ts               # Dashboard rendering
 ├── execution-modes.ts            # Execution mode definitions
-├── exploration-events.ts         # Event definitions
-├── exploration-state.ts          # State management
+├── exploration-events.ts         # Event emitter for real-time updates
+├── exploration-state.ts          # State persistence and recovery
 ├── merge-orchestrator.ts         # Merge exploration results
 ├── orchestrator.ts               # Main orchestration logic
 ├── resource-allocator.ts         # Resource management
 ├── result-comparator.ts          # Compare agent results
 ├── safety-validator.ts           # Safety validation
 ├── shared-volume-manager.ts      # Volume management
-└── worktree-manager.ts           # Git worktree management
+├── worktree-manager.ts           # Git worktree CRUD operations
+└── worktree-manager-secure.ts    # Secure worktree manager
 ```
 
 This module supports:
 
-- Parallel exploration of implementation approaches
-- Multi-agent collaboration
-- Safe result merging
+- Parallel exploration of implementation approaches using git worktrees
+- Multi-agent collaboration with shared insights and decisions
+- Safe result merging with backup branches
+- Real-time event emission for dashboard monitoring (via `ExplorationEventEmitter`)
+- Worktree usage statistics tracked per session (via `WorktreeStatsTracker` in session layer)
 
 ---
 
 ### Session Layer (`src/session/`)
 
-The session layer manages persistent state.
+The session layer manages persistent state and worktree usage tracking.
 
 ```plaintext
 src/session/
-├── session.repository.ts    # Session storage
-├── session.service.ts       # Session operations
-└── session-types.ts         # Type definitions
+├── archive-adapter.interface.ts  # Archive adapter interface
+├── archive-adapter.ts            # Archive implementation
+├── cleanup-scheduler.ts          # Session cleanup scheduling
+├── context.ts                    # Session context management
+├── lifecycle.ts                  # Session lifecycle (create, resume, complete)
+├── retention-manager.ts          # Retention management
+├── retention-policy-runner.ts    # Retention policy execution
+├── session-cleanup-ui.ts         # Cleanup UI
+├── session-exporter.ts           # Session export
+├── store.ts                      # Session file persistence
+├── types.ts                      # Internal types
+└── worktree-stats-tracker.ts     # Worktree usage statistics (event-driven)
 ```
 
-Session structure:
+Key components:
 
-```typescript
-interface Session {
-	id: string;
-	createdAt: Date;
-	updatedAt: Date;
-	context: SessionContext;
-	outputs: Map<string, Output>;
-	metadata: SessionMetadata;
-}
-```
+| Component                   | Responsibility                                                     |
+| --------------------------- | ------------------------------------------------------------------ |
+| `lifecycle.ts`              | Session creation, resumption, completion, and state transitions    |
+| `context.ts`                | Session context management and updates                             |
+| `store.ts`                  | File-based session persistence and listing                         |
+| `worktree-stats-tracker.ts` | Event-driven worktree usage tracking via `ExplorationEventEmitter` |
 
 ---
 
@@ -317,7 +322,7 @@ src/types/
 ├── provider.types.ts       # Provider types
 ├── registry.types.ts       # Registry types
 ├── result.types.ts         # Result types
-├── session.types.ts        # Session types
+├── session.types.ts        # Session types (incl. WorktreeUsageStats)
 └── stage.types.ts          # Stage types
 ```
 

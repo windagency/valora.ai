@@ -301,6 +301,48 @@ find .valora/sessions -name "*.json" -mtime +30 -delete
 valora session cleanup --days 30
 ```
 
+### Exploration Issues
+
+#### Exploration Fails Safety Checks
+
+**Symptoms**:
+
+- Error: "Insufficient memory: X.XGB available, Y.YGB required"
+
+**Solution**:
+
+```bash
+# Skip safety checks (for constrained environments)
+valora explore parallel "task" --skip-safety
+
+# Or reduce branch count
+valora explore parallel "task" --branches 2
+```
+
+The safety validator requires 1GB of available memory per branch. In environments where the OS reports low free memory (e.g., devcontainers), use `--skip-safety` to bypass the check. Docker enforces per-container memory limits via cgroups independently.
+
+#### Exploration Cleanup Fails
+
+**Symptoms**:
+
+- Error: "Exploration exp-XXX not found" during cleanup
+- Branches not deleted: "Branch refs/heads/exploration/... does not exist"
+
+**Solution**:
+
+```bash
+# Re-run cleanup — it now handles missing state gracefully
+valora explore cleanup exp-XXX
+
+# Or clean up all explorations
+valora explore cleanup --all
+
+# Manual cleanup of leftover branches
+git branch --list "exploration/*" | xargs -r git branch -D
+```
+
+If a previous cleanup removed the exploration state but failed to delete branches (e.g., due to the `refs/heads/` prefix issue), re-running cleanup will detect the missing state and fall back to pattern-based branch cleanup.
+
 ### LLM Provider Issues
 
 #### Rate Limiting

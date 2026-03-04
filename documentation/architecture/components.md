@@ -235,6 +235,39 @@ C4Component
     Rel(orchestrator, state, "Tracks")
 ```
 
+### Exploration Component Descriptions
+
+| Component                 | File                           | Responsibility                                    |
+| ------------------------- | ------------------------------ | ------------------------------------------------- |
+| Orchestrator              | `orchestrator.ts`              | Main exploration coordination                     |
+| Collaboration Coordinator | `collaboration-coordinator.ts` | Agent collaboration management                    |
+| Container Manager         | `container-manager.ts`         | Docker container isolation                        |
+| Worktree Manager          | `worktree-manager.ts`          | Git worktree CRUD operations                      |
+| Merge Orchestrator        | `merge-orchestrator.ts`        | Result merging strategies                         |
+| Result Comparator         | `result-comparator.ts`         | Compare outputs across branches                   |
+| Safety Validator          | `safety-validator.ts`          | Pre-exploration safety checks (1GB/branch memory) |
+| Exploration State         | `exploration-state.ts`         | State persistence, recovery, and session linking  |
+| Exploration Events        | `exploration-events.ts`        | Real-time event emitter for dashboard monitoring  |
+
+### Dashboard Integration
+
+The exploration layer integrates with the main dashboard (`valora dash`) through three mechanisms:
+
+1. **Worktree Diagram Panel**: The dashboard fetches `WorktreeManager.listWorktrees()` and `ExplorationStateManager.getActiveExplorations()` in parallel, transforming them into a live tree-diagram showing all git worktrees with exploration status indicators.
+
+2. **Exploration Info Panel**: When viewing a session that is linked to an exploration, the `ExplorationInfoPanel` component loads the exploration data (via `ExplorationStateManager.findBySessionId()`) and displays the task, status, branch completion, and per-worktree details. This works even while the exploration is still running, since the `session_id` is stored on the `Exploration` object immediately after creation.
+
+3. **Worktree Stats Tracking**: The `WorktreeStatsTracker` (in `src/session/`) subscribes to `ExplorationEventEmitter` events and accumulates per-session statistics, which are displayed in the session details view.
+
+### Session-Exploration Linking
+
+Explorations and sessions are bidirectionally linked:
+
+- The `Exploration` type has a `session_id` field, set by the orchestrator immediately after the exploration is created
+- Each `WorktreeExploration` also stores the `session_id`
+- The session context stores `exploration_id` after the exploration completes
+- `ExplorationStateManager.findBySessionId()` enables reverse lookup from session to exploration
+
 ### Parallel Exploration Flow
 
 ```mermaid
@@ -267,6 +300,11 @@ C4Component
         Component(service, "Session Service", "TypeScript", "Session operations")
         Component(repository, "Session Repository", "TypeScript", "File persistence")
         Component(types, "Session Types", "TypeScript", "Type definitions")
+        Component(worktree_tracker, "Worktree Stats Tracker", "TypeScript", "Worktree usage statistics")
+    }
+
+    Container_Boundary(exploration, "Exploration Layer") {
+        Component(events, "Exploration Events", "TypeScript", "Event emitter")
     }
 
     ContainerDb(store, "Session Files", "JSON", "Persistent storage")
@@ -274,7 +312,31 @@ C4Component
     Rel(service, repository, "Uses")
     Rel(repository, store, "Reads/Writes")
     Rel(service, types, "Uses")
+    Rel(worktree_tracker, events, "Subscribes to")
+    Rel(service, worktree_tracker, "Collects stats from")
 ```
+
+### Component Descriptions
+
+| Component              | File                         | Responsibility                                           |
+| ---------------------- | ---------------------------- | -------------------------------------------------------- |
+| Session Service        | `lifecycle.ts`, `context.ts` | Session creation, resumption, and state management       |
+| Session Repository     | `store.ts`                   | File-based persistence of session data                   |
+| Session Types          | `types/session.types.ts`     | Type definitions (`Session`, `WorktreeUsageStats`, etc.) |
+| Worktree Stats Tracker | `worktree-stats-tracker.ts`  | Event-driven worktree usage statistics accumulation      |
+
+### Worktree Stats Tracking
+
+The `WorktreeStatsTracker` subscribes to `ExplorationEventEmitter` and accumulates worktree usage statistics during a session:
+
+| Event                | Action                                                        |
+| -------------------- | ------------------------------------------------------------- |
+| `worktree:created`   | Increment `total_created`, add to `worktree_summaries`        |
+| `worktree:started`   | Track in active map, update `max_concurrent`                  |
+| `worktree:completed` | Calculate duration, update `total_duration_ms`, mark complete |
+| `worktree:failed`    | Same as completed but with `failed` status                    |
+
+On session completion, stats are stored into `session.context['worktree_stats']` (only if `total_created > 0`).
 
 ### Session Lifecycle
 

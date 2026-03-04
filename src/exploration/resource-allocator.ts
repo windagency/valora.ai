@@ -6,6 +6,8 @@
 
 import type { AllocatedResources } from 'types/exploration.types';
 
+import { execSync } from 'child_process';
+
 export interface AllocationRequest {
 	cpu_limit: string; // e.g., "1.5"
 	exploration_id: string;
@@ -169,11 +171,37 @@ export class ResourceAllocator {
 	}
 
 	/**
+	 * Get the set of host ports currently mapped by Docker containers
+	 */
+	private getDockerAllocatedPorts(): Set<number> {
+		try {
+			const output = execSync('docker ps --format "{{.Ports}}"', {
+				encoding: 'utf-8',
+				timeout: 5000
+			});
+			const ports = new Set<number>();
+			// Matches host port in "0.0.0.0:3000->..." or "[::]:3000->..."
+			const regex = /:(\d+)->/g;
+			let match;
+			while ((match = regex.exec(output)) !== null) {
+				if (match[1]) {
+					ports.add(parseInt(match[1], 10));
+				}
+			}
+			return ports;
+		} catch {
+			return new Set();
+		}
+	}
+
+	/**
 	 * Allocate a port from the pool
 	 */
 	private allocatePort(): number {
+		const dockerPorts = this.getDockerAllocatedPorts();
+
 		for (let port = this.pool.port_range_start; port <= this.pool.port_range_end; port++) {
-			if (!this.pool.allocated_ports.has(port)) {
+			if (!this.pool.allocated_ports.has(port) && !dockerPorts.has(port)) {
 				this.pool.allocated_ports.add(port);
 				return port;
 			}

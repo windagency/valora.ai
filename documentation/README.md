@@ -22,6 +22,7 @@ VALORA (Versatile Agent Logic for Orchestrated Response Architecture) is a softw
 - **Three-Tier Execution**: MCP Sampling, Guided Completion, and API Fallback modes
 - **External MCP Integration**: Connect to 15 external MCP servers (Playwright, GitHub, Terraform, etc.) with user approval
 - **Session-Based State**: Persistent context across command executions
+- **Worktree Dashboard**: Live tree-diagram of git worktrees in the `valora dash` dashboard with exploration status indicators and per-session worktree usage statistics
 - **Interactive Clarification**: Pipelines pause to collect user answers, ensuring decisions are documented
 - **Model Optimisation**: Cost-efficient AI model selection (GPT-5, Claude Sonnet, Claude Haiku)
 - **Quality Gates**: Multi-layer validation preventing technical debt
@@ -135,7 +136,7 @@ Start with the [User Guide](./user-guide/README.md):
 
 1. [Quick Start](./user-guide/quick-start.md) - Get up and running in 5 minutes
 2. [Basic Workflows](./user-guide/workflows.md) - Common development patterns
-3. [Command Reference](./user-guide/commands.md) - All 24 commands explained
+3. [Command Reference](./user-guide/commands.md) - All commands explained (incl. dashboard & worktree panels)
 4. [Metrics and Optimisation](./user-guide/metrics.md) - Track and improve efficiency
 
 ### For Developers

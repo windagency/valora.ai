@@ -129,3 +129,20 @@ export interface SessionSummary {
 	total_tokens_used?: number;
 	updated_at: string;
 }
+
+export interface WorktreeSessionSummary {
+	branch_name: string;
+	completed_at?: string;
+	created_at: string;
+	duration_ms?: number;
+	exploration_id?: string;
+	status: string;
+}
+
+export interface WorktreeUsageStats {
+	exploration_ids: string[];
+	max_concurrent: number;
+	total_created: number;
+	total_duration_ms: number;
+	worktree_summaries: WorktreeSessionSummary[];
+}

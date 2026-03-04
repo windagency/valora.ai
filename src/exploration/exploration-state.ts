@@ -243,6 +243,24 @@ export class ExplorationStateManager {
 	}
 
 	/**
+	 * Find exploration linked to a session
+	 */
+	async findBySessionId(sessionId: string): Promise<Exploration | null> {
+		const summaries = await this.listExplorations();
+		for (const summary of summaries) {
+			try {
+				const exploration = await this.loadExploration(summary.id);
+				if (exploration.session_id === sessionId) {
+					return exploration;
+				}
+			} catch {
+				// Skip unreadable explorations
+			}
+		}
+		return null;
+	}
+
+	/**
 	 * Get explorations root directory
 	 */
 	getExplorationsDir(): string {
