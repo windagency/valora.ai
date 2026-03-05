@@ -1153,7 +1153,7 @@ The Git Worktrees panel displays a live tree structure of all git worktrees in t
 - **Child worktrees**: Connected with `├──` / `└──` tree-drawing characters
 - **Exploration branches**: Highlighted in yellow with status icons
 - **Prunable worktrees**: Shown in red
-- **Status icons**: `▶` running, `✓` completed, `✗` failed, `○` pending
+- **Status icons**: `▶` running, `✓` completed, `✗` failed, `⏱` timed out, `○` pending
 - **Overflow**: Maximum 4 worktrees displayed, with `...and N more` for additional
 
 The panel fetches data from `WorktreeManager.listWorktrees()` and enriches exploration worktrees with active exploration metadata from `ExplorationStateManager.getActiveExplorations()`.

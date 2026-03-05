@@ -37,6 +37,7 @@ function getStatusColor(status: string): StatusColor {
 	if (status === 'completed') return 'green';
 	if (status === 'running') return 'cyan';
 	if (status === 'failed') return 'red';
+	if (status === 'timed_out') return 'yellow';
 	return 'yellow';
 }
 
@@ -47,6 +48,7 @@ function getStatusIcon(status: string): string {
 	if (status === 'completed') return '✓';
 	if (status === 'running') return '▶';
 	if (status === 'failed') return '✗';
+	if (status === 'timed_out') return '⏱';
 	return '○';
 }
 

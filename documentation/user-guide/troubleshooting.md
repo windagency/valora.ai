@@ -343,6 +343,29 @@ git branch --list "exploration/*" | xargs -r git branch -D
 
 If a previous cleanup removed the exploration state but failed to delete branches (e.g., due to the `refs/heads/` prefix issue), re-running cleanup will detect the missing state and fall back to pattern-based branch cleanup.
 
+#### Exploration Worktrees Show as Timed Out
+
+**Symptoms**:
+
+- Worktree status shows `timed_out` (⏱) instead of `completed`
+- Exploration finishes but some branches didn't complete in time
+
+**Solution**:
+
+```bash
+# Check which worktrees timed out
+valora explore status exp-XXX
+
+# Increase the timeout for future explorations
+valora explore parallel "task" --timeout 120
+
+# Timed-out worktrees cannot be merged — retry with a longer timeout
+# or fewer branches to give each more time
+valora explore parallel "task" --timeout 120 --branches 2
+```
+
+Worktrees that exceed the `--timeout` duration are marked as `timed_out` and cannot be merged. They score slightly above `failed` in comparisons (5/40 vs 0/40 for the status component) since partial progress may have been made. To resolve, either increase the timeout or simplify the task.
+
 ### LLM Provider Issues
 
 #### Rate Limiting

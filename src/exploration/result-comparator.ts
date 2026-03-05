@@ -327,7 +327,8 @@ export class ResultComparator {
 		const statusScores: Record<string, number> = {
 			completed: 40,
 			failed: 0,
-			running: 20
+			running: 20,
+			timed_out: 5
 		};
 		score += statusScores[worktree.status] ?? 0;
 

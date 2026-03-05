@@ -336,6 +336,8 @@ The `WorktreeStatsTracker` subscribes to `ExplorationEventEmitter` and accumulat
 | `worktree:completed` | Calculate duration, update `total_duration_ms`, mark complete |
 | `worktree:failed`    | Same as completed but with `failed` status                    |
 
+Worktrees that exceed the exploration timeout are marked with `timed_out` status. Timed-out worktrees are not eligible for merging and score 5/40 (status component) in result comparisons.
+
 On session completion, stats are stored into `session.context['worktree_stats']` (only if `total_created > 0`).
 
 ### Session Lifecycle

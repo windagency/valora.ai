@@ -3,7 +3,7 @@
  */
 
 export type ExecutionMode = 'parallel' | 'sequential';
-export type ExplorationStatus = 'completed' | 'failed' | 'pending' | 'running' | 'stopped';
+export type ExplorationStatus = 'completed' | 'failed' | 'pending' | 'running' | 'stopped' | 'timed_out';
 export type InsightType = 'approach' | 'decision' | 'finding' | 'issue';
 
 /**
