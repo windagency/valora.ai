@@ -5,18 +5,12 @@
 import type { MCPTool } from './mcp-registry.types';
 import type { ModelNameValue } from './provider-names.types';
 
-export type AgentRole =
-	| 'asserter'
-	| 'lead'
-	| 'platform-engineer'
-	| 'product-manager'
-	| 'qa'
-	| 'secops-engineer'
-	| 'software-engineer-typescript'
-	| 'software-engineer-typescript-backend'
-	| 'software-engineer-typescript-frontend'
-	| 'software-engineer-typescript-frontend-react'
-	| 'ui-ux-designer';
+/**
+ * Agent role identifier.
+ * Extensible via registry.json agent definitions — new roles for other
+ * languages/frameworks can be added without code changes.
+ */
+export type AgentRole = string;
 
 /**
  * AI Model names - uses centralized model registry

@@ -10,7 +10,7 @@ import { getConfigLoader } from 'config/loader';
 import { AgentLoader } from 'executor/agent-loader';
 import { ExecutionContext, type SessionInfo } from 'executor/execution-context';
 import { CommandExecutionStrategyFactory } from 'executor/execution-strategy';
-import { existsSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import { getLogger } from 'output/logger';
 import { getProcessingFeedback } from 'output/processing-feedback';
 import { resolve } from 'path';
@@ -457,11 +457,18 @@ export class ExecutionCoordinator {
 		options: CommandExecutionOptions,
 		sessionManager: SessionContextManager
 	): TaskContext {
-		// Extract task description from arguments or context
-		const description = this.extractTaskDescription(commandName, options, sessionManager);
+		const logger = getLogger();
 
-		// Extract affected files from context or arguments
-		const affectedFiles = this.extractAffectedFiles(options, sessionManager);
+		// For implement command, try to read plan file for better context
+		const planContext = this.extractPlanContext(commandName, options, logger);
+
+		// Extract task description from plan content, arguments, or context
+		const description = planContext?.description ?? this.extractTaskDescription(commandName, options, sessionManager);
+
+		// Extract affected files - prefer plan's target files over generic extraction
+		const affectedFiles = planContext?.affectedFiles?.length
+			? planContext.affectedFiles
+			: this.extractAffectedFiles(options, sessionManager);
 
 		// Extract dependencies from context
 		const dependencies = this.extractDependencies(sessionManager);
@@ -470,7 +477,7 @@ export class ExecutionCoordinator {
 			affectedFiles,
 			complexity: 'medium',
 			dependencies,
-			description, // Default, could be enhanced with analysis
+			description,
 			metadata: {
 				args: options.args,
 				commandName,
@@ -481,6 +488,112 @@ export class ExecutionCoordinator {
 	}
 
 	/**
+	 * Extract context from a plan file for better agent selection.
+	 * Reads the plan file content to extract task description and target files,
+	 * which dramatically improves keyword-based domain classification.
+	 */
+	private extractPlanContext(
+		commandName: string,
+		options: CommandExecutionOptions,
+		logger: ReturnType<typeof getLogger>
+	): null | { affectedFiles: string[]; description: string } {
+		if (commandName !== 'implement' || options.args.length === 0) {
+			return null;
+		}
+
+		const planPath = options.args[0];
+		if (!planPath) return null;
+
+		const resolvedPath = resolve(process.cwd(), planPath);
+		if (!existsSync(resolvedPath)) return null;
+
+		try {
+			const content = readFileSync(resolvedPath, 'utf-8');
+			if (!content.trim()) return null;
+
+			// Extract task description from plan headings and overview
+			const description = this.extractDescriptionFromPlan(content);
+
+			// Extract target file paths mentioned in the plan
+			const affectedFiles = this.extractFilesFromPlan(content);
+
+			logger.debug('Extracted plan context for agent selection', {
+				affectedFilesCount: affectedFiles.length,
+				descriptionLength: description.length,
+				planPath
+			});
+
+			return { affectedFiles, description };
+		} catch (error) {
+			logger.debug('Could not read plan file for agent selection', {
+				error: (error as Error).message,
+				planPath
+			});
+			return null;
+		}
+	}
+
+	/**
+	 * Extract a meaningful description from plan content.
+	 * Looks for task title, overview sections, and early content.
+	 */
+	private extractDescriptionFromPlan(content: string): string {
+		const parts: string[] = [];
+
+		// Extract title from first heading
+		const titleMatch = content.match(/^#\s+(.+)$/m);
+		if (titleMatch?.[1]) {
+			parts.push(titleMatch[1]);
+		}
+
+		// Extract task overview / description sections (first 500 chars of content after frontmatter)
+		const contentWithoutFrontmatter = content.replace(/^---[\s\S]*?---\s*/m, '');
+		const firstSection = contentWithoutFrontmatter.substring(0, 500);
+		parts.push(firstSection);
+
+		return parts.join('\n').trim();
+	}
+
+	/**
+	 * Extract file paths mentioned in the plan content.
+	 * Looks for common patterns like backtick-quoted paths, list items with file paths.
+	 */
+	private extractFilesFromPlan(content: string): string[] {
+		const files = new Set<string>();
+
+		// Match file paths in backticks: `src/components/App.tsx`
+		const backtickMatches = content.matchAll(/`([^`]+\.[a-z]{1,4})`/gi);
+		for (const match of backtickMatches) {
+			const filePath = match[1];
+			if (filePath && this.looksLikeFilePath(filePath)) {
+				files.add(filePath);
+			}
+		}
+
+		// Match file paths in list items: - src/routes/auth.ts
+		const listMatches = content.matchAll(/^[-*]\s+([\w./]+\.[a-z]{1,4})/gm);
+		for (const match of listMatches) {
+			const filePath = match[1];
+			if (filePath && this.looksLikeFilePath(filePath)) {
+				files.add(filePath);
+			}
+		}
+
+		return Array.from(files);
+	}
+
+	/**
+	 * Check if a string looks like a source file path
+	 */
+	private looksLikeFilePath(str: string): boolean {
+		return (
+			/\.(ts|tsx|js|jsx|css|html|json|yaml|yml|tf|sh|sql|md|vue|svelte)$/.test(str) &&
+			str.includes('/') &&
+			!str.includes(' ')
+		);
+	}
+
+	/**
 	 * Extract task description from command arguments and context
 	 */
 	private extractTaskDescription(
@@ -488,14 +601,6 @@ export class ExecutionCoordinator {
 		options: CommandExecutionOptions,
 		sessionManager: SessionContextManager
 	): string {
-		// For implement command, the first argument is typically the implementation plan
-		if (commandName === 'implement' && options.args.length > 0) {
-			const firstArg = options.args[0];
-			if (firstArg !== undefined) {
-				return firstArg;
-			}
-		}
-
 		// Check session context for plan or task information
 		const planSummary = sessionManager.getContext('planSummary');
 		if (hasDescription(planSummary)) {

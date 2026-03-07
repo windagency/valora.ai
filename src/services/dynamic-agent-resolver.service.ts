@@ -201,55 +201,77 @@ export class DynamicAgentResolverService {
 	}
 
 	/**
-	 * Determine the most appropriate fallback agent based on task context
+	 * Determine the most appropriate fallback agent based on task context.
+	 * Uses registry to find agents dynamically, so new language/framework
+	 * agents are automatically considered for fallback.
 	 */
 	private determineFallbackAgent(taskContext: TaskContext): string {
-		// Simple heuristic-based fallback selection
 		const affectedFiles = taskContext.affectedFiles ?? [];
-		const hasFrontendFiles = affectedFiles.some(
-			(file) =>
-				file.includes('frontend') ||
-				file.includes('ui') ||
-				file.includes('component') ||
-				file.endsWith('.tsx') ||
-				file.endsWith('.jsx')
-		);
 
-		const hasBackendFiles = affectedFiles.some(
-			(file) =>
-				file.includes('backend') ||
-				file.includes('api') ||
-				file.includes('server') ||
-				file.includes('database') ||
-				(file.endsWith('.ts') && !file.endsWith('.tsx'))
-		);
+		// Domain hints from file patterns — language-agnostic detection
+		const domainHints = this.detectDomainHintsFromFiles(affectedFiles);
 
-		const hasInfrastructureFiles = affectedFiles.some(
-			(file) =>
-				file.includes('infrastructure') ||
-				file.includes('terraform') ||
-				file.includes('docker') ||
-				file.includes('kubernetes') ||
-				file.endsWith('.tf') ||
-				file.endsWith('.yaml') ||
-				file.endsWith('.yml')
-		);
+		// Query registry for best agent per detected domain
+		const allCapabilities = this.registryService.getAllCapabilities();
+		if (allCapabilities.size > 0) {
+			for (const domain of domainHints) {
+				const matchingAgents = Array.from(allCapabilities.entries())
+					.filter(([, cap]) => cap.domains.includes(domain))
+					.sort(([, a], [, b]) => b.priority - a.priority);
 
-		// Priority order for fallbacks
-		if (hasInfrastructureFiles) {
-			return 'platform-engineer';
+				if (matchingAgents.length > 0 && matchingAgents[0]) {
+					return matchingAgents[0][0];
+				}
+			}
+
+			// No domain match — return highest priority non-lead agent
+			const sortedAgents = Array.from(allCapabilities.entries())
+				.filter(([role]) => role !== 'lead')
+				.sort(([, a], [, b]) => b.priority - a.priority);
+
+			if (sortedAgents.length > 0 && sortedAgents[0]) {
+				return sortedAgents[0][0];
+			}
 		}
 
-		if (hasFrontendFiles) {
-			return 'software-engineer-typescript-frontend-react';
+		// Ultimate fallback when registry is empty
+		return 'lead';
+	}
+
+	/**
+	 * Detect domain hints from file paths.
+	 * Returns domains in priority order (most specific first).
+	 */
+	private detectDomainHintsFromFiles(files: string[]): string[] {
+		const domains: string[] = [];
+
+		const hasMatch = (patterns: string[]): boolean =>
+			files.some((file) => {
+				const lower = file.toLowerCase();
+				return patterns.some((p) => lower.includes(p));
+			});
+
+		// Infrastructure signals (highest priority — most specific)
+		if (hasMatch(['.tf', 'terraform', 'docker', 'kubernetes', 'k8s/', 'helm/'])) {
+			domains.push('infrastructure');
 		}
 
-		if (hasBackendFiles) {
-			return 'software-engineer-typescript-backend';
+		// Security signals
+		if (hasMatch(['security', 'auth/', 'oauth', 'jwt', 'encryption'])) {
+			domains.push('security');
 		}
 
-		// Default fallback
-		return 'software-engineer-typescript';
+		// Frontend signals
+		if (hasMatch(['.tsx', '.jsx', '.vue', '.svelte', 'frontend', 'component', 'ui/'])) {
+			domains.push('frontend-ui');
+		}
+
+		// Backend signals
+		if (hasMatch(['controller', 'api/', 'server', 'backend', 'graphql', 'resolver'])) {
+			domains.push('backend-api');
+		}
+
+		return domains;
 	}
 
 	/**

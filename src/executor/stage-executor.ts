@@ -446,7 +446,14 @@ export class StageExecutor {
 		const agent = await this.agentLoader.loadAgent(executionContext.agentRole);
 		const projectGuidance = await loadProjectGuidance();
 		const projectKnowledge = await loadProjectKnowledge(executionContext.knowledgeFiles ?? []);
-		const availableAgents = await loadAvailableAgents(prompt.agents ?? []);
+
+		// Filter agents to only load the one matching the current execution context
+		// This avoids loading unnecessary agents (e.g., backend agent for a frontend task)
+		const promptAgents = prompt.agents ?? [];
+		const filteredAgents = promptAgents.includes(executionContext.agentRole)
+			? [executionContext.agentRole]
+			: promptAgents;
+		const availableAgents = await loadAvailableAgents(filteredAgents);
 
 		return {
 			agent,

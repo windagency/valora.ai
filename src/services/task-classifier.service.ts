@@ -10,12 +10,58 @@ import type { TaskClassification, TaskContext, TaskDomain } from 'types/agent.ty
 import { getLogger } from 'output/logger';
 import { type DomainKeywordRegistry, getDomainKeywordRegistry } from 'utils/domain-keyword-registry';
 
+import type { AgentCapabilityRegistryService } from './agent-capability-registry.service';
+
 export class TaskClassifierService {
+	/**
+	 * File patterns for domain detection.
+	 * Extend this to add new language/framework file associations.
+	 */
+	static readonly DEFAULT_FILE_PATTERNS: Record<string, { patterns: string[]; weight: number }> = {
+		'backend-api': {
+			patterns: [
+				'api',
+				'server',
+				'backend',
+				'database',
+				'sql',
+				'controller',
+				'resolver',
+				'graphql',
+				'routes',
+				'middleware'
+			],
+			weight: 0.7
+		},
+		design: {
+			patterns: ['.fig', '.sketch', '.xd', 'design', 'mockup', 'wireframe'],
+			weight: 0.8
+		},
+		'frontend-ui': {
+			patterns: ['.tsx', '.jsx', '.vue', '.svelte', '.html', '.css', 'frontend', 'ui', 'component', 'hook'],
+			weight: 0.9
+		},
+		infrastructure: {
+			patterns: ['.tf', '.yaml', '.yml', 'dockerfile', 'Dockerfile', '.sh', '.bash'],
+			weight: 1.0
+		},
+		security: {
+			patterns: ['security', 'auth', 'jwt', 'oauth', 'encryption', 'ssl', 'tls'],
+			weight: 0.8
+		},
+		'typescript-core': {
+			patterns: ['tsconfig.json', 'package.json'],
+			weight: 0.5
+		}
+	};
+
+	private readonly capabilityRegistry: AgentCapabilityRegistryService | null;
 	private readonly keywordRegistry: DomainKeywordRegistry;
 	private readonly logger = getLogger();
 
-	constructor(keywordRegistry?: DomainKeywordRegistry) {
+	constructor(keywordRegistry?: DomainKeywordRegistry, capabilityRegistry?: AgentCapabilityRegistryService) {
 		this.keywordRegistry = keywordRegistry ?? getDomainKeywordRegistry();
+		this.capabilityRegistry = capabilityRegistry ?? null;
 	}
 
 	/**
@@ -153,41 +199,14 @@ export class TaskClassifierService {
 	}
 
 	/**
-	 * Detect domain from affected files
+	 * Detect domain from affected files.
+	 * File patterns are extensible — new language/framework patterns can be added
+	 * to DEFAULT_FILE_PATTERNS without modifying the detection logic.
 	 */
 	private detectDomainFromFiles(affectedFiles: string[]): Map<TaskDomain, { reasons: string[]; score: number }> {
 		const domainScores = new Map<TaskDomain, { reasons: string[]; score: number }>();
 
-		const filePatterns: Record<TaskDomain, { patterns: string[]; weight: number }> = {
-			infrastructure: {
-				patterns: ['.tf', '.yaml', '.yml', 'dockerfile', 'Dockerfile', '.sh', '.bash'],
-				weight: 1.0
-			},
-			security: {
-				patterns: ['security', 'auth', 'jwt', 'oauth', 'encryption', 'ssl', 'tls'],
-				weight: 0.8
-			},
-			'typescript-backend-general': {
-				patterns: ['.ts', '.js', 'api', 'server', 'backend', 'database', 'sql'],
-				weight: 0.7
-			},
-			'typescript-core': {
-				patterns: ['.ts', '.js', 'config', 'build', 'package.json', 'tsconfig.json'],
-				weight: 0.5
-			},
-			'typescript-frontend-general': {
-				patterns: ['.tsx', '.jsx', '.html', '.css', 'frontend', 'ui'],
-				weight: 0.6
-			},
-			'typescript-frontend-react': {
-				patterns: ['.tsx', '.jsx', 'react', 'component', 'hook', 'state'],
-				weight: 0.9
-			},
-			'ui-ux-designer': {
-				patterns: ['.fig', '.sketch', '.xd', 'design', 'mockup', 'wireframe'],
-				weight: 0.8
-			}
-		};
+		const filePatterns = TaskClassifierService.DEFAULT_FILE_PATTERNS;
 
 		// Process file patterns using functional approach
 		affectedFiles.forEach((file) => {
@@ -232,29 +251,54 @@ export class TaskClassifierService {
 	}
 
 	/**
-	 * Get suggested agents for a domain
+	 * Get suggested agents for a domain.
+	 * When the capability registry is available, agents are looked up dynamically
+	 * so new language/framework agents are automatically suggested.
 	 */
 	private getSuggestedAgents(domain: TaskDomain, taskContext: TaskContext): string[] {
-		const agentMappings: Record<TaskDomain, string[]> = {
-			infrastructure: ['platform-engineer'],
-			security: ['secops-engineer'],
-			'typescript-backend-general': ['software-engineer-typescript-backend'],
-			'typescript-core': ['software-engineer-typescript'],
-			'typescript-frontend-general': ['software-engineer-typescript-frontend'],
-			'typescript-frontend-react': ['software-engineer-typescript-frontend-react'],
-			'ui-ux-designer': ['ui-ux-designer']
-		};
+		let suggestedAgents: string[] = [];
+
+		// Query registry for agents covering this domain
+		if (this.capabilityRegistry) {
+			try {
+				const registryAgents = this.capabilityRegistry.findAgentsByDomain(domain);
+				// Filter out generalist agents (lead) for domain-specific suggestions
+				suggestedAgents = registryAgents.filter((agent) => agent !== 'lead');
+			} catch {
+				// Registry not initialized — fall through to defaults
+			}
+		}
+
+		if (suggestedAgents.length === 0) {
+			// Fallback when registry is unavailable — derive agent name from domain
+			suggestedAgents = this.getDefaultAgentsForDomain(domain);
+		}
 
 		// Add lead for high complexity or multi-domain tasks
-		const suggestedAgents = [...(agentMappings[domain] || ['software-engineer-typescript'])];
-
 		if (
 			taskContext.complexity === 'high' ||
 			(taskContext.secondaryDomains && taskContext.secondaryDomains.length > 0)
 		) {
-			suggestedAgents.unshift('lead'); // Lead first for complex tasks
+			suggestedAgents.unshift('lead');
 		}
 
 		return suggestedAgents;
+	}
+
+	/**
+	 * Default agent suggestions when the capability registry is unavailable.
+	 * Maps well-known domains to conventional agent names.
+	 */
+	private getDefaultAgentsForDomain(domain: string): string[] {
+		const defaults: Record<string, string[]> = {
+			'backend-api': ['software-engineer-typescript-backend'],
+			design: ['ui-ux-designer'],
+			'frontend-ui': ['software-engineer-typescript-frontend', 'software-engineer-typescript-frontend-react'],
+			infrastructure: ['platform-engineer'],
+			security: ['secops-engineer'],
+			testing: ['qa']
+		};
+
+		return defaults[domain] ?? ['software-engineer-typescript'];
 	}
 }

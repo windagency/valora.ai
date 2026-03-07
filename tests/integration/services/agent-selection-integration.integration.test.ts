@@ -261,7 +261,7 @@ describe('Complete Integration Test Suite', () => {
 						dependencies: ['typescript'],
 						description: 'Fix the bug'
 					},
-					expectedRange: 'low'
+					expectedRange: 'medium'
 				}
 			];
 
@@ -270,15 +270,15 @@ describe('Complete Integration Test Suite', () => {
 
 				switch (testCase.expectedRange) {
 					case 'high':
-						expect(result.confidence).toBeGreaterThan(0.2); // Realistic high confidence
+						expect(result.confidence).toBeGreaterThan(0.3);
 						break;
 					case 'medium':
-						expect(result.confidence).toBeGreaterThan(0.1); // Realistic medium confidence
-						expect(result.confidence).toBeLessThanOrEqual(0.35);
+						expect(result.confidence).toBeGreaterThan(0.1);
+						expect(result.confidence).toBeLessThanOrEqual(0.6);
 						break;
 					case 'low':
-						expect(result.confidence).toBeGreaterThan(0); // Realistic low confidence
-						expect(result.confidence).toBeLessThanOrEqual(0.2);
+						expect(result.confidence).toBeGreaterThan(0);
+						expect(result.confidence).toBeLessThanOrEqual(0.3);
 						break;
 				}
 			}

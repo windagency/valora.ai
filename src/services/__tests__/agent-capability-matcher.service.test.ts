@@ -44,7 +44,7 @@ describe('AgentCapabilityMatcherService', () => {
 		[
 			'software-engineer-typescript-backend',
 			{
-				domains: ['typescript-backend-general'] as TaskDomain[],
+				domains: ['backend-api'] as TaskDomain[],
 				expertise: ['nodejs', 'express', 'graphql'],
 				priority: 85,
 				role: 'software-engineer-typescript-backend',
@@ -54,7 +54,7 @@ describe('AgentCapabilityMatcherService', () => {
 		[
 			'lead',
 			{
-				domains: ['infrastructure', 'typescript-backend-general', 'security'] as TaskDomain[],
+				domains: ['infrastructure', 'backend-api', 'security'] as TaskDomain[],
 				expertise: ['architecture', 'leadership', 'ddd'],
 				priority: 95,
 				role: 'lead',
@@ -265,7 +265,7 @@ describe('AgentCapabilityMatcherService', () => {
 			const taskClassification: TaskClassification = {
 				complexity: 'medium',
 				confidence: 1.0,
-				primaryDomain: 'typescript-backend-general',
+				primaryDomain: 'backend-api',
 				reasons: [],
 				suggestedAgents: []
 			};
@@ -281,7 +281,7 @@ describe('AgentCapabilityMatcherService', () => {
 			const scores = await matcher.scoreAgents(taskClassification, context);
 			const leadScore = scores.find((s) => s.role === 'lead');
 
-			// Lead has typescript-backend-general as related domain to infrastructure
+			// Lead has backend-api as related domain to infrastructure
 			expect(leadScore!.score).toBeGreaterThan(0.1);
 		});
 
@@ -291,7 +291,7 @@ describe('AgentCapabilityMatcherService', () => {
 				[
 					'unrelated-agent',
 					{
-						domains: ['ui-ux-designer'] as TaskDomain[],
+						domains: ['design'] as TaskDomain[],
 						expertise: ['figma', 'sketch'],
 						priority: 50,
 						role: 'unrelated-agent',
