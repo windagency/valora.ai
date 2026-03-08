@@ -89,6 +89,8 @@
 		"test:light": "SKIP_TESTCONTAINERS=true pnpm test:suite:unit && SKIP_TESTCONTAINERS=true pnpm test:suite:security",
 		"test:coverage": "vitest run --coverage",
 		"test:ci": "pnpm test && pnpm test:coverage",
+		"test:mutation": "stryker run stryker.config.mjs",
+		"test:mutation:utils": "stryker run stryker.config.mjs --mutate 'src/utils/*.ts'",
 		"test:quick": "pnpm test:suite:unit && pnpm test:suite:integration",
 		"test:smoke": "pnpm test:suite:unit --run --reporter=verbose",
 		"audit": "pnpm audit",
@@ -132,6 +134,9 @@
 	"devDependencies": {
 		"@eslint/js": "^9.39.1",
 		"@playwright/test": "^1.40.0",
+		"@stryker-mutator/core": "^8.7.1",
+		"@stryker-mutator/typescript-checker": "^8.7.1",
+		"@stryker-mutator/vitest-runner": "^8.7.1",
 		"@testcontainers/localstack": "^10.7.0",
 		"@testcontainers/postgresql": "^10.7.0",
 		"@testcontainers/redis": "^10.7.0",
