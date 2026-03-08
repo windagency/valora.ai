@@ -3,11 +3,11 @@
  */
 
 import React from 'react';
+
+import type { CacheData } from 'ui/dashboard/hooks/use-metrics-data';
+
+import { formatDurationMs } from 'ui/dashboard/utils/format-helpers';
 import { getTUIAdapter } from 'ui/tui-adapter.interface';
-
-import type { CacheData } from '../hooks/use-metrics-data';
-
-import { formatDurationMs } from '../utils/format-helpers';
 
 const tui = getTUIAdapter();
 // eslint-disable-next-line @typescript-eslint/naming-convention -- Box and Text are React components which require PascalCase

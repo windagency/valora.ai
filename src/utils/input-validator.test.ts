@@ -58,14 +58,11 @@ describe('InputValidator', () => {
 			expect(result.errors).toHaveLength(0);
 		});
 
-		it('should validate primitive types', () => {
-			const testCases = [42, 3.14, true, false, 'hello'];
+		it.each([42, 3.14, true, false, 'hello'])('should validate primitive value %s', (value) => {
+			const result = validator.validate(value);
 
-			testCases.forEach((value) => {
-				const result = validator.validate(value);
-				expect(result.valid).toBe(true);
-				expect(result.errors).toHaveLength(0);
-			});
+			expect(result.valid).toBe(true);
+			expect(result.errors).toHaveLength(0);
 		});
 
 		it('should track metrics for valid input', () => {

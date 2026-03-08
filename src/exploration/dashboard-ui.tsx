@@ -4,9 +4,10 @@
  * Interactive terminal UI for monitoring exploration progress
  */
 
+import React, { useEffect, useState } from 'react';
+
 import type { ContainerStats, Exploration, Insight, WorktreeExploration } from 'types/exploration.types';
 
-import React, { useEffect, useState } from 'react';
 import { getTUIAdapter, type RenderResult } from 'ui/tui-adapter.interface';
 
 import {

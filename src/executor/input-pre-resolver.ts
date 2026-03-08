@@ -8,9 +8,10 @@
  * - Early validation of input availability
  */
 
+import { existsSync } from 'fs';
+
 import type { PipelineStage } from 'types/command.types';
 
-import { existsSync } from 'fs';
 import { getLogger } from 'output/logger';
 import { readFile } from 'utils/file-utils';
 

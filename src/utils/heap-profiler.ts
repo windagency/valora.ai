@@ -6,9 +6,10 @@
  */
 
 import * as fs from 'fs';
-import { getLogger } from 'output/logger';
 import * as path from 'path';
 import * as v8 from 'v8';
+
+import { getLogger } from 'output/logger';
 
 import { generateShortId } from './id-generator';
 

@@ -5,6 +5,9 @@
  * and naming conventions across the codebase.
  */
 
+import * as fs from 'fs';
+import * as path from 'path';
+
 import { classes } from 'arch-unit-ts/dist/main';
 import { TypeScriptProject } from 'arch-unit-ts/dist/arch-unit/core/domain/TypeScriptProject';
 import { RelativePath } from 'arch-unit-ts/dist/arch-unit/core/domain/RelativePath';
@@ -57,6 +60,39 @@ describe('File Organization', () => {
 					throw new Error(`Service ${service.getSimpleName()} is in ${pkgPath} but should be in services directory`);
 				}
 			});
+		});
+
+		it('each service file should have a corresponding test file', () => {
+			// Known exceptions: services with outstanding test coverage debt.
+			// Adding a new entry here requires explicit acknowledgement — prefer writing the test instead.
+			const knownUntested = new Set([
+				'agent-selection-analytics.service.ts',
+				'document-path-resolver.service.ts',
+				'document-template.service.ts',
+				'document-writer.service.ts'
+			]);
+
+			const servicesDir = path.join(__dirname, '../../src/services');
+			const unitTestsDir = path.join(__dirname, '../../tests/unit/services');
+
+			const missingTests = fs
+				.readdirSync(servicesDir)
+				.filter((f) => f.endsWith('.service.ts'))
+				.filter((f) => !knownUntested.has(f))
+				.filter((f) => {
+					const testFile = f.replace('.ts', '.test.ts');
+					return (
+						!fs.existsSync(path.join(servicesDir, testFile)) &&
+						!fs.existsSync(path.join(servicesDir, '__tests__', testFile)) &&
+						!fs.existsSync(path.join(unitTestsDir, testFile))
+					);
+				});
+
+			if (missingTests.length > 0) {
+				throw new Error(
+					`Service files added without test coverage:\n  - ${missingTests.join('\n  - ')}\n\nWrite tests or add to knownUntested with justification.`
+				);
+			}
 		});
 	});
 

@@ -7,9 +7,10 @@
  * - StageExecutor -> stage-executor.ts
  */
 
+import { execSync } from 'child_process';
+
 import type { CommandResult, PipelineStage, StageOutput } from 'types/command.types';
 
-import { execSync } from 'child_process';
 import { getLogger } from 'output/logger';
 import { getProcessingFeedback } from 'output/processing-feedback';
 import { ExecutionError } from 'utils/error-handler';

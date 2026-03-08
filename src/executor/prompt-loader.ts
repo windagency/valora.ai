@@ -2,10 +2,11 @@
  * Prompt loader - loads prompt definitions from markdown files
  */
 
+import * as path from 'path';
+
 import type { PromptDefinition, PromptMetadata } from 'types/prompt.types';
 
 import { getLogger } from 'output/logger';
-import * as path from 'path';
 import { ValidationError } from 'utils/error-handler';
 import { findFiles, readFile } from 'utils/file-utils';
 import { getPackageDataDir } from 'utils/paths';

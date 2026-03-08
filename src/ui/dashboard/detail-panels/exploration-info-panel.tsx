@@ -2,13 +2,13 @@
  * Exploration Info Panel
  */
 
+import React, { useEffect, useState } from 'react';
+
 import type { Exploration } from 'types/exploration.types';
 
 import { ExplorationStateManager } from 'exploration/exploration-state';
-import React, { useEffect, useState } from 'react';
+import { formatDurationMs, getExplorationStatusColor } from 'ui/dashboard/utils/format-helpers';
 import { getTUIAdapter } from 'ui/tui-adapter.interface';
-
-import { formatDurationMs, getExplorationStatusColor } from '../utils/format-helpers';
 
 const tui = getTUIAdapter();
 // eslint-disable-next-line @typescript-eslint/naming-convention -- Box and Text are React components which require PascalCase

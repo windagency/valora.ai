@@ -10,10 +10,11 @@
  * - Get session details
  */
 
-import type { getLogger } from 'output/logger';
-
 import { existsSync, readdirSync } from 'fs';
 import { join } from 'path';
+
+import type { getLogger } from 'output/logger';
+
 import { readFile } from 'utils/file-utils';
 import { getRuntimeDataDir } from 'utils/paths';
 import { isNonEmptyString } from 'utils/type-guards';

@@ -5,10 +5,11 @@
  * memory usage analysis, and bottleneck identification.
  */
 
-import { getLogger } from 'output/logger';
 import { performance, type PerformanceEntry, PerformanceObserver } from 'perf_hooks';
-import { getMetricsCollector } from 'utils/metrics-collector';
 import * as v8 from 'v8';
+
+import { getLogger } from 'output/logger';
+import { getMetricsCollector } from 'utils/metrics-collector';
 
 export interface PerformanceReport {
 	averageDuration: number;

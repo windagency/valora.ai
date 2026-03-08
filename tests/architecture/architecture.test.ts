@@ -17,13 +17,27 @@ import * as path from 'path';
  * Matches: export class ClassName, export abstract class ClassName
  */
 function extractClassNames(content: string): string[] {
-	const classRegex = /export\s+(?:abstract\s+)?class\s+([A-Z][a-zA-Z0-9]*)/g;
-	const matches: string[] = [];
-	let match;
-	while ((match = classRegex.exec(content)) !== null) {
-		matches.push(match[1]);
-	}
-	return matches;
+	return [...content.matchAll(/export\s+(?:abstract\s+)?class\s+([A-Z][a-zA-Z0-9]*)/g)].map((match) => match[1]!);
+}
+
+/**
+ * Find source files that directly import restricted libraries outside of allowed locations.
+ * Applies the Adapter Pattern enforcement: third-party libs must be wrapped.
+ */
+function findLibraryImportViolations(
+	libraries: string[],
+	allowedFilePatterns: RegExp[],
+	srcDir: string
+): { file: string; library: string }[] {
+	return getTypeScriptFiles(srcDir)
+		.filter((file) => !allowedFilePatterns.some((pattern) => pattern.test(file)))
+		.flatMap((file) => {
+			const relativePath = path.relative(path.join(__dirname, '../..'), file);
+			const content = fs.readFileSync(file, 'utf-8');
+			return libraries
+				.filter((lib) => new RegExp(`from\\s+['"]${lib}['"]`).test(content))
+				.map((library) => ({ file: relativePath, library }));
+		});
 }
 
 /**
@@ -157,21 +171,12 @@ describe('Architecture Tests', () => {
 			const servicesDir = path.join(__dirname, '../../src/services');
 			const serviceFiles = getTypeScriptFiles(servicesDir);
 
-			const violations: { file: string; className: string }[] = [];
-
-			for (const file of serviceFiles) {
+			const violations = serviceFiles.flatMap((file) => {
 				const content = fs.readFileSync(file, 'utf-8');
-				const classNames = extractClassNames(content);
-
-				for (const className of classNames) {
-					if (!className.endsWith('Service')) {
-						violations.push({
-							className,
-							file: path.relative(path.join(__dirname, '../..'), file)
-						});
-					}
-				}
-			}
+				return extractClassNames(content)
+					.filter((className) => !className.endsWith('Service'))
+					.map((className) => ({ className, file: path.relative(path.join(__dirname, '../..'), file) }));
+			});
 
 			if (violations.length > 0) {
 				const violationList = violations.map((v) => `${v.className} in ${v.file}`).join('\n  - ');
@@ -353,10 +358,7 @@ describe('Architecture Tests', () => {
 		 * - Cleaner architecture
 		 */
 		it('presentation libraries should only be imported in adapter files', () => {
-			// These third-party presentation libraries must be wrapped with adapters
 			const presentationLibraries = ['chalk', 'ora', 'inquirer', 'ink', 'commander'];
-
-			// Allowed locations for direct imports of presentation libraries
 			const allowedAdapterPatterns = [
 				/adapter\.ts$/,
 				/adapter\.interface\.ts$/,
@@ -365,31 +367,11 @@ describe('Architecture Tests', () => {
 				/\/cli\/commander-adapter\.ts$/
 			];
 
-			const srcDir = path.join(__dirname, '../../src');
-			const allFiles = getTypeScriptFiles(srcDir);
-
-			const violations: { file: string; library: string }[] = [];
-
-			for (const file of allFiles) {
-				const relativePath = path.relative(path.join(__dirname, '../..'), file);
-
-				// Skip if this is an allowed adapter file
-				const isAdapterFile = allowedAdapterPatterns.some((pattern) => pattern.test(file));
-				if (isAdapterFile) continue;
-
-				const content = fs.readFileSync(file, 'utf-8');
-
-				for (const lib of presentationLibraries) {
-					// Check for direct imports of the library
-					const importRegex = new RegExp(`from\\s+['"]${lib}['"]`, 'g');
-					if (importRegex.test(content)) {
-						violations.push({
-							file: relativePath,
-							library: lib
-						});
-					}
-				}
-			}
+			const violations = findLibraryImportViolations(
+				presentationLibraries,
+				allowedAdapterPatterns,
+				path.join(__dirname, '../../src')
+			);
 
 			if (violations.length > 0) {
 				const violationList = violations.map((v) => `'${v.library}' in ${v.file}`).join('\n  - ');
@@ -400,32 +382,16 @@ describe('Architecture Tests', () => {
 		});
 
 		it('nanoid should only be imported in id-generator utility', () => {
-			// nanoid must be wrapped with id-generator utility
-			const allowedFiles = [/\/utils\/id-generator\.ts$/];
-
-			const srcDir = path.join(__dirname, '../../src');
-			const allFiles = getTypeScriptFiles(srcDir);
-
-			const violations: string[] = [];
-
-			for (const file of allFiles) {
-				const relativePath = path.relative(path.join(__dirname, '../..'), file);
-
-				// Skip if this is the allowed utility file
-				const isAllowed = allowedFiles.some((pattern) => pattern.test(file));
-				if (isAllowed) continue;
-
-				const content = fs.readFileSync(file, 'utf-8');
-
-				// Check for direct imports of nanoid
-				if (/from\s+['"]nanoid['"]/.test(content)) {
-					violations.push(relativePath);
-				}
-			}
+			const violations = findLibraryImportViolations(
+				['nanoid'],
+				[/\/utils\/id-generator\.ts$/],
+				path.join(__dirname, '../../src')
+			);
 
 			if (violations.length > 0) {
+				const violatingFiles = violations.map((v) => v.file);
 				throw new Error(
-					`nanoid should only be imported in id-generator utility.\nViolations:\n  - ${violations.join('\n  - ')}\n\nUse generateId/generateSessionId/etc from 'utils/id-generator' instead.`
+					`nanoid should only be imported in id-generator utility.\nViolations:\n  - ${violatingFiles.join('\n  - ')}\n\nUse generateId/generateSessionId/etc from 'utils/id-generator' instead.`
 				);
 			}
 		});
@@ -462,37 +428,11 @@ describe('Architecture Tests', () => {
 		});
 
 		it('archive libraries should only be imported in adapter files', () => {
-			// Archive libraries (archiver, unzipper) must be wrapped with adapters
-			const archiveLibraries = ['archiver', 'unzipper'];
-
-			// Allowed location for archive library imports
-			const allowedAdapterPatterns = [/\/session\/archive-adapter\.ts$/];
-
-			const srcDir = path.join(__dirname, '../../src');
-			const allFiles = getTypeScriptFiles(srcDir);
-
-			const violations: { file: string; library: string }[] = [];
-
-			for (const file of allFiles) {
-				const relativePath = path.relative(path.join(__dirname, '../..'), file);
-
-				// Skip if this is an allowed adapter file
-				const isAdapterFile = allowedAdapterPatterns.some((pattern) => pattern.test(file));
-				if (isAdapterFile) continue;
-
-				const content = fs.readFileSync(file, 'utf-8');
-
-				for (const lib of archiveLibraries) {
-					// Check for direct imports of the library
-					const importRegex = new RegExp(`from\\s+['"]${lib}['"]`, 'g');
-					if (importRegex.test(content)) {
-						violations.push({
-							file: relativePath,
-							library: lib
-						});
-					}
-				}
-			}
+			const violations = findLibraryImportViolations(
+				['archiver', 'unzipper'],
+				[/\/session\/archive-adapter\.ts$/],
+				path.join(__dirname, '../../src')
+			);
 
 			if (violations.length > 0) {
 				const violationList = violations.map((v) => `'${v.library}' in ${v.file}`).join('\n  - ');

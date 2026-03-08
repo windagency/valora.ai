@@ -12,7 +12,6 @@
 
 import type React from 'react';
 
-// eslint-disable-next-line import/no-unresolved -- ink is an optional peer dependency for TUI functionality
 import { Box as InkBox, Newline as InkNewline, render as inkRender, Text as InkText, useApp, useInput } from 'ink';
 
 import type {

@@ -2,9 +2,10 @@
  * Optimisation Panel - Per-command optimisation metrics
  */
 
+import React from 'react';
+
 import type { OptimizationMetrics, Session, SessionCommand } from 'types/session.types';
 
-import React from 'react';
 import { getTUIAdapter } from 'ui/tui-adapter.interface';
 
 const tui = getTUIAdapter();

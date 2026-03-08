@@ -7,9 +7,10 @@
 
 import * as fs from 'fs/promises';
 import * as os from 'os';
+import * as path from 'path';
+
 import { getColorAdapter } from 'output/color-adapter.interface';
 import { getHeaderFormatter } from 'output/header-formatter';
-import * as path from 'path';
 import { getPromptAdapter } from 'ui/prompt-adapter.interface';
 import { parseYamlContent, stringifyYaml } from 'utils/yaml-parser';
 

@@ -2,9 +2,10 @@
  * MCP Metrics Panel - Compact summary for main dashboard
  */
 
+import React from 'react';
+
 import type { MCPDashboardMetrics } from 'types/mcp-client.types';
 
-import React from 'react';
 import { getTUIAdapter } from 'ui/tui-adapter.interface';
 
 const tui = getTUIAdapter();

@@ -5,11 +5,12 @@
  * validation, backup, and update capabilities.
  */
 
+import { copyFileSync, existsSync, mkdirSync, writeFileSync } from 'fs';
+import { dirname } from 'path';
+
 import type { DocumentCategory, DocumentDefinition, DocumentType, DocumentWriteResult } from 'types/document.types';
 
-import { copyFileSync, existsSync, mkdirSync, writeFileSync } from 'fs';
 import { getLogger } from 'output/logger';
-import { dirname } from 'path';
 import { formatErrorMessage } from 'utils/error-utils';
 import { validateNotForbiddenPath } from 'utils/input-validator';
 

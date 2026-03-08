@@ -2,6 +2,9 @@
  * Execution Coordinator - Orchestrates the main command execution flow
  */
 
+import { existsSync, readFileSync } from 'fs';
+import { resolve } from 'path';
+
 import type { AgentSelectionAnalyticsService, DynamicAgentResolverService } from 'services/index';
 import type { TaskContext } from 'types/agent.types';
 import type { AgentRole, CommandResult, PromptsPipeline } from 'types/command.types';
@@ -10,10 +13,8 @@ import { getConfigLoader } from 'config/loader';
 import { AgentLoader } from 'executor/agent-loader';
 import { ExecutionContext, type SessionInfo } from 'executor/execution-context';
 import { CommandExecutionStrategyFactory } from 'executor/execution-strategy';
-import { existsSync, readFileSync } from 'fs';
 import { getLogger } from 'output/logger';
 import { getProcessingFeedback } from 'output/processing-feedback';
-import { resolve } from 'path';
 import { SessionContextManager } from 'session/context';
 import { getPromptAdapter } from 'ui/prompt-adapter.interface';
 import { ValidationError } from 'utils/error-handler';

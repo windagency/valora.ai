@@ -7,8 +7,9 @@
  */
 
 import * as fs from 'fs';
-import { getColorAdapter } from 'output/color-adapter.interface';
 import * as path from 'path';
+
+import { getColorAdapter } from 'output/color-adapter.interface';
 import { createErrorContext, ExecutionError } from 'utils/error-handler';
 import { checkRateLimit, getRateLimitStatus } from 'utils/rate-limiter';
 

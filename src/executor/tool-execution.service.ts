@@ -17,12 +17,14 @@
  * - query_session: Query previous session data for context reuse
  */
 
+import { exec } from 'child_process';
+import { existsSync, readdirSync, rmSync, statSync } from 'fs';
+import { promisify } from 'util';
+
 import type { MCPClientManagerService } from 'mcp/mcp-client-manager.service';
 import type { LLMToolCall, LLMToolDefinition, LLMToolResult } from 'types/llm.types';
 
-import { exec } from 'child_process';
 import { DEFAULT_TIMEOUT_MS } from 'config/constants';
-import { existsSync, readdirSync, rmSync, statSync } from 'fs';
 import { type MCPToolHandler } from 'mcp/mcp-tool-handler';
 import { getColorAdapter } from 'output/color-adapter.interface';
 import { getConsoleOutput } from 'output/console-output';
@@ -33,7 +35,6 @@ import { type IdempotencyOptions, isIdempotentTool } from 'types/idempotency.typ
 import { getServerIdFromTool } from 'types/mcp-registry.types';
 import { SemanticAttributes, SpanKind, type TraceContext } from 'types/tracing.types';
 import { getPromptAdapter } from 'ui/prompt-adapter.interface';
-import { promisify } from 'util';
 import { formatErrorMessage } from 'utils/error-utils';
 import { readFile, writeFile } from 'utils/file-utils';
 import { validateNotForbiddenPath } from 'utils/input-validator';

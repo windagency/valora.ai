@@ -3,12 +3,13 @@
  *
  */
 
-import type { Session } from 'types/session.types';
-
 import * as crypto from 'crypto';
 import * as fs from 'fs/promises';
-import { getLogger } from 'output/logger';
 import * as path from 'path';
+
+import type { Session } from 'types/session.types';
+
+import { getLogger } from 'output/logger';
 import { SessionError } from 'utils/error-handler';
 
 import type { ArchiveAdapter, ArchiveEntry } from './archive-adapter.interface';

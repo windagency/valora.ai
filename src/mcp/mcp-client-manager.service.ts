@@ -5,6 +5,11 @@
  * with lifecycle management, caching, and tool exposure.
  */
 
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import { existsSync } from 'fs';
+import { join, resolve } from 'path';
+
 import type {
 	ConnectedMCPServer,
 	ExternalMCPRegistry,
@@ -14,13 +19,7 @@ import type {
 	ExternalMCPToolCallResult
 } from 'types/mcp-client.types';
 
-// eslint-disable-next-line import/no-unresolved -- SDK exports work at runtime
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-// eslint-disable-next-line import/no-unresolved -- SDK exports work at runtime
-import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-import { existsSync } from 'fs';
 import { getLogger } from 'output/logger';
-import { join, resolve } from 'path';
 import { readFile } from 'utils/file-utils';
 import { getPackageDataDir } from 'utils/paths';
 

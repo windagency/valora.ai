@@ -6,8 +6,9 @@
  */
 
 import { existsSync, readFileSync } from 'fs';
-import { getLogger } from 'output/logger';
 import { dirname, join, resolve } from 'path';
+
+import { getLogger } from 'output/logger';
 import {
 	DOCUMENT_TYPE_CATEGORIES,
 	DOCUMENT_TYPE_DEFAULT_CATEGORY,

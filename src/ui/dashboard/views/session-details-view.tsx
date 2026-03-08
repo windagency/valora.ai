@@ -2,23 +2,22 @@
  * Session Details View - Enhanced with sub-tabs
  */
 
+import React, { useEffect, useState } from 'react';
+
 import type { Session, WorktreeUsageStats } from 'types/session.types';
+import type { SessionSubTab } from 'ui/dashboard/types';
 
 import { getMCPAuditLogger } from 'mcp/mcp-audit-logger.service';
-import React, { useEffect, useState } from 'react';
+import { CommandHistoryPanel } from 'ui/dashboard/detail-panels/command-history-panel';
+import { ExplorationInfoPanel } from 'ui/dashboard/detail-panels/exploration-info-panel';
+import { OptimizationPanel } from 'ui/dashboard/detail-panels/optimization-panel';
+import { QualityPanel } from 'ui/dashboard/detail-panels/quality-panel';
+import { RunningTaskPanel } from 'ui/dashboard/detail-panels/running-task-panel';
+import { SessionInfoPanel } from 'ui/dashboard/detail-panels/session-info-panel';
+import { TokenUsagePanel } from 'ui/dashboard/detail-panels/token-usage-panel';
+import { MCPSessionPanel } from 'ui/dashboard/detail-panels/tool-calls-panel';
+import { WorktreeStatsPanel } from 'ui/dashboard/detail-panels/worktree-stats-panel';
 import { getTUIAdapter } from 'ui/tui-adapter.interface';
-
-import type { SessionSubTab } from '../types';
-
-import { CommandHistoryPanel } from '../detail-panels/command-history-panel';
-import { ExplorationInfoPanel } from '../detail-panels/exploration-info-panel';
-import { OptimizationPanel } from '../detail-panels/optimization-panel';
-import { QualityPanel } from '../detail-panels/quality-panel';
-import { RunningTaskPanel } from '../detail-panels/running-task-panel';
-import { SessionInfoPanel } from '../detail-panels/session-info-panel';
-import { TokenUsagePanel } from '../detail-panels/token-usage-panel';
-import { MCPSessionPanel } from '../detail-panels/tool-calls-panel';
-import { WorktreeStatsPanel } from '../detail-panels/worktree-stats-panel';
 
 const tui = getTUIAdapter();
 // eslint-disable-next-line @typescript-eslint/naming-convention -- Box and Text are React components which require PascalCase

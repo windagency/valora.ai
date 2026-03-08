@@ -5,6 +5,9 @@
  * Tracks approval decisions, connections, tool calls, and errors.
  */
 
+import { existsSync, mkdirSync } from 'fs';
+import { dirname, join, resolve } from 'path';
+
 import type {
 	MCPAuditLogEntry,
 	MCPDashboardMetrics,
@@ -13,9 +16,7 @@ import type {
 	MCPToolBreakdown
 } from 'types/mcp-client.types';
 
-import { existsSync, mkdirSync } from 'fs';
 import { getLogger } from 'output/logger';
-import { dirname, join, resolve } from 'path';
 import { appendFile, readFile } from 'utils/file-utils';
 import { getRuntimeDataDir } from 'utils/paths';
 

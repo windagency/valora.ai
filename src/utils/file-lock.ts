@@ -4,11 +4,12 @@
  * Provides thread-safe file operations for shared volumes across containers
  */
 
+import { promises as fs } from 'fs';
+import * as path from 'path';
+
 import type { FileLock } from 'types/exploration.types';
 
-import { promises as fs } from 'fs';
 import { getLogger } from 'output/logger';
-import * as path from 'path';
 
 const logger = getLogger();
 

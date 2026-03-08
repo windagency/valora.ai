@@ -6,9 +6,10 @@
  * to skip redundant analysis and speed up execution.
  */
 
+import { createHash } from 'crypto';
+
 import type { CommandDefinition, PipelineStage, StageOutput } from 'types/command.types';
 
-import { createHash } from 'crypto';
 import { getLogger } from 'output/logger';
 
 /**

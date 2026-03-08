@@ -5,6 +5,7 @@
  */
 
 import { spawn } from 'child_process';
+
 import { COMMAND_EXISTENCE_CHECK_TIMEOUT_MS, HEALTH_CHECK_INTERVAL_MS } from 'config/constants';
 
 export interface ExecResult {

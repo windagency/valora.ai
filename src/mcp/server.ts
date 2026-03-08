@@ -5,6 +5,8 @@
  * Exposes orchestration commands as MCP tools for Cursor integration
  */
 
+import path from 'path';
+
 import type { CommandExecutor } from 'cli/command-executor';
 import type { CommandLoader } from 'executor/command-loader';
 import type { MCPSamplingOptions, MCPSamplingResult, MCPSamplingService } from 'types/mcp.types';
@@ -12,7 +14,6 @@ import type { MCPSamplingOptions, MCPSamplingResult, MCPSamplingService } from '
 import { getConfigLoader, setGlobalCliOverrides } from 'config/loader';
 import { createContainer, type DIContainer, SERVICE_IDENTIFIERS, setupMCPServices } from 'di/container';
 import { getLogger, type Logger } from 'output/logger';
-import path from 'path';
 import { readJSON } from 'utils/file-utils';
 import { getPackageRoot } from 'utils/paths';
 

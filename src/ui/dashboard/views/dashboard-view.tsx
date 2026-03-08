@@ -3,17 +3,17 @@
  */
 
 import React from 'react';
+
+import type { DashboardData } from 'ui/dashboard/types';
+
+import { ActiveSessionsPanel } from 'ui/dashboard/panels/active-sessions-panel';
+import { BackgroundTasksPanel } from 'ui/dashboard/panels/background-tasks-panel';
+import { MetricsSummaryPanel } from 'ui/dashboard/panels/metrics-summary-panel';
+import { RecentCommandsPanel } from 'ui/dashboard/panels/recent-commands-panel';
+import { MCPMetricsPanel } from 'ui/dashboard/panels/server-metrics-panel';
+import { SystemHealthPanel } from 'ui/dashboard/panels/system-health-panel';
+import { WorktreeDiagramPanel } from 'ui/dashboard/panels/worktree-diagram-panel';
 import { getTUIAdapter } from 'ui/tui-adapter.interface';
-
-import type { DashboardData } from '../types';
-
-import { ActiveSessionsPanel } from '../panels/active-sessions-panel';
-import { BackgroundTasksPanel } from '../panels/background-tasks-panel';
-import { MetricsSummaryPanel } from '../panels/metrics-summary-panel';
-import { RecentCommandsPanel } from '../panels/recent-commands-panel';
-import { MCPMetricsPanel } from '../panels/server-metrics-panel';
-import { SystemHealthPanel } from '../panels/system-health-panel';
-import { WorktreeDiagramPanel } from '../panels/worktree-diagram-panel';
 
 const tui = getTUIAdapter();
 // eslint-disable-next-line @typescript-eslint/naming-convention -- Box and Text are React components which require PascalCase

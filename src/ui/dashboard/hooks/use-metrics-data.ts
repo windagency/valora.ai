@@ -2,10 +2,13 @@
  * Metrics data fetching hook - per-tab data with tiered refresh rates
  */
 
+import { useCallback, useEffect, useRef, useState } from 'react';
+
+import type { DashboardTab, MetricsSummary } from 'ui/dashboard/types';
+
 import { getDryRunCache } from 'executor/dry-run-cache';
 import { getStageOutputCache } from 'executor/stage-output-cache';
 import { getMCPAuditLogger } from 'mcp/mcp-audit-logger.service';
-import { useCallback, useEffect, useRef, useState } from 'react';
 import { type AgentSelectionMetrics, getAgentSelectionAnalytics } from 'services/agent-selection-analytics.service';
 import { SessionStore } from 'session/store';
 import {
@@ -15,8 +18,6 @@ import {
 	type HistogramMetric,
 	type MetricsSnapshot
 } from 'utils/metrics-collector';
-
-import type { DashboardTab, MetricsSummary } from '../types';
 
 export interface AgentAnalyticsData {
 	metrics: AgentSelectionMetrics | null;

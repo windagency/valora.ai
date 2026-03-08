@@ -9,8 +9,9 @@
  * - dynamic commands: runtime-loaded orchestration commands
  */
 
-import { setGlobalCliOverrides } from 'config/loader';
 import { createRequire } from 'node:module';
+
+import { setGlobalCliOverrides } from 'config/loader';
 import { handlePromptCancellation, isPromptCancellation } from 'utils/prompt-handler';
 
 import type { CliOptions } from './types/cli-options.types';

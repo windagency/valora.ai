@@ -7,8 +7,9 @@
 
 import { exec } from 'child_process';
 import * as os from 'os';
-import { getLogger } from 'output/logger';
 import { promisify } from 'util';
+
+import { getLogger } from 'output/logger';
 import { getMetricsCollector } from 'utils/metrics-collector';
 
 const execAsync = promisify(exec);

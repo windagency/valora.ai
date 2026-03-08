@@ -2,13 +2,13 @@
  * MCP Session Panel - Detailed view for session details
  */
 
+import React from 'react';
+
 import type { MCPDashboardMetrics } from 'types/mcp-client.types';
 
 import { Sparkline } from 'exploration/dashboard-metrics';
-import React from 'react';
+import { formatAge } from 'ui/dashboard/utils/format-helpers';
 import { getTUIAdapter } from 'ui/tui-adapter.interface';
-
-import { formatAge } from '../utils/format-helpers';
 
 const tui = getTUIAdapter();
 // eslint-disable-next-line @typescript-eslint/naming-convention -- Box and Text are React components which require PascalCase

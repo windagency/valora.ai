@@ -3,6 +3,7 @@
  */
 
 import React from 'react';
+
 import { getTUIAdapter } from 'ui/tui-adapter.interface';
 
 const tui = getTUIAdapter();

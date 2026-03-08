@@ -2,12 +2,12 @@
  * Worktree Stats Panel
  */
 
+import React from 'react';
+
 import type { WorktreeUsageStats } from 'types/session.types';
 
-import React from 'react';
+import { formatDurationMs } from 'ui/dashboard/utils/format-helpers';
 import { getTUIAdapter } from 'ui/tui-adapter.interface';
-
-import { formatDurationMs } from '../utils/format-helpers';
 
 const tui = getTUIAdapter();
 // eslint-disable-next-line @typescript-eslint/naming-convention -- Box and Text are React components which require PascalCase

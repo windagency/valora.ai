@@ -4,6 +4,9 @@
  * Handles loading and saving exploration state to disk for recovery and tracking
  */
 
+import { promises as fs } from 'fs';
+import * as path from 'path';
+
 import type {
 	Exploration,
 	ExplorationConfig,
@@ -12,8 +15,6 @@ import type {
 	WorktreeExploration
 } from 'types/exploration.types';
 
-import { promises as fs } from 'fs';
-import * as path from 'path';
 import { ensureDir } from 'utils/file-utils';
 import { generateExplorationId } from 'utils/id-generator';
 import { getRuntimeDataDir } from 'utils/paths';

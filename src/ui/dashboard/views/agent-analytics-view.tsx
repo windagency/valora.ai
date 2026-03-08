@@ -2,12 +2,12 @@
  * Agent Analytics View - Agent selection data distributions and success metrics
  */
 
-import type { AgentSelectionMetrics } from 'services/agent-selection-analytics.service';
-
 import React from 'react';
-import { getTUIAdapter } from 'ui/tui-adapter.interface';
 
-import type { AgentAnalyticsData } from '../hooks/use-metrics-data';
+import type { AgentSelectionMetrics } from 'services/agent-selection-analytics.service';
+import type { AgentAnalyticsData } from 'ui/dashboard/hooks/use-metrics-data';
+
+import { getTUIAdapter } from 'ui/tui-adapter.interface';
 
 const tui = getTUIAdapter();
 // eslint-disable-next-line @typescript-eslint/naming-convention -- Box and Text are React components which require PascalCase

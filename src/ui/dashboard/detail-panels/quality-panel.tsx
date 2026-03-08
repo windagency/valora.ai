@@ -2,10 +2,11 @@
  * Quality Panel - Per-command quality metrics
  */
 
+import React from 'react';
+
 import type { QualityMetrics, Session, SessionCommand } from 'types/session.types';
 
 import { Sparkline } from 'exploration/dashboard-metrics';
-import React from 'react';
 import { getTUIAdapter } from 'ui/tui-adapter.interface';
 
 const tui = getTUIAdapter();

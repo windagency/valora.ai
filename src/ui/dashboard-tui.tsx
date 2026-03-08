@@ -5,9 +5,9 @@
  * Root shell that composes modular components from ./dashboard/
  */
 
-import type { Session } from 'types/session.types';
-
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+
+import type { Session } from 'types/session.types';
 
 import type { DashboardTab } from './dashboard/types';
 

@@ -10,10 +10,11 @@
  * - PROJECT KNOWLEDGE (knowledge-base/*) - Selectively loaded per command to save tokens
  */
 
+import * as path from 'path';
+
 import { getColorAdapter } from 'output/color-adapter.interface';
 import { getLogger } from 'output/logger';
 import { getProcessingFeedback } from 'output/processing-feedback';
-import * as path from 'path';
 import { dirExists, fileExists, readFile } from 'utils/file-utils';
 import { getPackageRoot } from 'utils/paths';
 

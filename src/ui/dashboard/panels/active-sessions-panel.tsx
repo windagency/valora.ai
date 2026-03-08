@@ -2,13 +2,13 @@
  * Active Sessions Panel
  */
 
+import React from 'react';
+
 import type { SessionSummary } from 'types/session.types';
 
-import React from 'react';
+import { formatAge, getContextColor } from 'ui/dashboard/utils/format-helpers';
 import { getTUIAdapter } from 'ui/tui-adapter.interface';
 import { formatNumber } from 'utils/number-format';
-
-import { formatAge, getContextColor } from '../utils/format-helpers';
 
 const tui = getTUIAdapter();
 // eslint-disable-next-line @typescript-eslint/naming-convention -- Box and Text are React components which require PascalCase

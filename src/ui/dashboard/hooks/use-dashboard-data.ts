@@ -2,13 +2,14 @@
  * Dashboard data fetching hook
  */
 
+import { useCallback, useState } from 'react';
+
+import type { BackgroundTask, DashboardData, RecentCommand, WorktreeDiagramEntry } from 'ui/dashboard/types';
+
 import { ExplorationStateManager } from 'exploration/exploration-state';
 import { WorktreeManager } from 'exploration/worktree-manager';
 import { getMCPAuditLogger } from 'mcp/mcp-audit-logger.service';
-import { useCallback, useState } from 'react';
 import { SessionStore } from 'session/store';
-
-import type { BackgroundTask, DashboardData, RecentCommand, WorktreeDiagramEntry } from '../types';
 
 const INITIAL_DATA: DashboardData = {
 	activeSessions: [],

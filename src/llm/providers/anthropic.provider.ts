@@ -9,17 +9,18 @@
  * Self-registers with the LLM Provider Registry using dependency inversion pattern
  */
 
-import type { LLMCompletionOptions, LLMCompletionResult, LLMMessage } from 'types/llm.types';
-
 import Anthropic from '@anthropic-ai/sdk';
 import { AnthropicVertex } from '@anthropic-ai/vertex-sdk';
+import { createHash } from 'crypto';
+import { Agent as UndiciAgent, fetch as undiciFetch } from 'undici';
+
+import type { LLMCompletionOptions, LLMCompletionResult, LLMMessage } from 'types/llm.types';
+
 import { DEFAULT_MAX_TOKENS } from 'config/constants';
 import { getProviderModels, ProviderName } from 'config/providers.config';
-import { createHash } from 'crypto';
 import { getModelMappingRegistry, type ModelMappingRegistry } from 'llm/model-mapping-registry';
 import { BaseLLMProvider } from 'llm/provider.interface';
 import { getProviderRegistry } from 'llm/registry';
-import { Agent as UndiciAgent, fetch as undiciFetch } from 'undici';
 import { createErrorContext, ProviderError, withCircuitBreaker, withRetry } from 'utils/error-handler';
 import { checkRateLimit, getRateLimitStatus } from 'utils/rate-limiter';
 

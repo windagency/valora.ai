@@ -98,9 +98,8 @@ describe('AgentCapabilityMatcherService', () => {
 			expect(scores[0].capability).toBeDefined();
 
 			// Should be sorted by score descending
-			for (let i = 1; i < scores.length; i++) {
-				expect(scores[i - 1].score).toBeGreaterThanOrEqual(scores[i].score);
-			}
+			expect(scores.length).toBeGreaterThan(0);
+			expect(scores.every((score, i) => i === 0 || scores[i - 1]!.score >= score.score)).toBe(true);
 		});
 
 		it('should apply confidence multiplier to final scores', async () => {
@@ -124,9 +123,8 @@ describe('AgentCapabilityMatcherService', () => {
 			const scores = await matcher.scoreAgents(taskClassification, context);
 
 			// All scores should be <= 0.5 due to confidence multiplier
-			scores.forEach((score) => {
-				expect(score.score).toBeLessThanOrEqual(0.5);
-			});
+			expect(scores.length).toBeGreaterThan(0);
+			expect(scores.every((score) => score.score <= 0.5)).toBe(true);
 		});
 
 		it('should handle empty agent list', async () => {
@@ -226,13 +224,13 @@ describe('AgentCapabilityMatcherService', () => {
 		it('should generate meaningful scoring reasons', async () => {
 			const scores = await matcher.scoreAgents(baseTaskClassification, baseContext);
 
-			scores.forEach((score) => {
-				expect(score.reasons).toBeInstanceOf(Array);
-				expect(score.reasons.length).toBeGreaterThan(0);
-				expect(
+			expect(scores.length).toBeGreaterThan(0);
+			expect(scores.every((score) => Array.isArray(score.reasons) && score.reasons.length > 0)).toBe(true);
+			expect(
+				scores.every((score) =>
 					score.reasons.some((r) => r.includes('domain') || r.includes('expertise') || r.includes('priority'))
-				).toBe(true);
-			});
+				)
+			).toBe(true);
 		});
 	});
 

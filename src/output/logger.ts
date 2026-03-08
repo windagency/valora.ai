@@ -2,6 +2,8 @@
  * Structured logging system
  */
 
+import * as path from 'path';
+
 import type * as CleanupCoordinatorModule from 'cleanup/coordinator';
 import type * as ConfigLoaderModule from 'config/loader';
 import type { LogEntry, LogLevel } from 'types/logger.types';
@@ -15,7 +17,6 @@ import {
 	LOG_FILE_PREFIX,
 	MCP_ID
 } from 'config/constants';
-import * as path from 'path';
 import { sanitizeForLogging } from 'utils/data-sanitizer';
 import { appendFile, fileExists, getFileStats } from 'utils/file-utils';
 import { getRuntimeDataDir } from 'utils/paths';

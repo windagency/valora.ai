@@ -4,6 +4,8 @@
  * MAINT-002: Large Files Need Splitting - Extracted from pipeline.ts
  */
 
+import { existsSync } from 'fs';
+
 import type { AgentDefinition } from 'types/agent.types';
 import type { PipelineStage, StageOutput } from 'types/command.types';
 import type { EscalationContext, EscalationSignal } from 'types/escalation.types';
@@ -18,7 +20,6 @@ import type { PromptDefinition } from 'types/prompt.types';
 
 import { DEFAULT_MAX_TOKENS, DEFAULT_TEMPERATURE } from 'config/constants';
 import { ProviderName } from 'config/providers.config';
-import { existsSync } from 'fs';
 import { MCPApprovalCacheService } from 'mcp/mcp-approval-cache.service';
 import { MCPApprovalWorkflow } from 'mcp/mcp-approval-workflow';
 import { MCPAuditLoggerService } from 'mcp/mcp-audit-logger.service';

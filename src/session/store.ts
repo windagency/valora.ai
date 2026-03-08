@@ -2,12 +2,13 @@
  * Session store - file-based persistence
  */
 
+import * as path from 'path';
+
 import type * as CleanupCoordinatorModule from 'cleanup/coordinator';
 import type { Session, SessionCommand, SessionSummary } from 'types/session.types';
 
 import { SESSION_CLEANUP_DAYS } from 'config/constants';
 import { getLogger } from 'output/logger';
-import * as path from 'path';
 import { decryptSessionData, encryptSessionData } from 'utils/encryption';
 import { SessionError } from 'utils/error-handler';
 import { ensureDir, listFiles, readJSON, writeFile } from 'utils/file-utils';

@@ -4,11 +4,11 @@
  * Performs comprehensive safety checks before starting an exploration
  */
 
-import type { GitState, ResourceAvailability, SafetyCheck, SafetyValidation } from 'types/exploration.types';
-
 import { exec } from 'child_process';
 import * as os from 'os';
 import { promisify } from 'util';
+
+import type { GitState, ResourceAvailability, SafetyCheck, SafetyValidation } from 'types/exploration.types';
 
 const execAsync = promisify(exec);
 

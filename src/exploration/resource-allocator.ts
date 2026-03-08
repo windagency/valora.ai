@@ -4,9 +4,9 @@
  * Manages resource allocation to prevent conflicts between parallel explorations
  */
 
-import type { AllocatedResources } from 'types/exploration.types';
-
 import { execSync } from 'child_process';
+
+import type { AllocatedResources } from 'types/exploration.types';
 
 export interface AllocationRequest {
 	cpu_limit: string; // e.g., "1.5"

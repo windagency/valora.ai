@@ -12,8 +12,9 @@
 
 import { createHash } from 'crypto';
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from 'fs';
-import { getLogger } from 'output/logger';
 import { join, join as pathJoin } from 'path';
+
+import { getLogger } from 'output/logger';
 import { getRuntimeDataDir } from 'utils/paths';
 
 /**

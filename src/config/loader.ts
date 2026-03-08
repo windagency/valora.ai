@@ -3,6 +3,7 @@
  */
 
 import * as path from 'path';
+
 import { ConfigurationError } from 'utils/error-handler';
 import { formatErrorMessage } from 'utils/error-utils';
 import { ensureDir, fileExists, readJSON, writeJSON } from 'utils/file-utils';

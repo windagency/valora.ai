@@ -2,10 +2,11 @@
  * Token Usage Panel - Token usage breakdown + trend
  */
 
+import React from 'react';
+
 import type { Session } from 'types/session.types';
 
 import { Sparkline } from 'exploration/dashboard-metrics';
-import React from 'react';
 import { getTUIAdapter } from 'ui/tui-adapter.interface';
 import { formatNumber } from 'utils/number-format';
 

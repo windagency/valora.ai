@@ -2,11 +2,12 @@
  * Performance View - MetricsCollector data: counters, gauges, histograms
  */
 
-import { ResourceGauge, Sparkline } from 'exploration/dashboard-metrics';
 import React from 'react';
-import { getTUIAdapter } from 'ui/tui-adapter.interface';
 
-import type { PerformanceData } from '../hooks/use-metrics-data';
+import type { PerformanceData } from 'ui/dashboard/hooks/use-metrics-data';
+
+import { ResourceGauge, Sparkline } from 'exploration/dashboard-metrics';
+import { getTUIAdapter } from 'ui/tui-adapter.interface';
 
 const tui = getTUIAdapter();
 // eslint-disable-next-line @typescript-eslint/naming-convention -- Box and Text are React components which require PascalCase

@@ -4,10 +4,11 @@
  * Coordinates the entire exploration lifecycle from initialization to cleanup
  */
 
+import * as path from 'path';
+
 import type { Exploration, ExplorationConfig, ExplorationSummary, WorktreeExploration } from 'types/exploration.types';
 
 import { getLogger } from 'output/logger';
-import * as path from 'path';
 
 import { ContainerManager } from './container-manager';
 import { createExecutionStrategy, type ExecutionContext, type ExecutionResult } from './execution-modes';

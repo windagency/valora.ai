@@ -5,18 +5,16 @@
  * Separated from MCPOrchestratorServer for better modularity.
  */
 
-import type { Logger } from 'output/logger';
-
 import fastifyCors from '@fastify/cors';
 import fastifyHelmet from '@fastify/helmet';
-// eslint-disable-next-line import/no-unresolved -- .js extensions required for ESM compatibility
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-// eslint-disable-next-line import/no-unresolved -- .js extensions required for ESM compatibility
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
-// eslint-disable-next-line import/no-unresolved -- .js extensions required for ESM compatibility
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { MCP_ID } from 'config/constants';
 import Fastify, { type FastifyInstance } from 'fastify';
+
+import type { Logger } from 'output/logger';
+
+import { MCP_ID } from 'config/constants';
 
 export class MCPServerManager {
 	private httpServer: FastifyInstance | null = null;

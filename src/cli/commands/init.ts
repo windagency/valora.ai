@@ -2,11 +2,12 @@
  * Init command - initializes a project-level .valora/ configuration directory
  */
 
+import * as fs from 'fs';
+import * as path from 'path';
+
 import type { CommandAdapter } from 'cli/command-adapter.interface';
 
-import * as fs from 'fs';
 import { getColorAdapter } from 'output/color-adapter.interface';
-import * as path from 'path';
 
 interface InitOptions extends Record<string, unknown> {
 	full?: boolean;

@@ -1,6 +1,7 @@
 import js from '@eslint/js';
 import tseslint from '@typescript-eslint/eslint-plugin';
 import tsparser from '@typescript-eslint/parser';
+import checkFile from 'eslint-plugin-check-file';
 import prettierConfig from 'eslint-config-prettier';
 import importPlugin from 'eslint-plugin-import';
 import perfectionist from 'eslint-plugin-perfectionist';
@@ -55,6 +56,7 @@ export default [
 		},
 		plugins: {
 			'@typescript-eslint': tseslint,
+			'check-file': checkFile,
 			import: importPlugin,
 			prettier: prettierPlugin,
 			sort: sortPlugin,
@@ -65,6 +67,13 @@ export default [
 			// ESLint recommended rules
 			...js.configs.recommended.rules,
 
+			// File naming convention: kebab-case for all source files
+			'check-file/filename-naming-convention': [
+				'error',
+				{ '**/*.{ts,tsx}': 'KEBAB_CASE' },
+				{ ignoreMiddleExtensions: true }
+			],
+
 			// Import rules
 			'import/first': 'error',
 			'import/newline-after-import': 'error',
@@ -72,10 +81,12 @@ export default [
 			'import/no-cycle': 'error',
 			'import/no-duplicates': 'error',
 			'import/no-relative-packages': 'error',
-			// 'import/no-relative-parent-imports': 'error',
 			'import/no-self-import': 'error',
 			'import/no-unresolved': 'error',
 			'import/no-useless-path-segments': 'error',
+
+			// Forbid literal relative parent imports (../../foo) while allowing path aliases
+			'no-restricted-imports': ['error', { patterns: ['../**'] }],
 
 			// ESLint rules
 			complexity: ['error', 10],
@@ -204,7 +215,9 @@ export default [
 						'unknown'
 					],
 					ignoreCase: true,
-					internalPattern: ['^src/.+'],
+					internalPattern: [
+						'^(?:cleanup|cli|config|di|executor|exploration|llm|mcp|output|services|session|src|types|ui|utils)/.+'
+					],
 					maxLineLength: undefined,
 					newlinesBetween: 'always',
 					order: 'asc',
@@ -322,9 +335,9 @@ export default [
 		settings: {
 			// Tells eslint how to resolve imports
 			'import/resolver': {
-				node: {
-					extensions: ['.js', '.jsx', '.mjs', '.cjs', '.ts', '.tsx'],
-					paths: ['src']
+				typescript: {
+					alwaysTryTypes: true,
+					project: './tsconfig.json'
 				}
 			},
 			perfectionist: {

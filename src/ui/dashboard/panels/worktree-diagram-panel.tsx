@@ -3,11 +3,11 @@
  */
 
 import React from 'react';
+
+import type { WorktreeDiagramEntry } from 'ui/dashboard/types';
+
+import { getExplorationStatusColor, getWorktreeStatusIcon } from 'ui/dashboard/utils/format-helpers';
 import { getTUIAdapter } from 'ui/tui-adapter.interface';
-
-import type { WorktreeDiagramEntry } from '../types';
-
-import { getExplorationStatusColor, getWorktreeStatusIcon } from '../utils/format-helpers';
 
 const tui = getTUIAdapter();
 // eslint-disable-next-line @typescript-eslint/naming-convention -- Box and Text are React components which require PascalCase
