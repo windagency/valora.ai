@@ -644,6 +644,7 @@ export class StageExecutor {
 
 	/**
 	 * Execute a single LLM iteration
+	 * If the prompt is too long, compresses older tool results and retries once
 	 */
 	private async executeLLMIteration(
 		executionContext: ExecutionContext,
@@ -663,10 +664,54 @@ export class StageExecutor {
 			modelOverride,
 			modeOverride
 		);
-		const completion = await executionContext.provider.complete(completionOptions);
 
-		this.logLLMResponse(logger, completion);
-		return completion;
+		try {
+			const completion = await executionContext.provider.complete(completionOptions);
+			this.logLLMResponse(logger, completion);
+			return completion;
+		} catch (error) {
+			if (this.isPromptTooLongError(error)) {
+				logger.warn('Prompt too long — compressing tool results in message history and retrying', {
+					iteration,
+					messageCount: messages.length
+				});
+				const compressedMessages = this.compressToolResults(messages);
+				completionOptions.messages = compressedMessages;
+				const completion = await executionContext.provider.complete(completionOptions);
+				this.logLLMResponse(logger, completion);
+				return completion;
+			}
+			throw error;
+		}
+	}
+
+	/**
+	 * Check whether an error is an LLM "prompt too long" / context-length error
+	 */
+	private isPromptTooLongError(error: unknown): boolean {
+		const message = (error as Error | undefined)?.message ?? '';
+		return (
+			message.includes('prompt is too long') ||
+			message.includes('maximum context length') ||
+			message.includes('context_length_exceeded') ||
+			message.includes('tokens > ')
+		);
+	}
+
+	/**
+	 * Compress message history by replacing old tool results with a placeholder.
+	 * Keeps the system message, first user message, and the most recent 4 messages intact.
+	 */
+	private compressToolResults(messages: LLMMessage[]): LLMMessage[] {
+		const KEEP_RECENT = 4;
+		const cutoff = messages.length - KEEP_RECENT;
+
+		return messages.map((msg, i) => {
+			if (msg.role === 'tool' && i < cutoff) {
+				return { ...msg, content: '[Tool result omitted to reduce context length]' };
+			}
+			return msg;
+		});
 	}
 
 	/**
@@ -847,9 +892,26 @@ Summarize ALL changes you made during tool execution. Output ONLY the JSON code 
 
 	/**
 	 * Format a tool result for the conversation
+	 * Truncates large results to prevent exceeding LLM context limits
 	 */
 	private formatToolResult(result: LLMToolResult): string {
-		return result.output;
+		const output = result.output;
+		const MAX_TOOL_RESULT_CHARS = 100_000;
+
+		if (output.length > MAX_TOOL_RESULT_CHARS) {
+			const logger = getLogger();
+			logger.warn('Tool result truncated due to length', {
+				originalLength: output.length,
+				toolCallId: result.tool_call_id,
+				truncatedLength: MAX_TOOL_RESULT_CHARS
+			});
+			return (
+				output.substring(0, MAX_TOOL_RESULT_CHARS) +
+				`\n\n[... truncated: ${output.length - MAX_TOOL_RESULT_CHARS} additional characters omitted due to context length limits ...]`
+			);
+		}
+
+		return output;
 	}
 
 	/**
