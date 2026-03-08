@@ -16,9 +16,11 @@ export default [
 	{
 		ignores: [
 			'.pnpm-store/**',
+			'.stryker-tmp/**',
 			'coverage/**',
 			'dist/**',
 			'node_modules/**',
+			'reportss/**',
 			'tests/**',
 			'__tests__/**',
 			'**/*.spec.ts',
