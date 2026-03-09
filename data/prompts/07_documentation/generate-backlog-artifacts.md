@@ -191,6 +191,20 @@ Create `knowledge-base/BACKLOG.md` with following structure:
 
 ---
 
+## 🚦 Stage Gates
+
+Stage gates are mandatory checkpoints between phases. Each gate defines the review and test criteria that MUST pass before the next phase begins.
+
+| Gate                 | After Phase   | Review Focus                                        | Automated Tests Required                     | Key Manual Tests                                      |
+| -------------------- | ------------- | --------------------------------------------------- | -------------------------------------------- | ----------------------------------------------------- |
+| **Gate 0 → 1**       | Foundation    | Infra up, CI/CD green, core models merged           | Unit tests, lint, smoke test                 | Fresh env setup, DB schema check, config validation   |
+| **Gate 1 → 2**       | Core Backend  | APIs documented, auth working, data layer tested    | Integration tests, API contract validation   | API explorer walkthrough, auth flow, edge-case inputs |
+| **Gate 2 → 3**       | Core Frontend | UI components reviewed, mock API removed            | Component tests, visual regression baseline  | Cross-browser walkthrough, accessibility, forms       |
+| **Gate 3 → 4**       | Integration   | E2E flows verified, third-party integrations stable | E2E suite green, load test baseline          | Core user journeys, role-based access, rollback drill |
+| **Gate 4 → Release** | Quality       | Security audit done, docs complete, SLOs met        | Full regression pass, performance benchmarks | Runbook walkthrough, monitoring alert drill, sec spot |
+
+---
+
 ## 📋 Complete Task List
 
 ### Phase 0: Foundation
@@ -228,6 +242,189 @@ Create `knowledge-base/BACKLOG.md` with following structure:
 - [Docs updates needed]
 
 ---
+
+> ### 🔍 Stage Gate 0 → 1: Foundation Review
+>
+> **Must pass before starting Phase 1.**
+>
+> **Exit Criteria**:
+>
+> - [ ] All Phase 0 tasks marked Done
+> - [ ] CI/CD pipeline green on main branch
+> - [ ] Development environment reproducible from scratch (README verified)
+> - [ ] Core data models reviewed and approved
+> - [ ] Base infrastructure deployed to staging
+>
+> **Tests Required**:
+>
+> - [ ] All unit tests pass (`pnpm test:suite:unit` or equivalent)
+> - [ ] Linting and type checks clean
+> - [ ] Smoke test: application starts without errors
+>
+> **🧑 Manual Testing — How to verify as a human**:
+>
+> 1. **Fresh environment setup**: Clone the repo on a clean machine (or container), follow the README step by step, and confirm the app starts with no extra steps needed. Note any missing instructions.
+> 2. **Database / schema check**: Connect to the local database with a GUI tool (e.g. TablePlus, pgAdmin, DBeaver) and verify all core tables/collections exist with the expected columns and constraints.
+> 3. **CI/CD pipeline**: Open the CI dashboard (GitHub Actions, GitLab CI, etc.), trigger a build on main, and confirm it completes green end-to-end.
+> 4. **Infrastructure smoke test**: Open the staging URL in a browser and confirm the application responds (200 OK on `/health` or equivalent). Check logs for startup errors.
+> 5. **Config & secrets**: Verify `.env.example` is up-to-date and that the app refuses to start with a missing required variable (test by removing one value).
+>
+> **Reviewers**: Tech Lead + Product Owner
+>
+> ---
+
+### Phase 1: Core Backend
+
+[Tasks grouped by phase — repeat task format from Phase 0]
+
+---
+
+> ### 🔍 Stage Gate 1 → 2: Backend Review
+>
+> **Must pass before starting Phase 2.**
+>
+> **Exit Criteria**:
+>
+> - [ ] All Phase 1 tasks marked Done
+> - [ ] All API endpoints documented (OpenAPI/Swagger or equivalent)
+> - [ ] Authentication and authorization working end-to-end
+> - [ ] Data layer integration tested
+>
+> **Tests Required**:
+>
+> - [ ] Integration tests pass for all backend services
+> - [ ] API contract validated (schema tests or consumer-driven contracts)
+> - [ ] Security review: no critical vulnerabilities in backend
+>
+> **🧑 Manual Testing — How to verify as a human**:
+>
+> 1. **API explorer**: Open the Swagger/OpenAPI UI (e.g. `http://localhost:3000/api-docs`) and call each endpoint manually. Verify responses match the documented schema, including error cases (missing fields, wrong types).
+> 2. **Authentication flow**: Using a REST client (Postman, Insomnia, or `curl`):
+>    - Register a new user → confirm 201 and token returned.
+>    - Log in with valid credentials → confirm token.
+>    - Call a protected endpoint without a token → confirm 401.
+>    - Call with an expired/invalid token → confirm 401.
+>    - Call with a token that lacks the required role → confirm 403.
+> 3. **Data persistence**: Create a resource via the API, restart the server, then fetch it again and confirm it persists correctly.
+> 4. **Edge cases**: Send payloads with missing required fields, extra unknown fields, and boundary values (empty strings, very long strings, negative numbers) — confirm the API returns consistent, descriptive 4xx errors.
+> 5. **Logs review**: Tail the server logs during the above steps and confirm no unexpected stack traces or unhandled errors appear.
+>
+> **Reviewers**: Tech Lead + Security Reviewer
+>
+> ---
+
+### Phase 2: Core Frontend
+
+[Tasks grouped by phase — repeat task format from Phase 0]
+
+---
+
+> ### 🔍 Stage Gate 2 → 3: Frontend Review
+>
+> **Must pass before starting Phase 3.**
+>
+> **Exit Criteria**:
+>
+> - [ ] All Phase 2 tasks marked Done
+> - [ ] All UI components reviewed (UX sign-off)
+> - [ ] Mock API removed or feature-flagged off
+> - [ ] Accessibility baseline met (WCAG AA minimum)
+>
+> **Tests Required**:
+>
+> - [ ] Component/unit tests pass for all UI components
+> - [ ] Visual regression baseline captured
+> - [ ] Cross-browser smoke test (latest Chrome, Firefox, Safari)
+>
+> **🧑 Manual Testing — How to verify as a human**:
+>
+> 1. **Visual walkthrough**: Open the app in Chrome, Firefox, and Safari. Navigate through every screen implemented so far. Compare against design mockups (Figma/Zeplin) and flag visual discrepancies.
+> 2. **Responsive layout**: Resize the browser window (or use DevTools device emulation) across mobile (375px), tablet (768px), and desktop (1280px+). Confirm no layout breaks or overflow.
+> 3. **Mock API removed**: Open DevTools → Network tab. Perform key user actions and confirm all requests hit a real backend URL, not localhost mock handlers or hardcoded JSON fixtures.
+> 4. **Accessibility check**: Using the browser's built-in accessibility tree (Chrome DevTools → Accessibility) or the axe DevTools extension, run a scan on each main page and confirm no critical violations.
+> 5. **Keyboard navigation**: Tab through every interactive element on each screen. Confirm focus is always visible and logical order is maintained. Test Enter/Space to activate buttons and links.
+> 6. **Form validation**: Submit every form with empty fields, invalid formats (bad email, short password), and boundary values. Confirm inline error messages appear and are screen-reader-friendly (aria-describedby).
+>
+> **Reviewers**: Tech Lead + UX Designer + Product Owner
+>
+> ---
+
+### Phase 3: Integration & Features
+
+[Tasks grouped by phase — repeat task format from Phase 0]
+
+---
+
+> ### 🔍 Stage Gate 3 → 4: Integration Review
+>
+> **Must pass before starting Phase 4.**
+>
+> **Exit Criteria**:
+>
+> - [ ] All Phase 3 tasks marked Done
+> - [ ] All major E2E user flows verified in staging
+> - [ ] Third-party integrations stable (no critical failures in 48h)
+> - [ ] Feature completeness sign-off from Product Owner
+>
+> **Tests Required**:
+>
+> - [ ] Full E2E test suite green in staging environment
+> - [ ] Load test baseline established (define SLOs)
+> - [ ] Rollback procedure verified
+>
+> **🧑 Manual Testing — How to verify as a human**:
+>
+> 1. **Core user journeys** (walk through each as a real user on staging):
+>    - Happy path: complete the primary workflow from start to finish (e.g. sign up → configure → use main feature → sign out).
+>    - Error recovery: simulate failures mid-flow (e.g. disconnect network, submit invalid data) and confirm the app recovers gracefully without data loss.
+>    - Re-entry: leave mid-flow, return later, and confirm state is preserved where expected.
+> 2. **Third-party integrations**: Trigger each external integration manually (e.g. send a payment, fire a webhook, receive an email). Confirm the expected side-effect occurs and the UI reflects the outcome.
+> 3. **Cross-feature interactions**: Test features that share data or state — confirm changes in one area are correctly reflected elsewhere (e.g. update a profile → verify the header avatar updates).
+> 4. **Role-based access**: Log in as each user role (admin, regular user, read-only, etc.) and confirm each role sees only the features and data it should.
+> 5. **Rollback drill**: Follow the documented rollback procedure in a staging environment. Confirm the previous version is restored and data integrity is maintained. Record the time taken.
+>
+> **Reviewers**: Tech Lead + Product Owner + QA Lead
+>
+> ---
+
+### Phase 4: Quality & Production Readiness
+
+[Tasks grouped by phase — repeat task format from Phase 0]
+
+---
+
+> ### 🔍 Stage Gate 4 → Release: Production Readiness Review
+>
+> **Must pass before production release.**
+>
+> **Exit Criteria**:
+>
+> - [ ] All Phase 4 tasks marked Done
+> - [ ] Security audit completed (no critical/high findings open)
+> - [ ] User documentation complete and reviewed
+> - [ ] SLOs defined and monitoring dashboards live
+> - [ ] On-call runbook written
+>
+> **Tests Required**:
+>
+> - [ ] Full regression suite passes on production-like environment
+> - [ ] Performance benchmarks meet SLOs (latency, throughput, error rate)
+> - [ ] Disaster recovery / backup restore tested
+>
+> **🧑 Manual Testing — How to verify as a human**:
+>
+> 1. **Full regression walkthrough**: Using the production-like environment, walk through every major user flow end-to-end as a first-time user. Use the user documentation as your only guide — if the docs are unclear or incomplete, flag them.
+> 2. **Performance feel**: Navigate through the app and note any screen that feels slow to load or interact with. Open DevTools → Network and Performance tabs. Flag any page load > 3s or interaction > 300ms for investigation.
+> 3. **Monitoring & alerting**: Trigger a known error (e.g. call a bad endpoint, simulate a slow query) and confirm:
+>    - The error appears in the monitoring dashboard within 1–2 minutes.
+>    - The configured alert fires (Slack, PagerDuty, email, etc.).
+> 4. **Security spot check**: As a logged-in user, manually attempt to access another user's data by modifying IDs in URLs or request bodies. Confirm the API returns 403/404 and does not leak data.
+> 5. **Backup restore drill**: Restore the latest backup to an isolated environment. Confirm the app starts, data is intact, and the most recent known records are present.
+> 6. **Runbook walkthrough**: A team member who did NOT write the runbook follows it cold to simulate an on-call incident. Note any steps that are unclear, missing, or outdated.
+>
+> **Reviewers**: Tech Lead + Security + Product Owner + Ops/DevOps
+>
+> ---
 
 [Repeat for all tasks, grouped by phase]
 
