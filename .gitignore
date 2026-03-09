@@ -288,3 +288,5 @@ dist/
 # Mutation testing
 .stryker-tmp/
 reports/
+# Bundled CLI tools (populated by postinstall)
+vendor/

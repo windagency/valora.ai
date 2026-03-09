@@ -19,6 +19,8 @@
 
 import { exec } from 'child_process';
 import { existsSync, readdirSync, rmSync, statSync } from 'fs';
+import { dirname, resolve } from 'path';
+import { fileURLToPath } from 'url';
 import { promisify } from 'util';
 
 import type { MCPClientManagerService } from 'mcp/mcp-client-manager.service';
@@ -53,6 +55,14 @@ import { getSearchToolsService, type SearchToolsService } from './tools/search-t
 import { getSessionToolsService, type SessionToolsService } from './tools/session-tools.service';
 
 const execAsync = promisify(exec);
+
+/**
+ * Path to the vendor/bin directory bundled with this package.
+ * Populated at install time by scripts/postinstall.mjs.
+ * This file is compiled to dist/executor/, so ../../vendor/bin reaches
+ * the package root's vendor/bin directory.
+ */
+const VENDOR_BIN = resolve(dirname(fileURLToPath(import.meta.url)), '../../vendor/bin');
 
 /**
  * Tool definitions for the LLM (built-in tools only)
@@ -345,6 +355,12 @@ export class ToolExecutionService {
 	 * preventing blind overwrites while still allowing intentional updates.
 	 */
 	private readonly readFiles: Set<string> = new Set();
+
+	/**
+	 * Cached result of rg (ripgrep) availability check.
+	 * null = not yet checked, true/false = result of check.
+	 */
+	private rgAvailableCache: boolean | null = null;
 
 	/**
 	 * Dry-run mode flag
@@ -1159,11 +1175,87 @@ export class ToolExecutionService {
 	}
 
 	/**
-	 * Build a PATH string that includes user-local bin directories.
-	 * Tools installed via install-cli-tools.sh (rg, fd, jq, etc.) land in
-	 * ~/.local/bin, which is only added to PATH by ~/.bashrc — not loaded in
-	 * non-interactive shells. Prepending these dirs ensures they are always
-	 * available regardless of how valora was started.
+	 * Check whether rg (ripgrep) is available in the augmented PATH.
+	 * Result is cached so the check only runs once per service instance.
+	 */
+	private async checkRgAvailable(): Promise<boolean> {
+		if (this.rgAvailableCache !== null) return this.rgAvailableCache;
+		try {
+			await execAsync('command -v rg', {
+				env: { ...process.env, PATH: this.buildAugmentedPath() },
+				timeout: 3000
+			});
+			this.rgAvailableCache = true;
+		} catch {
+			this.rgAvailableCache = false;
+		}
+		return this.rgAvailableCache;
+	}
+
+	/**
+	 * Translate an `rg` command to an equivalent `grep` command.
+	 * Called when ripgrep is not available on the user's system.
+	 * Handles the flag subset the LLM is instructed to use.
+	 */
+	private static translateRgToGrep(command: string): string {
+		const EXCLUDES = [
+			'--exclude-dir=node_modules',
+			'--exclude-dir=.git',
+			'--exclude-dir=dist',
+			'--exclude-dir=build',
+			'--exclude-dir=.valora'
+		].join(' ');
+
+		let rest = command.slice(3).trim(); // strip leading 'rg'
+		const flags: string[] = ['-r', '-n'];
+
+		// -l / --files-with-matches
+		if (/(?:^|\s)(?:-l|--files-with-matches)(?:\s|$)/.test(rest)) {
+			flags.push('-l');
+			rest = rest.replace(/\s*(?:-l|--files-with-matches)\b/, '');
+		}
+		// -i / --ignore-case
+		if (/(?:^|\s)(?:-i|--ignore-case)(?:\s|$)/.test(rest)) {
+			flags.push('-i');
+			rest = rest.replace(/\s*(?:-i|--ignore-case)\b/, '');
+		}
+		// -A N (after context)
+		const aMatch = rest.match(/\s*-A\s+(\d+)/);
+		if (aMatch?.[1]) {
+			flags.push('-A', aMatch[1]);
+			rest = rest.replace(/\s*-A\s+\d+/, '');
+		}
+		// -B N (before context)
+		const bMatch = rest.match(/\s*-B\s+(\d+)/);
+		if (bMatch?.[1]) {
+			flags.push('-B', bMatch[1]);
+			rest = rest.replace(/\s*-B\s+\d+/, '');
+		}
+		// -C N (context)
+		const cMatch = rest.match(/\s*-C\s+(\d+)/);
+		if (cMatch?.[1]) {
+			flags.push('-C', cMatch[1]);
+			rest = rest.replace(/\s*-C\s+\d+/, '');
+		}
+		// Strip flags with no grep equivalent
+		rest = rest
+			.replace(/\s*(?:-n|--line-number)\b/, '') // already in flags
+			.replace(/\s*--json\b/, '') // no structured-output equivalent
+			.replace(/\s*--glob\s+\S+/, '') // complex include pattern, skip
+			.replace(/\s*--[\w-]+=?\S*/g, ''); // any remaining -- flags
+
+		const body = rest.trim();
+		// If body ends with a quoted pattern (no path following), default to current dir
+		const needsPath = /['"]$/.test(body);
+		return `grep ${flags.join(' ')} ${EXCLUDES} ${body}${needsPath ? ' .' : ''}`;
+	}
+
+	/**
+	 * Build a PATH string that includes the package-local vendor/bin directory
+	 * (populated by scripts/postinstall.mjs) and user-local bin directories.
+	 *
+	 * VENDOR_BIN takes priority so the pinned tool versions bundled with valora
+	 * are used instead of whatever happens to be on the user's system PATH.
 	 *
 	 * Compatible with Linux, macOS, Windows, and devcontainer environments.
 	 */
@@ -1173,28 +1265,42 @@ export class ToolExecutionService {
 
 		if (isWindows) {
 			const home = process.env['USERPROFILE'] ?? process.env['HOME'] ?? 'C:\\Users\\node';
-			const extras = [`${home}\\AppData\\Roaming\\npm`, `${home}\\AppData\\Local\\pnpm`];
+			const extras = [VENDOR_BIN, `${home}\\AppData\\Roaming\\npm`, `${home}\\AppData\\Local\\pnpm`];
 			const current = process.env['PATH'] ?? 'C:\\Windows\\system32;C:\\Windows';
 			return [...extras, current].join(separator);
 		}
 
 		const home = process.env['HOME'] ?? '/home/node';
-		const extras = [`${home}/.local/bin`, `${home}/.npm-global/bin`, `${home}/.local/share/pnpm`];
+		const extras = [VENDOR_BIN, `${home}/.local/bin`, `${home}/.npm-global/bin`, `${home}/.local/share/pnpm`];
 		const current = process.env['PATH'] ?? '/usr/local/bin:/usr/bin:/bin';
 		return [...extras, current].join(separator);
+	}
+
+	/**
+	 * Resolve a command string, transparently translating rg to grep when
+	 * ripgrep is not available on the user's system.
+	 */
+	private async resolveCommand(command: string): Promise<string> {
+		if (/(?:^|\s)rg\s/.test(command) && !(await this.checkRgAvailable())) {
+			const translated = ToolExecutionService.translateRgToGrep(command.trimStart());
+			this.logger.debug(`rg not available, translating to: ${translated}`);
+			return translated;
+		}
+		return command;
 	}
 
 	/**
 	 * Execute a terminal command
 	 */
 	private async executeTerminalCmd(args: Record<string, unknown>): Promise<string> {
-		const command = args['command'] as string;
+		const raw = args['command'] as string;
 		const timeoutMs = (args['timeout_ms'] as number) ?? DEFAULT_TIMEOUT_MS;
 
-		if (!command) {
+		if (!raw) {
 			throw new Error('run_terminal_cmd requires command argument');
 		}
 
+		const command = await this.resolveCommand(raw);
 		this.logger.info(`Executing command: ${command}`);
 
 		try {

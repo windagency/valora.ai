@@ -46,9 +46,12 @@
 	"files": [
 		"dist/",
 		"data/",
-		"bin/"
+		"bin/",
+		"scripts/install-cli-tools.sh",
+		"scripts/postinstall.mjs"
 	],
 	"scripts": {
+		"postinstall": "node scripts/postinstall.mjs || true",
 		"prepare": "husky || true && pnpm build",
 		"clean": "rm -rf dist/",
 		"clean:build": "rm -rf ./dist/* && rm -f tsconfig.tsbuildinfo",
