@@ -37,7 +37,18 @@
 		"valora": "bin/valora.js",
 		"valora-mcp": "bin/mcp.js"
 	},
-	"main": "dist/",
+	"main": "dist/cli/index.js",
+	"exports": {
+		".": {
+			"import": "./dist/cli/index.js",
+			"types": "./dist/cli/index.d.ts"
+		},
+		"./mcp": {
+			"import": "./dist/mcp/server.js",
+			"types": "./dist/mcp/server.d.ts"
+		}
+	},
+	"sideEffects": false,
 	"directories": {
 		"documentation": "documentation",
 		"example": "examples",
