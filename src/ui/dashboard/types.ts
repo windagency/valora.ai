@@ -30,6 +30,8 @@ export interface MetricsSummary {
 	errors: number;
 	patterns: number;
 	timeSavedMinutes: number;
+	/** Number of times a stage hit the tool loop iteration limit this session */
+	toolLoopExhaustions: number;
 	totalCommands: number;
 	totalTokens: number;
 }

@@ -277,6 +277,11 @@ async function buildMetricsSummary(): Promise<MetricsSummary | null> {
 		const totalCacheEntries = dryRunStats.size + stageStats.size;
 		const cacheHitRate = totalCacheEntries > 0 ? Math.min(100, totalCacheEntries * 10) : 0;
 
+		const toolLoopExhaustions = getMetricsCollector()
+			.getSnapshot()
+			.counters.filter((c) => c.name === 'tool_loop_exhausted')
+			.reduce((sum, c) => sum + c.value, 0);
+
 		return {
 			avgReviewScore: detailed.reviewScoreCount > 0 ? detailed.reviewScoreSum / detailed.reviewScoreCount : 0,
 			cacheHitRate,
@@ -284,6 +289,7 @@ async function buildMetricsSummary(): Promise<MetricsSummary | null> {
 			errors: summaryErrors + detailed.errors,
 			patterns: detailed.patterns,
 			timeSavedMinutes: detailed.timeSavedMinutes,
+			toolLoopExhaustions,
 			totalCommands,
 			totalTokens
 		};

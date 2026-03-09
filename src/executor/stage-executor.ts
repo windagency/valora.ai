@@ -30,6 +30,7 @@ import { getLogger } from 'output/logger';
 import { ResolutionPath } from 'types/provider.types';
 import { formatErrorMessage } from 'utils/error-utils';
 import { readFile } from 'utils/file-utils';
+import { getMetricsCollector } from 'utils/metrics-collector';
 
 import type { AgentLoader } from './agent-loader';
 import type { ExecutionContext } from './execution-context';
@@ -805,7 +806,26 @@ export class StageExecutor {
 	}
 
 	/**
-	 * Handle case when tool loop exceeds max iterations
+	 * Extract the names of the most recently invoked tools from message history.
+	 * Useful for diagnosing what the agent was doing when it hit the iteration limit.
+	 */
+	private extractLastToolsInvoked(messages: LLMMessage[], limit = 10): string[] {
+		const toolNames: string[] = [];
+		for (let i = messages.length - 1; i >= 0 && toolNames.length < limit; i--) {
+			const msg = messages[i] as LLMMessage | undefined;
+			if (msg?.role === 'assistant' && msg.tool_calls) {
+				for (const tc of msg.tool_calls) {
+					toolNames.push(tc.name);
+				}
+			}
+		}
+		return toolNames.reverse();
+	}
+
+	/**
+	 * Handle case when tool loop exceeds max iterations.
+	 * Records a metrics counter, emits a TOOL_LOOP_EXHAUSTED pipeline event,
+	 * and logs diagnostic context before falling back to a forced final output.
 	 */
 	private async handleMaxIterationsExceeded(
 		executionContext: ExecutionContext,
@@ -815,9 +835,26 @@ export class StageExecutor {
 		modeOverride: string | undefined,
 		logger: ReturnType<typeof getLogger>
 	): Promise<LLMCompletionResult> {
+		const stageId = `${stage.stage}.${stage.prompt}`;
+		const lastToolsInvoked = this.extractLastToolsInvoked(messages);
+		const messageDepth = messages.length;
+
 		logger.warn('Tool loop exceeded maximum iterations', {
+			lastToolsInvoked,
 			maxIterations: 20,
-			stage: `${stage.stage}.${stage.prompt}`
+			messageDepth,
+			stage: stageId
+		});
+
+		// Record metric — visible in dashboard Performance tab and MetricsSummary
+		getMetricsCollector().incrementCounter('tool_loop_exhausted', 1, { stage: stageId });
+
+		// Emit typed event for real-time observers
+		getPipelineEmitter().emitToolLoopExhausted({
+			iterationsUsed: 20,
+			lastToolsInvoked,
+			messageDepth,
+			stage: stageId
 		});
 
 		return this.requestFinalOutput(executionContext, messages, stage, modelOverride, modeOverride, logger);

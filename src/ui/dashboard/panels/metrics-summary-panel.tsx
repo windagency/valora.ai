@@ -49,6 +49,10 @@ export function MetricsSummaryPanel({ summary }: { summary: MetricsSummary }): R
 				<Text bold color={summary.errors > 0 ? 'red' : 'green'}>
 					{summary.errors}
 				</Text>
+				<Text dimColor> Loop Exhausted: </Text>
+				<Text bold color={summary.toolLoopExhaustions > 0 ? 'yellow' : 'green'}>
+					{summary.toolLoopExhaustions}
+				</Text>
 			</Box>
 		</Box>
 	);
