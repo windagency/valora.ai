@@ -23,7 +23,7 @@ npm install -g @windagency/valora       # npm
 
 ```bash
 valora --version
-# Should output: 2.1.1
+# Should output: 2.1.2
 ```
 
 ### Step 3: Initialise Your Project (Optional)
@@ -124,7 +124,7 @@ When you run a command, you'll see:
 
 ```plaintext
 ╭──────────────────────────────────────────────────────────────╮
-│  VALORA v2.1.1                      │
+│  VALORA v2.1.2                      │
 ├──────────────────────────────────────────────────────────────┤
 │  Command: plan                                               │
 │  Agent: @lead                                                │
