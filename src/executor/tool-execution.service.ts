@@ -1159,6 +1159,32 @@ export class ToolExecutionService {
 	}
 
 	/**
+	 * Build a PATH string that includes user-local bin directories.
+	 * Tools installed via install-cli-tools.sh (rg, fd, jq, etc.) land in
+	 * ~/.local/bin, which is only added to PATH by ~/.bashrc — not loaded in
+	 * non-interactive shells. Prepending these dirs ensures they are always
+	 * available regardless of how valora was started.
+	 *
+	 * Compatible with Linux, macOS, Windows, and devcontainer environments.
+	 */
+	private buildAugmentedPath(): string {
+		const isWindows = process.platform === 'win32';
+		const separator = isWindows ? ';' : ':';
+
+		if (isWindows) {
+			const home = process.env['USERPROFILE'] ?? process.env['HOME'] ?? 'C:\\Users\\node';
+			const extras = [`${home}\\AppData\\Roaming\\npm`, `${home}\\AppData\\Local\\pnpm`];
+			const current = process.env['PATH'] ?? 'C:\\Windows\\system32;C:\\Windows';
+			return [...extras, current].join(separator);
+		}
+
+		const home = process.env['HOME'] ?? '/home/node';
+		const extras = [`${home}/.local/bin`, `${home}/.npm-global/bin`, `${home}/.local/share/pnpm`];
+		const current = process.env['PATH'] ?? '/usr/local/bin:/usr/bin:/bin';
+		return [...extras, current].join(separator);
+	}
+
+	/**
 	 * Execute a terminal command
 	 */
 	private async executeTerminalCmd(args: Record<string, unknown>): Promise<string> {
@@ -1174,6 +1200,7 @@ export class ToolExecutionService {
 		try {
 			const { stderr, stdout } = await execAsync(command, {
 				cwd: this.workingDir,
+				env: { ...process.env, PATH: this.buildAugmentedPath() },
 				timeout: timeoutMs
 			});
 
