@@ -1055,7 +1055,9 @@ Summarize ALL changes you made during tool execution. Output ONLY the JSON code 
 	 */
 	private formatToolResult(result: LLMToolResult): string {
 		const output = result.output;
-		const MAX_TOOL_RESULT_CHARS = 100_000;
+		const MAX_TOOL_RESULT_CHARS = 20_000;
+		const HEAD_CHARS = 15_000;
+		const TAIL_CHARS = 5_000;
 
 		if (output.length > MAX_TOOL_RESULT_CHARS) {
 			const logger = getLogger();
@@ -1064,9 +1066,11 @@ Summarize ALL changes you made during tool execution. Output ONLY the JSON code 
 				toolCallId: result.tool_call_id,
 				truncatedLength: MAX_TOOL_RESULT_CHARS
 			});
+			const omitted = output.length - HEAD_CHARS - TAIL_CHARS;
 			return (
-				output.substring(0, MAX_TOOL_RESULT_CHARS) +
-				`\n\n[... truncated: ${output.length - MAX_TOOL_RESULT_CHARS} additional characters omitted due to context length limits ...]`
+				output.substring(0, HEAD_CHARS) +
+				`\n\n[... ${omitted} characters omitted ...]\n\n` +
+				output.substring(output.length - TAIL_CHARS)
 			);
 		}
 

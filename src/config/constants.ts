@@ -145,6 +145,16 @@ export const RESOURCE_ALERT_CRITICAL_THRESHOLD = 90; // Critical resource alert
 export const RESOURCE_ALERT_WARNING_THRESHOLD = 70; // Warning resource alert
 
 /**
+ * Tool Output Limits
+ * Keep tool results small so the LLM receives complete (but bounded) output
+ * rather than a truncated slice from the global formatToolResult safety net.
+ */
+export const MAX_GREP_OUTPUT_LINES = 200;
+export const MAX_TERMINAL_OUTPUT_CHARS = 15_000;
+export const MAX_MCP_OUTPUT_CHARS = 15_000;
+export const MAX_LIST_DIR_ENTRIES = 200;
+
+/**
  * Display Truncation Constants
  */
 export const SESSION_ID_DISPLAY_LENGTH = 16;

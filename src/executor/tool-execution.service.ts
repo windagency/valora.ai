@@ -26,7 +26,12 @@ import { promisify } from 'util';
 import type { MCPClientManagerService } from 'mcp/mcp-client-manager.service';
 import type { LLMToolCall, LLMToolDefinition, LLMToolResult } from 'types/llm.types';
 
-import { DEFAULT_TIMEOUT_MS } from 'config/constants';
+import {
+	DEFAULT_TIMEOUT_MS,
+	MAX_LIST_DIR_ENTRIES,
+	MAX_MCP_OUTPUT_CHARS,
+	MAX_TERMINAL_OUTPUT_CHARS
+} from 'config/constants';
 import { type MCPToolHandler } from 'mcp/mcp-tool-handler';
 import { getColorAdapter } from 'output/color-adapter.interface';
 import { getConsoleOutput } from 'output/console-output';
@@ -859,7 +864,7 @@ export class ToolExecutionService {
 			if (result.success) {
 				return JSON.stringify({
 					duration_ms: result.durationMs,
-					output: result.output,
+					output: truncateMcpOutput(result.output),
 					server: result.serverId,
 					status: 'success',
 					tool: result.toolName
@@ -1312,11 +1317,11 @@ export class ToolExecutionService {
 
 			const output = stdout + (stderr ? `\nStderr: ${stderr}` : '');
 
-			return output || 'Command completed successfully (no output)';
+			return truncateTerminalOutput(output) || 'Command completed successfully (no output)';
 		} catch (error) {
 			const execError = error as { stderr?: string; stdout?: string };
 			const output = (execError.stdout ?? '') + (execError.stderr ?? '');
-			throw new Error(`Command failed: ${output || (error as Error).message}`);
+			throw new Error(`Command failed: ${truncateTerminalOutput(output) || (error as Error).message}`);
 		}
 	}
 
@@ -1337,10 +1342,16 @@ export class ToolExecutionService {
 		}
 
 		const entries = readdirSync(fullPath, { withFileTypes: true });
-		const formatted = entries.map((entry) => {
+		const total = entries.length;
+		const capped = entries.slice(0, MAX_LIST_DIR_ENTRIES);
+		const formatted = capped.map((entry) => {
 			const prefix = entry.isDirectory() ? '[DIR]' : '[FILE]';
 			return `${prefix} ${entry.name}`;
 		});
+
+		if (total > MAX_LIST_DIR_ENTRIES) {
+			formatted.push(`[... ${total - MAX_LIST_DIR_ENTRIES} more entries omitted — ${total} total]`);
+		}
 
 		return Promise.resolve(formatted.join('\n'));
 	}
@@ -1429,6 +1440,37 @@ export class ToolExecutionService {
 
 		return values.join(', ');
 	}
+}
+
+/**
+ * Serialise MCP tool output and truncate to MAX_MCP_OUTPUT_CHARS using head+tail.
+ * MCP servers are external and can return arbitrarily large payloads.
+ */
+function truncateMcpOutput(output: unknown): string {
+	const text = typeof output === 'string' ? output : JSON.stringify(output);
+	if (text.length <= MAX_MCP_OUTPUT_CHARS) return text;
+	const HEAD = Math.floor(MAX_MCP_OUTPUT_CHARS * 0.8);
+	const TAIL = MAX_MCP_OUTPUT_CHARS - HEAD;
+	const omitted = text.length - HEAD - TAIL;
+	return (
+		text.substring(0, HEAD) + `\n\n[... ${omitted} characters omitted ...]\n\n` + text.substring(text.length - TAIL)
+	);
+}
+
+/**
+ * Truncate terminal command output to MAX_TERMINAL_OUTPUT_CHARS using head+tail,
+ * so the LLM sees both the beginning (command context) and the end (summary/errors).
+ */
+function truncateTerminalOutput(output: string): string {
+	if (output.length <= MAX_TERMINAL_OUTPUT_CHARS) return output;
+	const HEAD = Math.floor(MAX_TERMINAL_OUTPUT_CHARS * 0.8);
+	const TAIL = MAX_TERMINAL_OUTPUT_CHARS - HEAD;
+	const omitted = output.length - HEAD - TAIL;
+	return (
+		output.substring(0, HEAD) +
+		`\n\n[... ${omitted} characters omitted ...]\n\n` +
+		output.substring(output.length - TAIL)
+	);
 }
 
 /**

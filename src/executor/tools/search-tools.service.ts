@@ -15,7 +15,7 @@ import { promisify } from 'util';
 
 import type { getLogger } from 'output/logger';
 
-import { DEFAULT_TIMEOUT_MS } from 'config/constants';
+import { DEFAULT_TIMEOUT_MS, MAX_GREP_OUTPUT_LINES } from 'config/constants';
 
 const execAsync = promisify(exec);
 
@@ -82,14 +82,22 @@ export class SearchToolsService {
 			// Build exclusion patterns for ripgrep
 			const excludes = GREP_EXCLUDE_PATHS.map((p) => `--glob '!${p}'`).join(' ');
 
-			// Use ripgrep for better performance with exclusions, fall back to grep
-			const command = `rg --line-number ${excludes} "${pattern}" "${path}" 2>/dev/null || grep -rn --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=.valora --exclude-dir=data "${pattern}" "${path}" 2>/dev/null`;
+			// Use ripgrep for better performance with exclusions, fall back to grep.
+			// Wrap in parens so | head applies to the whole pipeline, not just the grep fallback.
+			const command = `(rg --line-number ${excludes} "${pattern}" "${path}" 2>/dev/null || grep -rn --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=.valora --exclude-dir=data "${pattern}" "${path}" 2>/dev/null) | head -${MAX_GREP_OUTPUT_LINES}`;
 			const { stdout } = await execAsync(command, {
 				cwd: this.workingDir,
 				timeout: DEFAULT_TIMEOUT_MS
 			});
 
-			return stdout || 'No matches found';
+			if (!stdout) return 'No matches found';
+
+			const lines = stdout.trimEnd().split('\n');
+			const suffix =
+				lines.length >= MAX_GREP_OUTPUT_LINES
+					? `\n[Results limited to ${MAX_GREP_OUTPUT_LINES} lines — narrow your pattern for more precision]`
+					: '';
+			return stdout.trimEnd() + suffix;
 		} catch {
 			return 'No matches found';
 		}
