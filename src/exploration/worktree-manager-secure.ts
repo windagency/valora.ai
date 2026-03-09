@@ -10,8 +10,9 @@
  * - Cleanup rollback on partial failures
  */
 
-import { DEFAULT_TIMEOUT_MS } from 'config/constants';
 import * as path from 'path';
+
+import { DEFAULT_TIMEOUT_MS } from 'config/constants';
 import { InputValidator } from 'utils/input-validator';
 import { RetryExecutor, SafeExecutor } from 'utils/safe-exec';
 
@@ -210,10 +211,13 @@ export class WorktreeManager {
 	 * Delete branch after worktree removal (SECURITY HARDENED)
 	 */
 	async deleteBranch(branchName: string, force: boolean = false): Promise<void> {
-		// SECURITY: Validate branch name
-		InputValidator.validateBranchName(branchName);
+		// Strip refs/heads/ prefix if present — git branch expects short names
+		const shortName = branchName.replace(/^refs\/heads\//, '');
 
-		const args = ['branch', force ? '-D' : '-d', branchName];
+		// SECURITY: Validate branch name
+		InputValidator.validateBranchName(shortName);
+
+		const args = ['branch', force ? '-D' : '-d', shortName];
 
 		try {
 			await SafeExecutor.executeGit(args, {
@@ -223,7 +227,7 @@ export class WorktreeManager {
 			const typedError = error as Error;
 			// If branch doesn't exist, that's okay
 			if (typedError.message.includes('not found')) {
-				console.warn(`Branch ${branchName} does not exist, skipping deletion`);
+				console.warn(`Branch ${shortName} does not exist, skipping deletion`);
 				return;
 			}
 			throw new Error(`Failed to delete branch: ${typedError.message}`);

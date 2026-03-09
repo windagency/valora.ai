@@ -11,9 +11,10 @@
  * Concrete implementations extend this for specific file types (logs, sessions, etc.)
  */
 
-import { BYTES_PER_MB } from 'config/constants';
 import * as fs from 'fs';
 import { pipeline } from 'stream/promises';
+
+import { BYTES_PER_MB } from 'config/constants';
 
 import { formatErrorMessage } from './error-utils';
 

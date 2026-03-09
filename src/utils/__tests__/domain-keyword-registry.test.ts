@@ -24,10 +24,11 @@ describe('DomainKeywordRegistry', () => {
 			expect(domains).toContain('infrastructure');
 			expect(domains).toContain('security');
 			expect(domains).toContain('typescript-core');
-			expect(domains).toContain('typescript-backend-general');
-			expect(domains).toContain('typescript-frontend-general');
-			expect(domains).toContain('typescript-frontend-react');
-			expect(domains).toContain('ui-ux-designer');
+			expect(domains).toContain('backend-api');
+			expect(domains).toContain('frontend-ui');
+			expect(domains).toContain('design');
+			expect(domains).toContain('testing');
+			expect(domains).toContain('typescript-general');
 		});
 
 		it('should have infrastructure keywords', () => {
@@ -48,8 +49,8 @@ describe('DomainKeywordRegistry', () => {
 			expect(keywords).toContain('encryption');
 		});
 
-		it('should have typescript-backend-general keywords', () => {
-			const keywords = registry.getKeywords('typescript-backend-general');
+		it('should have backend-api keywords', () => {
+			const keywords = registry.getKeywords('backend-api');
 
 			expect(keywords).toContain('api');
 			expect(keywords).toContain('database');
@@ -57,13 +58,16 @@ describe('DomainKeywordRegistry', () => {
 			expect(keywords).toContain('prisma');
 		});
 
-		it('should have typescript-frontend-react keywords', () => {
-			const keywords = registry.getKeywords('typescript-frontend-react');
+		it('should have frontend-ui keywords', () => {
+			const keywords = registry.getKeywords('frontend-ui');
 
 			expect(keywords).toContain('react');
 			expect(keywords).toContain('hook');
 			expect(keywords).toContain('jsx');
-			expect(keywords).toContain('redux');
+			expect(keywords).toContain('component');
+			expect(keywords).toContain('container');
+			expect(keywords).toContain('grid');
+			expect(keywords).toContain('layout');
 		});
 	});
 
@@ -105,7 +109,7 @@ describe('DomainKeywordRegistry', () => {
 		it('should return all registered domains', () => {
 			const domains = registry.getDomains();
 
-			expect(domains.length).toBe(7);
+			expect(domains.length).toBe(8);
 		});
 	});
 

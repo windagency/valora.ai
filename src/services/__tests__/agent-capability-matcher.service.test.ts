@@ -44,7 +44,7 @@ describe('AgentCapabilityMatcherService', () => {
 		[
 			'software-engineer-typescript-backend',
 			{
-				domains: ['typescript-backend-general'] as TaskDomain[],
+				domains: ['backend-api'] as TaskDomain[],
 				expertise: ['nodejs', 'express', 'graphql'],
 				priority: 85,
 				role: 'software-engineer-typescript-backend',
@@ -54,7 +54,7 @@ describe('AgentCapabilityMatcherService', () => {
 		[
 			'lead',
 			{
-				domains: ['infrastructure', 'typescript-backend-general', 'security'] as TaskDomain[],
+				domains: ['infrastructure', 'backend-api', 'security'] as TaskDomain[],
 				expertise: ['architecture', 'leadership', 'ddd'],
 				priority: 95,
 				role: 'lead',
@@ -98,9 +98,8 @@ describe('AgentCapabilityMatcherService', () => {
 			expect(scores[0].capability).toBeDefined();
 
 			// Should be sorted by score descending
-			for (let i = 1; i < scores.length; i++) {
-				expect(scores[i - 1].score).toBeGreaterThanOrEqual(scores[i].score);
-			}
+			expect(scores.length).toBeGreaterThan(0);
+			expect(scores.every((score, i) => i === 0 || scores[i - 1]!.score >= score.score)).toBe(true);
 		});
 
 		it('should apply confidence multiplier to final scores', async () => {
@@ -124,9 +123,8 @@ describe('AgentCapabilityMatcherService', () => {
 			const scores = await matcher.scoreAgents(taskClassification, context);
 
 			// All scores should be <= 0.5 due to confidence multiplier
-			scores.forEach((score) => {
-				expect(score.score).toBeLessThanOrEqual(0.5);
-			});
+			expect(scores.length).toBeGreaterThan(0);
+			expect(scores.every((score) => score.score <= 0.5)).toBe(true);
 		});
 
 		it('should handle empty agent list', async () => {
@@ -226,13 +224,13 @@ describe('AgentCapabilityMatcherService', () => {
 		it('should generate meaningful scoring reasons', async () => {
 			const scores = await matcher.scoreAgents(baseTaskClassification, baseContext);
 
-			scores.forEach((score) => {
-				expect(score.reasons).toBeInstanceOf(Array);
-				expect(score.reasons.length).toBeGreaterThan(0);
-				expect(
+			expect(scores.length).toBeGreaterThan(0);
+			expect(scores.every((score) => Array.isArray(score.reasons) && score.reasons.length > 0)).toBe(true);
+			expect(
+				scores.every((score) =>
 					score.reasons.some((r) => r.includes('domain') || r.includes('expertise') || r.includes('priority'))
-				).toBe(true);
-			});
+				)
+			).toBe(true);
 		});
 	});
 
@@ -265,7 +263,7 @@ describe('AgentCapabilityMatcherService', () => {
 			const taskClassification: TaskClassification = {
 				complexity: 'medium',
 				confidence: 1.0,
-				primaryDomain: 'typescript-backend-general',
+				primaryDomain: 'backend-api',
 				reasons: [],
 				suggestedAgents: []
 			};
@@ -281,7 +279,7 @@ describe('AgentCapabilityMatcherService', () => {
 			const scores = await matcher.scoreAgents(taskClassification, context);
 			const leadScore = scores.find((s) => s.role === 'lead');
 
-			// Lead has typescript-backend-general as related domain to infrastructure
+			// Lead has backend-api as related domain to infrastructure
 			expect(leadScore!.score).toBeGreaterThan(0.1);
 		});
 
@@ -291,7 +289,7 @@ describe('AgentCapabilityMatcherService', () => {
 				[
 					'unrelated-agent',
 					{
-						domains: ['ui-ux-designer'] as TaskDomain[],
+						domains: ['design'] as TaskDomain[],
 						expertise: ['figma', 'sketch'],
 						priority: 50,
 						role: 'unrelated-agent',

@@ -5,10 +5,11 @@
  * Read-only tools execute normally; write operations return simulated results.
  */
 
+import { existsSync, statSync } from 'fs';
+
 import type { AllowedTool } from 'types/command.types';
 import type { LLMToolCall, LLMToolResult } from 'types/llm.types';
 
-import { existsSync, statSync } from 'fs';
 import { getLogger } from 'output/logger';
 import { createDeletedFileDiff, createNewFileDiff, type DiffResult, generateUnifiedDiff } from 'utils/diff-generator';
 import { readFile } from 'utils/file-utils';

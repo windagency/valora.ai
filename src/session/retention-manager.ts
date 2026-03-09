@@ -3,12 +3,13 @@
  * Handles automated cleanup of session files based on configurable policies
  */
 
+import * as fs from 'fs';
+import * as path from 'path';
+
 import type { SessionSummary } from 'types/session.types';
 
 import { BYTES_PER_MB, MS_PER_DAY } from 'config/constants';
-import * as fs from 'fs';
 import { getLogger } from 'output/logger';
-import * as path from 'path';
 import {
 	type BaseCleanupResult,
 	type BaseFileInfo,

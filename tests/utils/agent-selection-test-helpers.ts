@@ -251,14 +251,14 @@ export class MockUtils {
 					selectionCriteria: ['security-files', 'authentication-code']
 				},
 				'software-engineer-typescript-backend': {
-					domains: ['backend-api', 'typescript-backend-general'],
+					domains: ['backend-api'],
 					expertise: ['nodejs', 'express', 'graphql'],
 					priority: 95,
 					role: 'software-engineer-typescript-backend',
 					selectionCriteria: ['code-files', 'api-files']
 				},
 				'software-engineer-typescript-frontend-react': {
-					domains: ['frontend-ui', 'typescript-frontend-react'],
+					domains: ['frontend-ui'],
 					expertise: ['react', 'next.js', 'typescript'],
 					priority: 70,
 					role: 'software-engineer-typescript-frontend-react',

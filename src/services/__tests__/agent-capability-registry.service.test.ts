@@ -41,7 +41,7 @@ describe('AgentCapabilityRegistryService', () => {
 	const mockRegistryData = {
 		capabilities: {
 			lead: {
-				domains: ['infrastructure', 'typescript-backend-general', 'security'],
+				domains: ['infrastructure', 'backend-api', 'security'],
 				expertise: ['architecture', 'leadership', 'ddd'],
 				priority: 95,
 				role: 'lead',
@@ -55,7 +55,7 @@ describe('AgentCapabilityRegistryService', () => {
 				selectionCriteria: ['terraform-files', 'kubernetes-manifests']
 			},
 			'software-engineer-typescript-backend': {
-				domains: ['typescript-backend-general'],
+				domains: ['backend-api'],
 				expertise: ['nodejs', 'express', 'graphql'],
 				priority: 85,
 				role: 'software-engineer-typescript-backend',
@@ -73,7 +73,7 @@ describe('AgentCapabilityRegistryService', () => {
 		taskDomains: {
 			infrastructure: 'Infrastructure and DevOps tasks',
 			security: 'Security and compliance tasks',
-			'typescript-backend-general': 'Backend TypeScript development'
+			'backend-api': 'Backend TypeScript development'
 		}
 	};
 
@@ -194,7 +194,7 @@ describe('AgentCapabilityRegistryService', () => {
 		it('should return all available domains', () => {
 			const domains = registry.getAllTaskDomains();
 
-			expect(domains).toEqual(['infrastructure', 'security', 'typescript-backend-general']);
+			expect(domains).toEqual(['infrastructure', 'security', 'backend-api']);
 		});
 	});
 
@@ -299,7 +299,7 @@ describe('AgentCapabilityRegistryService', () => {
 		});
 
 		it('should prioritize domain matches over criteria-only matches', () => {
-			const agent = registry.findBestAgent('typescript-backend-general', ['terraform-files']);
+			const agent = registry.findBestAgent('backend-api', ['terraform-files']);
 
 			// Should return highest priority domain agent when no agent matches both domain and criteria
 			expect(agent).toBe('lead'); // lead has highest priority (95) for this domain
@@ -319,7 +319,7 @@ describe('AgentCapabilityRegistryService', () => {
 			expect(stats.totalCriteria).toBe(6);
 			expect(stats.agentsByDomain.infrastructure).toBe(2); // lead and platform-engineer
 			expect(stats.agentsByDomain.security).toBe(2); // lead and platform-engineer
-			expect(stats.agentsByDomain['typescript-backend-general']).toBe(2); // lead and backend engineer
+			expect(stats.agentsByDomain['backend-api']).toBe(2); // lead and backend engineer
 			expect(stats.averageCriteriaPerAgent).toBeCloseTo(2); // 6 criteria / 3 agents
 		});
 

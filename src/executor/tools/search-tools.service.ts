@@ -10,11 +10,12 @@
  * - Codebase semantic search
  */
 
+import { exec } from 'child_process';
+import { promisify } from 'util';
+
 import type { getLogger } from 'output/logger';
 
-import { exec } from 'child_process';
 import { DEFAULT_TIMEOUT_MS } from 'config/constants';
-import { promisify } from 'util';
 
 const execAsync = promisify(exec);
 

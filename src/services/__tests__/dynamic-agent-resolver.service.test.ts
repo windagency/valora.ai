@@ -34,7 +34,55 @@ const mockCapabilityMatcher = {
 	scoreAgents: vi.fn()
 };
 
+const mockCapabilities = new Map([
+	[
+		'platform-engineer',
+		{
+			domains: ['infrastructure', 'security'],
+			expertise: ['terraform', 'kubernetes'],
+			priority: 90,
+			role: 'platform-engineer',
+			selectionCriteria: []
+		}
+	],
+	[
+		'secops-engineer',
+		{ domains: ['security'], expertise: ['owasp'], priority: 88, role: 'secops-engineer', selectionCriteria: [] }
+	],
+	[
+		'software-engineer-typescript-backend',
+		{
+			domains: ['backend-api'],
+			expertise: ['express', 'graphql'],
+			priority: 85,
+			role: 'software-engineer-typescript-backend',
+			selectionCriteria: []
+		}
+	],
+	[
+		'software-engineer-typescript-frontend-react',
+		{
+			domains: ['frontend-ui'],
+			expertise: ['react', 'next.js'],
+			priority: 80,
+			role: 'software-engineer-typescript-frontend-react',
+			selectionCriteria: []
+		}
+	],
+	[
+		'software-engineer-typescript',
+		{
+			domains: ['typescript-core', 'typescript-general'],
+			expertise: ['typescript'],
+			priority: 75,
+			role: 'software-engineer-typescript',
+			selectionCriteria: []
+		}
+	]
+]);
+
 const mockRegistry = {
+	getAllCapabilities: vi.fn().mockReturnValue(mockCapabilities),
 	getStats: vi.fn().mockReturnValue({
 		agentsByDomain: {},
 		averageCriteriaPerAgent: 4,
@@ -71,7 +119,7 @@ describe('DynamicAgentResolverService', () => {
 		const mockTaskClassification: TaskClassification = {
 			complexity: 'medium',
 			confidence: 0.9,
-			primaryDomain: 'typescript-backend-general',
+			primaryDomain: 'backend-api',
 			reasons: ['Backend API keywords found', 'Authentication patterns detected'],
 			suggestedAgents: ['software-engineer-typescript-backend']
 		};
@@ -87,7 +135,7 @@ describe('DynamicAgentResolverService', () => {
 		const mockAgentScores: AgentScore[] = [
 			{
 				capability: {
-					domains: ['typescript-backend-general'],
+					domains: ['backend-api'],
 					expertise: ['nodejs', 'express'],
 					priority: 85,
 					role: 'software-engineer-typescript-backend',
@@ -99,7 +147,7 @@ describe('DynamicAgentResolverService', () => {
 			},
 			{
 				capability: {
-					domains: ['typescript-backend-general', 'architecture'],
+					domains: ['backend-api', 'architecture'],
 					expertise: ['leadership', 'architecture'],
 					priority: 95,
 					role: 'lead',
@@ -128,7 +176,7 @@ describe('DynamicAgentResolverService', () => {
 			expect(result.confidence).toBe(0.85);
 			expect(result.reasons).toContain('Primary domain match');
 			expect(result.alternatives).toHaveLength(1);
-			expect(result.fallbackAgent).toBe('software-engineer-typescript-backend'); // Same as selected when confidence is high
+			expect(result.fallbackAgent).toBe('platform-engineer'); // Registry-driven: auth files → security domain → platform-engineer (highest priority)
 		});
 
 		it('should apply high confidence threshold correctly', async () => {
@@ -202,7 +250,7 @@ describe('DynamicAgentResolverService', () => {
 
 			const result = await resolver.resolveAgent(mockTaskContext);
 
-			expect(result.selectedAgent).toBe('software-engineer-typescript-backend'); // Fallback based on task context
+			expect(result.selectedAgent).toBe('platform-engineer'); // Registry-driven fallback: auth files → security → platform-engineer
 			expect(result.confidence).toBe(0.1); // Very low confidence
 			expect(result.reasons).toContain('No agent scores available');
 		});
@@ -246,10 +294,10 @@ describe('DynamicAgentResolverService', () => {
 
 			const result = await resolver.resolveAgent(taskContext);
 
-			expect(result.selectedAgent).toBe('software-engineer-typescript');
+			expect(result.selectedAgent).toBe('platform-engineer'); // Highest priority non-lead agent from registry
 			expect(result.confidence).toBe(0.1);
 			expect(result.reasons).toContain('Automatic agent selection failed');
-			expect(result.reasons).toContain('Using fallback agent: software-engineer-typescript');
+			expect(result.reasons).toContain('Using fallback agent: platform-engineer');
 		});
 
 		it('should handle context analysis errors gracefully', async () => {
@@ -270,10 +318,10 @@ describe('DynamicAgentResolverService', () => {
 
 			const result = await resolver.resolveAgent(taskContext);
 
-			expect(result.selectedAgent).toBe('software-engineer-typescript');
+			expect(result.selectedAgent).toBe('platform-engineer'); // Highest priority non-lead agent from registry
 			expect(result.confidence).toBe(0.1);
 			expect(result.reasons).toContain('Automatic agent selection failed');
-			expect(result.reasons).toContain('Using fallback agent: software-engineer-typescript');
+			expect(result.reasons).toContain('Using fallback agent: platform-engineer');
 		});
 
 		it('should handle scoring errors gracefully', async () => {
@@ -303,10 +351,10 @@ describe('DynamicAgentResolverService', () => {
 
 			const result = await resolver.resolveAgent(taskContext);
 
-			expect(result.selectedAgent).toBe('software-engineer-typescript');
+			expect(result.selectedAgent).toBe('platform-engineer'); // Highest priority non-lead agent from registry
 			expect(result.confidence).toBe(0.1);
 			expect(result.reasons).toContain('Automatic agent selection failed');
-			expect(result.reasons).toContain('Using fallback agent: software-engineer-typescript');
+			expect(result.reasons).toContain('Using fallback agent: platform-engineer');
 		});
 	});
 
@@ -315,7 +363,7 @@ describe('DynamicAgentResolverService', () => {
 			const mockTaskClassification: TaskClassification = {
 				complexity: 'medium',
 				confidence: 0.9,
-				primaryDomain: 'typescript-backend-general',
+				primaryDomain: 'backend-api',
 				reasons: ['Backend patterns detected'],
 				suggestedAgents: ['software-engineer-typescript-backend']
 			};
@@ -331,7 +379,7 @@ describe('DynamicAgentResolverService', () => {
 			const mockAgentScores: AgentScore[] = [
 				{
 					capability: {
-						domains: ['typescript-backend-general'],
+						domains: ['backend-api'],
 						expertise: ['nodejs'],
 						priority: 85,
 						role: 'software-engineer-typescript-backend',
@@ -470,7 +518,7 @@ describe('DynamicAgentResolverService', () => {
 
 			const result = await resolver.resolveAgent(generalContext);
 
-			expect(result.fallbackAgent).toBe('software-engineer-typescript-backend'); // Falls back based on file patterns
+			expect(result.fallbackAgent).toBe('platform-engineer'); // Registry-driven: no domain match → highest priority non-lead agent
 		});
 	});
 
@@ -567,6 +615,20 @@ describe('DynamicAgentResolverService', () => {
 				suggestedAgents: ['platform-engineer', 'lead']
 			});
 
+			// Reset mocks to clear any prior mockRejectedValue from error handling tests
+			mockContextAnalyzer.analyzeTaskContext.mockReset();
+			mockContextAnalyzer.analyzeTaskContext.mockResolvedValue({
+				affectedFileTypes: ['.ts'],
+				architecturalPatterns: [],
+				importPatterns: [],
+				infrastructureComponents: [],
+				technologyStack: ['typescript']
+			});
+
+			// Ensure registry initialize is available (may have been cleared by mockReset elsewhere)
+			mockRegistry.initialize.mockResolvedValue(undefined);
+			mockRegistry.getAllCapabilities.mockReturnValue(mockCapabilities);
+
 			mockCapabilityMatcher.scoreAgents.mockReturnValue([
 				{
 					capability: {
@@ -584,7 +646,7 @@ describe('DynamicAgentResolverService', () => {
 
 			const result = await resolver.resolveAgent(highComplexityContext);
 
-			expect(result.selectedAgent).toBe('software-engineer-typescript-backend');
+			expect(result.selectedAgent).toBe('lead'); // Highest scorer at 0.8 confidence
 		});
 	});
 });

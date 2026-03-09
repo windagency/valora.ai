@@ -88,23 +88,6 @@ _\*When available in Cursor_
 <tr valign="top">
 <td width="50%">
 
-### 🔄 8-Phase Development Lifecycle
-
-Complete workflow automation:
-
-```plaintext
-Initialisation → Task Prep → Planning
-      ↓
-Implementation → Validation → Review
-      ↓
-Commit & PR → Feedback Loop
-```
-
-Each phase has dedicated commands and agents optimised for the task.
-
-</td>
-<td width="50%">
-
 ### 💎 Model Optimisation
 
 Strategic AI model assignment for cost efficiency:
@@ -116,24 +99,6 @@ Strategic AI model assignment for cost efficiency:
 | **Claude Haiku**   | Fast tasks, validation  |
 
 **31% strategic • 31% execution • 38% fast**
-
-</td>
-</tr>
-<tr valign="top">
-<td width="50%">
-
-### 🔌 External MCP Integration
-
-Connect to **15 external MCP servers** with user approval:
-
-| Category       | Servers                                   |
-| -------------- | ----------------------------------------- |
-| Browser/Test   | Playwright, Chrome DevTools, BrowserStack |
-| Design         | Figma, Storybook                          |
-| Development    | GitHub, Serena, Context7                  |
-| Infrastructure | Terraform, Firebase, Google Cloud         |
-| Data           | MongoDB, Elastic                          |
-| Observability  | Grafana, DeepResearch                     |
 
 </td>
 <td width="50%">
@@ -148,6 +113,46 @@ Enterprise-grade security controls:
 - **Tool Filtering** — Allowlist and blocklist per server
 - **Audit Logging** — Complete operation trail
 - **Session Caching** — Remember approvals per session
+
+</td>
+</tr>
+<tr valign="top">
+<td width="50%">
+
+### 🌳 Worktree Dashboard & Statistics
+
+Live visibility into parallel explorations:
+
+- **Worktree Diagram Panel** — Real-time tree view of git worktrees in the `valora dash` dashboard
+- **Exploration Status** — Color-coded branches with status icons (▶ running, ✓ completed, ✗ failed)
+- **Session-Exploration Linking** — Explorations create linked sessions; the dashboard shows exploration details (task, worktrees, status) in the session details view
+- **Worktree Usage Stats** — Per-session tracking of worktree creation, concurrency, and duration
+
+```plaintext
+┌─ Git Worktrees (3) ──────────┐
+│ ● main  abc1234              │
+│ ├── exploration/exp-abc-jwt  │
+│ │   def5678  ▶ RUNNING       │
+│ └── feature/new-api          │
+│     ghi9012                  │
+└──────────────────────────────┘
+```
+
+</td>
+<td width="50%">
+
+### 🔌 External MCP Integration
+
+Connect to **15 external MCP servers** with user approval:
+
+| Category       | Servers                                   |
+| -------------- | ----------------------------------------- |
+| Browser/Test   | Playwright, Chrome DevTools, BrowserStack |
+| Design         | Figma, Storybook                          |
+| Development    | GitHub, Serena, Context7                  |
+| Infrastructure | Terraform, Firebase, Google Cloud         |
+| Data           | MongoDB, Elastic                          |
+| Observability  | Grafana, DeepResearch                     |
 
 </td>
 </tr>
@@ -399,6 +404,8 @@ valora/                          # npm package root
 │   ├── llm/                     # LLM provider integrations
 │   ├── mcp/                     # MCP server implementation
 │   ├── session/                 # Session management
+│   │   └── worktree-stats-tracker.ts  # Worktree usage statistics
+│   ├── ui/                      # Terminal UI (dashboard, panels)
 │   ├── utils/                   # Utilities & path resolution
 │   └── ...
 ├── data/                        # Built-in resources (shipped with package)

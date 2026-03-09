@@ -4,10 +4,11 @@
  * Coordinates the entire exploration lifecycle from initialization to cleanup
  */
 
+import * as path from 'path';
+
 import type { Exploration, ExplorationConfig, ExplorationSummary, WorktreeExploration } from 'types/exploration.types';
 
 import { getLogger } from 'output/logger';
-import * as path from 'path';
 
 import { ContainerManager } from './container-manager';
 import { createExecutionStrategy, type ExecutionContext, type ExecutionResult } from './execution-modes';
@@ -26,6 +27,7 @@ const logger = getLogger();
  */
 export interface OrchestratorOptions {
 	config: ExplorationConfig;
+	sessionId?: string;
 	task: string;
 }
 
@@ -68,7 +70,7 @@ export class ExplorationOrchestrator {
 	 * Start a new exploration
 	 */
 	async startExploration(options: OrchestratorOptions): Promise<OrchestratorResult> {
-		const { config, task } = options;
+		const { config, sessionId, task } = options;
 
 		logger.info(`Starting new exploration: ${task}`);
 		logger.info(`Mode: ${config.mode ?? 'parallel'}, Branches: ${config.branches}`);
@@ -90,6 +92,10 @@ export class ExplorationOrchestrator {
 			// Create exploration state
 			logger.info('Creating exploration state...');
 			exploration = await this.stateManager.createExploration(task, config);
+			if (sessionId) {
+				exploration.session_id = sessionId;
+				await this.stateManager.saveExploration(exploration);
+			}
 			logger.info(`✓ Exploration created: ${exploration.id}`);
 
 			// Emit exploration created event
@@ -106,7 +112,7 @@ export class ExplorationOrchestrator {
 
 			// Create worktrees
 			logger.info('Creating git worktrees...');
-			const worktrees = await this.createWorktrees(exploration);
+			const worktrees = await this.createWorktrees(exploration, sessionId);
 			exploration.worktrees = worktrees;
 			await this.stateManager.saveExploration(exploration);
 			logger.info(`✓ Created ${worktrees.length} worktrees`);
@@ -194,7 +200,7 @@ export class ExplorationOrchestrator {
 	/**
 	 * Create worktrees for exploration
 	 */
-	private async createWorktrees(exploration: Exploration): Promise<WorktreeExploration[]> {
+	private async createWorktrees(exploration: Exploration, sessionId?: string): Promise<WorktreeExploration[]> {
 		const worktrees: WorktreeExploration[] = [];
 		const explorationsDir = this.stateManager.getExplorationsDir();
 		const baseWorktreePath = path.join(explorationsDir, exploration.id);
@@ -239,6 +245,7 @@ export class ExplorationOrchestrator {
 					percentage: 0,
 					stages_completed: []
 				},
+				session_id: sessionId,
 				status: 'pending',
 				strategy,
 				worktree_path: info.path

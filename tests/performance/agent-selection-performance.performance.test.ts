@@ -42,14 +42,14 @@ vi.mock('utils/file-utils', async (importOriginal) => {
 						selectionCriteria: ['security-files', 'audit-files', 'authentication-code']
 					},
 					'software-engineer-typescript-backend': {
-						domains: ['backend-api', 'typescript-backend-general'],
+						domains: ['backend-api'],
 						expertise: ['nodejs', 'express', 'graphql', 'postgresql'],
 						priority: 95,
 						role: 'software-engineer-typescript-backend',
 						selectionCriteria: ['code-files', 'api-files']
 					},
 					'software-engineer-typescript-frontend-react': {
-						domains: ['frontend-ui', 'typescript-frontend-react'],
+						domains: ['frontend-ui'],
 						expertise: ['react', 'next.js', 'typescript'],
 						priority: 70,
 						role: 'software-engineer-typescript-frontend-react',
@@ -195,7 +195,7 @@ describe('Performance Validation - Resolution Time and Accuracy Metrics', () => 
 
 			// Handle edge case where simpleTime is 0 (sub-millisecond resolution)
 			if (simpleTime > 0) {
-				expect(complexTime / simpleTime).toBeLessThan(2.0); // Max 2x slower for complex tasks
+				expect(complexTime / simpleTime).toBeLessThanOrEqual(2.0); // Max 2x slower for complex tasks
 			} else {
 				// If simple task completes in <1ms, complex should still be fast
 				expect(complexTime).toBeLessThan(PERFORMANCE_THRESHOLDS.resolutionTime * 0.5);

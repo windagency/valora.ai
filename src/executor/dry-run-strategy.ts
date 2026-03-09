@@ -13,9 +13,10 @@
  * Read-only tools execute normally.
  */
 
+import { existsSync } from 'fs';
+
 import type { CommandDefinition, CommandResult, PipelineStage, StageOutput } from 'types/command.types';
 
-import { existsSync } from 'fs';
 import { getLogger } from 'output/logger';
 import { readFile } from 'utils/file-utils';
 

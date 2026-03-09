@@ -8,13 +8,14 @@
  * Self-registers with the LLM Provider Registry using dependency inversion pattern
  */
 
+import { Agent as HttpsAgent } from 'https';
+import OpenAI from 'openai';
+
 import type { LLMCompletionOptions, LLMCompletionResult } from 'types/llm.types';
 
 import { getProviderModels, ProviderName } from 'config/providers.config';
-import { Agent as HttpsAgent } from 'https';
 import { BaseLLMProvider } from 'llm/provider.interface';
 import { getProviderRegistry } from 'llm/registry';
-import OpenAI from 'openai';
 import { createErrorContext, ProviderError, withCircuitBreaker, withRetry } from 'utils/error-handler';
 import { checkRateLimit, getRateLimitStatus } from 'utils/rate-limiter';
 

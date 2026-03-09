@@ -565,9 +565,12 @@
 			"selectionCriteria": [
 				"accessibility-files",
 				"code-files",
+				"config-files",
 				"design-files",
 				"documentation-files",
 				"react-imports",
+				"type-definitions",
+				"typescript-files",
 				"ui-mockups",
 				"ux-research"
 			],

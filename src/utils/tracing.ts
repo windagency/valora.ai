@@ -12,6 +12,7 @@
  */
 
 import { randomBytes } from 'crypto';
+
 import { getLogger } from 'output/logger';
 import {
 	SemanticAttributes,

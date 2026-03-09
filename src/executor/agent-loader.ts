@@ -2,10 +2,11 @@
  * Agent loader - loads agent definitions from markdown files
  */
 
+import * as path from 'path';
+
 import type { AgentDefinition, AgentMetadata } from 'types/agent.types';
 
 import { getLogger } from 'output/logger';
-import * as path from 'path';
 import { ValidationError } from 'utils/error-handler';
 import { listFiles, readFile } from 'utils/file-utils';
 import { getPackageDataDir } from 'utils/paths';

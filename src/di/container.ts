@@ -337,7 +337,10 @@ function setupDefaultServices(container: DIContainer): void {
 	});
 
 	// Dynamic Agent Selection Services
-	container.registerFactory(SERVICE_IDENTIFIERS.TASK_CLASSIFIER, () => new TaskClassifierService());
+	container.registerFactory(SERVICE_IDENTIFIERS.TASK_CLASSIFIER, () => {
+		const registry = container.resolve(SERVICE_IDENTIFIERS.AGENT_CAPABILITY_REGISTRY) as AgentCapabilityRegistryService;
+		return new TaskClassifierService(undefined, registry);
+	});
 	container.registerFactory(SERVICE_IDENTIFIERS.CONTEXT_ANALYZER, () => new ContextAnalyzerService());
 	container.registerFactory(SERVICE_IDENTIFIERS.AGENT_CAPABILITY_REGISTRY, () => new AgentCapabilityRegistryService());
 

@@ -61,6 +61,10 @@ export interface QualityMetrics {
 	test_failures?: number;
 	/** Number of test passes in assert phase */
 	test_passes?: number;
+	/** Total tool call failures across all stages in this command */
+	tool_failures?: number;
+	/** Number of stages that hit the tool loop iteration limit */
+	tool_loop_exhaustions?: number;
 }
 
 export interface Session extends Record<string, unknown>, SessionMetadata {
@@ -128,4 +132,21 @@ export interface SessionSummary {
 	status: Status;
 	total_tokens_used?: number;
 	updated_at: string;
+}
+
+export interface WorktreeSessionSummary {
+	branch_name: string;
+	completed_at?: string;
+	created_at: string;
+	duration_ms?: number;
+	exploration_id?: string;
+	status: string;
+}
+
+export interface WorktreeUsageStats {
+	exploration_ids: string[];
+	max_concurrent: number;
+	total_created: number;
+	total_duration_ms: number;
+	worktree_summaries: WorktreeSessionSummary[];
 }

@@ -20,12 +20,13 @@ import { getConsoleOutput } from 'output/console-output';
 import { getRenderer } from 'output/markdown';
 import { createGitStashProtection, type GitStashProtectionService } from 'services/git-stash-protection.service';
 import {
-	AgentSelectionAnalyticsService,
+	type AgentSelectionAnalyticsService,
 	DocumentDetectorService,
 	DocumentPathResolverService,
 	DocumentTemplateService,
 	DocumentWriterService,
-	type DynamicAgentResolverService
+	type DynamicAgentResolverService,
+	getAgentSelectionAnalytics
 } from 'services/index';
 import { SessionLifecycle } from 'session/lifecycle';
 import { SessionStore } from 'session/store';
@@ -248,7 +249,7 @@ export class CommandExecutor {
 			const analyticsEnabled = config.features?.agent_selection_analytics ?? true;
 
 			if (analyticsEnabled) {
-				const analyticsService = new AgentSelectionAnalyticsService();
+				const analyticsService = getAgentSelectionAnalytics();
 				this.analyticsService = analyticsService;
 				// Update coordinator with analytics service
 				if (this.executionCoordinator) {
@@ -512,7 +513,7 @@ export class CommandExecutor {
 		);
 
 		if (ctx.isDryRun) {
-			await this.sessionLifecycle.complete();
+			await this.sessionManager.completeSession();
 			return ctx.result;
 		}
 
@@ -539,7 +540,7 @@ export class CommandExecutor {
 			return failedResult;
 		}
 
-		await this.sessionLifecycle.complete();
+		await this.sessionManager.completeSession();
 		return ctx.result;
 	}
 
@@ -576,9 +577,28 @@ export class CommandExecutor {
 		tokenBreakdown: TokenBreakdown,
 		sessionManager: Awaited<ReturnType<CLISessionManager['getOrCreateSession']>>
 	): void {
-		// Extract optimization and quality metrics from outputs
+		// Extract optimisation and quality metrics from outputs
 		const optimizationMetrics = result.outputs['optimization_metrics'] as OptimizationMetrics | undefined;
-		const qualityMetrics = result.outputs['quality_metrics'] as QualityMetrics | undefined;
+		const baseQualityMetrics = result.outputs['quality_metrics'] as QualityMetrics | undefined;
+
+		// Aggregate tool failure and loop exhaustion counts from per-stage execution quality metadata
+		// and merge them into the quality metrics so they persist in the session store.
+		const toolFailures = result.stages.reduce((sum, s) => {
+			const eq = s.metadata?.['executionQuality'] as Record<string, unknown> | undefined;
+			return sum + (typeof eq?.['toolFailureCount'] === 'number' ? eq['toolFailureCount'] : 0);
+		}, 0);
+		const toolLoopExhaustions = result.stages.reduce((sum, s) => {
+			const eq = s.metadata?.['executionQuality'] as Record<string, unknown> | undefined;
+			return sum + (eq?.['wasLoopExhausted'] === true ? 1 : 0);
+		}, 0);
+		const qualityMetrics: QualityMetrics | undefined =
+			toolFailures > 0 || toolLoopExhaustions > 0
+				? {
+						...baseQualityMetrics,
+						tool_failures: toolFailures || undefined,
+						tool_loop_exhaustions: toolLoopExhaustions || undefined
+					}
+				: baseQualityMetrics;
 
 		sessionManager.addCommand(
 			commandName,

@@ -4,13 +4,14 @@
  * Provides detailed comparison of different exploration results
  */
 
-import type { Exploration, WorktreeExploration } from 'types/exploration.types';
-
 import { exec } from 'child_process';
 import { promises as fs } from 'fs';
-import { getLogger } from 'output/logger';
 import * as path from 'path';
 import { promisify } from 'util';
+
+import type { Exploration, WorktreeExploration } from 'types/exploration.types';
+
+import { getLogger } from 'output/logger';
 
 import type { ExplorationStateManager } from './exploration-state';
 
@@ -327,7 +328,8 @@ export class ResultComparator {
 		const statusScores: Record<string, number> = {
 			completed: 40,
 			failed: 0,
-			running: 20
+			running: 20,
+			timed_out: 5
 		};
 		score += statusScores[worktree.status] ?? 0;
 

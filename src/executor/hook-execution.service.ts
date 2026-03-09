@@ -10,6 +10,10 @@
  * via exit codes (0=allow, 2=deny for PreToolUse; PostToolUse is non-blocking).
  */
 
+import { exec } from 'child_process';
+import fs from 'fs';
+import path from 'path';
+
 import type {
 	HookCommand,
 	HookEventName,
@@ -21,13 +25,10 @@ import type {
 } from 'types/hook.types';
 import type { LLMToolCall } from 'types/llm.types';
 
-import { exec } from 'child_process';
 import { HOOKS_CONFIG_FILE } from 'config/constants';
 import { getConfigLoader } from 'config/loader';
-import fs from 'fs';
 import { getLogger } from 'output/logger';
 import { getPipelineEmitter } from 'output/pipeline-emitter';
-import path from 'path';
 import { formatErrorMessage } from 'utils/error-utils';
 import { getPackageDataDir, getPackageRoot } from 'utils/paths';
 import { checkReDoSRisk, safeRegexTest } from 'utils/safe-regex';

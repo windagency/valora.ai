@@ -21,9 +21,11 @@ export enum PipelineEventType {
 	STAGE_ERROR = 'stage:error',
 	STAGE_PROGRESS = 'stage:progress',
 	STAGE_START = 'stage:start',
+	TOOL_EXECUTION_FAILED = 'tool:execution:failed',
 	TOOL_HOOK_BLOCKED = 'tool:hook:blocked',
 	TOOL_HOOK_POST = 'tool:hook:post',
-	TOOL_HOOK_TRIGGERED = 'tool:hook:triggered'
+	TOOL_HOOK_TRIGGERED = 'tool:hook:triggered',
+	TOOL_LOOP_EXHAUSTED = 'tool:loop:exhausted'
 }
 
 export interface AgentThinkingData {
@@ -138,6 +140,13 @@ export interface StageStartData {
 	worktreeInfo?: WorktreeInfoData;
 }
 
+export interface ToolExecutionFailedData {
+	/** Error message returned by the tool */
+	errorMessage: string;
+	/** Name of the tool that failed */
+	toolName: string;
+}
+
 export interface ToolHookBlockedData {
 	reason: string;
 	toolName: string;
@@ -153,4 +162,15 @@ export interface ToolHookTriggeredData {
 	eventName: HookEventName;
 	hookCommand: string;
 	toolName: string;
+}
+
+export interface ToolLoopExhaustedData {
+	/** Number of tool call rounds that were made before exhaustion */
+	iterationsUsed: number;
+	/** Last tools invoked before exhaustion (for diagnosing loops) */
+	lastToolsInvoked: string[];
+	/** Depth of message history at exhaustion (indicator of complexity) */
+	messageDepth: number;
+	/** Stage that hit the iteration limit */
+	stage: string;
 }

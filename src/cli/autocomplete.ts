@@ -4,12 +4,13 @@
  * Generates completion scripts for bash, zsh, and fish shells
  */
 
-import { CommandLoader } from 'executor/command-loader';
 import * as fs from 'fs/promises';
 import * as os from 'os';
+import * as path from 'path';
+
+import { CommandLoader } from 'executor/command-loader';
 import { getColorAdapter } from 'output/color-adapter.interface';
 import { getConsoleOutput } from 'output/console-output';
-import * as path from 'path';
 
 import type { CommandAdapter } from './command-adapter.interface';
 

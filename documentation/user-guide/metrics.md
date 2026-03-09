@@ -1,10 +1,10 @@
-# Workflow Metrics and Optimization
+# Workflow Metrics and Optimisation
 
-VALORA includes a comprehensive metrics collection and reporting system that tracks workflow optimizations and provides data-driven insights into development efficiency.
+VALORA includes a comprehensive metrics collection and reporting system that tracks workflow optimisations and provides data-driven insights into development efficiency.
 
 ## Overview
 
-The metrics system automatically collects data about workflow optimizations, including:
+The metrics system automatically collects data about workflow optimisations, including:
 
 - **Template Usage** - Time saved by using pattern templates
 - **Early Exit Reviews** - Skipped review iterations for high-confidence plans
@@ -30,13 +30,13 @@ cat .valora/METRICS_REPORT.md
 The metrics dashboard shows:
 
 1. **Executive Summary** - Overall workflow performance
-2. **Optimization Adoption** - Usage rates of each optimization
-3. **Optimization Performance** - Time savings by optimization type
+2. **Optimisation Adoption** - Usage rates of each optimisation
+3. **Optimisation Performance** - Time savings by optimisation type
 4. **Phase Breakdown** - Time spent in each workflow phase
 5. **Quality Metrics** - Code/test/review quality scores
 6. **Recommendations** - Actionable improvements
 
-## Optimization Types
+## Optimisation Types
 
 ### 1. Plan Templates
 
@@ -249,16 +249,16 @@ jq '.qualityScores' metrics.json
 
 The **Time Efficiency Score** indicates overall workflow improvement:
 
-- **90-100**: Excellent - consistently hitting optimization targets
-- **70-89**: Good - regular optimization usage, room for improvement
-- **50-69**: Fair - some optimizations used, increase adoption
-- **<50**: Poor - optimizations underutilized, review recommendations
+- **90-100**: Excellent - consistently hitting optimisation targets
+- **70-89**: Good - regular optimisation usage, room for improvement
+- **50-69**: Fair - some optimisations used, increase adoption
+- **<50**: Poor - optimisations underutilised, review recommendations
 
-### Optimization Adoption Rates
+### Optimisation Adoption Rates
 
-Each optimization has a target adoption rate:
+Each optimisation has a target adoption rate:
 
-| Optimization     | Target | Interpretation                    |
+| Optimisation     | Target | Interpretation                    |
 | ---------------- | ------ | --------------------------------- |
 | Plan Templates   | 40%    | 40% of plans should use templates |
 | Early Exit       | 30%    | 30% of reviews should exit early  |
@@ -279,7 +279,7 @@ Each optimization has a target adoption rate:
 
 ### Quality Scores
 
-Metrics track quality to ensure optimizations don't compromise code quality:
+Metrics track quality to ensure optimisations don't compromise code quality:
 
 | Metric         | Target  | Current (Example) |
 | -------------- | ------- | ----------------- |
@@ -384,10 +384,10 @@ Write clear plans to trigger early exit:
 Check weekly reports to:
 
 - Identify improvement opportunities
-- Track optimization adoption
+- Track optimisation adoption
 - Ensure quality isn't compromised
 
-### 5. Customize for Your Workflow
+### 5. Customise for Your Workflow
 
 Create custom templates for your common patterns:
 
@@ -412,9 +412,9 @@ code .valora/templates/plans/PATTERN_CUSTOM.md
 2. Verify session logs exist: `ls .valora/sessions/*/`
 3. Check date range matches your activity
 
-### Low Optimization Rates
+### Low Optimisation Rates
 
-**Problem**: All optimization rates are 0%
+**Problem**: All optimisation rates are 0%
 
 **Solutions**:
 
@@ -454,7 +454,7 @@ const BASELINE_TIMES = {
 
 Adjust these based on your team's historical data.
 
-### Optimization Targets
+### Optimisation Targets
 
 Targets are defined in `documentation/architecture/metrics-dashboard.md`:
 
@@ -518,7 +518,7 @@ Export metrics to your analytics platform:
 ### User Guides
 
 - [Metrics Quick Start](./metrics-quickstart.md) - 5-minute quick start
-- [Workflow Optimizations](./workflow-optimizations.md) - Detailed optimization descriptions
+- [Workflow Optimisations](./workflow-optimisations.md) - Detailed optimisation descriptions
 - [Best Practices](./best-practices.md) - Recommended usage patterns
 - [Configuration](./configuration.md) - Configure metrics system
 

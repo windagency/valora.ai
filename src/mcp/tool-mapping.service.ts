@@ -4,11 +4,13 @@
 
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+
+import { z } from 'zod';
+
 import type { CommandDefinition } from 'types/command.types';
 import type { ToolCallArgs, ToolResult } from 'types/mcp.types';
 
 import { getLogger } from 'output/logger';
-import { z } from 'zod';
 
 export interface MCPTool {
 	description: string;

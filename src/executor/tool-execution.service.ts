@@ -17,26 +17,29 @@
  * - query_session: Query previous session data for context reuse
  */
 
+import { exec } from 'child_process';
+import { existsSync, readdirSync, rmSync, statSync } from 'fs';
+import { promisify } from 'util';
+
 import type { MCPClientManagerService } from 'mcp/mcp-client-manager.service';
 import type { LLMToolCall, LLMToolDefinition, LLMToolResult } from 'types/llm.types';
 
-import { exec } from 'child_process';
 import { DEFAULT_TIMEOUT_MS } from 'config/constants';
-import { existsSync, readdirSync, rmSync, statSync } from 'fs';
 import { type MCPToolHandler } from 'mcp/mcp-tool-handler';
 import { getColorAdapter } from 'output/color-adapter.interface';
 import { getConsoleOutput } from 'output/console-output';
 import { getLogger } from 'output/logger';
+import { getPipelineEmitter } from 'output/pipeline-emitter';
 import { getIdempotencyStore, type IdempotencyStoreService } from 'services/idempotency-store.service';
 import { type AllowedTool, type BuiltInTool, isMCPTool, type MCPTool } from 'types/command.types';
 import { type IdempotencyOptions, isIdempotentTool } from 'types/idempotency.types';
 import { getServerIdFromTool } from 'types/mcp-registry.types';
 import { SemanticAttributes, SpanKind, type TraceContext } from 'types/tracing.types';
 import { getPromptAdapter } from 'ui/prompt-adapter.interface';
-import { promisify } from 'util';
 import { formatErrorMessage } from 'utils/error-utils';
 import { readFile, writeFile } from 'utils/file-utils';
 import { validateNotForbiddenPath } from 'utils/input-validator';
+import { getMetricsCollector } from 'utils/metrics-collector';
 import { getTracer, type Span } from 'utils/tracing';
 
 import { getHookExecutionService } from './hook-execution.service';
@@ -729,6 +732,10 @@ export class ToolExecutionService {
 			span.recordException(error as Error);
 
 			this.logger.error(`Tool ${name} failed`, error as Error);
+
+			// Record metric and emit event so failures are visible in dashboard + to subscribers
+			getMetricsCollector().incrementCounter('tool_execution_failed', 1, { tool: name });
+			getPipelineEmitter().emitToolExecutionFailed({ errorMessage, toolName: name });
 
 			// Store failed result for idempotent tools (prevents retrying failed operations)
 			if (isIdempotentTool(name)) {

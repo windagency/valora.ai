@@ -5,18 +5,12 @@
 import type { MCPTool } from './mcp-registry.types';
 import type { ModelNameValue } from './provider-names.types';
 
-export type AgentRole =
-	| 'asserter'
-	| 'lead'
-	| 'platform-engineer'
-	| 'product-manager'
-	| 'qa'
-	| 'secops-engineer'
-	| 'software-engineer-typescript'
-	| 'software-engineer-typescript-backend'
-	| 'software-engineer-typescript-frontend'
-	| 'software-engineer-typescript-frontend-react'
-	| 'ui-ux-designer';
+/**
+ * Agent role identifier.
+ * Extensible via registry.json agent definitions — new roles for other
+ * languages/frameworks can be added without code changes.
+ */
+export type AgentRole = string;
 
 /**
  * AI Model names - uses centralized model registry
@@ -180,6 +174,8 @@ export interface PipelineStage {
 	parallel?: boolean;
 	prompt: string;
 	required: boolean;
+	/** Per-stage retry configuration. Only applies to sequential stages. */
+	retry?: StageRetryConfig;
 	stage: StageType;
 	timeout_ms?: number;
 }
@@ -219,6 +215,13 @@ export interface StageOutput {
 	prompt: string;
 	stage: string;
 	success: boolean;
+}
+
+export interface StageRetryConfig {
+	/** Delay in ms between attempts (default: 0) */
+	delay_ms?: number;
+	/** Maximum number of attempts including the first (default: 1 = no retry) */
+	maxAttempts?: number;
 }
 
 export type StageType =

@@ -4,6 +4,9 @@
  * Handles loading and saving exploration state to disk for recovery and tracking
  */
 
+import { promises as fs } from 'fs';
+import * as path from 'path';
+
 import type {
 	Exploration,
 	ExplorationConfig,
@@ -12,8 +15,6 @@ import type {
 	WorktreeExploration
 } from 'types/exploration.types';
 
-import { promises as fs } from 'fs';
-import * as path from 'path';
 import { ensureDir } from 'utils/file-utils';
 import { generateExplorationId } from 'utils/id-generator';
 import { getRuntimeDataDir } from 'utils/paths';
@@ -240,6 +241,24 @@ export class ExplorationStateManager {
 	async getActiveExplorations(): Promise<ExplorationSummary[]> {
 		const all = await this.listExplorations();
 		return all.filter((exp) => exp.status === 'running' || exp.status === 'pending');
+	}
+
+	/**
+	 * Find exploration linked to a session
+	 */
+	async findBySessionId(sessionId: string): Promise<Exploration | null> {
+		const summaries = await this.listExplorations();
+		for (const summary of summaries) {
+			try {
+				const exploration = await this.loadExploration(summary.id);
+				if (exploration.session_id === sessionId) {
+					return exploration;
+				}
+			} catch {
+				// Skip unreadable explorations
+			}
+		}
+		return null;
 	}
 
 	/**

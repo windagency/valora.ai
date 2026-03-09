@@ -106,39 +106,11 @@ export interface CodebaseContext {
 	technologyStack: string[];
 }
 
-export type SelectionCriterion =
-	| 'accessibility-files'
-	| 'architecture-files'
-	| 'audit-files'
-	| 'authentication-code'
-	| 'cloud-config'
-	| 'code-files'
-	| 'config-files'
-	| 'design-files'
-	| 'docker-files'
-	| 'documentation-files'
-	| 'encryption-code'
-	| 'engineering-docs'
-	| 'infrastructure-files'
-	| 'kubernetes-manifests'
-	| 'leadership-docs'
-	| 'policy-files'
-	| 'product-docs'
-	| 'qa-scripts'
-	| 'react-imports'
-	| 'requirements-files'
-	| 'roadmap-files'
-	| 'security-files'
-	| 'strategy-files'
-	| 'terraform-files'
-	| 'test-files'
-	| 'test-reports'
-	| 'testing-config'
-	| 'type-definitions'
-	| 'typescript-files'
-	| 'ui-mockups'
-	| 'user-stories'
-	| 'ux-research';
+/**
+ * Selection criteria for agent matching.
+ * Extensible via registry.json — new criteria can be added without code changes.
+ */
+export type SelectionCriterion = string;
 
 export interface TaskClassification {
 	complexity: 'high' | 'low' | 'medium';
@@ -158,11 +130,10 @@ export interface TaskContext {
 	secondaryDomains?: TaskDomain[];
 }
 
-export type TaskDomain =
-	| 'infrastructure'
-	| 'security'
-	| 'typescript-backend-general'
-	| 'typescript-core'
-	| 'typescript-frontend-general'
-	| 'typescript-frontend-react'
-	| 'ui-ux-designer';
+/**
+ * Task domain identifier aligned with registry.json taskDomains.
+ * The registry is the single source of truth for domain names.
+ * Using string to allow dynamic extension for new languages and frameworks
+ * (e.g. 'python-core', 'java-backend', 'rust-systems') without code changes.
+ */
+export type TaskDomain = string;

@@ -4,9 +4,9 @@
  * Provides event-driven updates for dashboard and monitoring
  */
 
-import type { ContainerStats, Decision, Exploration, Insight, WorktreeExploration } from 'types/exploration.types';
-
 import { EventEmitter } from 'events';
+
+import type { ContainerStats, Decision, Exploration, Insight, WorktreeExploration } from 'types/exploration.types';
 
 export interface ContainerStatsEvent extends ExplorationEvent {
 	data: {

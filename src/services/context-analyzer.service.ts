@@ -5,10 +5,11 @@
  * additional context for agent selection and task classification.
  */
 
+import * as path from 'path';
+
 import type { CodebaseContext, TaskContext } from 'types/agent.types';
 
 import { getLogger } from 'output/logger';
-import * as path from 'path';
 import { readFile } from 'utils/file-utils';
 
 export class ContextAnalyzerService {

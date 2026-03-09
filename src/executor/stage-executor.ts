@@ -4,6 +4,8 @@
  * MAINT-002: Large Files Need Splitting - Extracted from pipeline.ts
  */
 
+import { existsSync } from 'fs';
+
 import type { AgentDefinition } from 'types/agent.types';
 import type { PipelineStage, StageOutput } from 'types/command.types';
 import type { EscalationContext, EscalationSignal } from 'types/escalation.types';
@@ -11,6 +13,7 @@ import type {
 	LLMCompletionOptions,
 	LLMCompletionResult,
 	LLMMessage,
+	LLMToolCall,
 	LLMToolDefinition,
 	LLMToolResult
 } from 'types/llm.types';
@@ -18,7 +21,6 @@ import type { PromptDefinition } from 'types/prompt.types';
 
 import { DEFAULT_MAX_TOKENS, DEFAULT_TEMPERATURE } from 'config/constants';
 import { ProviderName } from 'config/providers.config';
-import { existsSync } from 'fs';
 import { MCPApprovalCacheService } from 'mcp/mcp-approval-cache.service';
 import { MCPApprovalWorkflow } from 'mcp/mcp-approval-workflow';
 import { MCPAuditLoggerService } from 'mcp/mcp-audit-logger.service';
@@ -29,6 +31,7 @@ import { getLogger } from 'output/logger';
 import { ResolutionPath } from 'types/provider.types';
 import { formatErrorMessage } from 'utils/error-utils';
 import { readFile } from 'utils/file-utils';
+import { getMetricsCollector } from 'utils/metrics-collector';
 
 import type { AgentLoader } from './agent-loader';
 import type { ExecutionContext } from './execution-context';
@@ -43,6 +46,13 @@ import { loadAvailableAgents, loadProjectGuidance, loadProjectKnowledge } from '
 import { getStageOutputCache, type StageOutputCache } from './stage-output-cache';
 import { getStageValidationService, type StageValidationService } from './stage-validation.service';
 import { getToolExecutionService, type ToolExecutionService } from './tool-execution.service';
+
+/**
+ * If this many tool calls fail within a single stage, the stage is hard-stopped
+ * (success: false) rather than allowing the LLM to produce degraded output.
+ * Prevents silently broken results from propagating downstream.
+ */
+const MAX_TOOL_FAILURES_BEFORE_HARD_STOP = 5;
 
 export interface PipelineExecutionContext {
 	executionContext: ExecutionContext;
@@ -68,9 +78,25 @@ export interface WorktreeInfoContext {
 interface CompletionHandlerContext {
 	completion: LLMCompletionResult;
 	duration: number;
+	/** Quality summary derived from the tool loop conversation history */
+	executionSummary?: ExecutionSummary;
 	logger: ReturnType<typeof getLogger>;
 	resolvedInputs: Record<string, unknown>;
 	stage: PipelineStage;
+}
+
+/**
+ * Execution quality summary derived from scanning the tool loop conversation history.
+ * Used to ground the forced final output prompt in verified facts and to annotate
+ * stage output metadata so downstream consumers can detect degraded results.
+ */
+interface ExecutionSummary {
+	/** Number of tool result messages that contained an error */
+	toolFailureCount: number;
+	/** Files that were successfully written, modified, or deleted by tool calls */
+	verifiedModifiedFiles: string[];
+	/** Whether the stage hit the iteration ceiling and required a forced output */
+	wasLoopExhausted: boolean;
 }
 
 export class StageExecutor {
@@ -400,7 +426,7 @@ export class StageExecutor {
 
 		// Call LLM with tool loop
 		// In dry-run mode, tools are passed to LLM but simulated during execution
-		const completion = await this.callLLMWithToolLoop(
+		const { completion, summary } = await this.callLLMWithToolLoop(
 			executionContext,
 			systemMessage,
 			userMessage,
@@ -419,6 +445,7 @@ export class StageExecutor {
 		// Handle completion
 		return this.handleStageCompletion(
 			completion,
+			summary,
 			stage,
 			executionContext,
 			resources.escalationCriteria,
@@ -446,7 +473,14 @@ export class StageExecutor {
 		const agent = await this.agentLoader.loadAgent(executionContext.agentRole);
 		const projectGuidance = await loadProjectGuidance();
 		const projectKnowledge = await loadProjectKnowledge(executionContext.knowledgeFiles ?? []);
-		const availableAgents = await loadAvailableAgents(prompt.agents ?? []);
+
+		// Filter agents to only load the one matching the current execution context
+		// This avoids loading unnecessary agents (e.g., backend agent for a frontend task)
+		const promptAgents = prompt.agents ?? [];
+		const filteredAgents = promptAgents.includes(executionContext.agentRole)
+			? [executionContext.agentRole]
+			: promptAgents;
+		const availableAgents = await loadAvailableAgents(filteredAgents);
 
 		return {
 			agent,
@@ -546,6 +580,7 @@ export class StageExecutor {
 	 */
 	private async handleStageCompletion(
 		completion: LLMCompletionResult,
+		executionSummary: ExecutionSummary,
 		stage: PipelineStage,
 		executionContext: ExecutionContext,
 		escalationCriteria: string[] | undefined,
@@ -556,6 +591,7 @@ export class StageExecutor {
 		const handlerCtx: CompletionHandlerContext = {
 			completion,
 			duration,
+			executionSummary,
 			logger,
 			resolvedInputs: enrichedInputs,
 			stage
@@ -602,7 +638,7 @@ export class StageExecutor {
 		tools: LLMToolDefinition[] | undefined,
 		stage: PipelineStage,
 		logger: ReturnType<typeof getLogger>
-	): Promise<LLMCompletionResult> {
+	): Promise<{ completion: LLMCompletionResult; summary: ExecutionSummary }> {
 		const maxToolIterations = 20;
 		const messages: LLMMessage[] = [
 			{ content: systemMessage, role: 'system' },
@@ -623,7 +659,10 @@ export class StageExecutor {
 			// No tool calls means we're done
 			if (!completion.tool_calls || completion.tool_calls.length === 0) {
 				logger.debug('LLM completed without tool calls', { iterations, stage: `${stage.stage}.${stage.prompt}` });
-				return completion;
+				return {
+					completion,
+					summary: { toolFailureCount: 0, verifiedModifiedFiles: [], wasLoopExhausted: false }
+				};
 			}
 
 			// Process tool calls and add to conversation
@@ -636,6 +675,7 @@ export class StageExecutor {
 
 	/**
 	 * Execute a single LLM iteration
+	 * If the prompt is too long, compresses older tool results and retries once
 	 */
 	private async executeLLMIteration(
 		executionContext: ExecutionContext,
@@ -655,10 +695,54 @@ export class StageExecutor {
 			modelOverride,
 			modeOverride
 		);
-		const completion = await executionContext.provider.complete(completionOptions);
 
-		this.logLLMResponse(logger, completion);
-		return completion;
+		try {
+			const completion = await executionContext.provider.complete(completionOptions);
+			this.logLLMResponse(logger, completion);
+			return completion;
+		} catch (error) {
+			if (this.isPromptTooLongError(error)) {
+				logger.warn('Prompt too long — compressing tool results in message history and retrying', {
+					iteration,
+					messageCount: messages.length
+				});
+				const compressedMessages = this.compressToolResults(messages);
+				completionOptions.messages = compressedMessages;
+				const completion = await executionContext.provider.complete(completionOptions);
+				this.logLLMResponse(logger, completion);
+				return completion;
+			}
+			throw error;
+		}
+	}
+
+	/**
+	 * Check whether an error is an LLM "prompt too long" / context-length error
+	 */
+	private isPromptTooLongError(error: unknown): boolean {
+		const message = (error as Error | undefined)?.message ?? '';
+		return (
+			message.includes('prompt is too long') ||
+			message.includes('maximum context length') ||
+			message.includes('context_length_exceeded') ||
+			message.includes('tokens > ')
+		);
+	}
+
+	/**
+	 * Compress message history by replacing old tool results with a placeholder.
+	 * Keeps the system message, first user message, and the most recent 4 messages intact.
+	 */
+	private compressToolResults(messages: LLMMessage[]): LLMMessage[] {
+		const KEEP_RECENT = 4;
+		const cutoff = messages.length - KEEP_RECENT;
+
+		return messages.map((msg, i) => {
+			if (msg.role === 'tool' && i < cutoff) {
+				return { ...msg, content: '[Tool result omitted to reduce context length]' };
+			}
+			return msg;
+		});
 	}
 
 	/**
@@ -752,7 +836,92 @@ export class StageExecutor {
 	}
 
 	/**
-	 * Handle case when tool loop exceeds max iterations
+	 * Extract the names of the most recently invoked tools from message history.
+	 * Useful for diagnosing what the agent was doing when it hit the iteration limit.
+	 */
+	private extractLastToolsInvoked(messages: LLMMessage[], limit = 10): string[] {
+		const toolNames: string[] = [];
+		for (let i = messages.length - 1; i >= 0 && toolNames.length < limit; i--) {
+			const msg = messages[i] as LLMMessage | undefined;
+			if (msg?.role === 'assistant' && msg.tool_calls) {
+				for (const tc of msg.tool_calls) {
+					toolNames.push(tc.name);
+				}
+			}
+		}
+		return toolNames.reverse();
+	}
+
+	/**
+	 * Scan the full tool loop conversation history to build an execution summary.
+	 *
+	 * - Counts tool results that started with "Error:" (these are caught failures
+	 *   returned as strings rather than thrown exceptions).
+	 * - Collects file paths from successful mutating tool calls (write, search_replace,
+	 *   delete_file) so they can be injected into the forced final prompt, grounding
+	 *   the LLM's summary in verified state rather than memory.
+	 */
+	private extractExecutionSummary(messages: LLMMessage[]): Omit<ExecutionSummary, 'wasLoopExhausted'> {
+		const mutatingTools = new Set(['delete_file', 'search_replace', 'write']);
+		const pendingFiles = new Map<string, string>(); // tool_call_id → path
+		let toolFailureCount = 0;
+		const verifiedModifiedFiles: string[] = [];
+
+		for (const msg of messages) {
+			if (msg.role === 'assistant' && msg.tool_calls) {
+				this.registerMutatingToolCalls(msg.tool_calls, mutatingTools, pendingFiles);
+			} else if (msg.role === 'tool') {
+				toolFailureCount += this.processToolResult(msg, pendingFiles, verifiedModifiedFiles);
+			}
+		}
+
+		return { toolFailureCount, verifiedModifiedFiles };
+	}
+
+	/**
+	 * Register file paths for mutating tool calls so results can be verified later.
+	 */
+	private registerMutatingToolCalls(
+		toolCalls: LLMToolCall[],
+		mutatingTools: Set<string>,
+		pendingFiles: Map<string, string>
+	): void {
+		for (const tc of toolCalls) {
+			if (mutatingTools.has(tc.name)) {
+				const path = typeof tc.arguments['path'] === 'string' ? tc.arguments['path'] : undefined;
+				if (path) pendingFiles.set(tc.id, path);
+			}
+		}
+	}
+
+	/**
+	 * Process a tool result message: count failures and track verified file writes.
+	 * Returns 1 if this result is a failure, 0 otherwise.
+	 */
+	private processToolResult(
+		msg: LLMMessage,
+		pendingFiles: Map<string, string>,
+		verifiedModifiedFiles: string[]
+	): number {
+		if (msg.content.startsWith('Error:')) {
+			if (msg.name) pendingFiles.delete(msg.name);
+			return 1;
+		}
+		if (msg.name) {
+			const path = pendingFiles.get(msg.name);
+			if (path && !verifiedModifiedFiles.includes(path)) {
+				verifiedModifiedFiles.push(path);
+			}
+			pendingFiles.delete(msg.name);
+		}
+		return 0;
+	}
+
+	/**
+	 * Handle case when tool loop exceeds max iterations.
+	 * Records a metrics counter, emits a TOOL_LOOP_EXHAUSTED pipeline event,
+	 * and falls back to a forced final output that is grounded in verified
+	 * execution state (actual file changes + failure count) rather than LLM memory.
 	 */
 	private async handleMaxIterationsExceeded(
 		executionContext: ExecutionContext,
@@ -761,18 +930,49 @@ export class StageExecutor {
 		modelOverride: string | undefined,
 		modeOverride: string | undefined,
 		logger: ReturnType<typeof getLogger>
-	): Promise<LLMCompletionResult> {
+	): Promise<{ completion: LLMCompletionResult; summary: ExecutionSummary }> {
+		const stageId = `${stage.stage}.${stage.prompt}`;
+		const { toolFailureCount, verifiedModifiedFiles } = this.extractExecutionSummary(messages);
+		const lastToolsInvoked = this.extractLastToolsInvoked(messages);
+		const messageDepth = messages.length;
+
 		logger.warn('Tool loop exceeded maximum iterations', {
+			lastToolsInvoked,
 			maxIterations: 20,
-			stage: `${stage.stage}.${stage.prompt}`
+			messageDepth,
+			stage: stageId,
+			toolFailureCount,
+			verifiedModifiedFiles
 		});
 
-		return this.requestFinalOutput(executionContext, messages, stage, modelOverride, modeOverride, logger);
+		// Record metric — visible in dashboard Performance tab and MetricsSummary
+		getMetricsCollector().incrementCounter('tool_loop_exhausted', 1, { stage: stageId });
+
+		// Emit typed event for real-time observers
+		getPipelineEmitter().emitToolLoopExhausted({
+			iterationsUsed: 20,
+			lastToolsInvoked,
+			messageDepth,
+			stage: stageId
+		});
+
+		const summary: ExecutionSummary = { toolFailureCount, verifiedModifiedFiles, wasLoopExhausted: true };
+		const completion = await this.requestFinalOutput(
+			executionContext,
+			messages,
+			stage,
+			modelOverride,
+			modeOverride,
+			summary,
+			logger
+		);
+		return { completion, summary };
 	}
 
 	/**
-	 * Request final structured output when tool loop is exhausted
-	 * Makes a final LLM call without tools to get the required JSON output
+	 * Request final structured output when tool loop is exhausted.
+	 * Injects verified execution facts (files actually written, failure count)
+	 * so the LLM summarises real state rather than relying on memory.
 	 */
 	private async requestFinalOutput(
 		executionContext: ExecutionContext,
@@ -780,15 +980,27 @@ export class StageExecutor {
 		stage: PipelineStage,
 		modelOverride: string | undefined,
 		modeOverride: string | undefined,
+		summary: ExecutionSummary,
 		logger: ReturnType<typeof getLogger>
 	): Promise<LLMCompletionResult> {
 		logger.warn('Requesting final structured output (tool loop exhausted)', {
 			stage: `${stage.stage}.${stage.prompt}`
 		});
 
+		// Inject verified execution facts so the LLM does not have to rely on memory
+		const verifiedFilesSection =
+			summary.verifiedModifiedFiles.length > 0
+				? `\n\n**VERIFIED files your tools actually wrote/modified (confirmed from tool results):**\n${summary.verifiedModifiedFiles.map((f) => `- ${f}`).join('\n')}\nUse this list for "files_modified" — do NOT invent additional files.`
+				: '\n\n**No file writes were confirmed successful.** Set "files_modified" to [].';
+
+		const failureSection =
+			summary.toolFailureCount > 0
+				? `\n\n**WARNING: ${summary.toolFailureCount} tool call(s) failed during execution.** You MUST include a note about these failures in "implementation_notes.decisions".`
+				: '';
+
 		// Add a user message prompting for final output
 		const finalPromptMessage: LLMMessage = {
-			content: `STOP. Tool execution limit reached. You MUST now output your final response.
+			content: `STOP. Tool execution limit reached. You MUST now output your final response.${verifiedFilesSection}${failureSection}
 
 **CRITICAL INSTRUCTION**: Your response must be ONLY a JSON code block. No other text before or after.
 
@@ -839,9 +1051,26 @@ Summarize ALL changes you made during tool execution. Output ONLY the JSON code 
 
 	/**
 	 * Format a tool result for the conversation
+	 * Truncates large results to prevent exceeding LLM context limits
 	 */
 	private formatToolResult(result: LLMToolResult): string {
-		return result.output;
+		const output = result.output;
+		const MAX_TOOL_RESULT_CHARS = 100_000;
+
+		if (output.length > MAX_TOOL_RESULT_CHARS) {
+			const logger = getLogger();
+			logger.warn('Tool result truncated due to length', {
+				originalLength: output.length,
+				toolCallId: result.tool_call_id,
+				truncatedLength: MAX_TOOL_RESULT_CHARS
+			});
+			return (
+				output.substring(0, MAX_TOOL_RESULT_CHARS) +
+				`\n\n[... truncated: ${output.length - MAX_TOOL_RESULT_CHARS} additional characters omitted due to context length limits ...]`
+			);
+		}
+
+		return output;
 	}
 
 	/**
@@ -901,11 +1130,49 @@ Summarize ALL changes you made during tool execution. Output ONLY the JSON code 
 	 * Handle normal completion result
 	 */
 	private handleNormalCompletion(ctx: CompletionHandlerContext): StageOutput {
-		const { completion, duration, logger, resolvedInputs, stage } = ctx;
-		logger.debug(`Stage completed: ${stage.stage}.${stage.prompt}`, {
-			duration_ms: duration,
-			outputTokens: completion.usage?.completion_tokens
-		});
+		const { completion, duration, executionSummary, logger, resolvedInputs, stage } = ctx;
+		const isDegraded =
+			executionSummary !== undefined && (executionSummary.wasLoopExhausted || executionSummary.toolFailureCount > 0);
+
+		// Hard-stop: too many tool failures means the output cannot be trusted
+		if (executionSummary !== undefined && executionSummary.toolFailureCount >= MAX_TOOL_FAILURES_BEFORE_HARD_STOP) {
+			const errorMsg =
+				`Stage hard-stopped: ${executionSummary.toolFailureCount} tool failures exceeded ` +
+				`the threshold of ${MAX_TOOL_FAILURES_BEFORE_HARD_STOP} (stage: ${stage.stage}.${stage.prompt})`;
+			logger.error(errorMsg, new Error(errorMsg));
+			this.eventEmitter.emitStageError(`${stage.stage}.${stage.prompt}`, errorMsg);
+			return {
+				duration_ms: duration,
+				error: errorMsg,
+				metadata: {
+					executionQuality: {
+						degraded: true,
+						hardStopped: true,
+						toolFailureCount: executionSummary.toolFailureCount,
+						verifiedModifiedFiles: executionSummary.verifiedModifiedFiles,
+						wasLoopExhausted: executionSummary.wasLoopExhausted
+					},
+					stageContext: { inputs: resolvedInputs, prompt: stage.prompt, stage: stage.stage }
+				},
+				outputs: {},
+				prompt: stage.prompt,
+				stage: stage.stage,
+				success: false
+			};
+		}
+
+		if (isDegraded) {
+			logger.warn(`Stage completed in degraded state: ${stage.stage}.${stage.prompt}`, {
+				toolFailureCount: executionSummary!.toolFailureCount,
+				verifiedModifiedFiles: executionSummary!.verifiedModifiedFiles,
+				wasLoopExhausted: executionSummary!.wasLoopExhausted
+			});
+		} else {
+			logger.debug(`Stage completed: ${stage.stage}.${stage.prompt}`, {
+				duration_ms: duration,
+				outputTokens: completion.usage?.completion_tokens
+			});
+		}
 
 		const parsedOutputs = this.outputParsingService.parseStageOutputs(completion.content, stage.outputs ?? []);
 
@@ -921,6 +1188,14 @@ Summarize ALL changes you made during tool execution. Output ONLY the JSON code 
 		return {
 			duration_ms: duration,
 			metadata: {
+				...(executionSummary !== undefined && {
+					executionQuality: {
+						degraded: isDegraded,
+						toolFailureCount: executionSummary.toolFailureCount,
+						verifiedModifiedFiles: executionSummary.verifiedModifiedFiles,
+						wasLoopExhausted: executionSummary.wasLoopExhausted
+					}
+				}),
 				stageContext: {
 					inputs: resolvedInputs,
 					prompt: stage.prompt,

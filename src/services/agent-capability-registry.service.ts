@@ -5,10 +5,11 @@
  * Loads and manages agent capabilities from the registry.json file.
  */
 
+import path from 'path';
+
 import type { AgentCapability, SelectionCriterion, TaskDomain } from 'types/agent.types';
 
 import { getLogger } from 'output/logger';
-import path from 'path';
 import { readFile } from 'utils/file-utils';
 import { getPackageDataDir } from 'utils/paths';
 

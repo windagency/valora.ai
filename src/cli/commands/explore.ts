@@ -5,9 +5,10 @@
  */
 
 import type { CommandAdapter } from 'cli/command-adapter.interface';
-import type { ExplorationConfig } from 'types/exploration.types';
+import type { Exploration, ExplorationConfig } from 'types/exploration.types';
 
 import { CollaborationCoordinator } from 'exploration/collaboration-coordinator';
+import { ContainerManager } from 'exploration/container-manager';
 import { ExplorationStateManager } from 'exploration/exploration-state';
 import { MergeOrchestrator, type MergeStrategy } from 'exploration/merge-orchestrator';
 import { ExplorationOrchestrator } from 'exploration/orchestrator';
@@ -15,8 +16,10 @@ import { ResultComparator } from 'exploration/result-comparator';
 import { SafetyValidator } from 'exploration/safety-validator';
 import { WorktreeManager } from 'exploration/worktree-manager';
 import { getColorAdapter } from 'output/color-adapter.interface';
+import { SessionLifecycle } from 'session/lifecycle';
+import { SessionStore } from 'session/store';
 import { getPromptAdapter } from 'ui/prompt-adapter.interface';
-import { getSpinnerAdapter } from 'ui/spinner-adapter.interface';
+import { getSpinnerAdapter, type Spinner } from 'ui/spinner-adapter.interface';
 import { formatError } from 'utils/error-handler';
 
 const prompt = getPromptAdapter();
@@ -34,6 +37,7 @@ function getStatusColor(status: string): StatusColor {
 	if (status === 'completed') return 'green';
 	if (status === 'running') return 'cyan';
 	if (status === 'failed') return 'red';
+	if (status === 'timed_out') return 'yellow';
 	return 'yellow';
 }
 
@@ -44,6 +48,7 @@ function getStatusIcon(status: string): string {
 	if (status === 'completed') return '✓';
 	if (status === 'running') return '▶';
 	if (status === 'failed') return '✗';
+	if (status === 'timed_out') return '⏱';
 	return '○';
 }
 
@@ -474,25 +479,33 @@ function displayMergeFailure(result: MergeResult): void {
 /**
  * Clean up single exploration
  */
-async function cleanupSingleExploration(
+/**
+ * Clean up exploration resources when state file exists
+ */
+async function cleanupExplorationWithState(
 	explorationId: string,
+	exploration: Exploration,
 	stateManager: ExplorationStateManager,
 	worktreeManager: WorktreeManager,
-	dryRun: boolean
+	loading: Spinner
 ): Promise<void> {
 	const color = getColorAdapter();
-	const loading = spinner.create(`Cleaning up exploration ${explorationId}...`).start();
-	const exploration = await stateManager.loadExploration(explorationId);
+	const containerNames = exploration.worktrees.map(
+		(w: { index: number }) => `exploration-${explorationId}-worktree-${w.index}`
+	);
 
-	if (dryRun) {
-		loading.info(color.cyan('Dry run - would remove:'));
-		console.log(color.gray(`  Exploration: ${explorationId}`));
-		console.log(color.gray(`  Worktrees: ${exploration.worktrees.length}`));
-		console.log(color.gray(`  Shared volume: ${stateManager.getSharedVolumePath(explorationId)}`));
-		return;
+	// Stop and remove Docker containers
+	if (containerNames.length > 0) {
+		const containerManager = new ContainerManager();
+		try {
+			await containerManager.stopMultipleContainers(containerNames, 30);
+			await containerManager.removeMultipleContainers(containerNames, true);
+		} catch (error) {
+			loading.warn(color.yellow(`Failed to cleanup some containers: ${(error as Error).message}`));
+		}
 	}
 
-	// Remove worktrees
+	// Remove worktrees and branches
 	for (const worktree of exploration.worktrees) {
 		try {
 			await worktreeManager.removeWorktree(worktree.worktree_path, true);
@@ -502,8 +515,84 @@ async function cleanupSingleExploration(
 		}
 	}
 
-	// Delete exploration
 	await stateManager.deleteExploration(explorationId);
+}
+
+/**
+ * Clean up leftover worktrees and branches when exploration state is already gone
+ */
+async function cleanupLeftoverBranches(
+	explorationId: string,
+	worktreeManager: WorktreeManager,
+	loading: Spinner
+): Promise<void> {
+	const color = getColorAdapter();
+	const explorationWorktrees = await worktreeManager.getExplorationWorktrees();
+	const prefix = `exploration/${explorationId}`;
+
+	for (const wt of explorationWorktrees) {
+		if (wt.branch.includes(prefix)) {
+			try {
+				await worktreeManager.removeWorktree(wt.path, true);
+			} catch (error) {
+				loading.warn(color.yellow(`Failed to remove worktree: ${(error as Error).message}`));
+			}
+		}
+	}
+
+	// Delete leftover branches by pattern
+	const { execSync } = await import('child_process');
+	try {
+		const branches = execSync(`git branch --list "exploration/${explorationId}*"`, { encoding: 'utf-8' })
+			.split('\n')
+			.map((b: string) => b.trim())
+			.filter(Boolean);
+		for (const branch of branches) {
+			await worktreeManager.deleteBranch(branch, true);
+		}
+	} catch {
+		// No leftover branches found
+	}
+}
+
+async function cleanupSingleExploration(
+	explorationId: string,
+	stateManager: ExplorationStateManager,
+	worktreeManager: WorktreeManager,
+	dryRun: boolean
+): Promise<void> {
+	const color = getColorAdapter();
+	const loading = spinner.create(`Cleaning up exploration ${explorationId}...`).start();
+
+	let exploration: Exploration | null = null;
+	try {
+		exploration = await stateManager.loadExploration(explorationId);
+	} catch {
+		// Exploration state already deleted — fall through to clean up leftover branches
+	}
+
+	if (dryRun) {
+		if (exploration) {
+			const containerNames = exploration.worktrees.map(
+				(w: { index: number }) => `exploration-${explorationId}-worktree-${w.index}`
+			);
+			loading.info(color.cyan('Dry run - would remove:'));
+			console.log(color.gray(`  Exploration: ${explorationId}`));
+			console.log(color.gray(`  Containers: ${containerNames.join(', ')}`));
+			console.log(color.gray(`  Worktrees: ${exploration.worktrees.length}`));
+			console.log(color.gray(`  Shared volume: ${stateManager.getSharedVolumePath(explorationId)}`));
+		} else {
+			loading.info(color.cyan('Dry run - exploration state already removed, would clean up leftover branches'));
+		}
+		return;
+	}
+
+	if (exploration) {
+		await cleanupExplorationWithState(explorationId, exploration, stateManager, worktreeManager, loading);
+	} else {
+		await cleanupLeftoverBranches(explorationId, worktreeManager, loading);
+	}
+
 	loading.succeed(color.green(`Exploration ${explorationId} cleaned up`));
 }
 
@@ -660,6 +749,7 @@ export function configureExploreCommand(program: CommandAdapter): void {
 		.option('--memory-limit <size>', 'Memory limit per container', '2g')
 		.option('--auto-merge', 'Auto-merge winning exploration')
 		.option('--no-cleanup', 'Keep explorations for debugging')
+		.option('--skip-safety', 'Skip pre-flight safety checks')
 		.action(async (...args: Array<Record<string, unknown>>) => {
 			const task = args[0] as unknown as string;
 			const options = args[1] as unknown as ExploreTaskOptions;
@@ -673,7 +763,9 @@ export function configureExploreCommand(program: CommandAdapter): void {
 				const strategies = parseStrategies(options.strategies, branches);
 
 				// Run safety validation
-				await runSafetyValidation(branches);
+				if (!options['skipSafety']) {
+					await runSafetyValidation(branches);
+				}
 
 				// Build configuration
 				const config: ExplorationConfig = {
@@ -692,18 +784,29 @@ export function configureExploreCommand(program: CommandAdapter): void {
 
 				displayExplorationConfig(task, branches, strategies, config);
 
+				// Create session for this exploration
+				const sessionLifecycle = new SessionLifecycle(new SessionStore());
+				const sessionManager = await sessionLifecycle.create();
+				const sessionId = sessionManager.getSession().session_id;
+
 				// Start orchestrator
 				const orchestratorSpinner = spinner.create('Starting exploration orchestrator...').start();
 				const orchestrator = new ExplorationOrchestrator();
 
 				try {
-					const result = await orchestrator.startExploration({ config, task });
+					const result = await orchestrator.startExploration({ config, sessionId, task });
+
+					// Store exploration ID in session context
+					sessionManager.updateContext('exploration_id', result.exploration_id);
+					await sessionLifecycle.complete();
+
 					orchestratorSpinner.succeed(color.green('Exploration completed!'));
 
 					// Display results and next steps
 					displayExplorationResults(result);
 					displayNextSteps(result);
 				} catch (error) {
+					await sessionLifecycle.fail((error as Error).message);
 					orchestratorSpinner.fail(color.red('Exploration failed'));
 					throw error;
 				}
@@ -753,33 +856,47 @@ export function configureExploreCommand(program: CommandAdapter): void {
 					timeout_minutes: parseInt(options['timeout'] as string, 10)
 				};
 
+				// Create session for this exploration
+				const sessionLifecycle = new SessionLifecycle(new SessionStore());
+				const sessionManager = await sessionLifecycle.create();
+				const sessionId = sessionManager.getSession().session_id;
+
 				// Start orchestrator
 				const loading = spinner.create('Starting sequential exploration...').start();
 				const orchestrator = new ExplorationOrchestrator();
 
-				const result = await orchestrator.startExploration({ config, task });
+				try {
+					const result = await orchestrator.startExploration({ config, sessionId, task });
 
-				loading.succeed(color.green('Sequential exploration completed!'));
+					// Store exploration ID in session context
+					sessionManager.updateContext('exploration_id', result.exploration_id);
+					await sessionLifecycle.complete();
 
-				// Display results
-				console.log(color.getRawFn('cyan.bold')('\n📊 Exploration Results\n'));
-				console.log(color.gray(`Exploration ID: ${result.exploration_id}`));
-				console.log(color.gray(`Mode: sequential`));
-				console.log(
-					color.gray(
-						`Tried: ${result.execution_result.completed_branches}/${result.execution_result.total_branches} approaches`
-					)
-				);
-				console.log(color.gray(`Duration: ${(result.execution_result.duration_ms / 1000).toFixed(2)}s`));
+					loading.succeed(color.green('Sequential exploration completed!'));
 
-				if (result.execution_result.winner_index) {
-					console.log(color.green(`\n✓ Successful approach: Worktree ${result.execution_result.winner_index}`));
-				} else {
-					console.log(color.yellow('\n⚠️  All approaches failed'));
-				}
+					// Display results
+					console.log(color.getRawFn('cyan.bold')('\n📊 Exploration Results\n'));
+					console.log(color.gray(`Exploration ID: ${result.exploration_id}`));
+					console.log(color.gray(`Mode: sequential`));
+					console.log(
+						color.gray(
+							`Tried: ${result.execution_result.completed_branches}/${result.execution_result.total_branches} approaches`
+						)
+					);
+					console.log(color.gray(`Duration: ${(result.execution_result.duration_ms / 1000).toFixed(2)}s`));
 
-				if (result.comparison_report_path) {
-					console.log(color.gray(`\nComparison report: ${result.comparison_report_path}\n`));
+					if (result.execution_result.winner_index) {
+						console.log(color.green(`\n✓ Successful approach: Worktree ${result.execution_result.winner_index}`));
+					} else {
+						console.log(color.yellow('\n⚠️  All approaches failed'));
+					}
+
+					if (result.comparison_report_path) {
+						console.log(color.gray(`\nComparison report: ${result.comparison_report_path}\n`));
+					}
+				} catch (error) {
+					await sessionLifecycle.fail((error as Error).message);
+					throw error;
 				}
 			} catch (error) {
 				console.error(color.red('Sequential exploration failed:'), formatError(error as Error));

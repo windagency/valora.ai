@@ -6,6 +6,7 @@
  */
 
 import { EventEmitter } from 'events';
+
 import {
 	type AgentThinkingData,
 	type EscalationAbortedData,
@@ -19,9 +20,11 @@ import {
 	type StageCompleteData,
 	type StageProgressData,
 	type StageStartData,
+	type ToolExecutionFailedData,
 	type ToolHookBlockedData,
 	type ToolHookPostData,
-	type ToolHookTriggeredData
+	type ToolHookTriggeredData,
+	type ToolLoopExhaustedData
 } from 'types/pipeline.types';
 
 export class PipelineEventEmitter extends EventEmitter {
@@ -191,6 +194,28 @@ export class PipelineEventEmitter extends EventEmitter {
 			...data,
 			timestamp: Date.now(),
 			type: PipelineEventType.TOOL_HOOK_BLOCKED
+		} as PipelineEventData);
+	}
+
+	/**
+	 * Emit tool execution failed event
+	 */
+	emitToolExecutionFailed(data: ToolExecutionFailedData): void {
+		this.emit(PipelineEventType.TOOL_EXECUTION_FAILED, {
+			...data,
+			timestamp: Date.now(),
+			type: PipelineEventType.TOOL_EXECUTION_FAILED
+		} as PipelineEventData);
+	}
+
+	/**
+	 * Emit tool loop exhausted event
+	 */
+	emitToolLoopExhausted(data: ToolLoopExhaustedData): void {
+		this.emit(PipelineEventType.TOOL_LOOP_EXHAUSTED, {
+			...data,
+			timestamp: Date.now(),
+			type: PipelineEventType.TOOL_LOOP_EXHAUSTED
 		} as PipelineEventData);
 	}
 

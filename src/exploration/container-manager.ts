@@ -4,12 +4,13 @@
  * Handles creating, monitoring, and destroying Docker containers for explorations
  */
 
-import type { ContainerStats } from 'types/exploration.types';
-
 import { exec } from 'child_process';
-import { getLogger } from 'output/logger';
 import * as path from 'path';
 import { promisify } from 'util';
+
+import type { ContainerStats } from 'types/exploration.types';
+
+import { getLogger } from 'output/logger';
 import { formatErrorMessage } from 'utils/error-handler';
 
 const execAsync = promisify(exec);

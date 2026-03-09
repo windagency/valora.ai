@@ -2,8 +2,9 @@
  * Command discovery utilities - handles command file discovery and listing
  */
 
-import { getLogger } from 'output/logger';
 import * as path from 'path';
+
+import { getLogger } from 'output/logger';
 import { ValidationError } from 'utils/error-handler';
 import { fileExists, getFileStats, listFiles } from 'utils/file-utils';
 import { getPackageDataDir } from 'utils/paths';

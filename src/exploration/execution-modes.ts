@@ -116,7 +116,7 @@ export abstract class ExecutionStrategy {
 		containerIds: string[],
 		worktreeIndices: number[],
 		timeoutMs: number
-	): Promise<void> {
+	): Promise<boolean> {
 		const startTime = Date.now();
 		const checkInterval = 5000; // Check every 5 seconds
 
@@ -128,7 +128,11 @@ export abstract class ExecutionStrategy {
 			await this.sleep(checkInterval);
 		}
 
-		this.checkTimeout(startTime, timeoutMs);
+		const timedOut = Date.now() - startTime >= timeoutMs;
+		if (timedOut) {
+			logger.warn(`Exploration timeout reached (${timeoutMs}ms)`);
+		}
+		return timedOut;
 	}
 
 	/**
@@ -202,15 +206,6 @@ export abstract class ExecutionStrategy {
 	 */
 	private handleMonitoringError(error: unknown): void {
 		logger.error(`Error monitoring containers: ${formatErrorMessage(error)}`);
-	}
-
-	/**
-	 * Check if timeout was reached
-	 */
-	private checkTimeout(startTime: number, timeoutMs: number): void {
-		if (Date.now() - startTime >= timeoutMs) {
-			logger.warn(`Exploration timeout reached (${timeoutMs}ms)`);
-		}
 	}
 
 	/**
@@ -330,11 +325,21 @@ export class ParallelExecutionStrategy extends ExecutionStrategy {
 
 			// Monitor containers until completion or timeout
 			const timeoutMs = exploration.config.timeout_minutes * 60 * 1000;
-			await this.monitorContainers(
+			const timedOut = await this.monitorContainers(
 				containerIds,
 				exploration.worktrees.map((_, i) => i + 1),
 				timeoutMs
 			);
+
+			// Mark timed-out worktrees
+			if (timedOut) {
+				for (const worktree of exploration.worktrees) {
+					if (worktree.status === 'running') {
+						worktree.status = 'timed_out';
+					}
+				}
+				await this.context.stateManager.saveExploration(exploration);
+			}
 
 			// Stop all containers
 			logger.info('Stopping all containers...');
@@ -395,53 +400,8 @@ export class SequentialExecutionStrategy extends ExecutionStrategy {
 			exploration.started_at = new Date().toISOString();
 			await this.context.stateManager.saveExploration(exploration);
 
-			let winnerIndex: number | undefined;
-
-			// Try each worktree sequentially
-			for (let i = 0; i < exploration.worktrees.length; i++) {
-				const worktree = exploration.worktrees[i];
-				if (!worktree) continue;
-
-				const worktreeIndex = i + 1;
-
-				logger.info(`Trying worktree ${worktreeIndex}: ${worktree.strategy ?? 'default'}`);
-
-				// Create container config
-				const containerConfig = this.createContainerConfig(worktree, worktreeIndex);
-
-				// Start container
-				const containerId = await this.context.containerManager.createContainer(containerConfig);
-				worktree.container_id = containerId;
-				worktree.status = 'running';
-				await this.context.stateManager.saveExploration(exploration);
-
-				// Monitor this container
-				const timeoutMs = exploration.config.timeout_minutes * 60 * 1000;
-				await this.monitorContainers([containerId], [worktreeIndex], timeoutMs);
-
-				// Stop container
-				const containerName = `exploration-${exploration.id}-worktree-${worktreeIndex}`;
-				await this.context.containerManager.stopContainer(containerName, 30);
-
-				// Reload exploration to get updated status (monitorContainers updates it)
-				const updatedExploration = await this.context.stateManager.loadExploration(exploration.id);
-				const updatedWorktree = updatedExploration.worktrees[i];
-				if (!updatedWorktree) {
-					logger.error(`Failed to load updated worktree ${worktreeIndex}`);
-					continue;
-				}
-
-				// Check if this worktree succeeded
-				if (updatedWorktree.status === 'completed') {
-					logger.info(`Worktree ${worktreeIndex} succeeded!`);
-					worktree.status = 'completed'; // Update local reference
-					winnerIndex = worktreeIndex;
-					break; // Stop trying other approaches
-				} else {
-					logger.warn(`Worktree ${worktreeIndex} failed, trying next approach`);
-					worktree.status = updatedWorktree.status; // Update local reference
-				}
-			}
+			// Try each worktree sequentially until one succeeds
+			const winnerIndex = await this.tryWorktreesSequentially();
 
 			// Collect results
 			const results = await this.collectResults();
@@ -481,6 +441,71 @@ export class SequentialExecutionStrategy extends ExecutionStrategy {
 
 			throw error;
 		}
+	}
+
+	private async tryWorktree(
+		worktree: WorktreeExploration,
+		worktreeIndex: number,
+		arrayIndex: number
+	): Promise<'failed' | 'succeeded'> {
+		const { exploration } = this.context;
+
+		logger.info(`Trying worktree ${worktreeIndex}: ${worktree.strategy ?? 'default'}`);
+
+		// Start container
+		const containerConfig = this.createContainerConfig(worktree, worktreeIndex);
+		const containerId = await this.context.containerManager.createContainer(containerConfig);
+		worktree.container_id = containerId;
+		worktree.status = 'running';
+		await this.context.stateManager.saveExploration(exploration);
+
+		// Monitor this container
+		const timeoutMs = exploration.config.timeout_minutes * 60 * 1000;
+		const timedOut = await this.monitorContainers([containerId], [worktreeIndex], timeoutMs);
+
+		// Mark timed-out worktree before stopping container
+		if (timedOut && worktree.status === 'running') {
+			worktree.status = 'timed_out';
+			await this.context.stateManager.saveExploration(exploration);
+		}
+
+		// Stop container
+		const containerName = `exploration-${exploration.id}-worktree-${worktreeIndex}`;
+		await this.context.containerManager.stopContainer(containerName, 30);
+
+		// Reload exploration to get updated status (monitorContainers updates it)
+		const updatedExploration = await this.context.stateManager.loadExploration(exploration.id);
+		const updatedWorktree = updatedExploration.worktrees[arrayIndex];
+		if (!updatedWorktree) {
+			logger.error(`Failed to load updated worktree ${worktreeIndex}`);
+			return 'failed';
+		}
+
+		if (updatedWorktree.status === 'completed') {
+			logger.info(`Worktree ${worktreeIndex} succeeded!`);
+			worktree.status = 'completed';
+			return 'succeeded';
+		}
+
+		logger.warn(`Worktree ${worktreeIndex} ${timedOut ? 'timed out' : 'failed'}, trying next approach`);
+		worktree.status = updatedWorktree.status;
+		return 'failed';
+	}
+
+	private async tryWorktreesSequentially(): Promise<number | undefined> {
+		const { exploration } = this.context;
+
+		for (let i = 0; i < exploration.worktrees.length; i++) {
+			const worktree = exploration.worktrees[i];
+			if (!worktree) continue;
+
+			const worktreeIndex = i + 1;
+			const result = await this.tryWorktree(worktree, worktreeIndex, i);
+
+			if (result === 'succeeded') return worktreeIndex;
+		}
+
+		return undefined;
 	}
 }
 

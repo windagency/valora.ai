@@ -12,10 +12,10 @@ This guide is designed for developers who want to use VALORA to automate and enh
 2. [Workflows](./workflows.md) - Common development patterns
 3. [Commands](./commands.md) - Complete command reference
 4. [Dry Run Mode](./dry-run-mode.md) - Preview changes before execution
-5. [Metrics and Optimization](./metrics.md) - Track and improve workflow efficiency
+5. [Metrics and Optimisation](./metrics.md) - Track and improve workflow efficiency
    - [Metrics Quick Start](./metrics-quickstart.md) - 5-minute metrics setup
-   - [Workflow Optimizations](./workflow-optimizations.md) - Detailed optimization reference
-6. [Configuration](./configuration.md) - Configure and customize the engine
+   - [Workflow Optimisations](./workflow-optimisations.md) - Detailed optimisation reference
+6. [Configuration](./configuration.md) - Configure and customise the engine
 7. [Best Practices](./best-practices.md) - Recommended usage patterns
 8. [Troubleshooting](./troubleshooting.md) - Common issues and solutions
 

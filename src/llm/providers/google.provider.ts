@@ -9,9 +9,10 @@
  * Self-registers with the LLM Provider Registry using dependency inversion pattern
  */
 
+import { GoogleGenerativeAI } from '@google/generative-ai';
+
 import type { LLMCompletionOptions, LLMCompletionResult } from 'types/llm.types';
 
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import { getProviderModels, ProviderName } from 'config/providers.config';
 import { BaseLLMProvider } from 'llm/provider.interface';
 import { getProviderRegistry } from 'llm/registry';

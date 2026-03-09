@@ -107,7 +107,7 @@ describe('ExecutionCoordinator - Dynamic Agent Integration', () => {
 						selectionCriteria: ['terraform-files']
 					},
 					'software-engineer-typescript-backend': {
-						domains: ['typescript-backend-general'],
+						domains: ['backend-api'],
 						expertise: ['nodejs', 'express'],
 						priority: 85,
 						role: 'software-engineer-typescript-backend',
@@ -120,7 +120,7 @@ describe('ExecutionCoordinator - Dynamic Agent Integration', () => {
 				},
 				taskDomains: {
 					infrastructure: 'Infrastructure tasks',
-					'typescript-backend-general': 'Backend development'
+					'backend-api': 'Backend development'
 				}
 			})
 		);

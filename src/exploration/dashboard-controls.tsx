@@ -4,10 +4,11 @@
  * Provides keyboard shortcuts and controls for pause/resume/stop operations
  */
 
+import React, { useEffect, useRef, useState } from 'react';
+
 import type { Exploration } from 'types/exploration.types';
 
 import { getLogger } from 'output/logger';
-import React, { useEffect, useRef, useState } from 'react';
 import { getTUIAdapter } from 'ui/tui-adapter.interface';
 import { formatErrorMessage } from 'utils/error-utils';
 

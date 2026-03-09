@@ -2,9 +2,10 @@
  * Doctor command for system diagnostics
  */
 
+import * as fs from 'fs';
+
 import type { CommandAdapter } from 'cli/command-adapter.interface';
 
-import * as fs from 'fs';
 import { getColorAdapter } from 'output/color-adapter.interface';
 import { getDiagnosticFormatter } from 'output/diagnostic-formatter';
 import { DiagnosticsService } from 'services/diagnostics.service';

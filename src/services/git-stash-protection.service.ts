@@ -6,8 +6,9 @@
  */
 
 import { exec } from 'child_process';
-import { getLogger } from 'output/logger';
 import { promisify } from 'util';
+
+import { getLogger } from 'output/logger';
 
 const execAsync = promisify(exec);
 

@@ -284,3 +284,7 @@ dist/
 
 # Project-local VALORA config
 .valora/
+
+# Mutation testing
+.stryker-tmp/
+reports/

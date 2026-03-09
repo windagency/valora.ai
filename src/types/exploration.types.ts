@@ -3,7 +3,7 @@
  */
 
 export type ExecutionMode = 'parallel' | 'sequential';
-export type ExplorationStatus = 'completed' | 'failed' | 'pending' | 'running' | 'stopped';
+export type ExplorationStatus = 'completed' | 'failed' | 'pending' | 'running' | 'stopped' | 'timed_out';
 export type InsightType = 'approach' | 'decision' | 'finding' | 'issue';
 
 /**
@@ -19,6 +19,7 @@ export interface Exploration {
 	id: string; // exp-{nanoid}
 	mode: ExecutionMode;
 	results?: ExplorationResults;
+	session_id?: string; // Linked CLI session ID
 	started_at?: string;
 	status: ExplorationStatus;
 	task: string; // User's task description

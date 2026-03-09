@@ -118,7 +118,7 @@ export class AgentCapabilityMatcherService {
 			return 1.0;
 		}
 
-		// Partial match for related domains (simplified - could be enhanced with domain relationships)
+		// Partial match for related domains
 		const relatedDomains = this.getRelatedDomains(primaryDomain);
 		const relatedMatch = relatedDomains.some((domain) => capability.domains.includes(domain));
 
@@ -126,20 +126,27 @@ export class AgentCapabilityMatcherService {
 	}
 
 	/**
-	 * Get related domains for a given domain (simplified relationship mapping)
+	 * Get related domains for a given domain.
+	 * Derived dynamically from the registry: two domains are related if
+	 * specialist agents (≤5 domains) cover both. This automatically adapts
+	 * when new language/framework agents are added to the registry.
 	 */
 	private getRelatedDomains(domain: TaskDomain): TaskDomain[] {
-		const domainRelationships: Record<TaskDomain, TaskDomain[]> = {
-			infrastructure: ['typescript-backend-general'],
-			security: ['typescript-backend-general', 'typescript-core'],
-			'typescript-backend-general': ['typescript-core', 'infrastructure'],
-			'typescript-core': ['typescript-backend-general', 'typescript-frontend-general', 'typescript-frontend-react'],
-			'typescript-frontend-general': ['typescript-core'],
-			'typescript-frontend-react': ['typescript-frontend-general', 'typescript-core'],
-			'ui-ux-designer': ['typescript-frontend-general']
-		};
+		const allCapabilities = this.registryService.getAllCapabilities();
+		const relatedDomains = new Set<string>();
 
-		return domainRelationships[domain] ?? [];
+		for (const capability of allCapabilities.values()) {
+			// Skip generalist agents — too many domains dilute relationships
+			if (capability.domains.length > 5) continue;
+
+			if (capability.domains.includes(domain)) {
+				for (const d of capability.domains) {
+					if (d !== domain) relatedDomains.add(d);
+				}
+			}
+		}
+
+		return Array.from(relatedDomains);
 	}
 
 	/**
@@ -201,48 +208,76 @@ export class AgentCapabilityMatcherService {
 	}
 
 	/**
-	 * Extract selection criteria from codebase context
+	 * Extract selection criteria from codebase context.
+	 * Uses a data-driven mapping so new file types and technologies
+	 * can be associated with criteria without modifying the logic.
 	 */
 	private extractSelectionCriteriaFromContext(context: CodebaseContext): SelectionCriterion[] {
-		const criteria: SelectionCriterion[] = [];
+		const criteria = new Set<SelectionCriterion>();
 
-		// File-based criteria
-		if (context.affectedFileTypes.includes('.ts') || context.affectedFileTypes.includes('.tsx')) {
-			criteria.push('typescript-files');
+		// File type → criteria mappings (extensible for new languages)
+		const fileTypeCriteria: Record<string, SelectionCriterion> = {
+			'.go': 'code-files',
+			'.java': 'code-files',
+			'.py': 'code-files',
+			'.rs': 'code-files',
+			'.tf': 'terraform-files',
+			'.ts': 'typescript-files',
+			'.tsx': 'typescript-files'
+		};
+
+		this.addMatchingCriteria(criteria, context.affectedFileTypes, fileTypeCriteria);
+
+		for (const fileType of context.affectedFileTypes) {
+			if (fileType.includes('yaml') || fileType.includes('yml')) {
+				criteria.add('kubernetes-manifests');
+			}
 		}
 
-		if (context.affectedFileTypes.includes('.tf')) {
-			criteria.push('terraform-files');
+		// Import pattern → criteria mappings (substring match)
+		const importCriteria: Record<string, SelectionCriterion> = {
+			react: 'react-imports'
+		};
+
+		for (const imp of context.importPatterns) {
+			for (const [pattern, criterion] of Object.entries(importCriteria)) {
+				if (imp.includes(pattern)) criteria.add(criterion);
+			}
 		}
 
-		if (context.affectedFileTypes.some((type) => type.includes('yaml') || type.includes('yml'))) {
-			criteria.push('kubernetes-manifests');
-		}
+		// Technology → criteria mappings
+		const techCriteria: Record<string, SelectionCriterion> = {
+			docker: 'docker-files',
+			kubernetes: 'kubernetes-manifests'
+		};
 
-		// Import-based criteria
-		if (context.importPatterns.some((imp) => imp.includes('react'))) {
-			criteria.push('react-imports');
-		}
+		this.addMatchingCriteria(criteria, context.technologyStack, techCriteria);
 
-		// Technology-based criteria
-		if (context.technologyStack.includes('docker')) {
-			criteria.push('docker-files');
-		}
+		// Infrastructure → criteria mappings
+		const infraCriteria: Record<string, SelectionCriterion> = {
+			aws: 'cloud-config',
+			azure: 'cloud-config',
+			gcp: 'cloud-config',
+			monitoring: 'policy-files'
+		};
 
-		if (context.technologyStack.includes('kubernetes')) {
-			criteria.push('kubernetes-manifests');
-		}
+		this.addMatchingCriteria(criteria, context.infrastructureComponents, infraCriteria);
 
-		// Infrastructure-based criteria
-		if (context.infrastructureComponents.includes('aws')) {
-			criteria.push('cloud-config');
-		}
+		return Array.from(criteria);
+	}
 
-		if (context.infrastructureComponents.includes('monitoring')) {
-			criteria.push('policy-files'); // Monitoring configs often in policy files
+	/**
+	 * Add criteria from a lookup table for each matching key.
+	 */
+	private addMatchingCriteria(
+		criteria: Set<SelectionCriterion>,
+		keys: string[],
+		lookup: Record<string, SelectionCriterion>
+	): void {
+		for (const key of keys) {
+			const criterion = lookup[key];
+			if (criterion) criteria.add(criterion);
 		}
-
-		return criteria;
 	}
 
 	/**

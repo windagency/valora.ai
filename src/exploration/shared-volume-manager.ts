@@ -4,11 +4,12 @@
  * Sets up the shared volume structure that allows agents to collaborate
  */
 
+import { promises as fs } from 'fs';
+import * as path from 'path';
+
 import type { DecisionsPool, InsightsPool } from 'types/exploration.types';
 
-import { promises as fs } from 'fs';
 import { getLogger } from 'output/logger';
-import * as path from 'path';
 import { ensureDir } from 'utils/file-utils';
 
 const logger = getLogger();

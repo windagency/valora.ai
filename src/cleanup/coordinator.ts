@@ -5,13 +5,14 @@
  * entry point, ensuring consistent initialization and lifecycle management.
  */
 
+import path from 'path';
+
 import type { Config } from 'config/schema';
 
 import { getConfigLoader } from 'config/loader';
 import { type CleanupSchedule, CleanupScheduler } from 'output/cleanup-scheduler';
 import { getLogger } from 'output/logger';
 import { RetentionManager, type RetentionPolicy } from 'output/retention-manager';
-import path from 'path';
 import { type SessionCleanupSchedule, SessionCleanupScheduler } from 'session/cleanup-scheduler';
 import { SessionRetentionManager, type SessionRetentionPolicy } from 'session/retention-manager';
 import { SessionStore } from 'session/store';

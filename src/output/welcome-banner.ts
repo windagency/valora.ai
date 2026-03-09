@@ -2,6 +2,7 @@
  * Welcome banner for first-run experience
  */
 
+// eslint-disable-next-line no-restricted-imports -- no path alias exists for root package.json
 import pkg from '../../package.json' with { type: 'json' };
 import { getColorAdapter } from './color-adapter.interface';
 import { getHeaderFormatter } from './header-formatter';

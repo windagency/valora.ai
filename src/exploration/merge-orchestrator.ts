@@ -4,11 +4,12 @@
  * Handles merging winning exploration branches back to main codebase
  */
 
+import { exec } from 'child_process';
+import { promisify } from 'util';
+
 import type { Exploration, WorktreeExploration } from 'types/exploration.types';
 
-import { exec } from 'child_process';
 import { getLogger } from 'output/logger';
-import { promisify } from 'util';
 import { formatErrorMessage } from 'utils/error-handler';
 
 import { ExplorationStateManager } from './exploration-state';

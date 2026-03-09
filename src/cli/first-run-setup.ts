@@ -2,11 +2,12 @@
  * First-run setup wizard for new users
  */
 
+import * as fs from 'fs';
+import * as path from 'path';
+
 import { getConfigLoader } from 'config/loader';
 import { SetupWizard } from 'config/wizard';
-import * as fs from 'fs';
 import { createNextStepsMessage, createWelcomeBanner } from 'output/welcome-banner';
-import * as path from 'path';
 import { getGlobalConfigDir } from 'utils/paths';
 import { isPromptCancellation } from 'utils/prompt-handler';
 

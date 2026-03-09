@@ -2,9 +2,12 @@
  * Structured logging system
  */
 
+import * as path from 'path';
+
+import type * as CleanupCoordinatorModule from 'cleanup/coordinator';
+import type * as ConfigLoaderModule from 'config/loader';
 import type { LogEntry, LogLevel } from 'types/logger.types';
 
-import { getLogCleanupScheduler } from 'cleanup/coordinator';
 import {
 	BYTES_PER_MB,
 	DAILY_FILE_ROTATION_ENABLED,
@@ -14,8 +17,6 @@ import {
 	LOG_FILE_PREFIX,
 	MCP_ID
 } from 'config/constants';
-import { getConfigLoader } from 'config/loader';
-import * as path from 'path';
 import { sanitizeForLogging } from 'utils/data-sanitizer';
 import { appendFile, fileExists, getFileStats } from 'utils/file-utils';
 import { getRuntimeDataDir } from 'utils/paths';
@@ -440,6 +441,9 @@ function getLogsDirectory(): { configLoadError: unknown; logsDir: string } {
 	let configLoadError: unknown = null;
 
 	try {
+		// Lazy import to break circular dependency: logger -> config/loader -> error-handler -> logger
+		// eslint-disable-next-line @typescript-eslint/no-require-imports -- lazy import to break circular dependency
+		const { getConfigLoader } = require('config/loader') as typeof ConfigLoaderModule;
 		const configLoader = getConfigLoader();
 		const config = configLoader.get();
 		if (config.logging?.logs_path) {
@@ -461,6 +465,8 @@ function configureLoggerFromConfig(logger: Logger, existingError: unknown): void
 	let configLoadError = existingError;
 
 	try {
+		// eslint-disable-next-line @typescript-eslint/no-require-imports -- lazy import to break circular dependency
+		const { getConfigLoader } = require('config/loader') as typeof ConfigLoaderModule;
 		const configLoader = getConfigLoader();
 		const config = configLoader.get();
 		if (config.logging?.daily_file_max_size_mb) {
@@ -488,8 +494,9 @@ function applyMCPSuppressionIfNeeded(): void {
 	}
 
 	try {
-		const configLoader = getConfigLoader();
-		const config = configLoader.get();
+		// eslint-disable-next-line @typescript-eslint/no-require-imports -- lazy import to break circular dependency
+		const { getConfigLoader } = require('config/loader') as typeof ConfigLoaderModule;
+		const config = getConfigLoader().get();
 		const logLevel = config.defaults?.log_level ?? 'info';
 
 		if (logLevel !== 'debug') {
@@ -533,6 +540,8 @@ function createMCPSuppressionProxy(logger: Logger): Logger {
  * Note: Scheduler is now initialized via cleanup/coordinator.ts
  */
 export function getCleanupScheduler(): CleanupScheduler | null {
-	// Import and delegate to coordinator
+	// Lazy import to break circular dependency: logger -> cleanup/coordinator -> config/loader -> error-handler -> logger
+	// eslint-disable-next-line @typescript-eslint/no-require-imports -- lazy import to break circular dependency
+	const { getLogCleanupScheduler } = require('cleanup/coordinator') as typeof CleanupCoordinatorModule;
 	return getLogCleanupScheduler();
 }

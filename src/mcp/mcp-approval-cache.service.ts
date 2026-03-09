@@ -5,11 +5,12 @@
  * Prevents repeated approval prompts for the same server.
  */
 
+import { existsSync } from 'fs';
+import { join, resolve } from 'path';
+
 import type { MCPApprovalCacheEntry, MCPApprovalMemory, MCPApprovalResult } from 'types/mcp-client.types';
 
-import { existsSync } from 'fs';
 import { getLogger } from 'output/logger';
-import { join, resolve } from 'path';
 import { readFile, writeFile } from 'utils/file-utils';
 import { getRuntimeDataDir } from 'utils/paths';
 

@@ -7,9 +7,10 @@
  * - StageExecutor -> stage-executor.ts
  */
 
+import { execSync } from 'child_process';
+
 import type { CommandResult, PipelineStage, StageOutput } from 'types/command.types';
 
-import { execSync } from 'child_process';
 import { getLogger } from 'output/logger';
 import { getProcessingFeedback } from 'output/processing-feedback';
 import { ExecutionError } from 'utils/error-handler';
@@ -186,7 +187,7 @@ export class PipelineExecutor {
 							...options,
 							preResolvedInputs: this.getPreResolvedInputsForStage(stage)
 						};
-						const result = await this.stageExecutor.executeStage(stage, context, stageIndexStart + index, stageOptions);
+						const result = await this.executeStageWithRetry(stage, context, stageIndexStart + index, stageOptions);
 
 						// Record completed stage in execution context
 						executionContext.recordStageCompletion(result);
@@ -318,6 +319,38 @@ export class PipelineExecutor {
 	 */
 	validatePipeline(stages: PipelineStage[]): string[] {
 		return this.pipelineValidator.validatePipeline(stages);
+	}
+
+	/**
+	 * Execute a stage with optional retry on failure.
+	 * Only sequential stages support retry; parallel stages are never retried here.
+	 */
+	private async executeStageWithRetry(
+		stage: PipelineStage,
+		context: PipelineExecutionContext,
+		stageIndex: number,
+		options: StageExecutionOptions
+	): Promise<StageOutput> {
+		const logger = getLogger();
+		const maxAttempts = stage.retry?.maxAttempts ?? 1;
+		const delayMs = stage.retry?.delay_ms ?? 0;
+
+		let lastResult = await this.stageExecutor.executeStage(stage, context, stageIndex, options);
+
+		for (let attempt = 2; attempt <= maxAttempts && !lastResult.success; attempt++) {
+			logger.warn(`Stage failed, retrying (attempt ${attempt}/${maxAttempts}): ${stage.stage}.${stage.prompt}`, {
+				delay_ms: delayMs,
+				error: lastResult.error
+			});
+
+			if (delayMs > 0) {
+				await new Promise<void>((resolve) => setTimeout(resolve, delayMs));
+			}
+
+			lastResult = await this.stageExecutor.executeStage(stage, context, stageIndex, options);
+		}
+
+		return lastResult;
 	}
 
 	/**

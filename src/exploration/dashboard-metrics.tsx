@@ -4,9 +4,10 @@
  * Provides detailed metrics charts and statistics for exploration monitoring
  */
 
+import React from 'react';
+
 import type { ContainerStats, WorktreeExploration } from 'types/exploration.types';
 
-import React from 'react';
 import { getTUIAdapter } from 'ui/tui-adapter.interface';
 
 const tui = getTUIAdapter();

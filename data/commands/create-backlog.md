@@ -108,6 +108,8 @@ Transform a **Product Requirements Document (PRD)** into a **prioritized, action
 4. **Review**: Validate backlog completeness and quality
 5. **Generate**: Create backlog artifacts and documentation
 
+The generated backlog includes **stage gates** — mandatory review and test checkpoints between execution phases, ensuring the team validates quality and correctness before advancing to the next phase.
+
 ## Input Arguments
 
 **Available arguments** (accessible via `$ARGUMENTS`):
@@ -157,7 +159,9 @@ After successful pipeline execution, the following files are created:
 
 - Executive summary with coverage score and statistics
 - Task distribution (by priority, domain, phase)
+- Stage gates summary table (one gate per phase transition)
 - Complete task list with all metadata (ID, title, description, acceptance criteria, dependencies, etc.)
+- Stage gate blocks between phases (exit criteria, required tests, reviewers)
 - Dependency graph (Mermaid diagram)
 - Timeline projection and critical path
 - Recommended starting tasks
@@ -214,9 +218,10 @@ After successful execution, display handoff summary to user:
 4. ✅ All tasks have complete metadata (description, acceptance criteria, effort, dependencies)
 5. ✅ Dependency graph is acyclic (no circular dependencies)
 6. ✅ No task exceeds 5-day effort threshold
-7. ✅ Primary backlog file created at `knowledge-base/BACKLOG.md`
-8. ✅ Supporting files updated (TODO.md, CHANGELOG.md, backup)
-9. ✅ User receives clear handoff summary with next steps
+7. ✅ Stage gates generated between each phase (exit criteria, required tests, reviewers)
+8. ✅ Primary backlog file created at `knowledge-base/BACKLOG.md`
+9. ✅ Supporting files updated (TODO.md, CHANGELOG.md, backup)
+10. ✅ User receives clear handoff summary with next steps
 
 ---
 
@@ -337,11 +342,18 @@ Print the following summary at command completion:
 | P1 (High)     | [N]   | [X] SP |
 | P2 (Medium)   | [N]   | [X] SP |
 
-### Phases
+### Phases & Stage Gates
 
-1. **[Phase 1 Name]**: [N] tasks
-2. **[Phase 2 Name]**: [N] tasks
-3. **[Phase 3 Name]**: [N] tasks
+1. **Phase 0 – Foundation**: [N] tasks
+   → 🔍 Gate 0→1: CI green, infra up, core models approved
+2. **Phase 1 – Core Backend**: [N] tasks
+   → 🔍 Gate 1→2: APIs documented, integration tests pass
+3. **Phase 2 – Core Frontend**: [N] tasks
+   → 🔍 Gate 2→3: UX sign-off, component tests pass
+4. **Phase 3 – Integration & Features**: [N] tasks
+   → 🔍 Gate 3→4: E2E suite green, feature sign-off
+5. **Phase 4 – Quality & Production Readiness**: [N] tasks
+   → 🔍 Gate 4→Release: Security audit, regression pass, SLOs met
 
 ### Documents Generated
 
