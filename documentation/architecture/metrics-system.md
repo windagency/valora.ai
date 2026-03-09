@@ -138,6 +138,10 @@ export interface QualityMetrics {
 	review_score?: number;
 	test_failures?: number;
 	test_passes?: number;
+	/** Total tool call failures across all stages in this command */
+	tool_failures?: number;
+	/** Number of stages that hit the 20-iteration tool loop ceiling */
+	tool_loop_exhaustions?: number;
 }
 
 export interface SessionCommand {
@@ -240,38 +244,30 @@ interface WorkflowMetrics {
 When a workflow command executes:
 
 ```typescript
-// command-executor.ts:570-593
-private updateSessionState(
-  commandName: string,
-  options: CommandExecutionOptions,
-  result: CommandResult,
-  duration: number,
-  tokenBreakdown: TokenBreakdown,
-  sessionManager: SessionContextManager
-): void {
-  // Extract metrics from command outputs
-  const optimizationMetrics = result.outputs['optimization_metrics'] as
-    | OptimizationMetrics
-    | undefined;
-  const qualityMetrics = result.outputs['quality_metrics'] as
-    | QualityMetrics
-    | undefined;
+private updateSessionState(...): void {
+  const optimizationMetrics = result.outputs['optimization_metrics'] as OptimizationMetrics | undefined;
+  const baseQualityMetrics  = result.outputs['quality_metrics']      as QualityMetrics      | undefined;
 
-  // Store in session
+  // Aggregate tool failure and loop exhaustion counts from per-stage execution quality
+  // metadata and merge them into quality_metrics for persistent cross-session tracking.
+  const toolFailures = result.stages.reduce((sum, s) => {
+    const eq = s.metadata?.['executionQuality'] as Record<string, unknown> | undefined;
+    return sum + (typeof eq?.['toolFailureCount'] === 'number' ? eq['toolFailureCount'] : 0);
+  }, 0);
+  const toolLoopExhaustions = result.stages.reduce((sum, s) => {
+    const eq = s.metadata?.['executionQuality'] as Record<string, unknown> | undefined;
+    return sum + (eq?.['wasLoopExhausted'] === true ? 1 : 0);
+  }, 0);
+  const qualityMetrics = toolFailures > 0 || toolLoopExhaustions > 0
+    ? { ...baseQualityMetrics, tool_failures: toolFailures || undefined, tool_loop_exhaustions: toolLoopExhaustions || undefined }
+    : baseQualityMetrics;
+
   sessionManager.addCommand(
-    commandName,
-    options.args,
-    options.flags,
-    result.outputs,
-    result.success,
-    duration,
-    result.error,
-    tokenBreakdown.total,
-    optimizationMetrics,  // ← Optimization metrics
-    qualityMetrics        // ← Quality metrics
+    commandName, options.args, options.flags, result.outputs,
+    result.success, duration, result.error, tokenBreakdown.total,
+    optimizationMetrics, qualityMetrics
   );
 
-  // Persist to disk (debounced)
   this.sessionLifecycle.persist();
 }
 ```
@@ -671,6 +667,76 @@ await fetch('http://pushgateway:9091/metrics/job/workflow', {
 // Export to Datadog
 await datadogClient.gauge('workflow.time_saved', metrics.totalTimeSaved);
 ```
+
+## Pipeline Resilience Metrics
+
+In addition to optimization and quality metrics emitted by commands, the pipeline executor
+itself emits runtime health signals that feed the same collection pipeline.
+
+### In-memory counters (current session)
+
+| Counter                 | Labels      | Incremented when                                             |
+| ----------------------- | ----------- | ------------------------------------------------------------ |
+| `tool_execution_failed` | `{ tool }`  | A tool call exception is caught in `executeToolWithSpan`     |
+| `tool_loop_exhausted`   | `{ stage }` | The 20-iteration ceiling is reached in `callLLMWithToolLoop` |
+
+These counters are visible in the dashboard **Performance** tab and in `MetricsSummary`
+(read via `getMetricsCollector().getSnapshot().counters`).
+
+### Typed pipeline events
+
+| Event                   | Payload                                                     |
+| ----------------------- | ----------------------------------------------------------- |
+| `tool:execution:failed` | `{ toolName, errorMessage }`                                |
+| `tool:loop:exhausted`   | `{ stage, iterationsUsed, lastToolsInvoked, messageDepth }` |
+
+Subscribers receive these via `getPipelineEmitter().on(PipelineEventType.TOOL_LOOP_EXHAUSTED, ...)`.
+
+### Per-stage execution quality metadata
+
+`StageOutput.metadata.executionQuality` is set on every stage that ran through the tool
+loop:
+
+```typescript
+{
+  degraded: boolean;            // true if any failures or exhaustion occurred
+  hardStopped?: boolean;        // true if toolFailureCount >= MAX_TOOL_FAILURES_BEFORE_HARD_STOP
+  toolFailureCount: number;
+  verifiedModifiedFiles: string[];
+  wasLoopExhausted: boolean;
+}
+```
+
+`verifiedModifiedFiles` is computed mechanically from the conversation history: only files
+whose `write`/`search_replace`/`delete_file` tool call produced a non-error result are
+included. It is injected into the forced final prompt when the loop exhausts.
+
+### Persistent storage
+
+After each command, `command-executor.ts` aggregates `toolFailureCount` and
+`wasLoopExhausted` from all stage metadata entries and writes the totals into
+`SessionCommand.quality_metrics.tool_failures` and
+`SessionCommand.quality_metrics.tool_loop_exhaustions`.
+
+The dashboard `buildMetricsSummary` combines in-memory counters (current process) with
+these persisted values (historical sessions) so the Overview panel always reflects the
+full history.
+
+### Dashboard display
+
+The **Metrics Summary** panel in the Overview tab shows:
+
+```
+Loop Exhausted: N   ← yellow if > 0, green if 0
+Tool Failures:  N   ← red if > 0, green if 0
+```
+
+For detailed per-stage and per-tool breakdown, switch to the **Performance** tab.
+
+### Related
+
+- [Pipeline Resilience Operations Guide](../operations/pipeline-resilience.md)
+- [ADR-010: Pipeline Resilience and Tool-Failure Observability](../adr/010-pipeline-resilience-and-tool-failure-observability.md)
 
 ## Related Documentation
 

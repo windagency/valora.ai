@@ -61,6 +61,10 @@ export interface QualityMetrics {
 	test_failures?: number;
 	/** Number of test passes in assert phase */
 	test_passes?: number;
+	/** Total tool call failures across all stages in this command */
+	tool_failures?: number;
+	/** Number of stages that hit the tool loop iteration limit */
+	tool_loop_exhaustions?: number;
 }
 
 export interface Session extends Record<string, unknown>, SessionMetadata {

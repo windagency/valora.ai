@@ -20,6 +20,7 @@ import {
 	type StageCompleteData,
 	type StageProgressData,
 	type StageStartData,
+	type ToolExecutionFailedData,
 	type ToolHookBlockedData,
 	type ToolHookPostData,
 	type ToolHookTriggeredData,
@@ -193,6 +194,17 @@ export class PipelineEventEmitter extends EventEmitter {
 			...data,
 			timestamp: Date.now(),
 			type: PipelineEventType.TOOL_HOOK_BLOCKED
+		} as PipelineEventData);
+	}
+
+	/**
+	 * Emit tool execution failed event
+	 */
+	emitToolExecutionFailed(data: ToolExecutionFailedData): void {
+		this.emit(PipelineEventType.TOOL_EXECUTION_FAILED, {
+			...data,
+			timestamp: Date.now(),
+			type: PipelineEventType.TOOL_EXECUTION_FAILED
 		} as PipelineEventData);
 	}
 

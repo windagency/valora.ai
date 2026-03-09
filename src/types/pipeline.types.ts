@@ -21,6 +21,7 @@ export enum PipelineEventType {
 	STAGE_ERROR = 'stage:error',
 	STAGE_PROGRESS = 'stage:progress',
 	STAGE_START = 'stage:start',
+	TOOL_EXECUTION_FAILED = 'tool:execution:failed',
 	TOOL_HOOK_BLOCKED = 'tool:hook:blocked',
 	TOOL_HOOK_POST = 'tool:hook:post',
 	TOOL_HOOK_TRIGGERED = 'tool:hook:triggered',
@@ -137,6 +138,13 @@ export interface StageStartData {
 	stage: string;
 	totalStages: number;
 	worktreeInfo?: WorktreeInfoData;
+}
+
+export interface ToolExecutionFailedData {
+	/** Error message returned by the tool */
+	errorMessage: string;
+	/** Name of the tool that failed */
+	toolName: string;
 }
 
 export interface ToolHookBlockedData {

@@ -29,6 +29,7 @@ import { type MCPToolHandler } from 'mcp/mcp-tool-handler';
 import { getColorAdapter } from 'output/color-adapter.interface';
 import { getConsoleOutput } from 'output/console-output';
 import { getLogger } from 'output/logger';
+import { getPipelineEmitter } from 'output/pipeline-emitter';
 import { getIdempotencyStore, type IdempotencyStoreService } from 'services/idempotency-store.service';
 import { type AllowedTool, type BuiltInTool, isMCPTool, type MCPTool } from 'types/command.types';
 import { type IdempotencyOptions, isIdempotentTool } from 'types/idempotency.types';
@@ -38,6 +39,7 @@ import { getPromptAdapter } from 'ui/prompt-adapter.interface';
 import { formatErrorMessage } from 'utils/error-utils';
 import { readFile, writeFile } from 'utils/file-utils';
 import { validateNotForbiddenPath } from 'utils/input-validator';
+import { getMetricsCollector } from 'utils/metrics-collector';
 import { getTracer, type Span } from 'utils/tracing';
 
 import { getHookExecutionService } from './hook-execution.service';
@@ -730,6 +732,10 @@ export class ToolExecutionService {
 			span.recordException(error as Error);
 
 			this.logger.error(`Tool ${name} failed`, error as Error);
+
+			// Record metric and emit event so failures are visible in dashboard + to subscribers
+			getMetricsCollector().incrementCounter('tool_execution_failed', 1, { tool: name });
+			getPipelineEmitter().emitToolExecutionFailed({ errorMessage, toolName: name });
 
 			// Store failed result for idempotent tools (prevents retrying failed operations)
 			if (isIdempotentTool(name)) {

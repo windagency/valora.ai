@@ -579,7 +579,26 @@ export class CommandExecutor {
 	): void {
 		// Extract optimisation and quality metrics from outputs
 		const optimizationMetrics = result.outputs['optimization_metrics'] as OptimizationMetrics | undefined;
-		const qualityMetrics = result.outputs['quality_metrics'] as QualityMetrics | undefined;
+		const baseQualityMetrics = result.outputs['quality_metrics'] as QualityMetrics | undefined;
+
+		// Aggregate tool failure and loop exhaustion counts from per-stage execution quality metadata
+		// and merge them into the quality metrics so they persist in the session store.
+		const toolFailures = result.stages.reduce((sum, s) => {
+			const eq = s.metadata?.['executionQuality'] as Record<string, unknown> | undefined;
+			return sum + (typeof eq?.['toolFailureCount'] === 'number' ? eq['toolFailureCount'] : 0);
+		}, 0);
+		const toolLoopExhaustions = result.stages.reduce((sum, s) => {
+			const eq = s.metadata?.['executionQuality'] as Record<string, unknown> | undefined;
+			return sum + (eq?.['wasLoopExhausted'] === true ? 1 : 0);
+		}, 0);
+		const qualityMetrics: QualityMetrics | undefined =
+			toolFailures > 0 || toolLoopExhaustions > 0
+				? {
+						...baseQualityMetrics,
+						tool_failures: toolFailures || undefined,
+						tool_loop_exhaustions: toolLoopExhaustions || undefined
+					}
+				: baseQualityMetrics;
 
 		sessionManager.addCommand(
 			commandName,

@@ -69,6 +69,18 @@ const REFRESH_RATES: Record<DashboardTab, number> = {
 	performance: 2000
 };
 
+interface CmdOptMetrics {
+	early_exit_triggered?: boolean;
+	pattern_detected?: string;
+	time_saved_minutes?: number;
+}
+
+interface CmdQualityMetrics {
+	review_score?: number;
+	tool_failures?: number;
+	tool_loop_exhaustions?: number;
+}
+
 interface SessionAggregates {
 	earlyExits: number;
 	errors: number;
@@ -76,8 +88,9 @@ interface SessionAggregates {
 	reviewScoreCount: number;
 	reviewScoreSum: number;
 	timeSavedMinutes: number;
+	toolFailures: number;
+	toolLoopExhaustions: number;
 }
-
 export function useMetricsData(activeTab: DashboardTab): {
 	agentData: AgentAnalyticsData;
 	auditData: AuditData;
@@ -209,23 +222,27 @@ export function useMetricsData(activeTab: DashboardTab): {
 }
 
 function accumulateCommandMetrics(
-	cmd: {
-		error?: string;
-		optimization_metrics?: { early_exit_triggered?: boolean; pattern_detected?: string; time_saved_minutes?: number };
-		quality_metrics?: { review_score?: number };
-	},
+	cmd: { error?: string; optimization_metrics?: CmdOptMetrics; quality_metrics?: CmdQualityMetrics },
 	acc: SessionAggregates
 ): void {
-	if (cmd.optimization_metrics) {
-		if (cmd.optimization_metrics.early_exit_triggered) acc.earlyExits++;
-		if (cmd.optimization_metrics.pattern_detected) acc.patterns++;
-		acc.timeSavedMinutes += cmd.optimization_metrics.time_saved_minutes ?? 0;
-	}
-	if (cmd.quality_metrics?.review_score != null) {
-		acc.reviewScoreSum += cmd.quality_metrics.review_score;
+	if (cmd.optimization_metrics) accumulateOptimizationMetrics(cmd.optimization_metrics, acc);
+	if (cmd.quality_metrics) accumulateQualityMetrics(cmd.quality_metrics, acc);
+	if (cmd.error) acc.errors++;
+}
+
+function accumulateOptimizationMetrics(opt: CmdOptMetrics, acc: SessionAggregates): void {
+	if (opt.early_exit_triggered) acc.earlyExits++;
+	if (opt.pattern_detected) acc.patterns++;
+	acc.timeSavedMinutes += opt.time_saved_minutes ?? 0;
+}
+
+function accumulateQualityMetrics(q: CmdQualityMetrics, acc: SessionAggregates): void {
+	if (q.review_score != null) {
+		acc.reviewScoreSum += q.review_score;
 		acc.reviewScoreCount++;
 	}
-	if (cmd.error) acc.errors++;
+	acc.toolFailures += q.tool_failures ?? 0;
+	acc.toolLoopExhaustions += q.tool_loop_exhaustions ?? 0;
 }
 
 async function aggregateSessionMetrics(
@@ -238,7 +255,9 @@ async function aggregateSessionMetrics(
 		patterns: 0,
 		reviewScoreCount: 0,
 		reviewScoreSum: 0,
-		timeSavedMinutes: 0
+		timeSavedMinutes: 0,
+		toolFailures: 0,
+		toolLoopExhaustions: 0
 	};
 
 	for (const s of recentSessions.slice(0, 5)) {
@@ -277,10 +296,19 @@ async function buildMetricsSummary(): Promise<MetricsSummary | null> {
 		const totalCacheEntries = dryRunStats.size + stageStats.size;
 		const cacheHitRate = totalCacheEntries > 0 ? Math.min(100, totalCacheEntries * 10) : 0;
 
-		const toolLoopExhaustions = getMetricsCollector()
-			.getSnapshot()
-			.counters.filter((c) => c.name === 'tool_loop_exhausted')
+		const counters = getMetricsCollector().getSnapshot().counters;
+
+		// Current-session counters (in-memory, reset each process start)
+		const sessionLoopExhaustions = counters
+			.filter((c) => c.name === 'tool_loop_exhausted')
 			.reduce((sum, c) => sum + c.value, 0);
+		const sessionToolFailures = counters
+			.filter((c) => c.name === 'tool_execution_failed')
+			.reduce((sum, c) => sum + c.value, 0);
+
+		// Historical totals from persisted session quality_metrics (cross-session)
+		const toolLoopExhaustions = sessionLoopExhaustions + detailed.toolLoopExhaustions;
+		const toolExecutionFailures = sessionToolFailures + detailed.toolFailures;
 
 		return {
 			avgReviewScore: detailed.reviewScoreCount > 0 ? detailed.reviewScoreSum / detailed.reviewScoreCount : 0,
@@ -289,6 +317,7 @@ async function buildMetricsSummary(): Promise<MetricsSummary | null> {
 			errors: summaryErrors + detailed.errors,
 			patterns: detailed.patterns,
 			timeSavedMinutes: detailed.timeSavedMinutes,
+			toolExecutionFailures,
 			toolLoopExhaustions,
 			totalCommands,
 			totalTokens

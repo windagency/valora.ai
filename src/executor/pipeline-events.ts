@@ -24,6 +24,7 @@ export type {
 	StageCompleteData,
 	StageProgressData,
 	StageStartData,
+	ToolExecutionFailedData,
 	ToolHookBlockedData,
 	ToolHookPostData,
 	ToolHookTriggeredData,

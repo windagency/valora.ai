@@ -174,6 +174,8 @@ export interface PipelineStage {
 	parallel?: boolean;
 	prompt: string;
 	required: boolean;
+	/** Per-stage retry configuration. Only applies to sequential stages. */
+	retry?: StageRetryConfig;
 	stage: StageType;
 	timeout_ms?: number;
 }
@@ -213,6 +215,13 @@ export interface StageOutput {
 	prompt: string;
 	stage: string;
 	success: boolean;
+}
+
+export interface StageRetryConfig {
+	/** Delay in ms between attempts (default: 0) */
+	delay_ms?: number;
+	/** Maximum number of attempts including the first (default: 1 = no retry) */
+	maxAttempts?: number;
 }
 
 export type StageType =
