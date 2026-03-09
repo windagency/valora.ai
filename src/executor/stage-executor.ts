@@ -639,7 +639,7 @@ export class StageExecutor {
 		stage: PipelineStage,
 		logger: ReturnType<typeof getLogger>
 	): Promise<{ completion: LLMCompletionResult; summary: ExecutionSummary }> {
-		const maxToolIterations = 20;
+		const maxToolIterations = stage.max_tool_iterations ?? 20;
 		const messages: LLMMessage[] = [
 			{ content: systemMessage, role: 'system' },
 			{ content: userMessage, role: 'user' }
@@ -936,9 +936,11 @@ export class StageExecutor {
 		const lastToolsInvoked = this.extractLastToolsInvoked(messages);
 		const messageDepth = messages.length;
 
+		const maxIterations = stage.max_tool_iterations ?? 20;
+
 		logger.warn('Tool loop exceeded maximum iterations', {
 			lastToolsInvoked,
-			maxIterations: 20,
+			maxIterations,
 			messageDepth,
 			stage: stageId,
 			toolFailureCount,
@@ -950,7 +952,7 @@ export class StageExecutor {
 
 		// Emit typed event for real-time observers
 		getPipelineEmitter().emitToolLoopExhausted({
-			iterationsUsed: 20,
+			iterationsUsed: maxIterations,
 			lastToolsInvoked,
 			messageDepth,
 			stage: stageId

@@ -170,6 +170,8 @@ export interface PipelineStage {
 	cache?: PipelineStageCacheConfig;
 	conditional?: string;
 	inputs?: Record<string, string>;
+	/** Maximum number of tool-call iterations before forcing final output. Overrides the default of 20. */
+	max_tool_iterations?: number;
 	outputs?: string[];
 	parallel?: boolean;
 	prompt: string;

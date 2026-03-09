@@ -72,6 +72,7 @@ prompts:
     - stage: test
       prompt: code.implement-tests
       required: true
+      max_tool_iterations: 40
       inputs:
         code_changes: $STAGE_code.code_changes
         testing_strategy: $STAGE_context.testing_strategy
