@@ -136,14 +136,17 @@ C4Container
 
 **Purpose**: Multi-provider AI integration
 
-| Component          | Responsibility               |
-| ------------------ | ---------------------------- |
-| Provider Registry  | Register LLM providers       |
-| Provider Interface | Abstract provider operations |
-| Anthropic Provider | Claude integration           |
-| OpenAI Provider    | GPT integration              |
-| Google Provider    | Gemini integration           |
-| Cursor Provider    | Cursor subscription          |
+| Component          | Responsibility                                           |
+| ------------------ | -------------------------------------------------------- |
+| Provider Registry  | Register LLM providers                                   |
+| Provider Interface | Abstract provider operations                             |
+| Anthropic Provider | Claude integration + explicit prompt caching breakpoints |
+| OpenAI Provider    | GPT integration + automatic cache metric extraction      |
+| Google Provider    | Gemini integration + automatic cache metric extraction   |
+| Cursor Provider    | Cursor subscription (MCP, no caching)                    |
+| Token Estimator    | Cost estimation with cache-aware pricing                 |
+
+All providers normalise cache metrics into `LLMUsage.cache_creation_input_tokens` and `LLMUsage.cache_read_input_tokens`. The token estimator includes per-model cache pricing (write and read rates) for accurate cost calculation.
 
 ### MCP Server Layer
 

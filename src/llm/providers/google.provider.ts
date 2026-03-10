@@ -11,7 +11,7 @@
 
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-import type { LLMCompletionOptions, LLMCompletionResult } from 'types/llm.types';
+import type { LLMCompletionOptions, LLMCompletionResult, LLMUsage } from 'types/llm.types';
 
 import { getProviderModels, ProviderName } from 'config/providers.config';
 import { BaseLLMProvider } from 'llm/provider.interface';
@@ -78,11 +78,7 @@ export class GoogleProvider extends BaseLLMProvider {
 			return {
 				content: fullContent,
 				role: 'assistant',
-				usage: {
-					completion_tokens: response.usageMetadata?.candidatesTokenCount ?? 0,
-					prompt_tokens: response.usageMetadata?.promptTokenCount ?? 0,
-					total_tokens: response.usageMetadata?.totalTokenCount ?? 0
-				}
+				usage: this.extractUsage(response.usageMetadata)
 			};
 		} catch (error) {
 			this.handleGoogleError(error, 'streaming');
@@ -161,12 +157,37 @@ export class GoogleProvider extends BaseLLMProvider {
 	}
 
 	/**
+	 * Extract usage metrics from Google response, including cached content tokens.
+	 */
+	private extractUsage(usageMetadata?: {
+		cachedContentTokenCount?: number;
+		candidatesTokenCount?: number;
+		promptTokenCount?: number;
+		totalTokenCount?: number;
+	}): LLMUsage {
+		const usage: LLMUsage = {
+			completion_tokens: usageMetadata?.candidatesTokenCount ?? 0,
+			prompt_tokens: usageMetadata?.promptTokenCount ?? 0,
+			total_tokens: usageMetadata?.totalTokenCount ?? 0
+		};
+
+		// Google context caching: extract cachedContentTokenCount
+		const cachedTokens = usageMetadata?.cachedContentTokenCount ?? 0;
+		if (cachedTokens > 0) {
+			usage.cache_read_input_tokens = cachedTokens;
+		}
+
+		return usage;
+	}
+
+	/**
 	 * Map Google API response to LLMCompletionResult
 	 */
 	private mapResponseToResult(response: {
 		candidates?: Array<{ finishReason?: string }>;
 		text: () => string;
 		usageMetadata?: {
+			cachedContentTokenCount?: number;
 			candidatesTokenCount?: number;
 			promptTokenCount?: number;
 			totalTokenCount?: number;
@@ -176,11 +197,7 @@ export class GoogleProvider extends BaseLLMProvider {
 			content: response.text(),
 			finish_reason: response.candidates?.[0]?.finishReason,
 			role: 'assistant',
-			usage: {
-				completion_tokens: response.usageMetadata?.candidatesTokenCount ?? 0,
-				prompt_tokens: response.usageMetadata?.promptTokenCount ?? 0,
-				total_tokens: response.usageMetadata?.totalTokenCount ?? 0
-			}
+			usage: this.extractUsage(response.usageMetadata)
 		};
 	}
 

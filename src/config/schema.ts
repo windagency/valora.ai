@@ -28,6 +28,7 @@ export const PROVIDER_CONFIG_SCHEMA = z.object({
 	baseUrl: z.string().url().optional(),
 	default_model: z.string().optional(),
 	max_retries: z.number().min(0).max(10).optional(),
+	prompt_caching: z.boolean().optional(),
 	rate_limit: z
 		.object({
 			requests_per_minute: z.number().optional(),

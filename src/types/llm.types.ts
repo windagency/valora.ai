@@ -73,6 +73,8 @@ export interface LLMToolResult {
 }
 
 export interface LLMUsage {
+	cache_creation_input_tokens?: number;
+	cache_read_input_tokens?: number;
 	completion_tokens: number;
 	prompt_tokens: number;
 	total_tokens: number;

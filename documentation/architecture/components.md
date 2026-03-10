@@ -191,6 +191,16 @@ interface LLMProvider {
 }
 ```
 
+### Prompt Caching
+
+All providers extract cache metrics into the normalised `LLMUsage` type (`cache_creation_input_tokens`, `cache_read_input_tokens`). The CLI displays cache hit rates and cost savings when these fields are present.
+
+| Provider      | Mechanism                                                               | Config Flag            |
+| ------------- | ----------------------------------------------------------------------- | ---------------------- |
+| **Anthropic** | Explicit `cache_control` breakpoints (system, tools, last user message) | `prompt_caching: true` |
+| **OpenAI**    | Automatic — reads `prompt_tokens_details.cached_tokens`                 | None needed            |
+| **Google**    | Automatic — reads `usageMetadata.cachedContentTokenCount`               | None needed            |
+
 ### Provider Selection Flow
 
 ```mermaid

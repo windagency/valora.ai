@@ -11,7 +11,7 @@
 import { Agent as HttpsAgent } from 'https';
 import OpenAI from 'openai';
 
-import type { LLMCompletionOptions, LLMCompletionResult } from 'types/llm.types';
+import type { LLMCompletionOptions, LLMCompletionResult, LLMUsage } from 'types/llm.types';
 
 import { getProviderModels, ProviderName } from 'config/providers.config';
 import { BaseLLMProvider } from 'llm/provider.interface';
@@ -93,13 +93,7 @@ export class OpenAIProvider extends BaseLLMProvider {
 					id: tc.id,
 					name: tc.function.name
 				})),
-				usage: response.usage
-					? {
-							completion_tokens: response.usage.completion_tokens,
-							prompt_tokens: response.usage.prompt_tokens,
-							total_tokens: response.usage.total_tokens
-						}
-					: undefined
+				usage: response.usage ? this.extractUsage(response.usage) : undefined
 			};
 		};
 
@@ -157,26 +151,7 @@ export class OpenAIProvider extends BaseLLMProvider {
 				top_p: options.top_p
 			});
 
-			let fullContent = '';
-			let finishReason: string | undefined;
-
-			for await (const chunk of stream) {
-				const choice = chunk.choices[0];
-				const delta = choice?.delta;
-				if (delta?.content) {
-					fullContent += delta.content;
-					onChunk(delta.content);
-				}
-				if (choice?.finish_reason) {
-					finishReason = choice.finish_reason;
-				}
-			}
-
-			return {
-				content: fullContent,
-				finish_reason: finishReason,
-				role: 'assistant'
-			};
+			return await this.processStream(stream, onChunk);
 		} catch (error) {
 			throw new ProviderError(`OpenAI streaming error: ${(error as Error).message}`, {
 				error: error,
@@ -185,6 +160,9 @@ export class OpenAIProvider extends BaseLLMProvider {
 		}
 	}
 
+	/**
+	 * Process streaming response chunks into a completion result.
+	 */
 	override validateModel(modelName: string): Promise<boolean> {
 		// Get known models from MODEL_PROVIDER_SUGGESTIONS
 		const knownModels = getProviderModels(ProviderName.OPENAI);
@@ -202,6 +180,59 @@ export class OpenAIProvider extends BaseLLMProvider {
 		if (modelName.startsWith('ft:')) return Promise.resolve(true); // Fine-tuned models
 
 		return Promise.resolve(false);
+	}
+
+	private async processStream(
+		stream: AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>,
+		onChunk: (chunk: string) => void
+	): Promise<LLMCompletionResult> {
+		let fullContent = '';
+		let finishReason: string | undefined;
+		let streamUsage: LLMUsage | undefined;
+
+		for await (const chunk of stream) {
+			const choice = chunk.choices[0];
+			const delta = choice?.delta;
+			if (delta?.content) {
+				fullContent += delta.content;
+				onChunk(delta.content);
+			}
+			if (choice?.finish_reason) {
+				finishReason = choice.finish_reason;
+			}
+			// OpenAI sends usage in the final chunk when stream_options.include_usage is set
+			if (chunk.usage) {
+				streamUsage = this.extractUsage(chunk.usage);
+			}
+		}
+
+		return {
+			content: fullContent,
+			finish_reason: finishReason,
+			role: 'assistant',
+			usage: streamUsage
+		};
+	}
+
+	/**
+	 * Extract usage metrics from OpenAI response, including automatic cache metrics.
+	 * OpenAI returns cached token counts in prompt_tokens_details.cached_tokens.
+	 */
+	private extractUsage(responseUsage: OpenAI.CompletionUsage): LLMUsage {
+		const usage: LLMUsage = {
+			completion_tokens: responseUsage.completion_tokens,
+			prompt_tokens: responseUsage.prompt_tokens,
+			total_tokens: responseUsage.total_tokens
+		};
+
+		// OpenAI automatic caching: extract cached_tokens from prompt_tokens_details
+		const details = responseUsage.prompt_tokens_details as Record<string, unknown> | undefined;
+		const cachedTokens = typeof details?.['cached_tokens'] === 'number' ? details['cached_tokens'] : 0;
+		if (cachedTokens > 0) {
+			usage.cache_read_input_tokens = cachedTokens;
+		}
+
+		return usage;
 	}
 
 	private getClient(): OpenAI {

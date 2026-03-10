@@ -181,6 +181,16 @@ class LLMRegistry {
 }
 ```
 
+#### Prompt Caching
+
+Each provider extracts cache metrics into the normalised `LLMUsage` type:
+
+- **Anthropic**: Injects `cache_control` breakpoints when `prompt_caching: true` in provider config. Caches system prompt, tools, and conversation history across tool-loop iterations.
+- **OpenAI**: Extracts `cached_tokens` from `prompt_tokens_details` (automatic, no config needed).
+- **Google**: Extracts `cachedContentTokenCount` from `usageMetadata` (automatic, no config needed).
+
+The token estimator (`src/utils/token-estimator.ts`) includes `cache_write` and `cache_read` rates per model for accurate cost calculation via `calculateActualCost()`.
+
 ---
 
 ### Exploration Layer (`src/exploration/`)
@@ -315,7 +325,7 @@ src/types/
 ├── execution.types.ts      # Execution types
 ├── exploration.types.ts    # Exploration types
 ├── index.ts
-├── llm.types.ts            # LLM types
+├── llm.types.ts            # LLM types (incl. LLMUsage with cache fields)
 ├── output.types.ts         # Output types
 ├── pipeline.types.ts       # Pipeline types
 ├── prompt.types.ts         # Prompt types
@@ -352,6 +362,7 @@ src/utils/
 ├── string.ts               # String utilities
 ├── timeout-promise.ts      # Timeout handling
 ├── time.ts                 # Time utilities
+├── token-estimator.ts      # Token counting, cost estimation, cache pricing
 └── validation.ts           # Validation utilities
 ```
 

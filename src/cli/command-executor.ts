@@ -66,6 +66,8 @@ interface TokenUsage {
  * Token breakdown structure for tracking
  */
 interface TokenBreakdown {
+	cache_read?: number;
+	cache_write?: number;
 	context: number;
 	generation: number;
 	total: number;
@@ -451,28 +453,42 @@ export class CommandExecutor {
 	/**
 	 * Calculate detailed token usage breakdown from command result
 	 */
-	private calculateTokenUsage(result: CommandResult): {
-		context: number;
-		generation: number;
-		total: number;
-	} {
+	private calculateTokenUsage(result: CommandResult): TokenBreakdown {
 		// Use reduce to accumulate token usage from all stages
 		const tokenUsage = result.stages.reduce(
 			(acc, stage) => {
 				const usageValue = stage.outputs?.['usage'];
 				if (usageValue && isTokenUsage(usageValue)) {
+					const usage = usageValue as TokenUsage;
+					const cacheRead =
+						typeof (usage as Record<string, unknown>)['cache_read_input_tokens'] === 'number'
+							? ((usage as Record<string, unknown>)['cache_read_input_tokens'] as number)
+							: 0;
+					const cacheWrite =
+						typeof (usage as Record<string, unknown>)['cache_creation_input_tokens'] === 'number'
+							? ((usage as Record<string, unknown>)['cache_creation_input_tokens'] as number)
+							: 0;
 					return {
-						context: acc.context + (usageValue.prompt_tokens ?? 0),
-						generation: acc.generation + (usageValue.completion_tokens ?? 0),
-						total: acc.total + (usageValue.total_tokens ?? 0)
+						cache_read: acc.cache_read + cacheRead,
+						cache_write: acc.cache_write + cacheWrite,
+						context: acc.context + (usage.prompt_tokens ?? 0),
+						generation: acc.generation + (usage.completion_tokens ?? 0),
+						total: acc.total + (usage.total_tokens ?? 0)
 					};
 				}
 				return acc;
 			},
-			{ context: 0, generation: 0, total: 0 }
+			{ cache_read: 0, cache_write: 0, context: 0, generation: 0, total: 0 }
 		);
 
-		return tokenUsage;
+		// Only include cache fields if they have values
+		return {
+			...(tokenUsage.cache_read > 0 ? { cache_read: tokenUsage.cache_read } : {}),
+			...(tokenUsage.cache_write > 0 ? { cache_write: tokenUsage.cache_write } : {}),
+			context: tokenUsage.context,
+			generation: tokenUsage.generation,
+			total: tokenUsage.total
+		};
 	}
 
 	/**

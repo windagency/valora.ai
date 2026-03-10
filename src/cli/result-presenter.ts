@@ -36,6 +36,8 @@ export class ResultPresenter {
 		agent?: string,
 		model?: string,
 		tokenBreakdown?: {
+			cache_read?: number;
+			cache_write?: number;
 			context: number;
 			generation: number;
 			total: number;
@@ -80,6 +82,8 @@ export class ResultPresenter {
 		duration: number,
 		sessionId: string,
 		tokenBreakdown?: {
+			cache_read?: number;
+			cache_write?: number;
 			context: number;
 			generation: number;
 			total: number;
@@ -135,6 +139,8 @@ export class ResultPresenter {
 	 */
 	private displayTokenUsage(
 		tokenBreakdown?: {
+			cache_read?: number;
+			cache_write?: number;
 			context: number;
 			generation: number;
 			total: number;
@@ -159,6 +165,8 @@ export class ResultPresenter {
 	 */
 	private displayCLITokenUsage(
 		tokenBreakdown?: {
+			cache_read?: number;
+			cache_write?: number;
 			context: number;
 			generation: number;
 			total: number;
@@ -181,7 +189,13 @@ export class ResultPresenter {
 	/**
 	 * Display tokens for current interaction
 	 */
-	private displayInteractionTokens(tokenBreakdown: { context: number; generation: number; total: number }): void {
+	private displayInteractionTokens(tokenBreakdown: {
+		cache_read?: number;
+		cache_write?: number;
+		context: number;
+		generation: number;
+		total: number;
+	}): void {
 		this.console.print(`   • This interaction: ${formatNumber(tokenBreakdown.total)} tokens`);
 
 		if (tokenBreakdown.context > 0 || tokenBreakdown.generation > 0) {
@@ -192,12 +206,29 @@ export class ResultPresenter {
 	/**
 	 * Display detailed token breakdown with percentages
 	 */
-	private displayTokenBreakdown(tokenBreakdown: { context: number; generation: number; total: number }): void {
+	private displayTokenBreakdown(tokenBreakdown: {
+		cache_read?: number;
+		cache_write?: number;
+		context: number;
+		generation: number;
+		total: number;
+	}): void {
 		const contextPercent = this.calculatePercentage(tokenBreakdown.context, tokenBreakdown.total);
 		const generationPercent = this.calculatePercentage(tokenBreakdown.generation, tokenBreakdown.total);
 
 		this.console.print(`     └─ Context: ${formatNumber(tokenBreakdown.context)} tokens (${contextPercent}%)`);
 		this.console.print(`     └─ Generation: ${formatNumber(tokenBreakdown.generation)} tokens (${generationPercent}%)`);
+
+		// Display cache metrics if present
+		if (tokenBreakdown.cache_read && tokenBreakdown.cache_read > 0) {
+			const cacheHitRate = this.calculatePercentage(tokenBreakdown.cache_read, tokenBreakdown.context);
+			this.console.print(
+				`     └─ Cache read: ${formatNumber(tokenBreakdown.cache_read)} tokens (${cacheHitRate}% hit rate)`
+			);
+		}
+		if (tokenBreakdown.cache_write && tokenBreakdown.cache_write > 0) {
+			this.console.print(`     └─ Cache write: ${formatNumber(tokenBreakdown.cache_write)} tokens`);
+		}
 
 		this.validateContextInfluence(contextPercent, generationPercent);
 	}
