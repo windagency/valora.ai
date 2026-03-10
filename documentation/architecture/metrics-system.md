@@ -356,6 +356,64 @@ Session data is written to `.valora/sessions/<session-id>/session.json`:
 }
 ```
 
+## Spending Ledger
+
+In addition to the in-process counters and session-level metrics above, VALORA maintains a per-request cost ledger at `.valora/spending.jsonl`.
+
+### Collection
+
+`CommandExecutor.execute()` calls `calculateActualCost()` (from `src/utils/token-estimator.ts`) immediately after `calculateTokenUsage()`, then calls `getSpendingTracker().record()`:
+
+```typescript
+const costResult = calculateActualCost(
+	{
+		cache_creation_input_tokens: tokenBreakdown.cache_write ?? 0,
+		cache_read_input_tokens: tokenBreakdown.cache_read ?? 0,
+		completion_tokens: tokenBreakdown.generation,
+		prompt_tokens: tokenBreakdown.context,
+		total_tokens: tokenBreakdown.total
+	},
+	resolvedCommand.command.model
+);
+
+getSpendingTracker().record({
+	id: `${Date.now()}-${commandName}`,
+	command: commandName,
+	stage: result.stages.map((s) => s.stage).join('+'),
+	model: model ?? 'unknown',
+	promptTokens: tokenBreakdown.context,
+	completionTokens: tokenBreakdown.generation,
+	cacheReadTokens: tokenBreakdown.cache_read ?? 0,
+	cacheWriteTokens: tokenBreakdown.cache_write ?? 0,
+	totalTokens: tokenBreakdown.total,
+	costUsd: costResult.totalCost,
+	cacheSavingsUsd: costResult.cacheSavings,
+	durationMs: duration,
+	timestamp: new Date().toISOString(),
+	batchDiscounted: options.flags['batch'] === true
+});
+```
+
+### Querying
+
+`SpendingTracker` (`src/utils/spending-tracker.ts`) provides four query methods:
+
+| Method              | Returns                                                                    |
+| ------------------- | -------------------------------------------------------------------------- |
+| `getRecords(opts?)` | Raw records, optionally filtered by command / date                         |
+| `getByEndpoint()`   | Per-command summaries, sorted by total cost desc                           |
+| `getExpensive(n)`   | Top N records sorted by `costUsd` desc                                     |
+| `getTotals()`       | Aggregate `totalCostUsd`, `cacheSavingsUsd`, `requestCount`, `totalTokens` |
+
+These methods back both `valora monitoring spending` and the dashboard **Spending** sub-tab.
+
+### Live Feedback
+
+`ProcessingFeedback` also calls `calculateActualCost()` on every `LLM_RESPONSE` pipeline event, accumulating an `estimatedCostUsd` field. This value is displayed:
+
+- Appended to the context-insights status bar: `~$0.0124`
+- Appended to each stage-completion line: `Done (review, 3.2s, 48,880 tokens, ~$0.0124)`
+
 ## Extraction Algorithm
 
 ### Scanning Sessions

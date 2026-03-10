@@ -201,6 +201,27 @@ All providers extract cache metrics into the normalised `LLMUsage` type (`cache_
 | **OpenAI**    | Automatic — reads `prompt_tokens_details.cached_tokens`                 | None needed            |
 | **Google**    | Automatic — reads `usageMetadata.cachedContentTokenCount`               | None needed            |
 
+### Cost Tracking
+
+Cost information flows through three layers:
+
+1. **Live display** — `ProcessingFeedback` (`src/output/processing-feedback.ts`) calls `calculateActualCost()` on each `LLM_RESPONSE` event and accumulates an `estimatedCostUsd` total. This total is appended to the context-insights status bar (`~$0.xxxx`) and to each stage-completion line.
+
+2. **Final summary** — `ResultPresenter` (`src/cli/result-presenter.ts`) receives `costUsd` and `cacheSavingsUsd` from the executor and appends them to the "Token Usage" block printed at the end of every command:
+
+   ```
+   📊 Token Usage:
+      • This interaction: 48,880 tokens (~$0.0124)
+        └─ Cache read: 12,000 tokens (25% hit rate, saved $0.0036)
+   ```
+
+3. **Persistent ledger** — `SpendingTracker` (`src/utils/spending-tracker.ts`) appends one `SpendingRecord` to `.valora/spending.jsonl` after each command. The ledger is queried by `valora monitoring spending` and by the dashboard Spending panel.
+
+| Component       | File                        | Responsibility                                      |
+| --------------- | --------------------------- | --------------------------------------------------- |
+| SpendingTracker | `utils/spending-tracker.ts` | Append-only JSONL ledger; query by endpoint or date |
+| TokenEstimator  | `utils/token-estimator.ts`  | `calculateActualCost()` — pricing for all providers |
+
 ### Provider Selection Flow
 
 ```mermaid
@@ -268,6 +289,8 @@ The exploration layer integrates with the main dashboard (`valora dash`) through
 2. **Exploration Info Panel**: When viewing a session that is linked to an exploration, the `ExplorationInfoPanel` component loads the exploration data (via `ExplorationStateManager.findBySessionId()`) and displays the task, status, branch completion, and per-worktree details. This works even while the exploration is still running, since the `session_id` is stored on the `Exploration` object immediately after creation.
 
 3. **Worktree Stats Tracking**: The `WorktreeStatsTracker` (in `src/session/`) subscribes to `ExplorationEventEmitter` events and accumulates per-session statistics, which are displayed in the session details view.
+
+4. **Spending Panel**: The session details view has a **Spending** sub-tab (`SpendingPanel` in `src/ui/dashboard/detail-panels/spending-panel.tsx`) that queries `SpendingTracker` filtered to `session.created_at`. It displays session-scoped total cost, cache savings, a per-command cost bar chart, and the top 5 most expensive requests.
 
 ### Session-Exploration Linking
 

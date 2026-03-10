@@ -1183,7 +1183,15 @@ The panel fetches data from `WorktreeManager.listWorktrees()` and enriches explo
 
 **Session Details View:**
 
-Press `Enter` on a session to view details.
+Press `Enter` on a session to view details. The details view has five sub-tabs (switch with `[` / `]`):
+
+| Sub-tab          | Contents                                                               |
+| ---------------- | ---------------------------------------------------------------------- |
+| **Overview**     | Session info, running task, exploration panel, command history         |
+| **Optimisation** | Agent selection analytics and model selection metrics                  |
+| **Quality**      | Quality gate scores and thresholds                                     |
+| **Tokens**       | Per-command token usage bar chart and context-window utilisation       |
+| **Spending**     | Session cost totals, per-command cost bars, top 5 most expensive calls |
 
 If the session is linked to an exploration (via `explore parallel` or `explore sequential`), an **Exploration** panel appears showing the exploration task, status, branch completion, and per-worktree details:
 
@@ -1227,6 +1235,112 @@ If the session also has aggregate worktree stats (from the `WorktreeStatsTracker
 - **No exploration data**: Worktrees render without status icons
 - **Session without worktrees**: Worktree Usage panel is hidden in session details
 - **Session without exploration**: Exploration panel is hidden in session details
+- **Session without spending records**: Spending panel shows "No spending recorded this session"
+
+---
+
+### monitoring
+
+VALORA exposes runtime performance metrics, resource usage, and LLM cost data through the `monitoring` sub-commands.
+
+#### monitoring metrics
+
+Show the current in-process metrics snapshot (counters, gauges, histograms).
+
+```bash
+valora monitoring metrics
+valora monitoring metrics --format prometheus
+```
+
+| Flag                 | Description            | Default |
+| -------------------- | ---------------------- | ------- |
+| `-f, --format <fmt>` | `json` or `prometheus` | `json`  |
+
+#### monitoring performance
+
+Show the performance profiling report with slowest operations and memory/CPU statistics.
+
+```bash
+valora monitoring performance
+valora monitoring performance --detailed
+```
+
+#### monitoring resources
+
+Display current system resource usage (CPU, memory, disk, network, process).
+
+```bash
+valora monitoring resources
+```
+
+#### monitoring status
+
+Show the overall monitoring status (active intervals, uptime, session count).
+
+```bash
+valora monitoring status
+```
+
+#### monitoring spending
+
+Show LLM cost history from `.valora/spending.jsonl`. Spending records are written after every command execution.
+
+```bash
+# Summary grouped by command (endpoint)
+valora monitoring spending
+
+# Top 10 most expensive individual requests
+valora monitoring spending --top 10
+
+# Group by model instead of command
+valora monitoring spending --by-model
+
+# Filter to records since a specific date
+valora monitoring spending --since 2026-03-01
+
+# Output raw JSON
+valora monitoring spending --format json
+```
+
+**Options:**
+
+| Flag                 | Description                               | Default |
+| -------------------- | ----------------------------------------- | ------- |
+| `-t, --top <n>`      | Show top N most expensive requests        | —       |
+| `--by-model`         | Group summary by model instead of command | —       |
+| `--since <date>`     | Filter records on or after this date      | —       |
+| `-f, --format <fmt>` | `table` or `json`                         | `table` |
+
+**Example output — endpoint summary:**
+
+```
+💸 Spending by Endpoint
+══════════════════════════════════════════════════════════════
+  review          12 req  $0.1423  48.8k avg tok  saved $0.0218
+  test             8 req  $0.0891  31.2k avg tok  saved $0.0145
+  plan             5 req  $0.0521  22.1k avg tok
+──────────────────────────────────────────────────────────────
+  Total:          25 req  $0.2835  saved $0.0363
+```
+
+**Example output — top requests:**
+
+```
+🔴 Top 5 Most Expensive Requests:
+  1. review    10/03/2026, 14:23:01  $0.0214  claude-3-5-sonnet  82k tok
+  2. review    10/03/2026, 09:11:44  $0.0198  claude-3-5-sonnet  76k tok
+  ...
+```
+
+The ledger is stored as append-only JSONL at `.valora/spending.jsonl` (one record per line). Each record captures command, stage, model, token breakdown, cost, cache savings, duration, and a timestamp.
+
+#### monitoring reset
+
+Reset all in-process metrics and performance profiles.
+
+```bash
+valora monitoring reset
+```
 
 ---
 

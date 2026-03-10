@@ -14,6 +14,7 @@ import {
 	type WorktreeInfoData
 } from 'types/pipeline.types';
 import { formatNumber } from 'utils/number-format';
+import { calculateActualCost } from 'utils/token-estimator';
 
 import { getColorAdapter } from './color-adapter.interface';
 import { getPipelineEmitter, type PipelineEventEmitter } from './pipeline-emitter';
@@ -62,6 +63,8 @@ interface StageGroup {
 	startTime: number;
 	/** Number of child messages printed for this stage */
 	childCount: number;
+	/** Estimated cost accumulated for this stage (USD) */
+	costUsd: number;
 	isParallel: boolean;
 	name: string;
 	state: StageState;
@@ -80,6 +83,8 @@ const MAX_TOOLS_LIST_LENGTH = 60;
 export class ProcessingFeedback {
 	private activeLLMRequests = 0;
 	private activeParallelStages: Map<string, StageGroup> = new Map();
+	/** Cumulative estimated cost across all LLM responses in this session (USD) */
+	private estimatedCostUsd = 0;
 	/** Context window usage tracking */
 	private contextWindow: ContextWindowState | null = null;
 	private currentActivity: string = '';
@@ -177,6 +182,7 @@ export class ProcessingFeedback {
 		// Register the stage with active state
 		this.activeParallelStages.set(this.currentStage, {
 			childCount: 0,
+			costUsd: 0,
 			isParallel,
 			messageBuffer: [],
 			name: stageName ?? 'Stage',
@@ -478,6 +484,10 @@ export class ProcessingFeedback {
 			`${color.dim('Remaining:')} ${color.cyan(formatNumber(remaining))}`
 		];
 
+		if (this.estimatedCostUsd > 0) {
+			parts.push(`${color.dim('~$')}${color.cyan(this.estimatedCostUsd.toFixed(4))}`);
+		}
+
 		return parts.join(separator);
 	}
 
@@ -546,9 +556,30 @@ export class ProcessingFeedback {
 			this.updateContextWindowUsage(event.model, event.promptTokens, event.outputTokens);
 		}
 
+		this.accumulateLLMResponseCost(event, stageName);
+
 		if (this.activeLLMRequests > 0) {
 			this.setActivity('Processing');
 		}
+	}
+
+	/**
+	 * Accumulate estimated cost from a single LLM response event
+	 */
+	private accumulateLLMResponseCost(event: PipelineEventData, stageName: null | string | undefined): void {
+		if (!event.promptTokens && !event.outputTokens) return;
+
+		const model = event.model ?? this.currentModel ?? undefined;
+		const { totalCost } = calculateActualCost(
+			{
+				completion_tokens: event.outputTokens ?? 0,
+				prompt_tokens: event.promptTokens ?? 0,
+				total_tokens: (event.promptTokens ?? 0) + (event.outputTokens ?? 0)
+			},
+			model
+		);
+		this.estimatedCostUsd += totalCost;
+		this.updateStageCost(stageName, totalCost);
 	}
 
 	/**
@@ -584,6 +615,30 @@ export class ProcessingFeedback {
 	}
 
 	/**
+	 * Update estimated cost for a stage
+	 */
+	private updateStageCost(stageName: null | string | undefined, costUsd: number): void {
+		if (!stageName || costUsd <= 0) return;
+
+		const stage = this.activeParallelStages.get(stageName);
+		if (stage) {
+			stage.costUsd += costUsd;
+		}
+	}
+
+	/**
+	 * Print the indented completion summary line for a finished stage
+	 */
+	private printStageCompletionSummary(stageGroup: StageGroup): void {
+		const color = getColorAdapter();
+		const duration = ((Date.now() - stageGroup.startTime) / 1000).toFixed(1);
+		const tokens = stageGroup.tokenCount > 0 ? `, ${formatNumber(stageGroup.tokenCount)} tokens` : '';
+		const cost = stageGroup.costUsd > 0 ? `, ~$${stageGroup.costUsd.toFixed(4)}` : '';
+		const msg = `    ${color.green('✓')} ${color.gray(`Done (${stageGroup.name}, ${duration}s${tokens}${cost})`)}`;
+		this.printLineAboveStatusBar(msg);
+	}
+
+	/**
 	 * Handle stage complete - update state and clean up
 	 */
 	private handleStageComplete(event: PipelineEventData): void {
@@ -609,16 +664,8 @@ export class ProcessingFeedback {
 					this.flushStageMessages(stageGroup);
 				}
 
-				// Calculate duration
-				const duration = ((Date.now() - stageGroup.startTime) / 1000).toFixed(1);
-				const tokens = stageGroup.tokenCount > 0 ? `, ${formatNumber(stageGroup.tokenCount)} tokens` : '';
-
 				// Print stage completion summary (indented inside the stage group)
-				const color = getColorAdapter();
-				const completionMessage = `    ${color.green('✓')} ${color.gray(`Done (${stageGroup.name}, ${duration}s${tokens})`)}`;
-
-				// Print completion above status bar (indented as part of the stage group)
-				this.printLineAboveStatusBar(completionMessage);
+				this.printStageCompletionSummary(stageGroup);
 			}
 
 			// Remove the stage from active stages

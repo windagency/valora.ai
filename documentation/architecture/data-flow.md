@@ -528,7 +528,31 @@ sequenceDiagram
 ├── logs/
 │   ├── 2024-01-15.log
 │   └── latest.log -> 2024-01-15.log
+├── batches/
+│   └── <localId>.json
+├── spending.jsonl        ← append-only per-request cost ledger
 └── config.json
+```
+
+Each line of `spending.jsonl` is a JSON object with the following fields:
+
+```json
+{
+	"id": "1741609384000-review",
+	"command": "review",
+	"stage": "context+analysis+synthesis",
+	"model": "claude-3-5-sonnet-latest",
+	"promptTokens": 29817,
+	"completionTokens": 19063,
+	"cacheReadTokens": 12000,
+	"cacheWriteTokens": 0,
+	"totalTokens": 48880,
+	"costUsd": 0.0124,
+	"cacheSavingsUsd": 0.0036,
+	"durationMs": 3200,
+	"timestamp": "2026-03-10T14:23:01.000Z",
+	"batchDiscounted": false
+}
 ```
 
 ### Session File Format
@@ -558,15 +582,17 @@ sequenceDiagram
 
 ### Collected Metrics
 
-| Metric               | Type      | Description                    |
-| -------------------- | --------- | ------------------------------ |
-| command_duration     | Histogram | Command execution time         |
-| llm_request_duration | Histogram | LLM API latency                |
-| session_count        | Gauge     | Active sessions                |
-| error_count          | Counter   | Errors by type                 |
-| token_usage          | Counter   | Tokens consumed                |
-| cache_read_tokens    | Counter   | Tokens read from prompt cache  |
-| cache_write_tokens   | Counter   | Tokens written to prompt cache |
+| Metric               | Type      | Description                                |
+| -------------------- | --------- | ------------------------------------------ |
+| command_duration     | Histogram | Command execution time                     |
+| llm_request_duration | Histogram | LLM API latency                            |
+| session_count        | Gauge     | Active sessions                            |
+| error_count          | Counter   | Errors by type                             |
+| token_usage          | Counter   | Tokens consumed                            |
+| cache_read_tokens    | Counter   | Tokens read from prompt cache              |
+| cache_write_tokens   | Counter   | Tokens written to prompt cache             |
+| cost_usd             | Ledger    | Per-request USD cost (spending.jsonl)      |
+| cache_savings_usd    | Ledger    | Per-request cache savings (spending.jsonl) |
 
 ### Log Structure
 

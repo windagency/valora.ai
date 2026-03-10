@@ -49,6 +49,7 @@ export { OptimizationPanel } from './detail-panels/optimization-panel';
 export { QualityPanel } from './detail-panels/quality-panel';
 export { RunningTaskPanel } from './detail-panels/running-task-panel';
 export { SessionInfoPanel } from './detail-panels/session-info-panel';
+export { SpendingPanel } from './detail-panels/spending-panel';
 export { TokenUsagePanel } from './detail-panels/token-usage-panel';
 export { MCPSessionPanel } from './detail-panels/tool-calls-panel';
 export { WorktreeStatsPanel } from './detail-panels/worktree-stats-panel';
