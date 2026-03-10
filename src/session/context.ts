@@ -118,14 +118,33 @@ export class SessionContextManager {
 	 * Merge context
 	 */
 	mergeContext(context: SessionContext): void {
-		this.session.context = { ...this.session.context, ...context };
+		this.session.context = SessionContextManager.deepMerge(
+			this.session.context as Record<string, unknown>,
+			context as Record<string, unknown>
+		);
 	}
 
 	/**
 	 * Clear specific context key
 	 */
 	clearContext(key: string): void {
-		delete this.session.context[key];
+		const keys = key.split('.');
+		const lastKey = keys[keys.length - 1];
+		if (!lastKey) return;
+
+		if (keys.length === 1) {
+			delete this.session.context[key];
+			return;
+		}
+
+		const parent = keys.slice(0, -1).reduce((obj: unknown, k: string) => {
+			if (obj && typeof obj === 'object') return (obj as Record<string, unknown>)[k];
+			return undefined;
+		}, this.session.context);
+
+		if (parent && typeof parent === 'object') {
+			delete (parent as Record<string, unknown>)[lastKey];
+		}
 	}
 
 	/**
@@ -222,7 +241,7 @@ export class SessionContextManager {
 	 * Check if context has key
 	 */
 	hasContext(key: string): boolean {
-		return key in this.session.context;
+		return this.getContext(key) !== undefined;
 	}
 
 	/**
@@ -249,28 +268,49 @@ export class SessionContextManager {
 	 * Get filtered context containing only specified keys
 	 * Useful for reducing token usage by only passing context that's actually referenced
 	 */
+	private static buildNestedFromPath(path: string, value: unknown): Record<string, unknown> {
+		const keys = path.split('.').reverse();
+		return keys.reduce((acc, k) => ({ [k]: acc }), value as Record<string, unknown>);
+	}
+
+	private static deepMerge(target: Record<string, unknown>, source: Record<string, unknown>): Record<string, unknown> {
+		const result = { ...target };
+		for (const [key, value] of Object.entries(source)) {
+			const existing = result[key];
+			if (
+				value !== null &&
+				typeof value === 'object' &&
+				!Array.isArray(value) &&
+				existing !== null &&
+				typeof existing === 'object' &&
+				!Array.isArray(existing)
+			) {
+				result[key] = SessionContextManager.deepMerge(
+					existing as Record<string, unknown>,
+					value as Record<string, unknown>
+				);
+			} else {
+				result[key] = value;
+			}
+		}
+		return result;
+	}
+
 	getFilteredContext(keys: string[]): SessionContext {
 		if (keys.length === 0) {
 			return {};
 		}
 
-		const filtered: SessionContext = {};
+		let filtered: Record<string, unknown> = {};
 		for (const key of keys) {
 			const value = this.getContext(key);
 			if (value !== undefined) {
-				// Handle nested keys by setting the value at the root key
-				const rootKey = key.split('.')[0];
-				if (rootKey && !(rootKey in filtered)) {
-					// Get the full value for the root key to preserve nesting
-					const rootValue = this.getContext(rootKey);
-					if (rootValue !== undefined) {
-						filtered[rootKey] = rootValue;
-					}
-				}
+				const nested = SessionContextManager.buildNestedFromPath(key, value);
+				filtered = SessionContextManager.deepMerge(filtered, nested);
 			}
 		}
 
-		return filtered;
+		return filtered as SessionContext;
 	}
 
 	/**

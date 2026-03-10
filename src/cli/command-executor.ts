@@ -776,8 +776,7 @@ export class CommandExecutor {
 
 		for (const stage of result.stages) {
 			if (stage.success && stage.outputs) {
-				// Use stage.prompt as the key since it's unique within a command
-				const stageKey = `${stage.stage}_${stage.prompt}`;
+				const stageKey = stage.stage;
 				stageOutputs[stageKey] = stage.outputs;
 			}
 		}

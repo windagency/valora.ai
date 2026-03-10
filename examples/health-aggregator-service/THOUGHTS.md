@@ -44,23 +44,23 @@ GET /status/aggregate → Full health report of all monitored services
 
 ```json
 {
-  "status": "healthy | degraded | unhealthy",
-  "timestamp": "2024-01-25T10:00:00.000Z",
-  "services": [
-    {
-      "name": "user-service",
-      "url": "https://user-service.run.app/health",
-      "status": "healthy",
-      "latency": 45,
-      "lastChecked": "2024-01-25T10:00:00.000Z"
-    }
-  ],
-  "summary": {
-    "total": 5,
-    "healthy": 4,
-    "degraded": 1,
-    "unhealthy": 0
-  }
+	"status": "healthy | degraded | unhealthy",
+	"timestamp": "2024-01-25T10:00:00.000Z",
+	"services": [
+		{
+			"name": "user-service",
+			"url": "https://user-service.run.app/health",
+			"status": "healthy",
+			"latency": 45,
+			"lastChecked": "2024-01-25T10:00:00.000Z"
+		}
+	],
+	"summary": {
+		"total": 5,
+		"healthy": 4,
+		"degraded": 1,
+		"unhealthy": 0
+	}
 }
 ```
 
@@ -102,7 +102,7 @@ services:
   - name: analytics
     url: https://analytics-service.run.app/health
     timeout: 2000
-    critical: false  # Non-critical — degraded is OK
+    critical: false # Non-critical — degraded is OK
 ```
 
 ### Health Status Logic

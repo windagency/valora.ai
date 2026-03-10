@@ -69,7 +69,7 @@ Context loading stages (like `context.load-specifications`) are expensive LLM op
 ```typescript
 generateCacheKey(stageId, inputs, config): string {
   // Hash includes:
-  // 1. Stage identifier (stage.prompt)
+  // 1. Stage identifier (stage.stage — the stage name)
   // 2. Resolved inputs
   // 3. File dependency content hashes
   return sha256({ stageId, inputs, fileHashes }).substring(0, 24);
@@ -188,7 +188,7 @@ saveStageOutputsToSession(sessionManager, result) {
   const stageOutputs = {};
   for (const stage of result.stages) {
     if (stage.success && stage.outputs) {
-      const stageKey = `${stage.stage}_${stage.prompt}`;
+      const stageKey = stage.stage;
       stageOutputs[stageKey] = stage.outputs;
     }
   }
@@ -199,12 +199,12 @@ saveStageOutputsToSession(sessionManager, result) {
 }
 ```
 
-Subsequent commands can reference previous outputs via variable resolution:
+Stage outputs are keyed by `stage.stage` (the stage name) only. Subsequent commands can reference previous outputs via variable resolution using `$STAGE_<stageName>`:
 
 ```yaml
 # In pipeline stage definition
 inputs:
-  previous_analysis: $STAGE_analyze_context.summary
+  previous_analysis: $STAGE_analyze.summary
   target_files: $STAGE_plan.files
 ```
 
