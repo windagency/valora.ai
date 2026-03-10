@@ -31,6 +31,7 @@ prompts:
         - project_type
     - stage: onboard
       prompt: onboard.analyze-requirements
+      batch: true
       required: true
       inputs:
         source_document: $STAGE_context.specifications
@@ -59,6 +60,7 @@ prompts:
         - questions_skipped
     - stage: documentation
       prompt: documentation.generate-prd
+      batch: true
       required: true
       inputs:
         specifications: $STAGE_context.specifications
@@ -71,6 +73,7 @@ prompts:
         - executive_summary
     - stage: review
       prompt: review.validate-completeness
+      batch: true
       required: true
       inputs:
         document: $STAGE_documentation.prd_document

@@ -77,10 +77,15 @@ interface LLMResponse {
 	usage?: {
 		inputTokens: number;
 		outputTokens: number;
+		cacheCreationInputTokens?: number;
+		cacheReadInputTokens?: number;
+		batch_discount_applied?: boolean;
 	};
 	metadata?: Record<string, unknown>;
 }
 ```
+
+Cache usage fields are optional and populated by providers that support prompt caching (see below).
 
 ### Provider Selection
 
@@ -98,6 +103,59 @@ flowchart TD
     H --> F
 ```
 
+## Prompt Caching
+
+Each provider implements prompt caching according to its API's capabilities. Cache metrics are normalised into the shared `LLMUsage` type (`cache_creation_input_tokens`, `cache_read_input_tokens`) so the CLI layer and cost estimator can display cache hit rates and savings regardless of provider.
+
+| Provider      | Caching Mechanism                                                                   | Opt-In Required                                 | Cache Pricing                                  |
+| ------------- | ----------------------------------------------------------------------------------- | ----------------------------------------------- | ---------------------------------------------- |
+| **Anthropic** | Explicit `cache_control` breakpoints on system prompt, tools, and last user message | Yes — `prompt_caching: true` in provider config | Write: 1.25× input, Read: 0.1× input (90% off) |
+| **OpenAI**    | Automatic prompt caching                                                            | No — metrics extracted automatically            | Read: 0.5× input (50% off), no write surcharge |
+| **Google**    | Context caching                                                                     | No — metrics extracted automatically            | Read: 0.25× input (75% off)                    |
+| **Cursor**    | N/A (MCP protocol)                                                                  | N/A                                             | N/A                                            |
+
+### Anthropic Cache Strategy
+
+When `prompt_caching` is enabled, the Anthropic provider injects up to 3 `cache_control: { type: "ephemeral" }` breakpoints:
+
+1. **System prompt** — converted from string to `TextBlockParam[]` (skipped if below 1 024 estimated tokens)
+2. **Last tool definition** — caches the full tool schema
+3. **Last user message before the final turn** — caches the conversation history
+
+This leaves 1 of 4 allowed breakpoints free for future extension.
+
+### OpenAI & Google Cache Extraction
+
+These providers extract cache metrics from API responses without requiring explicit breakpoints:
+
+- **OpenAI**: Reads `prompt_tokens_details.cached_tokens` from `CompletionUsage`
+- **Google**: Reads `cachedContentTokenCount` from `usageMetadata`
+
+## Batch API
+
+Each provider that supports a batch API implements the `BatchableProvider` interface (defined in `src/batch/batch-provider.interface.ts`). Batch processing reduces token costs by ~50% in exchange for asynchronous execution (24-hour window).
+
+```typescript
+interface BatchableProvider extends LLMProvider {
+	supportsBatch(): true;
+	submitBatch(requests: BatchRequest[]): Promise<BatchSubmission>;
+	getBatchStatus(batchId: string): Promise<BatchStatusInfo>;
+	getBatchResults(batchId: string): Promise<BatchResult[]>;
+	cancelBatch(batchId: string): Promise<void>;
+}
+```
+
+The `isBatchableProvider()` type guard performs a runtime check so the stage executor can route eligible stages through the batch path without knowing which provider is active.
+
+| Provider      | Batch API                                | Discount | `supportsBatch()` |
+| ------------- | ---------------------------------------- | -------- | ----------------- |
+| **Anthropic** | Message Batches (`/v1/messages/batches`) | ~50%     | `true`            |
+| **OpenAI**    | Batch API (`/v1/batches`)                | ~50%     | `true`            |
+| **Google**    | Vertex AI (not yet implemented)          | ~50%     | `false`           |
+| **Cursor**    | Not supported                            | —        | N/A               |
+
+Batch results include `batch_discount_applied: true` on the `LLMUsage` object so cost reporting can distinguish batch from real-time calls.
+
 ## Consequences
 
 ### Positive
@@ -107,6 +165,7 @@ flowchart TD
 - **Consistent Interface**: Same code works with all providers
 - **Extensibility**: New providers easily added
 - **Optimisation**: Use best provider for each task
+- **Cost Reduction**: Prompt caching reduces input token costs by up to 90%
 
 ### Negative
 

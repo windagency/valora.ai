@@ -33,6 +33,8 @@ import { SessionStore } from 'session/store';
 import { getPromptAdapter } from 'ui/prompt-adapter.interface';
 import { formatErrorMessage } from 'utils/error-utils';
 import { incrementCounter, timeAsync } from 'utils/metrics-collector';
+import { getSpendingTracker } from 'utils/spending-tracker';
+import { calculateActualCost } from 'utils/token-estimator';
 
 import { CommandErrorHandler, type ErrorHandlingContext } from './command-error-handler';
 import { CommandResolver } from './command-resolver';
@@ -66,6 +68,8 @@ interface TokenUsage {
  * Token breakdown structure for tracking
  */
 interface TokenBreakdown {
+	cache_read?: number;
+	cache_write?: number;
 	context: number;
 	generation: number;
 	total: number;
@@ -75,7 +79,9 @@ interface TokenBreakdown {
  * Context for successful result handling
  */
 interface SuccessHandlingContext {
+	cacheSavingsUsd: number;
 	commandName: string;
+	costUsd: number;
 	documentOptions: DocumentOutputOptions & { taskId?: string };
 	duration: number;
 	isDryRun: boolean;
@@ -330,6 +336,17 @@ export class CommandExecutor {
 					// Step 5.5: Restore stashed changes if stash protection was used
 					await this.restoreStashProtection(stashProtection);
 
+					// Compute cost from token breakdown and record to spending ledger
+					const model = resolvedCommand.command.model;
+					const costResult = this.computeAndRecordSpending(
+						commandName,
+						options,
+						tokenBreakdown,
+						model,
+						duration,
+						result
+					);
+
 					// Step 6: Handle result (success or failure)
 					if (result.success) {
 						const isDryRun = options.flags['dryRun'] === true || options.flags['dry-run'] === true;
@@ -338,7 +355,9 @@ export class CommandExecutor {
 						const documentOptions = { ...(options.documentOutput ?? { enabled: true }), taskId };
 
 						return await this.handleSuccessfulResult({
+							cacheSavingsUsd: costResult.cacheSavings,
 							commandName,
+							costUsd: costResult.totalCost,
 							documentOptions,
 							duration,
 							isDryRun,
@@ -356,7 +375,9 @@ export class CommandExecutor {
 						duration,
 						finalSessionManager.getSession().session_id,
 						tokenBreakdown,
-						totalSessionTokens
+						totalSessionTokens,
+						costResult.totalCost,
+						costResult.cacheSavings
 					);
 					return result;
 				} catch (error) {
@@ -451,28 +472,83 @@ export class CommandExecutor {
 	/**
 	 * Calculate detailed token usage breakdown from command result
 	 */
-	private calculateTokenUsage(result: CommandResult): {
-		context: number;
-		generation: number;
-		total: number;
-	} {
+	private calculateTokenUsage(result: CommandResult): TokenBreakdown {
 		// Use reduce to accumulate token usage from all stages
 		const tokenUsage = result.stages.reduce(
 			(acc, stage) => {
 				const usageValue = stage.outputs?.['usage'];
 				if (usageValue && isTokenUsage(usageValue)) {
+					const usage = usageValue as TokenUsage;
+					const cacheRead =
+						typeof (usage as Record<string, unknown>)['cache_read_input_tokens'] === 'number'
+							? ((usage as Record<string, unknown>)['cache_read_input_tokens'] as number)
+							: 0;
+					const cacheWrite =
+						typeof (usage as Record<string, unknown>)['cache_creation_input_tokens'] === 'number'
+							? ((usage as Record<string, unknown>)['cache_creation_input_tokens'] as number)
+							: 0;
 					return {
-						context: acc.context + (usageValue.prompt_tokens ?? 0),
-						generation: acc.generation + (usageValue.completion_tokens ?? 0),
-						total: acc.total + (usageValue.total_tokens ?? 0)
+						cache_read: acc.cache_read + cacheRead,
+						cache_write: acc.cache_write + cacheWrite,
+						context: acc.context + (usage.prompt_tokens ?? 0),
+						generation: acc.generation + (usage.completion_tokens ?? 0),
+						total: acc.total + (usage.total_tokens ?? 0)
 					};
 				}
 				return acc;
 			},
-			{ context: 0, generation: 0, total: 0 }
+			{ cache_read: 0, cache_write: 0, context: 0, generation: 0, total: 0 }
 		);
 
-		return tokenUsage;
+		// Only include cache fields if they have values
+		return {
+			...(tokenUsage.cache_read > 0 ? { cache_read: tokenUsage.cache_read } : {}),
+			...(tokenUsage.cache_write > 0 ? { cache_write: tokenUsage.cache_write } : {}),
+			context: tokenUsage.context,
+			generation: tokenUsage.generation,
+			total: tokenUsage.total
+		};
+	}
+
+	/**
+	 * Compute cost from a token breakdown and append a record to the spending ledger.
+	 * Returns the cost result for passing through to the result presenter.
+	 */
+	private computeAndRecordSpending(
+		commandName: string,
+		options: CommandExecutionOptions,
+		tokenBreakdown: TokenBreakdown,
+		model: string | undefined,
+		duration: number,
+		result: CommandResult
+	): { cacheSavings: number; totalCost: number } {
+		const costResult = calculateActualCost(
+			{
+				cache_creation_input_tokens: tokenBreakdown.cache_write ?? 0,
+				cache_read_input_tokens: tokenBreakdown.cache_read ?? 0,
+				completion_tokens: tokenBreakdown.generation,
+				prompt_tokens: tokenBreakdown.context,
+				total_tokens: tokenBreakdown.total
+			},
+			model
+		);
+		getSpendingTracker().record({
+			batchDiscounted: options.flags['batch'] === true,
+			cacheReadTokens: tokenBreakdown.cache_read ?? 0,
+			cacheSavingsUsd: costResult.cacheSavings,
+			cacheWriteTokens: tokenBreakdown.cache_write ?? 0,
+			command: commandName,
+			completionTokens: tokenBreakdown.generation,
+			costUsd: costResult.totalCost,
+			durationMs: duration,
+			id: `${Date.now()}-${commandName}`,
+			model: model ?? 'unknown',
+			promptTokens: tokenBreakdown.context,
+			stage: result.stages.map((s) => s.stage).join('+'),
+			timestamp: new Date().toISOString(),
+			totalTokens: tokenBreakdown.total
+		});
+		return costResult;
 	}
 
 	/**
@@ -509,7 +585,9 @@ export class CommandExecutor {
 			ctx.resolvedCommand.command.agent,
 			ctx.resolvedCommand.command.model,
 			ctx.tokenBreakdown,
-			ctx.totalSessionTokens
+			ctx.totalSessionTokens,
+			ctx.costUsd,
+			ctx.cacheSavingsUsd
 		);
 
 		if (ctx.isDryRun) {
@@ -553,7 +631,9 @@ export class CommandExecutor {
 		duration: number,
 		sessionId: string,
 		tokenBreakdown: TokenBreakdown,
-		totalSessionTokens: number
+		totalSessionTokens: number,
+		costUsd?: number,
+		cacheSavingsUsd?: number
 	): Promise<void> {
 		this.resultPresenter.displayFailure(
 			commandName,
@@ -561,7 +641,9 @@ export class CommandExecutor {
 			duration,
 			sessionId,
 			tokenBreakdown,
-			totalSessionTokens
+			totalSessionTokens,
+			costUsd,
+			cacheSavingsUsd
 		);
 		await this.sessionLifecycle.fail(result.error);
 	}
@@ -694,8 +776,7 @@ export class CommandExecutor {
 
 		for (const stage of result.stages) {
 			if (stage.success && stage.outputs) {
-				// Use stage.prompt as the key since it's unique within a command
-				const stageKey = `${stage.stage}_${stage.prompt}`;
+				const stageKey = stage.stage;
 				stageOutputs[stageKey] = stage.outputs;
 			}
 		}

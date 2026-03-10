@@ -10,8 +10,10 @@ import { getColorAdapter } from 'output/color-adapter.interface';
 import { formatError } from 'utils/error-handler';
 import { createHeapSnapshot } from 'utils/heap-profiler';
 import { exportMetricsPrometheus, getMetricsCollector, getMetricsSnapshot } from 'utils/metrics-collector';
+import { formatNumber } from 'utils/number-format';
 import { generatePerformanceReport, getPerformanceProfiler } from 'utils/performance-profiler';
 import { getCurrentResourceUsage, getResourceMonitor, getResourceStats } from 'utils/resource-monitor';
+import { type GetRecordsOptions, getSpendingTracker } from 'utils/spending-tracker';
 
 /**
  * Display CPU information
@@ -109,6 +111,127 @@ function displayNetworkInfo(
 	console.log(`TX Bytes: ${usage.network.txBytes.toLocaleString()}`);
 	console.log(`RX Packets: ${usage.network.rxPackets.toLocaleString()}`);
 	console.log(`TX Packets: ${usage.network.txPackets.toLocaleString()}`);
+}
+
+/**
+ * Display top N most expensive spending records
+ */
+function displayTopExpensive(
+	tracker: ReturnType<typeof getSpendingTracker>,
+	topN: number,
+	opts: GetRecordsOptions | undefined,
+	color: ReturnType<typeof getColorAdapter>,
+	isJson: boolean
+): void {
+	const records = tracker.getExpensive(topN, opts);
+
+	if (isJson) {
+		console.log(JSON.stringify(records, null, 2));
+		return;
+	}
+
+	console.log(`\n${color.magenta(`🔴 Top ${topN} Most Expensive Requests:`)}`);
+	console.log('═'.repeat(62));
+
+	records.forEach((r, i) => {
+		const date = new Date(r.timestamp).toLocaleString();
+		console.log(
+			`  ${i + 1}. ${color.cyan(r.command.padEnd(12))} ${color.dim(date)}  $${r.costUsd.toFixed(4)}  ${color.dim(r.model)}  ${formatNumber(r.totalTokens)} tok`
+		);
+	});
+
+	if (records.length === 0) {
+		console.log(color.dim('  No spending records found.'));
+	}
+}
+
+/**
+ * Display spending grouped by model
+ */
+function displayByModel(
+	tracker: ReturnType<typeof getSpendingTracker>,
+	opts: GetRecordsOptions | undefined,
+	color: ReturnType<typeof getColorAdapter>,
+	isJson: boolean
+): void {
+	const records = tracker.getRecords(opts);
+	const modelMap = new Map<
+		string,
+		{ cacheSavingsUsd: number; requestCount: number; totalCostUsd: number; totalTokens: number }
+	>();
+
+	for (const r of records) {
+		const existing = modelMap.get(r.model);
+		if (existing) {
+			existing.totalCostUsd += r.costUsd;
+			existing.totalTokens += r.totalTokens;
+			existing.requestCount += 1;
+			existing.cacheSavingsUsd += r.cacheSavingsUsd;
+		} else {
+			modelMap.set(r.model, {
+				cacheSavingsUsd: r.cacheSavingsUsd,
+				requestCount: 1,
+				totalCostUsd: r.costUsd,
+				totalTokens: r.totalTokens
+			});
+		}
+	}
+
+	const summaries = Array.from(modelMap.entries())
+		.map(([model, data]) => ({ model, ...data }))
+		.sort((a, b) => b.totalCostUsd - a.totalCostUsd);
+
+	if (isJson) {
+		console.log(JSON.stringify(summaries, null, 2));
+		return;
+	}
+
+	console.log(`\n${color.magenta('💸 Spending by Model')}`);
+	console.log('═'.repeat(62));
+
+	for (const s of summaries) {
+		const savings = s.cacheSavingsUsd > 0 ? `  saved $${s.cacheSavingsUsd.toFixed(4)}` : '';
+		const avgTok = s.requestCount > 0 ? Math.round(s.totalTokens / s.requestCount) : 0;
+		console.log(
+			`  ${color.cyan(s.model.padEnd(30))} ${String(s.requestCount).padStart(3)} req  $${s.totalCostUsd.toFixed(4)}  ${formatNumber(avgTok)} avg tok${savings}`
+		);
+	}
+
+	if (summaries.length === 0) {
+		console.log(color.dim('  No spending records found.'));
+	}
+}
+
+/**
+ * Display spending grouped by command endpoint
+ */
+function displayByEndpoint(
+	tracker: ReturnType<typeof getSpendingTracker>,
+	opts: GetRecordsOptions | undefined,
+	color: ReturnType<typeof getColorAdapter>,
+	isJson: boolean
+): void {
+	const endpoints = tracker.getByEndpoint(opts);
+
+	if (isJson) {
+		console.log(JSON.stringify(endpoints, null, 2));
+		return;
+	}
+
+	console.log(`\n${color.magenta('💸 Spending by Endpoint')}`);
+	console.log('═'.repeat(62));
+
+	for (const e of endpoints) {
+		const savings = e.cacheSavingsUsd > 0 ? `  saved $${e.cacheSavingsUsd.toFixed(4)}` : '';
+		const avgTok = e.requestCount > 0 ? Math.round(e.totalTokens / e.requestCount) : 0;
+		console.log(
+			`  ${color.cyan(e.command.padEnd(14))} ${String(e.requestCount).padStart(3)} req  $${e.totalCostUsd.toFixed(4)}  ${formatNumber(avgTok)} avg tok${savings}`
+		);
+	}
+
+	if (endpoints.length === 0) {
+		console.log(color.dim('  No spending records found.'));
+	}
 }
 
 /**
@@ -455,6 +578,47 @@ export function configureMonitoringCommand(program: CommandAdapter): void {
 				console.log(color.green('✅ All monitoring data has been reset'));
 			} catch (error) {
 				console.error(color.red('Failed to reset monitoring data:'), formatError(error as Error));
+				process.exit(1);
+			}
+		});
+
+	// Spending subcommand
+	monitoringCmd
+		.command('spending')
+		.description('Show LLM spending breakdown by endpoint or top expensive requests')
+		.option('-t, --top <n>', 'Show top N most expensive requests', '')
+		.option('--by-model', 'Group by model instead of command', false)
+		.option('--since <date>', 'Filter records since date (ISO 8601)', '')
+		.option('-f, --format <format>', 'Output format (json|table)', 'table')
+		.action((options: Record<string, unknown>) => {
+			const color = getColorAdapter();
+			try {
+				const tracker = getSpendingTracker();
+				const since = typeof options['since'] === 'string' && options['since'] ? options['since'] : undefined;
+				const opts = since ? { since } : undefined;
+				const topN = typeof options['top'] === 'string' && options['top'] ? parseInt(options['top'], 10) : 0;
+				const isJson = options['format'] === 'json';
+
+				if (topN > 0) {
+					displayTopExpensive(tracker, topN, opts, color, isJson);
+					return;
+				}
+
+				if (options['byModel'] === true) {
+					displayByModel(tracker, opts, color, isJson);
+				} else {
+					displayByEndpoint(tracker, opts, color, isJson);
+				}
+
+				const totals = tracker.getTotals(opts);
+				console.log('─'.repeat(62));
+				const totalSavings = totals.cacheSavingsUsd > 0 ? `  saved $${totals.cacheSavingsUsd.toFixed(4)}` : '';
+				console.log(
+					`  ${color.bold('Total:')} ${String(totals.requestCount).padStart(3)} req  $${totals.totalCostUsd.toFixed(4)}${totalSavings}`
+				);
+				console.log('');
+			} catch (error) {
+				console.error(color.red('Failed to retrieve spending data:'), formatError(error as Error));
 				process.exit(1);
 			}
 		});

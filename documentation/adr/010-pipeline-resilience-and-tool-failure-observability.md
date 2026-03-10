@@ -151,7 +151,8 @@ the persisted session totals (historical) so both panels reflect cross-session h
 ### Neutral
 
 - The `MAX_TOOL_FAILURES_BEFORE_HARD_STOP` constant is defined in `stage-executor.ts` and
-  applies globally. Per-stage overrides are not yet supported.
+  applies globally. Override per stage via `PipelineStage.max_tool_failures` in the command
+  YAML (see Amendment 2026-03-09 below).
 - The forced-output JSON template is hardcoded to the `code_changes` shape, which suits
   `code` stages but may not match other stage types. The verified-files injection still
   improves accuracy regardless of the template shape.
@@ -191,3 +192,114 @@ high number effectively disables the hard-stop, reverting to the old behaviour.
 - `src/types/session.types.ts` — `QualityMetrics.tool_failures`, `QualityMetrics.tool_loop_exhaustions`
 - `src/cli/command-executor.ts` — `updateSessionState` aggregation
 - `src/ui/dashboard/panels/metrics-summary-panel.tsx` — "Loop Exhausted" and "Tool Failures" display
+
+---
+
+## Amendment — 2026-03-09: Per-stage limits and guidance-vs-failure distinction
+
+### Context
+
+Two problems were observed in production use of the `implement` command:
+
+1. The `test.code.implement-tests` stage (10 steps: unit tests, integration tests, E2E,
+   security, etc.) consistently hit the 20-iteration ceiling.
+2. The `documentation.documentation.update-inline-docs` stage both hit the ceiling _and_
+   triggered the hard-stop because "File too large" read attempts on source files were
+   each counted as tool failures.
+
+### Changes
+
+#### Per-stage iteration and failure limits
+
+`PipelineStage` gains two optional tuning fields:
+
+```typescript
+interface PipelineStage {
+	/** Override the default 20-iteration ceiling for this stage. */
+	max_tool_iterations?: number;
+	/** Override the default hard-stop threshold of 5 failures for this stage. */
+	max_tool_failures?: number;
+}
+```
+
+Command YAML usage:
+
+```yaml
+- stage: test
+  prompt: code.implement-tests
+  required: true
+  max_tool_iterations: 40 # 10-step prompt needs more room
+
+- stage: documentation
+  prompt: documentation.update-inline-docs
+  required: true
+  max_tool_iterations: 30
+  max_tool_failures: 10 # large-file guidance was inflating failure count
+```
+
+#### Guidance vs failure: tools now return strings for correctable mistakes
+
+Previously, every "File too large", "File not found", "Text not found in file", etc.
+threw a JavaScript `Error`, which was caught by `executeToolWithSpan`, serialised as
+`"Error: <message>"`, and therefore counted as a failure by `processToolResult`.
+
+The hard-stop was firing because the LLM routinely reads source files while documenting
+code — source files regularly exceed the 100-line limit — so each read attempt burned one
+failure token.
+
+The fix: tools distinguish between **genuine failures** (system faults that warrant an
+`"Error:"` prefix and increment the counter) and **guidance** (correctable LLM mistakes
+that should redirect the LLM without burning a failure token).
+
+**Genuine failures (still throw / return `"Error:"`):**
+
+- `executeToolByName` — unknown tool name (configuration bug)
+- `run_terminal_cmd` — exit code ≥ 2 (actual command error)
+- OS-level exceptions from `fs` operations
+
+**Guidance (now return plain strings, no `"Error:"` prefix):**
+
+| Tool               | Situation                       | Guidance returned                           |
+| ------------------ | ------------------------------- | ------------------------------------------- |
+| `read_file`        | Missing `path` arg              | Usage hint                                  |
+| `read_file`        | Blocked path                    | Policy explanation                          |
+| `read_file`        | File not found                  | Hint to use `list_dir` / `glob_file_search` |
+| `read_file`        | Byte size > 1 MB                | Use `head`, `sed -n`, `rg`                  |
+| `read_file`        | Line count > 100                | Selective extraction examples               |
+| `read_file`        | Structured file (.json/.yaml/…) | Use `jq`/`yq`                               |
+| `search_replace`   | Missing args                    | Usage hint                                  |
+| `search_replace`   | File not found                  | Hint to verify path first                   |
+| `search_replace`   | `old_str` not in file           | Hint to read file first                     |
+| `write`            | Missing args                    | Usage hint                                  |
+| `write`            | Protected file not yet read     | Hint to read first                          |
+| `delete_file`      | Missing `path` arg              | Usage hint                                  |
+| `delete_file`      | File not found                  | `"(nothing to delete)"` — idempotent        |
+| `list_dir`         | Directory not found             | Hint to verify path                         |
+| `list_dir`         | Path is a file                  | Hint to use `read_file`                     |
+| `web_search`       | Missing `query` arg             | Usage hint                                  |
+| `glob_file_search` | Missing `pattern` arg           | Usage hint                                  |
+| `grep`             | Missing `pattern` arg           | Usage hint                                  |
+| `codebase_search`  | Missing `query` arg             | Usage hint                                  |
+| `query_session`    | Missing / invalid args          | Usage hint with valid actions               |
+| `query_session`    | Session not found               | Hint to `list` sessions first               |
+| `run_terminal_cmd` | `rg`/`grep` exit code 1         | `"No matches found for: …"`                 |
+
+The `processToolResult` failure-detection rule is unchanged: any tool result whose
+content starts with `"Error:"` is a failure; all others are not.
+
+### Updated Neutral consequences
+
+- `MAX_TOOL_FAILURES_BEFORE_HARD_STOP` can now be overridden per stage via
+  `PipelineStage.max_tool_failures`.
+- The default value of 5 remains appropriate for stages that do not involve heavy
+  read-navigation patterns. Stages with large codebases should raise it or the
+  "File too large" guidance responses will never accumulate to the threshold anyway.
+
+### Implementation references
+
+- `src/types/command.types.ts` — `PipelineStage.max_tool_iterations`, `PipelineStage.max_tool_failures`
+- `src/executor/stage-executor.ts` — `callLLMWithToolLoop`, `handleMaxIterationsExceeded`, `handleNormalCompletion`
+- `src/executor/tool-execution.service.ts` — full guidance-vs-failure policy (see file-level JSDoc)
+- `src/executor/tools/search-tools.service.ts` — `executeGlobSearch`, `executeGrep`, `executeCodebaseSearch`
+- `src/executor/tools/session-tools.service.ts` — `executeQuerySession`, `getSessionDetails`
+- `data/commands/implement.md` — `max_tool_iterations` and `max_tool_failures` on `test` and `documentation` stages

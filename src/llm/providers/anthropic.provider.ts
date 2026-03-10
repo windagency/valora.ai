@@ -9,12 +9,22 @@
  * Self-registers with the LLM Provider Registry using dependency inversion pattern
  */
 
+import type { BatchableProvider } from 'batch/batch-provider.interface';
+import type { BatchRequest, BatchResult, BatchStatusInfo, BatchSubmission } from 'batch/batch.types';
+
 import Anthropic from '@anthropic-ai/sdk';
 import { AnthropicVertex } from '@anthropic-ai/vertex-sdk';
+import { generateLocalId } from 'batch/batch-session';
+import {
+	cancelAnthropicBatch,
+	getAnthropicBatchResults,
+	getAnthropicBatchStatus,
+	submitAnthropicBatch
+} from 'batch/providers/anthropic.batch-provider';
 import { createHash } from 'crypto';
 import { Agent as UndiciAgent, fetch as undiciFetch } from 'undici';
 
-import type { LLMCompletionOptions, LLMCompletionResult, LLMMessage } from 'types/llm.types';
+import type { LLMCompletionOptions, LLMCompletionResult, LLMMessage, LLMUsage } from 'types/llm.types';
 
 import { DEFAULT_MAX_TOKENS } from 'config/constants';
 import { getProviderModels, ProviderName } from 'config/providers.config';
@@ -23,8 +33,12 @@ import { BaseLLMProvider } from 'llm/provider.interface';
 import { getProviderRegistry } from 'llm/registry';
 import { createErrorContext, ProviderError, withCircuitBreaker, withRetry } from 'utils/error-handler';
 import { checkRateLimit, getRateLimitStatus } from 'utils/rate-limiter';
+import { estimateTokensFromText } from 'utils/token-estimator';
 
-export class AnthropicProvider extends BaseLLMProvider {
+/** Minimum estimated tokens for a content block to be worth caching */
+const MIN_CACHEABLE_TOKENS = 1024;
+
+export class AnthropicProvider extends BaseLLMProvider implements BatchableProvider {
 	name = ProviderName.ANTHROPIC;
 	private client: Anthropic | AnthropicVertex | null = null;
 	private readonly modelMappingRegistry: ModelMappingRegistry;
@@ -127,21 +141,22 @@ export class AnthropicProvider extends BaseLLMProvider {
 				top_p: options.top_p
 			};
 
+			// Apply cache breakpoints if prompt caching is enabled
+			this.applyCacheBreakpoints(messageParams);
+
 			const response =
 				client instanceof AnthropicVertex
 					? await client.messages.create(messageParams)
 					: await client.messages.create(messageParams);
+
+			const usage = this.extractUsage(response.usage);
 
 			return {
 				content: this.extractContent(response),
 				finish_reason: response.stop_reason ?? undefined,
 				role: 'assistant' as const,
 				tool_calls: this.extractToolCalls(response),
-				usage: {
-					completion_tokens: response.usage.output_tokens,
-					prompt_tokens: response.usage.input_tokens,
-					total_tokens: response.usage.input_tokens + response.usage.output_tokens
-				}
+				usage
 			};
 		};
 
@@ -232,7 +247,7 @@ export class AnthropicProvider extends BaseLLMProvider {
 		// Resolve model name for Vertex AI compatibility
 		const resolvedModel = this.resolveModelName(options.model, options.mode);
 
-		return {
+		const params: Anthropic.MessageCreateParamsStreaming = {
 			max_tokens: options.max_tokens ?? DEFAULT_MAX_TOKENS,
 			messages,
 			model: resolvedModel,
@@ -246,6 +261,11 @@ export class AnthropicProvider extends BaseLLMProvider {
 			})),
 			top_p: options.top_p
 		};
+
+		// Apply cache breakpoints if prompt caching is enabled
+		this.applyCacheBreakpoints(params);
+
+		return params;
 	}
 
 	/**
@@ -337,7 +357,7 @@ export class AnthropicProvider extends BaseLLMProvider {
 		onChunk: (chunk: string) => void
 	): Promise<LLMCompletionResult> {
 		let fullContent = '';
-		const usage = {
+		const usage: LLMUsage = {
 			completion_tokens: 0,
 			prompt_tokens: 0,
 			total_tokens: 0
@@ -381,6 +401,13 @@ export class AnthropicProvider extends BaseLLMProvider {
 			messageStart: (chunk: Anthropic.MessageStreamEvent) => {
 				if (chunk.type === 'message_start') {
 					usage.prompt_tokens = chunk.message.usage.input_tokens;
+					const msgUsage = chunk.message.usage as unknown as Record<string, unknown>;
+					if (typeof msgUsage['cache_creation_input_tokens'] === 'number') {
+						usage.cache_creation_input_tokens = msgUsage['cache_creation_input_tokens'];
+					}
+					if (typeof msgUsage['cache_read_input_tokens'] === 'number') {
+						usage.cache_read_input_tokens = msgUsage['cache_read_input_tokens'];
+					}
 				}
 			}
 		};
@@ -545,12 +572,180 @@ export class AnthropicProvider extends BaseLLMProvider {
 		};
 	}
 
+	/**
+	 * Extract usage metrics from Anthropic response, including cache fields
+	 */
+	private extractUsage(responseUsage: Anthropic.Usage): LLMUsage {
+		const usage: LLMUsage = {
+			completion_tokens: responseUsage.output_tokens,
+			prompt_tokens: responseUsage.input_tokens,
+			total_tokens: responseUsage.input_tokens + responseUsage.output_tokens
+		};
+
+		const raw = responseUsage as unknown as Record<string, unknown>;
+		if (typeof raw['cache_creation_input_tokens'] === 'number') {
+			usage.cache_creation_input_tokens = raw['cache_creation_input_tokens'];
+		}
+		if (typeof raw['cache_read_input_tokens'] === 'number') {
+			usage.cache_read_input_tokens = raw['cache_read_input_tokens'];
+		}
+
+		return usage;
+	}
+
+	/**
+	 * Apply cache breakpoints to message params when prompt_caching is enabled.
+	 * Uses up to 3 breakpoints: system (1) + tools (1) + last user message (1).
+	 */
+	applyCacheBreakpoints(
+		params: Anthropic.MessageCreateParamsNonStreaming | Anthropic.MessageCreateParamsStreaming
+	): void {
+		if (this.config['prompt_caching'] !== true) {
+			return;
+		}
+
+		this.applyCacheToSystem(params);
+		this.applyCacheToTools(params);
+		this.applyCacheToLastUserMessage(params);
+	}
+
+	/**
+	 * Convert system prompt to TextBlockParam[] with cache_control if above token threshold.
+	 */
+	private applyCacheToSystem(
+		params: Anthropic.MessageCreateParamsNonStreaming | Anthropic.MessageCreateParamsStreaming
+	): void {
+		if (typeof params.system !== 'string' || params.system.length === 0) {
+			return;
+		}
+		if (estimateTokensFromText(params.system) < MIN_CACHEABLE_TOKENS) {
+			return;
+		}
+		params.system = [
+			{
+				cache_control: { type: 'ephemeral' as const },
+				text: params.system,
+				type: 'text' as const
+			}
+		];
+	}
+
+	/**
+	 * Add cache_control to the last tool definition.
+	 */
+	private applyCacheToTools(
+		params: Anthropic.MessageCreateParamsNonStreaming | Anthropic.MessageCreateParamsStreaming
+	): void {
+		if (!params.tools || params.tools.length === 0) {
+			return;
+		}
+		const lastTool = params.tools[params.tools.length - 1];
+		(lastTool as unknown as Record<string, unknown>)['cache_control'] = { type: 'ephemeral' };
+	}
+
+	/**
+	 * Add cache_control to the last user message before the final turn.
+	 */
+	private applyCacheToLastUserMessage(
+		params: Anthropic.MessageCreateParamsNonStreaming | Anthropic.MessageCreateParamsStreaming
+	): void {
+		if (!params.messages || params.messages.length < 2) {
+			return;
+		}
+		for (let i = params.messages.length - 2; i >= 0; i--) {
+			const msg = params.messages[i];
+			if (msg?.role !== 'user') {
+				continue;
+			}
+			if (typeof msg.content === 'string') {
+				params.messages[i] = {
+					content: [
+						{
+							cache_control: { type: 'ephemeral' as const },
+							text: msg.content,
+							type: 'text' as const
+						}
+					],
+					role: 'user'
+				};
+			} else if (Array.isArray(msg.content) && msg.content.length > 0) {
+				const lastBlock = msg.content[msg.content.length - 1];
+				if (lastBlock) {
+					(lastBlock as unknown as Record<string, unknown>)['cache_control'] = { type: 'ephemeral' };
+				}
+			}
+			break;
+		}
+	}
+
 	private resolveModelName(model?: string, mode?: string): string {
 		model ??= this.getDefaultModel() ?? 'claude-sonnet-4.5';
 		const useVertex = this.config['vertexAI'] as boolean;
 
 		// Use the model mapping registry for resolution
 		return this.modelMappingRegistry.resolveWithMode(model, mode, useVertex);
+	}
+
+	// ─── BatchableProvider implementation ────────────────────────────────────
+
+	async cancelBatch(batchId: string): Promise<void> {
+		const client = this.getClient();
+		if (client instanceof AnthropicVertex) {
+			throw new Error('Anthropic Message Batches are not available when using Vertex AI');
+		}
+		return cancelAnthropicBatch(client, batchId);
+	}
+
+	async getBatchResults(batchId: string): Promise<BatchResult[]> {
+		const client = this.getClient();
+		if (client instanceof AnthropicVertex) {
+			throw new Error('Anthropic Message Batches are not available when using Vertex AI');
+		}
+		return getAnthropicBatchResults(client, batchId);
+	}
+
+	async getBatchStatus(batchId: string): Promise<BatchStatusInfo> {
+		const client = this.getClient();
+		if (client instanceof AnthropicVertex) {
+			throw new Error('Anthropic Message Batches are not available when using Vertex AI');
+		}
+		return getAnthropicBatchStatus(client, batchId);
+	}
+
+	async submitBatch(requests: BatchRequest[]): Promise<BatchSubmission> {
+		const client = this.getClient();
+		if (client instanceof AnthropicVertex) {
+			throw new Error('Anthropic Message Batches are not available when using Vertex AI');
+		}
+
+		const formatted = requests.map((req) => {
+			const { messages, system } = this.formatMessages(req.options.messages);
+			const resolvedModel = this.resolveModelName(req.options.model, req.options.mode);
+			const formattedTools = req.options.tools?.map((tool) => ({
+				description: tool.description,
+				input_schema: tool.parameters as Anthropic.Tool.InputSchema,
+				name: tool.name
+			}));
+
+			const params: Anthropic.MessageCreateParamsNonStreaming = {
+				max_tokens: req.options.max_tokens ?? DEFAULT_MAX_TOKENS,
+				messages: messages as Anthropic.MessageParam[],
+				model: resolvedModel,
+				stop_sequences: req.options.stop,
+				system,
+				temperature: req.options.temperature,
+				tools: formattedTools,
+				top_p: req.options.top_p
+			};
+
+			return { customId: req.id, params };
+		});
+
+		return submitAnthropicBatch(client, formatted, this.name, generateLocalId());
+	}
+
+	supportsBatch(): true {
+		return true;
 	}
 }
 

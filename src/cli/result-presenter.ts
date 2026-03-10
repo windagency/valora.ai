@@ -36,11 +36,15 @@ export class ResultPresenter {
 		agent?: string,
 		model?: string,
 		tokenBreakdown?: {
+			cache_read?: number;
+			cache_write?: number;
 			context: number;
 			generation: number;
 			total: number;
 		},
-		totalSessionTokens?: number
+		totalSessionTokens?: number,
+		costUsd?: number,
+		cacheSavingsUsd?: number
 	): void {
 		// Display agent and model information
 		if (agent && model) {
@@ -65,7 +69,7 @@ export class ResultPresenter {
 		});
 
 		// Display token usage information
-		this.displayTokenUsage(tokenBreakdown, totalSessionTokens);
+		this.displayTokenUsage(tokenBreakdown, totalSessionTokens, costUsd, cacheSavingsUsd);
 
 		this.console.success('Command completed successfully');
 		this.console.blank();
@@ -80,11 +84,15 @@ export class ResultPresenter {
 		duration: number,
 		sessionId: string,
 		tokenBreakdown?: {
+			cache_read?: number;
+			cache_write?: number;
 			context: number;
 			generation: number;
 			total: number;
 		},
-		totalSessionTokens?: number
+		totalSessionTokens?: number,
+		costUsd?: number,
+		cacheSavingsUsd?: number
 	): void {
 		this.logger.error(`Command failed: ${commandName}`, error ? new Error(error) : undefined, {
 			duration,
@@ -100,7 +108,7 @@ export class ResultPresenter {
 		this.console.blank();
 
 		// Display token usage information even for failed commands
-		this.displayTokenUsage(tokenBreakdown, totalSessionTokens);
+		this.displayTokenUsage(tokenBreakdown, totalSessionTokens, costUsd, cacheSavingsUsd);
 	}
 
 	/**
@@ -135,11 +143,15 @@ export class ResultPresenter {
 	 */
 	private displayTokenUsage(
 		tokenBreakdown?: {
+			cache_read?: number;
+			cache_write?: number;
 			context: number;
 			generation: number;
 			total: number;
 		},
-		totalSessionTokens?: number
+		totalSessionTokens?: number,
+		costUsd?: number,
+		cacheSavingsUsd?: number
 	): void {
 		if (!tokenBreakdown && totalSessionTokens === undefined) {
 			return;
@@ -151,7 +163,7 @@ export class ResultPresenter {
 			return;
 		}
 
-		this.displayCLITokenUsage(tokenBreakdown, totalSessionTokens);
+		this.displayCLITokenUsage(tokenBreakdown, totalSessionTokens, costUsd, cacheSavingsUsd);
 	}
 
 	/**
@@ -159,16 +171,20 @@ export class ResultPresenter {
 	 */
 	private displayCLITokenUsage(
 		tokenBreakdown?: {
+			cache_read?: number;
+			cache_write?: number;
 			context: number;
 			generation: number;
 			total: number;
 		},
-		totalSessionTokens?: number
+		totalSessionTokens?: number,
+		costUsd?: number,
+		cacheSavingsUsd?: number
 	): void {
 		this.console.print('📊 Token Usage:');
 
 		if (tokenBreakdown) {
-			this.displayInteractionTokens(tokenBreakdown);
+			this.displayInteractionTokens(tokenBreakdown, costUsd, cacheSavingsUsd);
 		}
 
 		if (totalSessionTokens !== undefined) {
@@ -181,23 +197,56 @@ export class ResultPresenter {
 	/**
 	 * Display tokens for current interaction
 	 */
-	private displayInteractionTokens(tokenBreakdown: { context: number; generation: number; total: number }): void {
-		this.console.print(`   • This interaction: ${formatNumber(tokenBreakdown.total)} tokens`);
+	private displayInteractionTokens(
+		tokenBreakdown: {
+			cache_read?: number;
+			cache_write?: number;
+			context: number;
+			generation: number;
+			total: number;
+		},
+		costUsd?: number,
+		cacheSavingsUsd?: number
+	): void {
+		const costSuffix = costUsd != null && costUsd > 0 ? ` (~$${costUsd.toFixed(4)})` : '';
+		this.console.print(`   • This interaction: ${formatNumber(tokenBreakdown.total)} tokens${costSuffix}`);
 
 		if (tokenBreakdown.context > 0 || tokenBreakdown.generation > 0) {
-			this.displayTokenBreakdown(tokenBreakdown);
+			this.displayTokenBreakdown(tokenBreakdown, cacheSavingsUsd);
 		}
 	}
 
 	/**
 	 * Display detailed token breakdown with percentages
 	 */
-	private displayTokenBreakdown(tokenBreakdown: { context: number; generation: number; total: number }): void {
+	private displayTokenBreakdown(
+		tokenBreakdown: {
+			cache_read?: number;
+			cache_write?: number;
+			context: number;
+			generation: number;
+			total: number;
+		},
+		cacheSavingsUsd?: number
+	): void {
 		const contextPercent = this.calculatePercentage(tokenBreakdown.context, tokenBreakdown.total);
 		const generationPercent = this.calculatePercentage(tokenBreakdown.generation, tokenBreakdown.total);
 
 		this.console.print(`     └─ Context: ${formatNumber(tokenBreakdown.context)} tokens (${contextPercent}%)`);
 		this.console.print(`     └─ Generation: ${formatNumber(tokenBreakdown.generation)} tokens (${generationPercent}%)`);
+
+		// Display cache metrics if present
+		if (tokenBreakdown.cache_read && tokenBreakdown.cache_read > 0) {
+			const cacheHitRate = this.calculatePercentage(tokenBreakdown.cache_read, tokenBreakdown.context);
+			const savingsSuffix =
+				cacheSavingsUsd != null && cacheSavingsUsd > 0 ? `, saved $${cacheSavingsUsd.toFixed(4)}` : '';
+			this.console.print(
+				`     └─ Cache read: ${formatNumber(tokenBreakdown.cache_read)} tokens (${cacheHitRate}% hit rate${savingsSuffix})`
+			);
+		}
+		if (tokenBreakdown.cache_write && tokenBreakdown.cache_write > 0) {
+			this.console.print(`     └─ Cache write: ${formatNumber(tokenBreakdown.cache_write)} tokens`);
+		}
 
 		this.validateContextInfluence(contextPercent, generationPercent);
 	}

@@ -69,7 +69,7 @@ Context loading stages (like `context.load-specifications`) are expensive LLM op
 ```typescript
 generateCacheKey(stageId, inputs, config): string {
   // Hash includes:
-  // 1. Stage identifier (stage.prompt)
+  // 1. Stage identifier (stage.stage — the stage name)
   // 2. Resolved inputs
   // 3. File dependency content hashes
   return sha256({ stageId, inputs, fileHashes }).substring(0, 24);
@@ -188,7 +188,7 @@ saveStageOutputsToSession(sessionManager, result) {
   const stageOutputs = {};
   for (const stage of result.stages) {
     if (stage.success && stage.outputs) {
-      const stageKey = `${stage.stage}_${stage.prompt}`;
+      const stageKey = stage.stage;
       stageOutputs[stageKey] = stage.outputs;
     }
   }
@@ -199,12 +199,12 @@ saveStageOutputsToSession(sessionManager, result) {
 }
 ```
 
-Subsequent commands can reference previous outputs via variable resolution:
+Stage outputs are keyed by `stage.stage` (the stage name) only. Subsequent commands can reference previous outputs via variable resolution using `$STAGE_<stageName>`:
 
 ```yaml
 # In pipeline stage definition
 inputs:
-  previous_analysis: $STAGE_analyze_context.summary
+  previous_analysis: $STAGE_analyze.summary
   target_files: $STAGE_plan.files
 ```
 
@@ -394,15 +394,26 @@ This helps users understand when session optimisations are active.
 
 ## Performance Summary
 
-| Optimisation                 | Impact                             | When Active                        |
-| ---------------------------- | ---------------------------------- | ---------------------------------- |
-| **Persistent stage caching** | **2-3 min saved per context load** | **Unchanged source documents**     |
-| Loader cache reuse           | 90%+ faster agent loading          | Session resume with fresh cache    |
-| Stage output reference       | Eliminates redundant execution     | Multi-command workflows            |
-| Context filtering            | ~40% token reduction               | Pipelines with `$CONTEXT_*` refs   |
-| Snapshot resume              | 2-5x faster startup                | Session resume with `--session-id` |
-| Debounced persistence        | 80% fewer disk writes              | Rapid command sequences            |
-| Token tracking               | Full visibility                    | All sessions                       |
+| Optimisation                 | Impact                                | When Active                              |
+| ---------------------------- | ------------------------------------- | ---------------------------------------- |
+| **Persistent stage caching** | **2-3 min saved per context load**    | **Unchanged source documents**           |
+| **Prompt caching**           | **Up to 90% input token savings**     | **Tool-loop iterations (all providers)** |
+| Loader cache reuse           | 90%+ faster agent loading             | Session resume with fresh cache          |
+| Stage output reference       | Eliminates redundant execution        | Multi-command workflows                  |
+| Context filtering            | ~40% token reduction                  | Pipelines with `$CONTEXT_*` refs         |
+| Snapshot resume              | 2-5x faster startup                   | Session resume with `--session-id`       |
+| Debounced persistence        | 80% fewer disk writes                 | Rapid command sequences                  |
+| Token tracking               | Full visibility (incl. cache metrics) | All sessions                             |
+
+### Prompt Caching
+
+Prompt caching is a provider-side optimisation that avoids re-processing identical prefixes across API calls within a tool loop. Each provider handles this differently:
+
+- **Anthropic** (`prompt_caching: true` in config): Explicit `cache_control` breakpoints on system prompt, tools, and last user message. Cached reads cost 0.1× the standard input rate (90% discount).
+- **OpenAI**: Automatic caching with no configuration. Cached reads cost 0.5× input (50% discount).
+- **Google**: Automatic context caching. Cached reads cost 0.25× input (75% discount).
+
+Cache metrics (`cache_creation_input_tokens`, `cache_read_input_tokens`) are extracted from all provider responses and displayed in the CLI token usage summary alongside context and generation breakdowns.
 
 ## Usage
 

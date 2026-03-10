@@ -229,6 +229,100 @@ chmod -R 644 .valora/logs/**/*.log
 chmod +x scripts/*
 ```
 
+### Pipeline Stage Issues
+
+#### Tool Loop Exceeded Maximum Iterations
+
+**Symptoms**:
+
+```
+⚠ Tool loop exceeded maximum iterations (stage: test.code.implement-tests)
+⚠ Requesting final structured output (tool loop exhausted) (stage: test.code.implement-tests)
+⚠ Received final output after tool loop exhaustion (stage: test.code.implement-tests)
+```
+
+**Cause**: The stage needed more than 20 tool calls (the default limit) to complete its
+work. Common in stages that write many files (test generation, documentation, large
+refactors).
+
+**Solution**:
+
+Raise `max_tool_iterations` for the affected stage in the command's pipeline YAML:
+
+```yaml
+# data/commands/implement.md  (or .valora/commands/implement.md for project overrides)
+pipeline:
+  - stage: test
+    prompt: code.implement-tests
+    required: true
+    max_tool_iterations: 40 # was 20
+```
+
+**Check whether the stage actually completed correctly** by inspecting
+`StageOutput.metadata.executionQuality.verifiedModifiedFiles`. If it matches the
+expected outputs, the forced final output was accurate and you may just need the higher
+limit to avoid the warning in future runs.
+
+---
+
+#### Stage Hard-Stopped: N Tool Failures Exceeded Threshold
+
+**Symptoms**:
+
+```
+✗ Stage hard-stopped: 7 tool failures exceeded the threshold of 5
+  (stage: documentation.documentation.update-inline-docs)
+✗ Pipeline execution failed — Required stage failed
+```
+
+**Cause**: The stage accumulated too many tool results starting with `"Error:"`. This
+is often caused by a combination of:
+
+1. A tight iteration limit pushing the LLM to make rapid tool calls without waiting for
+   guidance feedback.
+2. Genuine tool failures (bad shell commands, wrong paths, network errors).
+
+**Note**: "File too large", "No matches found", "File not found" and similar guidance
+messages do **not** count as failures. Only results starting with `"Error:"` do.
+
+**Solution A — Raise the failure threshold** (if the stage navigates many large files):
+
+```yaml
+- stage: documentation
+  prompt: documentation.update-inline-docs
+  required: true
+  max_tool_failures: 10 # was 5
+```
+
+**Solution B — Raise the iteration limit** (if failures are accumulating because the
+LLM is rushing):
+
+```yaml
+- stage: documentation
+  prompt: documentation.update-inline-docs
+  required: true
+  max_tool_iterations: 30 # give the LLM more room before it hits the ceiling
+```
+
+**Solution C — Make the stage optional** (if failures should not block the pipeline):
+
+```yaml
+- stage: documentation
+  prompt: documentation.update-inline-docs
+  required: false # pipeline continues even if documentation stage fails
+```
+
+**Diagnose root cause** by checking the `tool:execution:failed` pipeline events in the
+session log — they include `toolName` and `errorMessage` for each counted failure:
+
+```bash
+jq '.commands[-1].stages[] | select(.metadata.executionQuality.hardStopped == true)' \
+  .valora/sessions/<session-id>/session.json
+```
+
+See [Pipeline Resilience](../operations/pipeline-resilience.md) for a full
+troubleshooting walkthrough.
+
 ### Session Issues
 
 #### Sessions Not Saving

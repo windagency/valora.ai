@@ -38,6 +38,7 @@ prompts:
         - execution_order
     - stage: risks
       prompt: plan.assess-risks
+      batch: true
       required: true
       inputs:
         architecture: $STAGE_load-arch.result
@@ -50,6 +51,7 @@ prompts:
         - risk_score
     - stage: breakdown
       prompt: plan.breakdown-implementation
+      batch: true
       required: true
       inputs:
         architecture: $STAGE_load-arch.result

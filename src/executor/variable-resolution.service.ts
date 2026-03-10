@@ -46,8 +46,7 @@ export class VariableResolutionService {
 	 * Resolve a single variable by scope and path
 	 */
 	resolveVariable(scope: VariableScope, path: string): unknown {
-		// Use the private method from VariableResolver via a wrapper
-		return this.resolver['resolveVariable'](scope, path);
+		return this.resolver.resolveVariable(scope, path);
 	}
 
 	/**

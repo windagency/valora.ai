@@ -14,6 +14,7 @@ import { OptimizationPanel } from 'ui/dashboard/detail-panels/optimization-panel
 import { QualityPanel } from 'ui/dashboard/detail-panels/quality-panel';
 import { RunningTaskPanel } from 'ui/dashboard/detail-panels/running-task-panel';
 import { SessionInfoPanel } from 'ui/dashboard/detail-panels/session-info-panel';
+import { SpendingPanel } from 'ui/dashboard/detail-panels/spending-panel';
 import { TokenUsagePanel } from 'ui/dashboard/detail-panels/token-usage-panel';
 import { MCPSessionPanel } from 'ui/dashboard/detail-panels/tool-calls-panel';
 import { WorktreeStatsPanel } from 'ui/dashboard/detail-panels/worktree-stats-panel';
@@ -27,7 +28,8 @@ const SUB_TAB_CONFIG: Array<{ label: string; tab: SessionSubTab }> = [
 	{ label: 'Overview', tab: 'overview' },
 	{ label: 'Optimisation', tab: 'optimization' },
 	{ label: 'Quality', tab: 'quality' },
-	{ label: 'Tokens', tab: 'tokens' }
+	{ label: 'Tokens', tab: 'tokens' },
+	{ label: 'Spending', tab: 'spending' }
 ];
 
 // eslint-disable-next-line @typescript-eslint/naming-convention -- React components must use PascalCase
@@ -137,6 +139,8 @@ function SubTabContent({
 			return <OptimizationPanel session={session} />;
 		case 'quality':
 			return <QualityPanel session={session} />;
+		case 'spending':
+			return <SpendingPanel session={session} />;
 		case 'tokens':
 			return <TokenUsagePanel session={session} />;
 		default:

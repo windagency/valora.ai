@@ -4,6 +4,10 @@
  * MAINT-002: Large Files Need Splitting - Extracted from pipeline.ts
  */
 
+import { isEligible } from 'batch/batch-eligibility';
+import { getBatchOrchestrator } from 'batch/batch-orchestrator';
+import { isBatchableProvider } from 'batch/batch-provider.interface';
+import { createHash } from 'crypto';
 import { existsSync } from 'fs';
 
 import type { AgentDefinition } from 'types/agent.types';
@@ -51,6 +55,13 @@ import { getToolExecutionService, type ToolExecutionService } from './tool-execu
  * If this many tool calls fail within a single stage, the stage is hard-stopped
  * (success: false) rather than allowing the LLM to produce degraded output.
  * Prevents silently broken results from propagating downstream.
+ *
+ * A "failure" is any tool result whose content starts with "Error:" (see
+ * processToolResult). Guidance responses — file-not-found hints, too-large
+ * redirects, no-matches-found from rg/grep — do NOT start with "Error:" and
+ * are therefore not counted. Only genuine system faults increment this counter.
+ *
+ * Override per stage via PipelineStage.max_tool_failures.
  */
 const MAX_TOOL_FAILURES_BEFORE_HARD_STOP = 5;
 
@@ -190,6 +201,12 @@ export class StageExecutor {
 				if (cachedResult) {
 					return cachedResult;
 				}
+			}
+
+			// Batch path — submit to provider batch API if eligible
+			const batchResult = await this.tryBatchPath(stage, executionContext, startTime, options);
+			if (batchResult) {
+				return batchResult;
 			}
 
 			const stageResult = await this.performStageExecution(stage, executionContext, startTime, options);
@@ -453,6 +470,107 @@ export class StageExecutor {
 			duration,
 			logger
 		);
+	}
+
+	/**
+	 * Check batch eligibility and delegate to executeBatchStage if eligible.
+	 * Returns the batch StageOutput on success, or null to fall through to real-time.
+	 */
+	private async tryBatchPath(
+		stage: PipelineStage,
+		executionContext: ExecutionContext,
+		startTime: number,
+		options?: StageExecutionOptions
+	): Promise<null | StageOutput> {
+		const logger = getLogger();
+		const eligibility = isEligible(stage, executionContext, executionContext.provider);
+		if (eligibility.eligible && isBatchableProvider(executionContext.provider)) {
+			return this.executeBatchStage(stage, executionContext, startTime, options);
+		}
+		if (executionContext.flags['batch'] && !eligibility.eligible) {
+			logger.warn(`Stage "${stage.stage}" is not batch-eligible: ${eligibility.reason}. Falling back to real-time.`);
+		}
+		return null;
+	}
+
+	/**
+	 * Execute a stage via the provider's batch API.
+	 * Builds messages exactly as real-time execution does, then submits a single
+	 * BatchRequest. Returns immediately with batchPending outputs.
+	 */
+	private async executeBatchStage(
+		stage: PipelineStage,
+		executionContext: ExecutionContext,
+		startTime: number,
+		options?: StageExecutionOptions
+	): Promise<StageOutput> {
+		const logger = getLogger();
+
+		// Build messages using the same path as real-time execution
+		const resources = await this.loadStageResources(stage, executionContext);
+		const enrichedInputs = await this.resolveStageInputs(stage, executionContext, options, logger);
+		const { systemMessage, userMessage } = this.buildStageMessages(stage, resources, enrichedInputs);
+		const config = this.getExecutionConfig(executionContext);
+
+		const messages: LLMMessage[] = [
+			{ content: systemMessage, role: 'system' },
+			{ content: userMessage, role: 'user' }
+		];
+
+		const completionOptions: LLMCompletionOptions = {
+			max_tokens: DEFAULT_MAX_TOKENS,
+			messages,
+			mode: config.modeOverride ?? executionContext.mode,
+			model: config.modelOverride ?? executionContext.model
+		};
+
+		// Generate content hash for idempotent request ID
+		const requestId = createHash('sha256')
+			.update(JSON.stringify({ model: completionOptions.model, stage: stage.stage, userMessage }))
+			.digest('hex')
+			.substring(0, 32);
+
+		const batchRequest = {
+			id: requestId,
+			metadata: {
+				command: executionContext.commandName,
+				prompt: stage.prompt,
+				stage: stage.stage
+			},
+			options: completionOptions
+		};
+
+		const provider = executionContext.provider;
+		if (!isBatchableProvider(provider)) {
+			throw new Error(`Provider "${provider.name}" does not support batch (unexpected)`);
+		}
+
+		const orchestrator = getBatchOrchestrator();
+		const submission = await orchestrator.submit([batchRequest], provider);
+		const duration = Date.now() - startTime;
+
+		logger.info(`Batch submitted for stage "${stage.stage}"`, {
+			batchId: submission.batchId,
+			localId: submission.localId
+		});
+
+		return {
+			duration_ms: duration,
+			metadata: {
+				batchId: submission.batchId,
+				batchPending: true,
+				localId: submission.localId,
+				provider: provider.name
+			},
+			outputs: {
+				batchId: submission.batchId,
+				batchPending: true,
+				localId: submission.localId
+			},
+			prompt: stage.prompt,
+			stage: stage.stage,
+			success: true
+		};
 	}
 
 	/**
@@ -897,6 +1015,11 @@ export class StageExecutor {
 	/**
 	 * Process a tool result message: count failures and track verified file writes.
 	 * Returns 1 if this result is a failure, 0 otherwise.
+	 *
+	 * A failure is defined as a tool result whose content starts with "Error:".
+	 * Plain-string guidance responses (file-not-found hints, too-large redirects,
+	 * no-matches, missing-argument messages, etc.) do not start with "Error:" and
+	 * are not counted as failures. See ToolExecutionService for the full policy.
 	 */
 	private processToolResult(
 		msg: LLMMessage,
@@ -1141,10 +1264,11 @@ Summarize ALL changes you made during tool execution. Output ONLY the JSON code 
 			executionSummary !== undefined && (executionSummary.wasLoopExhausted || executionSummary.toolFailureCount > 0);
 
 		// Hard-stop: too many tool failures means the output cannot be trusted
-		if (executionSummary !== undefined && executionSummary.toolFailureCount >= MAX_TOOL_FAILURES_BEFORE_HARD_STOP) {
+		const maxToolFailures = stage.max_tool_failures ?? MAX_TOOL_FAILURES_BEFORE_HARD_STOP;
+		if (executionSummary !== undefined && executionSummary.toolFailureCount >= maxToolFailures) {
 			const errorMsg =
 				`Stage hard-stopped: ${executionSummary.toolFailureCount} tool failures exceeded ` +
-				`the threshold of ${MAX_TOOL_FAILURES_BEFORE_HARD_STOP} (stage: ${stage.stage}.${stage.prompt})`;
+				`the threshold of ${maxToolFailures} (stage: ${stage.stage}.${stage.prompt})`;
 			logger.error(errorMsg, new Error(errorMsg));
 			this.eventEmitter.emitStageError(`${stage.stage}.${stage.prompt}`, errorMsg);
 			return {
@@ -1180,10 +1304,11 @@ Summarize ALL changes you made during tool execution. Output ONLY the JSON code 
 			});
 		}
 
-		const parsedOutputs = this.outputParsingService.parseStageOutputs(completion.content, stage.outputs ?? []);
+		const outputDefs = stage.outputs ?? [];
+		const parsedOutputs = this.outputParsingService.parseStageOutputs(completion.content, outputDefs);
 
 		// Provide default values for missing expected outputs to prevent pipeline failures
-		const outputsWithDefaults = this.outputParsingService.applyDefaultValues(parsedOutputs, stage.outputs ?? []);
+		const outputsWithDefaults = this.outputParsingService.applyDefaultValues(parsedOutputs, outputDefs);
 
 		this.eventEmitter.emitStageComplete({
 			duration,

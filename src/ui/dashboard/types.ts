@@ -68,7 +68,7 @@ export interface WorktreeDiagramEntry {
 export type DashboardTab = 'agents' | 'audit' | 'cache' | 'overview' | 'performance';
 
 /** Session details sub-tabs */
-export type SessionSubTab = 'optimization' | 'overview' | 'quality' | 'tokens';
+export type SessionSubTab = 'optimization' | 'overview' | 'quality' | 'spending' | 'tokens';
 
 /** Navigation view mode */
 export type ViewMode = 'dashboard' | 'details';

@@ -11,6 +11,7 @@ import { createOption } from './commander-adapter';
  */
 export interface GlobalFlags {
 	agent: OptionAdapter;
+	batch: OptionAdapter;
 	cleanupInterval: OptionAdapter;
 	compressAfter: OptionAdapter;
 	documentAutoApprove: OptionAdapter;
@@ -56,6 +57,8 @@ export interface GlobalFlags {
 
 export const globalFlags: GlobalFlags = {
 	agent: createOption('--agent <role>', 'Override default agent'),
+
+	batch: createOption('--batch', 'Submit LLM calls via batch API for 50% token cost reduction (async)'),
 
 	cleanupInterval: createOption('--cleanup-interval <hours>', 'Run cleanup every N hours').argParser(parseInt),
 

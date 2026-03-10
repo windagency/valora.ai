@@ -76,7 +76,7 @@ export class VariableResolver {
 	/**
 	 * Resolve a single variable
 	 */
-	private resolveVariable(scope: VariableScope, path: string): unknown {
+	resolveVariable(scope: VariableScope, path: string): unknown {
 		// Map scope to resolver method
 		const scopeResolverMap = new Map<VariableScope, () => unknown>([
 			['ARG', () => this.resolveArg(path)],
@@ -340,38 +340,4 @@ export class VariableResolver {
 		validate(value);
 		return errors;
 	}
-}
-
-/**
- * Helper function to create a variable resolver with common context
- */
-export function createVariableResolver(
-	args: string[],
-	flags: Record<string, boolean | string>,
-	stageOutputs: Record<string, Record<string, unknown>> = {},
-	sessionContext: Record<string, unknown> = {},
-	strict = true
-): VariableResolver {
-	// Convert positional args to indexed object
-	const argsObj = args.reduce(
-		(acc, arg, idx) => {
-			acc[(idx + 1).toString()] = arg;
-			return acc;
-		},
-		{} as Record<string, unknown>
-	);
-
-	// Merge flags into args
-	const mergedArgs = Object.entries(flags).reduce((acc, [key, value]) => {
-		acc[key] = value;
-		return acc;
-	}, argsObj);
-
-	const context: VariableContext = {
-		args: mergedArgs,
-		context: sessionContext,
-		stages: stageOutputs
-	};
-
-	return new VariableResolver(context, strict);
 }

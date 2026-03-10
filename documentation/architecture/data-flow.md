@@ -134,21 +134,24 @@ sequenceDiagram
     participant Registry
     participant Provider
     participant API
-    participant Cache
 
     Executor->>Registry: getProvider(name)
     Registry-->>Executor: provider
     Executor->>Provider: sendPrompt(prompt, options)
-    Provider->>Cache: checkCache(prompt)
-    alt Cached
-        Cache-->>Provider: cachedResponse
-    else Not Cached
-        Provider->>API: HTTP POST
-        API-->>Provider: response
-        Provider->>Cache: store(prompt, response)
-    end
-    Provider-->>Executor: LLMResponse
+    Provider->>Provider: applyCacheBreakpoints(params)
+    Provider->>API: HTTP POST (with cache_control markers)
+    API-->>Provider: response (incl. cache metrics)
+    Provider->>Provider: extractUsage(response)
+    Provider-->>Executor: LLMResponse {usage: {cache_read, cache_write, ...}}
 ```
+
+**Prompt caching** reduces input token costs across tool-loop iterations. Each provider applies its own caching strategy:
+
+- **Anthropic**: Injects `cache_control: { type: "ephemeral" }` breakpoints on system prompt, tools, and last user message (when `prompt_caching: true`)
+- **OpenAI**: Automatic caching — extracts `cached_tokens` from `prompt_tokens_details`
+- **Google**: Automatic caching — extracts `cachedContentTokenCount` from `usageMetadata`
+
+Cache metrics are normalised into `LLMUsage.cache_creation_input_tokens` and `LLMUsage.cache_read_input_tokens`, enabling the CLI to display cache hit rates and cost savings across all providers.
 
 ## State Management
 
@@ -418,14 +421,17 @@ flowchart TD
 
 ### What's Cached
 
-| Data Type         | Cache Location | TTL              |
-| ----------------- | -------------- | ---------------- |
-| Agent definitions | Memory         | Session lifetime |
-| Command specs     | Memory         | Session lifetime |
-| Prompt templates  | Memory         | Session lifetime |
-| Configuration     | Memory         | Until reload     |
-| Session data      | File           | Configurable     |
-| LLM responses     | None           | Not cached       |
+| Data Type         | Cache Location      | TTL              |
+| ----------------- | ------------------- | ---------------- |
+| Agent definitions | Memory              | Session lifetime |
+| Command specs     | Memory              | Session lifetime |
+| Prompt templates  | Memory              | Session lifetime |
+| Configuration     | Memory              | Until reload     |
+| Session data      | File                | Configurable     |
+| LLM prompt tokens | Provider-side (API) | ~5 minutes       |
+| LLM responses     | None                | Not cached       |
+
+**LLM prompt token caching** is handled server-side by the provider APIs. When prompt caching is active, the system prompt, tool definitions, and conversation history are cached by the API and reused across tool-loop iterations. This is transparent to the application — the provider injects cache markers in the request and extracts cache metrics from the response.
 
 ## Error Propagation
 
@@ -522,7 +528,31 @@ sequenceDiagram
 ├── logs/
 │   ├── 2024-01-15.log
 │   └── latest.log -> 2024-01-15.log
+├── batches/
+│   └── <localId>.json
+├── spending.jsonl        ← append-only per-request cost ledger
 └── config.json
+```
+
+Each line of `spending.jsonl` is a JSON object with the following fields:
+
+```json
+{
+	"id": "1741609384000-review",
+	"command": "review",
+	"stage": "context+analysis+synthesis",
+	"model": "claude-3-5-sonnet-latest",
+	"promptTokens": 29817,
+	"completionTokens": 19063,
+	"cacheReadTokens": 12000,
+	"cacheWriteTokens": 0,
+	"totalTokens": 48880,
+	"costUsd": 0.0124,
+	"cacheSavingsUsd": 0.0036,
+	"durationMs": 3200,
+	"timestamp": "2026-03-10T14:23:01.000Z",
+	"batchDiscounted": false
+}
 ```
 
 ### Session File Format
@@ -552,13 +582,17 @@ sequenceDiagram
 
 ### Collected Metrics
 
-| Metric               | Type      | Description            |
-| -------------------- | --------- | ---------------------- |
-| command_duration     | Histogram | Command execution time |
-| llm_request_duration | Histogram | LLM API latency        |
-| session_count        | Gauge     | Active sessions        |
-| error_count          | Counter   | Errors by type         |
-| token_usage          | Counter   | Tokens consumed        |
+| Metric               | Type      | Description                                |
+| -------------------- | --------- | ------------------------------------------ |
+| command_duration     | Histogram | Command execution time                     |
+| llm_request_duration | Histogram | LLM API latency                            |
+| session_count        | Gauge     | Active sessions                            |
+| error_count          | Counter   | Errors by type                             |
+| token_usage          | Counter   | Tokens consumed                            |
+| cache_read_tokens    | Counter   | Tokens read from prompt cache              |
+| cache_write_tokens   | Counter   | Tokens written to prompt cache             |
+| cost_usd             | Ledger    | Per-request USD cost (spending.jsonl)      |
+| cache_savings_usd    | Ledger    | Per-request cache savings (spending.jsonl) |
 
 ### Log Structure
 

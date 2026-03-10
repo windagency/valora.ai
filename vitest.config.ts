@@ -8,6 +8,7 @@ const __dirname = dirname(__filename);
 export default defineConfig({
 	resolve: {
 		alias: {
+			batch: path.resolve(__dirname, './src/batch'),
 			cleanup: path.resolve(__dirname, './src/cleanup'),
 			cli: path.resolve(__dirname, './src/cli'),
 			config: path.resolve(__dirname, './src/config'),

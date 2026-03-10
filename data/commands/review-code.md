@@ -51,6 +51,7 @@ prompts:
         - validation_results
     - stage: documentation
       prompt: documentation.generate-code-review-report
+      batch: true
       required: true
       inputs:
         quality_score: $STAGE_review.quality_score

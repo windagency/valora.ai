@@ -73,6 +73,10 @@ export interface LLMToolResult {
 }
 
 export interface LLMUsage {
+	/** True when the result came from a batch API call (50% cost reduction applied) */
+	batch_discount_applied?: boolean;
+	cache_creation_input_tokens?: number;
+	cache_read_input_tokens?: number;
 	completion_tokens: number;
 	prompt_tokens: number;
 	total_tokens: number;

@@ -42,11 +42,13 @@ tool name, letting you see which tools fail most.
 
 ### Tool loop exhaustion
 
-The LLM does not produce a tool-call-free response within 20 iterations.
+The LLM does not produce a tool-call-free response within the stage's iteration limit
+(default: **20**, configurable via `max_tool_iterations` in the stage definition).
 
 **What happens:**
 
-1. `callLLMWithToolLoop` exits the loop after iteration 20.
+1. `callLLMWithToolLoop` exits the loop after reaching the stage's `max_tool_iterations`
+   limit (default: 20).
 2. `extractExecutionSummary` scans the conversation history to build a verified record:
    - **`verifiedModifiedFiles`** — paths from successful `write`, `search_replace`,
      and `delete_file` calls (files whose matching tool result did **not** start with
@@ -73,6 +75,35 @@ In the dashboard **Overview** tab:
 ```
 Loop Exhausted: 1   (shown in yellow when > 0)
 ```
+
+---
+
+### Guidance vs failure
+
+Not every non-success tool result is counted as a failure. Tools distinguish between
+**genuine failures** and **guidance** responses:
+
+- **Genuine failure** — the tool result content starts with `"Error:"`. This increments
+  `toolFailureCount` and may eventually trigger the hard-stop. Examples: a shell command
+  exits with code ≥ 2, an unknown tool name is invoked.
+- **Guidance** — the tool result is a plain string with no `"Error:"` prefix. The LLM
+  receives actionable instructions and can self-correct on the next iteration. Guidance
+  does **not** increment `toolFailureCount`.
+
+Common guidance situations (do not count as failures):
+
+| Tool               | Situation                                                                         |
+| ------------------ | --------------------------------------------------------------------------------- |
+| `read_file`        | File not found, line count > 100, byte size > 1 MB, structured file (.json/.yaml) |
+| `search_replace`   | `old_str` not found in file, file not found                                       |
+| `delete_file`      | File not found (idempotent — nothing to delete)                                   |
+| `list_dir`         | Directory not found, path is a file                                               |
+| `run_terminal_cmd` | `rg`/`grep` exits with code 1 (no matches found)                                  |
+| All tools          | Missing required arguments                                                        |
+
+This distinction matters because the LLM frequently reads large source files during
+documentation or test-writing stages. Without it, every "File too large" redirect would
+have consumed one of the stage's five allowed failures.
 
 ---
 
@@ -119,9 +150,19 @@ If a stage accumulates **5 or more** tool call failures, it is hard-stopped:
 
 **Tuning the threshold:**
 
-The constant `MAX_TOOL_FAILURES_BEFORE_HARD_STOP` is defined in
-`src/executor/stage-executor.ts`. Raise it to tolerate more failures; set it very high
-to restore the old always-continue behaviour (not recommended).
+The global default (`MAX_TOOL_FAILURES_BEFORE_HARD_STOP = 5`) is defined in
+`src/executor/stage-executor.ts`. Override it for individual stages in the command YAML:
+
+```yaml
+- stage: documentation
+  prompt: documentation.update-inline-docs
+  required: true
+  max_tool_failures: 10 # tolerate more failures in doc-heavy stages
+```
+
+Setting `max_tool_failures` to a very high number effectively disables the hard-stop for
+that stage (not recommended). The global constant acts as a fallback for any stage that
+does not declare its own limit.
 
 ---
 
@@ -164,6 +205,34 @@ Sequential stages can be configured to retry on failure:
   level.
 - Each retry re-executes the full stage, including all LLM calls and tool calls. Idempotent
   tools (write, delete) cache their results, but shell commands and MCP tools do not.
+
+---
+
+## Per-stage iteration and failure limits
+
+Control the tool loop budget and hard-stop sensitivity independently per stage:
+
+```yaml
+- stage: test
+  prompt: code.implement-tests
+  required: true
+  max_tool_iterations: 40 # default 20 — increase for multi-file stages
+  max_tool_failures: 10 # default 5  — increase when guidance responses are expected
+
+- stage: documentation
+  prompt: documentation.update-inline-docs
+  required: true
+  max_tool_iterations: 30
+  max_tool_failures: 10
+```
+
+| Field                 | Default | Effect                          |
+| --------------------- | ------- | ------------------------------- |
+| `max_tool_iterations` | 20      | Iterations before forced output |
+| `max_tool_failures`   | 5       | Failures before hard-stop       |
+
+Only genuine failures (`"Error:"` prefix) count toward `max_tool_failures`. Guidance
+responses (file-not-found hints, no-matches, too-large redirects) do not.
 
 ---
 
@@ -216,6 +285,10 @@ steps:
 
 2. **Check `toolFailureCount`**. If it is high (≥ 3), look for the corresponding
    `tool:execution:failed` events to find which tool was failing and why.
+   Note that guidance responses (file-not-found, file-too-large, no-matches) are
+   **not** counted. If `toolFailureCount` is 0 but the loop still exhausted, the LLM
+   was navigating correctly but the stage simply required more than 20 iterations.
+   Raise `max_tool_iterations` in the stage definition.
 
 3. **Check `messageDepth`**. A very high message depth (> 60) suggests the stage prompt
    asks for too much work in a single stage. Consider splitting it.
@@ -237,13 +310,20 @@ steps:
 Tool failures and loop exhaustion are often correlated:
 
 ```
-Tool fails (returns "Error: ...")
+Tool fails (returns "Error: ...")     ← genuine failure, counted
          ↓
 LLM retries the same operation
          ↓  (repeated N times)
 Iteration budget exhausted
          ↓
 Forced output based on partial state
+
+Tool returns guidance string           ← not counted as failure
+(file-not-found hint, no-matches, …)
+         ↓
+LLM adjusts approach and continues
+         ↓
+Stage completes normally (or hits max_tool_iterations)
 ```
 
 The `lastToolsInvoked` field makes this chain visible: if the same tool appears many

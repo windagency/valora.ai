@@ -97,6 +97,43 @@ valora plan --model claude-sonnet-4.5 "Add auth"
 valora implement --model claude-haiku "Fix typo"
 ```
 
+### Prompt Caching
+
+Prompt caching reduces input token costs by reusing previously sent content across tool-loop iterations. Each provider handles caching differently:
+
+| Provider      | Behaviour                  | Configuration                           |
+| ------------- | -------------------------- | --------------------------------------- |
+| **Anthropic** | Explicit cache breakpoints | Enable with `prompt_caching: true`      |
+| **OpenAI**    | Automatic                  | No configuration needed — always active |
+| **Google**    | Automatic                  | No configuration needed — always active |
+| **Cursor**    | Not applicable             | N/A (MCP protocol)                      |
+
+To enable Anthropic prompt caching:
+
+```json
+{
+	"providers": {
+		"anthropic": {
+			"apiKey": "...",
+			"prompt_caching": true
+		}
+	}
+}
+```
+
+When enabled, the system injects cache breakpoints on the system prompt, tool definitions, and conversation history. Subsequent iterations in a tool loop reuse cached content at 90% discount. The CLI displays cache hit rates in the token usage summary:
+
+```
+📊 Token Usage:
+   • This interaction: 15,432 tokens
+     └─ Context: 12,100 tokens (78%)
+     └─ Generation: 3,332 tokens (22%)
+     └─ Cache read: 10,500 tokens (87% hit rate)
+     └─ Cache write: 1,600 tokens
+```
+
+For OpenAI and Google, cache metrics are extracted from API responses automatically and displayed when present.
+
 ### Model Configuration
 
 Customize model settings in `.valora/config.json`:
@@ -486,6 +523,38 @@ Configure automatic retries:
 	}
 }
 ```
+
+### Per-Stage Tool Loop Tuning
+
+For stages that involve many files (test generation, documentation, large refactors),
+the default tool loop limits may be too tight. Override them per stage in the command's
+pipeline YAML:
+
+```yaml
+pipeline:
+  - stage: test
+    prompt: code.implement-tests
+    required: true
+    max_tool_iterations: 40 # iterations before forcing final output (default: 20)
+
+  - stage: documentation
+    prompt: documentation.update-inline-docs
+    required: true
+    max_tool_iterations: 30
+    max_tool_failures: 10 # genuine failures before hard-stop (default: 5)
+```
+
+| Field                 | Default | When to raise                                           |
+| --------------------- | ------- | ------------------------------------------------------- |
+| `max_tool_iterations` | 20      | Stage writes many files or has many steps               |
+| `max_tool_failures`   | 5       | Stage involves heavy file navigation (many large files) |
+
+**What counts as a failure:** only tool results whose content starts with `"Error:"`.
+Guidance responses — file-not-found hints, "file too large" redirects, "no matches
+found" from `rg`/`grep` — do **not** count and will not trigger the hard-stop.
+
+See [Pipeline Resilience](../operations/pipeline-resilience.md) for detailed
+diagnostics guidance.
 
 ## Metrics Configuration
 

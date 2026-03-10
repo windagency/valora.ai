@@ -26,6 +26,7 @@
 		"noUnusedParameters": true,
 		"outDir": "./dist",
 		"paths": {
+			"batch/*": ["./src/batch/*"],
 			"cleanup/*": ["./src/cleanup/*"],
 			"cli/*": ["./src/cli/*"],
 			"config/*": ["./src/config/*"],

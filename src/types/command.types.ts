@@ -166,11 +166,25 @@ export function extractMCPServerId(tool: MCPTool): string {
  * Cache configuration for a pipeline stage
  */
 export interface PipelineStage {
+	/** Opt this stage into batch processing when --batch flag is set */
+	batch?: boolean;
 	/** Cache configuration for this stage */
 	cache?: PipelineStageCacheConfig;
 	conditional?: string;
 	inputs?: Record<string, string>;
-	/** Maximum number of tool-call iterations before forcing final output. Overrides the default of 20. */
+	/**
+	 * Maximum number of tool-call failures before hard-stopping the stage.
+	 * A failure is any tool result whose content starts with "Error:". Guidance
+	 * responses (file-not-found hints, no-matches, etc.) are NOT counted.
+	 * Overrides the default of 5 (MAX_TOOL_FAILURES_BEFORE_HARD_STOP).
+	 */
+	max_tool_failures?: number;
+	/**
+	 * Maximum number of tool-call iterations before forcing a final structured
+	 * output. Increase for stages that legitimately need many tool calls (e.g.
+	 * writing many test files, updating many documentation blocks).
+	 * Overrides the default of 20.
+	 */
 	max_tool_iterations?: number;
 	outputs?: string[];
 	parallel?: boolean;

@@ -11,6 +11,7 @@
 export interface CliOptions {
 	// Core options
 	agent?: string;
+	batch?: boolean;
 	dryRun?: boolean;
 	interactive?: boolean;
 	logLevel?: 'debug' | 'error' | 'info' | 'warn';

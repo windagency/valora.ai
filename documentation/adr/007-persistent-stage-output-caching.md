@@ -50,7 +50,7 @@ Add a `cache` property to `PipelineStage` allowing per-stage cache configuration
 
 Cache keys are generated from:
 
-- Stage identifier (`stage.prompt`)
+- Stage identifier (`stage.stage` — the stage name)
 - Resolved inputs (excluding large content fields)
 - SHA-256 hashes of monitored file contents
 

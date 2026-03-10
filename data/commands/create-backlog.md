@@ -31,6 +31,7 @@ prompts:
       timeout_ms: 30000
     - stage: onboard
       prompt: onboard.analyze-requirements
+      batch: true
       required: true
       inputs:
         source_document: $STAGE_context.prd_document
@@ -43,6 +44,7 @@ prompts:
       timeout_ms: 60000
     - stage: breakdown
       prompt: plan.decompose-tasks
+      batch: true
       required: true
       inputs:
         analysis: $STAGE_onboard.requirement_analysis
@@ -56,6 +58,7 @@ prompts:
       timeout_ms: 90000
     - stage: review
       prompt: review.validate-backlog
+      batch: true
       required: true
       inputs:
         tasks: $STAGE_breakdown.task_list
@@ -67,6 +70,7 @@ prompts:
       timeout_ms: 60000
     - stage: generate
       prompt: documentation.generate-backlog-artifacts
+      batch: true
       required: true
       inputs:
         task_list: $STAGE_breakdown.task_list
