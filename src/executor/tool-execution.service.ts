@@ -15,6 +15,31 @@
  * - grep: Search file contents
  * - codebase_search: Semantic code search
  * - query_session: Query previous session data for context reuse
+ *
+ * ## Failure vs Guidance
+ *
+ * Tool results are classified by stage-executor as either a *failure* (content
+ * starts with `"Error:"`) or a *success*. To avoid inflating the failure counter
+ * with recoverable LLM mistakes, tools in this service follow a strict policy:
+ *
+ * **Throw / return `"Error:…"`** — only for genuine system faults: unknown tool
+ * name, filesystem permission errors, unexpected exceptions propagated from the
+ * OS, or commands that exit with code ≥ 2.
+ *
+ * **Return a plain string** — for all *guidance* situations where the LLM made a
+ * correctable mistake and should retry with better arguments:
+ *   - Missing or invalid arguments
+ *   - File / directory not found
+ *   - File too large → suggests selective extraction
+ *   - Structured file read via read_file → suggests jq/yq
+ *   - Protected-file overwrite attempt → suggests read-first
+ *   - search_replace old_str not found → suggests reading the file first
+ *   - rg/grep exit code 1 (no matches) → returns "No matches found"
+ *   - Blocked path access
+ *
+ * This keeps the hard-stop threshold (MAX_TOOL_FAILURES_BEFORE_HARD_STOP in
+ * stage-executor) meaningful: it only fires when tools are genuinely broken,
+ * not when the LLM is working through normal search/navigation patterns.
  */
 
 import { exec } from 'child_process';
@@ -909,7 +934,7 @@ export class ToolExecutionService {
 		const content = args['content'] as string;
 
 		if (!path || content === undefined) {
-			throw new Error('write requires path and content arguments');
+			return 'write requires path and content arguments';
 		}
 
 		const fullPath = this.validateAndResolvePath(path, 'write to');
@@ -923,10 +948,10 @@ export class ToolExecutionService {
 		// Allow writes to protected files only if they were read first
 		// This prevents blind overwrites while allowing intentional updates
 		if (isProtectedFile && existsSync(fullPath) && !this.readFiles.has(fullPath)) {
-			throw new Error(
+			return (
 				`Cannot overwrite existing protected file: ${path}. ` +
-					`This file already exists and is protected from accidental overwrite. ` +
-					`Use 'read_file' to see its current contents first, then you can overwrite it.`
+				`This file already exists and is protected from accidental overwrite. ` +
+				`Use 'read_file' to see its current contents first, then you can overwrite it.`
 			);
 		}
 
@@ -1034,33 +1059,48 @@ export class ToolExecutionService {
 		const path = args['path'] as string;
 
 		if (!path) {
-			throw new Error('read_file requires path argument');
+			return 'read_file requires path argument';
 		}
 
 		// Check if path is in a blocked directory using find for lookup
 		const blockedPath = ToolExecutionService.BLOCKED_READ_PATHS.find((blocked) => path.includes(blocked));
 		if (blockedPath) {
-			throw new Error(`Cannot read files in ${blockedPath} - these files may be very large or contain session data`);
+			return `Cannot read files in ${blockedPath} — these files may be very large or contain session data`;
 		}
 
 		const fullPath = this.resolvePath(path);
 
 		if (!existsSync(fullPath)) {
-			throw new Error(`File not found: ${path}`);
+			return (
+				`File not found: ${path}\n\n` +
+				`Verify the path with list_dir or glob_file_search("${path.split('/').pop() ?? path}") to locate the file.`
+			);
 		}
 
 		// Check file size before reading
 		const stat = statSync(fullPath);
 		if (stat.size > ToolExecutionService.MAX_READ_FILE_SIZE) {
-			throw new Error(
-				`File too large to read: ${path} (${Math.round(stat.size / 1024)}KB > ${Math.round(ToolExecutionService.MAX_READ_FILE_SIZE / 1024)}KB limit)`
+			const kb = Math.round(stat.size / 1024);
+			const limitKb = Math.round(ToolExecutionService.MAX_READ_FILE_SIZE / 1024);
+			return (
+				`File too large to read: ${path} (${kb}KB > ${limitKb}KB limit)\n\n` +
+				`Use selective extraction via run_terminal_cmd instead:\n` +
+				`  run_terminal_cmd("rg -n 'pattern' ${path}")  # Search for specific content\n` +
+				`  run_terminal_cmd("head -50 ${path}")          # Read first 50 lines\n` +
+				`  run_terminal_cmd("sed -n '1,50p' ${path}")    # Read specific line range`
 			);
 		}
 
-		this.validateNotStructuredFile(path);
+		const structuredGuidance = this.structuredFileGuidance(path);
+		if (structuredGuidance !== null) {
+			return structuredGuidance;
+		}
 
 		const content = await readFile(fullPath);
-		this.validateFileLineCount(path, content);
+		const lineGuidance = this.lineCountGuidance(path, content);
+		if (lineGuidance !== null) {
+			return lineGuidance;
+		}
 
 		// Track that this file was read (enables writes to protected files)
 		this.readFiles.add(fullPath);
@@ -1069,33 +1109,41 @@ export class ToolExecutionService {
 	}
 
 	/**
-	 * Enforce modern CLI tool usage: block structured files (JSON/YAML/TOML/XML).
+	 * Returns guidance for structured files (JSON/YAML/TOML/XML) that should be
+	 * read with jq/yq rather than read_file, or null if the file is not structured.
+	 *
+	 * Returns a string rather than throwing so the LLM receives actionable guidance
+	 * without the result being counted as a tool failure.
 	 */
-	private validateNotStructuredFile(path: string): void {
+	private structuredFileGuidance(path: string): null | string {
 		const structuredFileExtensions = ['.json', '.yaml', '.yml', '.toml', '.xml'];
 		const isStructuredFile = structuredFileExtensions.some((ext) => path.toLowerCase().endsWith(ext));
 		if (!isStructuredFile) {
-			return;
+			return null;
 		}
 
 		const tool = path.endsWith('.json') ? 'jq' : 'yq';
-		throw new Error(
+		return (
 			`Cannot use read_file for structured files: ${path}\n\n` +
-				`Structured files (JSON/YAML/TOML/XML) must be read with ${tool} via run_terminal_cmd.\n\n` +
-				`Use instead:\n` +
-				`  run_terminal_cmd("${tool} '.' ${path}")  # Read entire file\n` +
-				`  run_terminal_cmd("${tool} '.key' ${path}")  # Extract specific field\n\n` +
-				`This saves 85-95% of tokens compared to read_file.`
+			`Structured files (JSON/YAML/TOML/XML) must be read with ${tool} via run_terminal_cmd.\n\n` +
+			`Use instead:\n` +
+			`  run_terminal_cmd("${tool} '.' ${path}")  # Read entire file\n` +
+			`  run_terminal_cmd("${tool} '.key' ${path}")  # Extract specific field\n\n` +
+			`This saves 85-95% of tokens compared to read_file.`
 		);
 	}
 
 	/**
-	 * Enforce modern CLI tool usage: block files with >100 lines.
+	 * Returns guidance for reading large files (>100 lines) with selective CLI tools,
+	 * or null if the file is within the line limit.
+	 *
+	 * Returns a string rather than throwing so the LLM receives actionable guidance
+	 * without the result being counted as a tool failure.
 	 */
-	private validateFileLineCount(path: string, content: string): void {
+	private lineCountGuidance(path: string, content: string): null | string {
 		const lineCount = content.split('\n').length;
 		if (lineCount <= 100) {
-			return;
+			return null;
 		}
 
 		const fileName = path.split('/').pop() ?? path;
@@ -1109,11 +1157,11 @@ export class ToolExecutionService {
 			suggestion = `run_terminal_cmd("rg -A 10 'class|function|export' ${path}")  # Extract key definitions`;
 		}
 
-		throw new Error(
+		return (
 			`File too large: ${path} (${lineCount} lines > 100 line limit)\n\n` +
-				`Files with >100 lines must be read with selective extraction via run_terminal_cmd.\n\n` +
-				`Use instead:\n  ${suggestion}\n\n` +
-				`This saves 80-90% of tokens compared to reading the entire file.`
+			`Files with >100 lines must be read with selective extraction via run_terminal_cmd.\n\n` +
+			`Use instead:\n  ${suggestion}\n\n` +
+			`This saves 80-90% of tokens compared to reading the entire file.`
 		);
 	}
 
@@ -1126,19 +1174,25 @@ export class ToolExecutionService {
 		const newStr = args['new_str'] as string;
 
 		if (!path || oldStr === undefined || newStr === undefined) {
-			throw new Error('search_replace requires path, old_str, and new_str arguments');
+			return 'search_replace requires path, old_str, and new_str arguments';
 		}
 
 		const fullPath = this.validateAndResolvePath(path, 'modify');
 
 		if (!existsSync(fullPath)) {
-			throw new Error(`File not found: ${path}`);
+			return (
+				`File not found: ${path}\n\n` +
+				`Verify the path with list_dir or glob_file_search before calling search_replace.`
+			);
 		}
 
 		const content = await readFile(fullPath);
 
 		if (!content.includes(oldStr)) {
-			throw new Error(`Text not found in file: "${oldStr.substring(0, 50)}..."`);
+			return (
+				`Text not found in file: "${oldStr.substring(0, 50)}..."\n\n` +
+				`Use read_file("${path}") to see the current file contents, then adjust old_str to match exactly.`
+			);
 		}
 
 		const newContent = content.replace(oldStr, newStr);
@@ -1159,14 +1213,14 @@ export class ToolExecutionService {
 		const path = args['path'] as string;
 
 		if (!path) {
-			return Promise.reject(new Error('delete_file requires path argument'));
+			return Promise.resolve('delete_file requires path argument');
 		}
 
 		try {
 			const fullPath = this.validateAndResolvePath(path, 'delete');
 
 			if (!existsSync(fullPath)) {
-				return Promise.reject(new Error(`File not found: ${path}`));
+				return Promise.resolve(`File not found: ${path} (nothing to delete)`);
 			}
 
 			rmSync(fullPath);
@@ -1319,8 +1373,16 @@ export class ToolExecutionService {
 
 			return truncateTerminalOutput(output) || 'Command completed successfully (no output)';
 		} catch (error) {
-			const execError = error as { stderr?: string; stdout?: string };
-			const output = (execError.stdout ?? '') + (execError.stderr ?? '');
+			const execError = error as { code?: number; stderr?: string; stdout?: string };
+			const output = [execError.stdout, execError.stderr].filter(Boolean).join('');
+
+			// Search tools (rg, grep) exit with code 1 when there are no matches.
+			// This is a valid result, not a broken command — return guidance rather
+			// than throwing so it is not counted as a tool failure.
+			if (execError.code === 1 && isNoMatchesExitCode(command)) {
+				return `No matches found for: ${command}`;
+			}
+
 			throw new Error(`Command failed: ${truncateTerminalOutput(output) || (error as Error).message}`);
 		}
 	}
@@ -1333,12 +1395,16 @@ export class ToolExecutionService {
 		const fullPath = this.resolvePath(path);
 
 		if (!existsSync(fullPath)) {
-			return Promise.reject(new Error(`Directory not found: ${path}`));
+			return Promise.resolve(
+				`Directory not found: ${path}\n\nVerify the path or use glob_file_search to find the correct location.`
+			);
 		}
 
 		const stat = statSync(fullPath);
 		if (!stat.isDirectory()) {
-			return Promise.reject(new Error(`Not a directory: ${path}`));
+			return Promise.resolve(
+				`Not a directory: ${path}\n\nThis path points to a file. Use read_file("${path}") to read it.`
+			);
 		}
 
 		const entries = readdirSync(fullPath, { withFileTypes: true });
@@ -1363,7 +1429,7 @@ export class ToolExecutionService {
 		const query = args['query'] as string;
 
 		if (!query) {
-			throw new Error('web_search requires query argument');
+			return Promise.resolve('web_search requires query argument');
 		}
 
 		return Promise.resolve(`Web search not implemented. Query: ${query}`);
@@ -1461,6 +1527,18 @@ function truncateMcpOutput(output: unknown): string {
  * Truncate terminal command output to MAX_TERMINAL_OUTPUT_CHARS using head+tail,
  * so the LLM sees both the beginning (command context) and the end (summary/errors).
  */
+/**
+ * Returns true if a command is a search tool that exits with code 1 to signal
+ * "no matches found" rather than an actual error.
+ *
+ * rg (ripgrep) and grep family: exit 0 = matches, exit 1 = no matches, exit 2 = error.
+ * git grep follows the same convention.
+ */
+function isNoMatchesExitCode(command: string): boolean {
+	const trimmed = command.trimStart();
+	return /^(rg|grep|egrep|fgrep|git grep)\b/.test(trimmed);
+}
+
 function truncateTerminalOutput(output: string): string {
 	if (output.length <= MAX_TERMINAL_OUTPUT_CHARS) return output;
 	const HEAD = Math.floor(MAX_TERMINAL_OUTPUT_CHARS * 0.8);

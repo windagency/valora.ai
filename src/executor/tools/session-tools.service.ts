@@ -85,7 +85,7 @@ export class SessionToolsService {
 		const sessionId = args['session_id'] as string;
 
 		if (!action) {
-			throw new Error('query_session requires action argument (list, search, or get)');
+			return 'query_session requires action argument (list, search, or get)';
 		}
 
 		const sessionsDir = this.resolvePath(SESSIONS_DIR);
@@ -97,18 +97,18 @@ export class SessionToolsService {
 		switch (action) {
 			case 'get':
 				if (!sessionId) {
-					throw new Error('query_session with action="get" requires session_id argument');
+					return 'query_session with action="get" requires session_id argument';
 				}
 				return this.getSessionDetails(sessionsDir, sessionId);
 			case 'list':
 				return this.listSessions(sessionsDir);
 			case 'search':
 				if (!query) {
-					throw new Error('query_session with action="search" requires query argument');
+					return 'query_session with action="search" requires query argument';
 				}
 				return this.searchSessions(sessionsDir, query);
 			default:
-				throw new Error(`Unknown action: ${action}. Use "list", "search", or "get"`);
+				return `Unknown action: ${action}. Use "list", "search", or "get"`;
 		}
 	}
 
@@ -268,7 +268,7 @@ export class SessionToolsService {
 		const sessionFile = `${sessionsDir}/${sessionId}.json`;
 
 		if (!existsSync(sessionFile)) {
-			throw new Error(`Session not found: ${sessionId}`);
+			return `Session not found: ${sessionId}\n\nUse query_session with action="list" to see available sessions.`;
 		}
 
 		const content = await readFile(sessionFile);

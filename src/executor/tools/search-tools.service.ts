@@ -44,7 +44,7 @@ export class SearchToolsService {
 		const pattern = args['pattern'] as string;
 
 		if (!pattern) {
-			throw new Error('glob_file_search requires pattern argument');
+			return 'glob_file_search requires pattern argument';
 		}
 
 		try {
@@ -75,7 +75,7 @@ export class SearchToolsService {
 		const path = (args['path'] as string) ?? '.';
 
 		if (!pattern) {
-			throw new Error('grep requires pattern argument');
+			return 'grep requires pattern argument';
 		}
 
 		try {
@@ -111,7 +111,7 @@ export class SearchToolsService {
 		const query = args['query'] as string;
 
 		if (!query) {
-			throw new Error('codebase_search requires query argument');
+			return 'codebase_search requires query argument';
 		}
 
 		// For now, fall back to grep-based search

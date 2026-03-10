@@ -83,6 +83,8 @@ prompts:
     - stage: documentation
       prompt: documentation.update-inline-docs
       required: true
+      max_tool_iterations: 30
+      max_tool_failures: 10
       inputs:
         code_changes: $STAGE_code.code_changes
         files_modified: $STAGE_code.files_modified

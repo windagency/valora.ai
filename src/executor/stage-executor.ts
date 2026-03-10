@@ -51,6 +51,13 @@ import { getToolExecutionService, type ToolExecutionService } from './tool-execu
  * If this many tool calls fail within a single stage, the stage is hard-stopped
  * (success: false) rather than allowing the LLM to produce degraded output.
  * Prevents silently broken results from propagating downstream.
+ *
+ * A "failure" is any tool result whose content starts with "Error:" (see
+ * processToolResult). Guidance responses — file-not-found hints, too-large
+ * redirects, no-matches-found from rg/grep — do NOT start with "Error:" and
+ * are therefore not counted. Only genuine system faults increment this counter.
+ *
+ * Override per stage via PipelineStage.max_tool_failures.
  */
 const MAX_TOOL_FAILURES_BEFORE_HARD_STOP = 5;
 
@@ -897,6 +904,11 @@ export class StageExecutor {
 	/**
 	 * Process a tool result message: count failures and track verified file writes.
 	 * Returns 1 if this result is a failure, 0 otherwise.
+	 *
+	 * A failure is defined as a tool result whose content starts with "Error:".
+	 * Plain-string guidance responses (file-not-found hints, too-large redirects,
+	 * no-matches, missing-argument messages, etc.) do not start with "Error:" and
+	 * are not counted as failures. See ToolExecutionService for the full policy.
 	 */
 	private processToolResult(
 		msg: LLMMessage,
@@ -1141,10 +1153,11 @@ Summarize ALL changes you made during tool execution. Output ONLY the JSON code 
 			executionSummary !== undefined && (executionSummary.wasLoopExhausted || executionSummary.toolFailureCount > 0);
 
 		// Hard-stop: too many tool failures means the output cannot be trusted
-		if (executionSummary !== undefined && executionSummary.toolFailureCount >= MAX_TOOL_FAILURES_BEFORE_HARD_STOP) {
+		const maxToolFailures = stage.max_tool_failures ?? MAX_TOOL_FAILURES_BEFORE_HARD_STOP;
+		if (executionSummary !== undefined && executionSummary.toolFailureCount >= maxToolFailures) {
 			const errorMsg =
 				`Stage hard-stopped: ${executionSummary.toolFailureCount} tool failures exceeded ` +
-				`the threshold of ${MAX_TOOL_FAILURES_BEFORE_HARD_STOP} (stage: ${stage.stage}.${stage.prompt})`;
+				`the threshold of ${maxToolFailures} (stage: ${stage.stage}.${stage.prompt})`;
 			logger.error(errorMsg, new Error(errorMsg));
 			this.eventEmitter.emitStageError(`${stage.stage}.${stage.prompt}`, errorMsg);
 			return {
@@ -1180,10 +1193,11 @@ Summarize ALL changes you made during tool execution. Output ONLY the JSON code 
 			});
 		}
 
-		const parsedOutputs = this.outputParsingService.parseStageOutputs(completion.content, stage.outputs ?? []);
+		const outputDefs = stage.outputs ?? [];
+		const parsedOutputs = this.outputParsingService.parseStageOutputs(completion.content, outputDefs);
 
 		// Provide default values for missing expected outputs to prevent pipeline failures
-		const outputsWithDefaults = this.outputParsingService.applyDefaultValues(parsedOutputs, stage.outputs ?? []);
+		const outputsWithDefaults = this.outputParsingService.applyDefaultValues(parsedOutputs, outputDefs);
 
 		this.eventEmitter.emitStageComplete({
 			duration,

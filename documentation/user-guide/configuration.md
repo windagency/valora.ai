@@ -487,6 +487,38 @@ Configure automatic retries:
 }
 ```
 
+### Per-Stage Tool Loop Tuning
+
+For stages that involve many files (test generation, documentation, large refactors),
+the default tool loop limits may be too tight. Override them per stage in the command's
+pipeline YAML:
+
+```yaml
+pipeline:
+  - stage: test
+    prompt: code.implement-tests
+    required: true
+    max_tool_iterations: 40 # iterations before forcing final output (default: 20)
+
+  - stage: documentation
+    prompt: documentation.update-inline-docs
+    required: true
+    max_tool_iterations: 30
+    max_tool_failures: 10 # genuine failures before hard-stop (default: 5)
+```
+
+| Field                 | Default | When to raise                                           |
+| --------------------- | ------- | ------------------------------------------------------- |
+| `max_tool_iterations` | 20      | Stage writes many files or has many steps               |
+| `max_tool_failures`   | 5       | Stage involves heavy file navigation (many large files) |
+
+**What counts as a failure:** only tool results whose content starts with `"Error:"`.
+Guidance responses — file-not-found hints, "file too large" redirects, "no matches
+found" from `rg`/`grep` — do **not** count and will not trigger the hard-stop.
+
+See [Pipeline Resilience](../operations/pipeline-resilience.md) for detailed
+diagnostics guidance.
+
 ## Metrics Configuration
 
 ### Baseline Times
