@@ -27,6 +27,7 @@ prompts:
         - complexity_assessment
     - stage: completeness
       prompt: review.validate-completeness
+      batch: true
       required: true
       inputs:
         document_type: 'plan'
@@ -49,6 +50,7 @@ prompts:
         - blockers_identified
     - stage: risks
       prompt: review.validate-risk-coverage
+      batch: true
       required: true
       parallel: true
       inputs:
@@ -60,6 +62,7 @@ prompts:
         - mitigation_gaps
     - stage: steps
       prompt: review.validate-step-quality
+      batch: true
       required: true
       parallel: true
       inputs:
@@ -70,6 +73,7 @@ prompts:
         - actionability_issues
     - stage: tests
       prompt: review.validate-test-strategy
+      batch: true
       required: true
       parallel: true
       inputs:
@@ -79,6 +83,7 @@ prompts:
         - testing_gaps
     - stage: synthesis
       prompt: review.synthesize-plan-assessment
+      batch: true
       required: true
       inputs:
         completeness_score: $STAGE_completeness.completeness_score

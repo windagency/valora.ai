@@ -25,6 +25,7 @@ prompts:
         - initial_scope
     - stage: onboard
       prompt: onboard.refine-specifications
+      batch: true
       required: true
       inputs:
         user_intent: $STAGE_context.user_intent
@@ -39,6 +40,7 @@ prompts:
         - clarifying_questions
     - stage: review
       prompt: review.validate-completeness
+      batch: true
       required: true
       inputs:
         document: $STAGE_onboard.refined_specifications

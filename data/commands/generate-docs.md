@@ -53,6 +53,7 @@ prompts:
       timeout_ms: 60000
     - stage: generateInfra
       prompt: documentation.generate-infrastructure-docs
+      batch: true
       required: false
       conditional: $STAGE_analyze.domain_assignments.infrastructure
       parallel: true
@@ -73,6 +74,7 @@ prompts:
       timeout_ms: 180000
     - stage: generateBackend
       prompt: documentation.generate-backend-docs
+      batch: true
       required: false
       conditional: $STAGE_analyze.domain_assignments.backend
       parallel: true
@@ -92,6 +94,7 @@ prompts:
       timeout_ms: 180000
     - stage: generateFrontend
       prompt: documentation.generate-frontend-docs
+      batch: true
       required: false
       conditional: $STAGE_analyze.domain_assignments.frontend
       parallel: true
@@ -110,6 +113,7 @@ prompts:
       timeout_ms: 180000
     - stage: review
       prompt: review.validate-documentation
+      batch: true
       required: true
       inputs:
         infrastructure_docs: $STAGE_generateInfra

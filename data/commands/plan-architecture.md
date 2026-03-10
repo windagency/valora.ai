@@ -36,6 +36,7 @@ prompts:
         - scope_boundaries
     - stage: architecture
       prompt: plan.define-architecture
+      batch: true
       required: true
       inputs:
         task_details: $STAGE_load.task_details

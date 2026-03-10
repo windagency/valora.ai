@@ -27,6 +27,7 @@ prompts:
         - linked_requirements
     - stage: analyze
       prompt: onboard.analyze-clarity
+      batch: true
       required: true
       inputs:
         task_context: $STAGE_context.result
@@ -48,6 +49,7 @@ prompts:
         - assumptions_made
     - stage: review
       prompt: review.validate-testability
+      batch: true
       required: true
       inputs:
         task_context: $STAGE_context.result

@@ -47,6 +47,7 @@ prompts:
         - workflow_validation
     - stage: documentation
       prompt: documentation.generate-functional-review-report
+      batch: true
       required: true
       inputs:
         completeness_score: $STAGE_review.completeness_score
