@@ -19,6 +19,7 @@ Architecture Decision Records (ADRs) capture important architectural decisions m
 | [007](./007-persistent-stage-output-caching.md) | Persistent Stage Output Caching    | Accepted | 2026-01 |
 | [008](./008-pretooluse-cli-enforcement.md)      | PreToolUse CLI Enforcement         | Accepted | 2026-02 |
 | [009](./009-supply-chain-hardening.md)          | Supply Chain Hardening             | Accepted | 2026-03 |
+| [010](./010-batch-processing.md)                | Async Batch Processing             | Accepted | 2026-03 |
 
 ## ADR Status
 

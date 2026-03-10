@@ -3,6 +3,7 @@
 		"baseUrl": ".",
 		"paths": {
 			"src/*": ["./*"],
+			"batch/*": ["./batch/*"],
 			"cleanup/*": ["./cleanup/*"],
 			"cli/*": ["./cli/*"],
 			"config/*": ["./config/*"],

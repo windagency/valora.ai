@@ -79,6 +79,7 @@ interface LLMResponse {
 		outputTokens: number;
 		cacheCreationInputTokens?: number;
 		cacheReadInputTokens?: number;
+		batch_discount_applied?: boolean;
 	};
 	metadata?: Record<string, unknown>;
 }
@@ -129,6 +130,31 @@ These providers extract cache metrics from API responses without requiring expli
 
 - **OpenAI**: Reads `prompt_tokens_details.cached_tokens` from `CompletionUsage`
 - **Google**: Reads `cachedContentTokenCount` from `usageMetadata`
+
+## Batch API
+
+Each provider that supports a batch API implements the `BatchableProvider` interface (defined in `src/batch/batch-provider.interface.ts`). Batch processing reduces token costs by ~50% in exchange for asynchronous execution (24-hour window).
+
+```typescript
+interface BatchableProvider extends LLMProvider {
+	supportsBatch(): true;
+	submitBatch(requests: BatchRequest[]): Promise<BatchSubmission>;
+	getBatchStatus(batchId: string): Promise<BatchStatusInfo>;
+	getBatchResults(batchId: string): Promise<BatchResult[]>;
+	cancelBatch(batchId: string): Promise<void>;
+}
+```
+
+The `isBatchableProvider()` type guard performs a runtime check so the stage executor can route eligible stages through the batch path without knowing which provider is active.
+
+| Provider      | Batch API                                | Discount | `supportsBatch()` |
+| ------------- | ---------------------------------------- | -------- | ----------------- |
+| **Anthropic** | Message Batches (`/v1/messages/batches`) | ~50%     | `true`            |
+| **OpenAI**    | Batch API (`/v1/batches`)                | ~50%     | `true`            |
+| **Google**    | Vertex AI (not yet implemented)          | ~50%     | `false`           |
+| **Cursor**    | Not supported                            | —        | N/A               |
+
+Batch results include `batch_discount_applied: true` on the `LLMUsage` object so cost reporting can distinguish batch from real-time calls.
 
 ## Consequences
 

@@ -166,6 +166,8 @@ export function extractMCPServerId(tool: MCPTool): string {
  * Cache configuration for a pipeline stage
  */
 export interface PipelineStage {
+	/** Opt this stage into batch processing when --batch flag is set */
+	batch?: boolean;
 	/** Cache configuration for this stage */
 	cache?: PipelineStageCacheConfig;
 	conditional?: string;

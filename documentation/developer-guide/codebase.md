@@ -6,6 +6,8 @@
 
 ```plaintext
 src/
+├── batch/             # Async batch processing (LLM batch APIs)
+│   └── providers/     # Provider-specific batch implementations
 ├── cleanup/           # Resource cleanup coordination
 ├── cli/               # Command-line interface
 │   ├── commands/      # Individual CLI commands
@@ -26,6 +28,61 @@ src/
 ```
 
 ## Core Modules
+
+### Batch Layer (`src/batch/`)
+
+The batch layer provides asynchronous LLM processing via provider batch APIs, reducing token costs by ~50%.
+
+```plaintext
+src/batch/
+├── batch.types.ts                   # BatchRequest, BatchSubmission, BatchResult, PersistedBatch
+├── batch-provider.interface.ts      # BatchableProvider interface + isBatchableProvider() type guard
+├── batch-eligibility.ts             # isEligible(stage, context, provider) helper
+├── batch-orchestrator.ts            # Submit → poll → retrieve orchestration; singleton getBatchOrchestrator()
+├── batch-session.ts                 # JSON file persistence under .valora/batches/<localId>.json
+└── providers/
+    ├── anthropic.batch-provider.ts  # Anthropic Message Batches implementation
+    ├── openai.batch-provider.ts     # OpenAI Batch API (JSONL file upload)
+    └── google.batch-provider.ts     # Vertex AI stub (supportsBatch() returns false)
+```
+
+Key components:
+
+| Component                     | Responsibility                                                    |
+| ----------------------------- | ----------------------------------------------------------------- |
+| `batch-provider.interface.ts` | `BatchableProvider` extends `LLMProvider`; runtime type guard     |
+| `batch-eligibility.ts`        | Checks stage opt-in, `--batch` flag, and provider capability      |
+| `batch-orchestrator.ts`       | Coordinates submit/poll/retrieve; persists state via BatchSession |
+| `batch-session.ts`            | File-based batch state persistence (one JSON file per job)        |
+
+The `AnthropicProvider` and `OpenAIProvider` implement `BatchableProvider` directly. The `isBatchableProvider()` type guard is used in `StageExecutor` to route eligible stages through the batch path.
+
+#### Batch Flow
+
+```mermaid
+sequenceDiagram
+    participant CLI
+    participant StageExecutor
+    participant BatchOrchestrator
+    participant Provider
+    participant Disk
+
+    CLI->>StageExecutor: executeStage(stage) [--batch]
+    StageExecutor->>BatchOrchestrator: submit([request], provider)
+    BatchOrchestrator->>Provider: submitBatch(requests)
+    Provider-->>BatchOrchestrator: BatchSubmission
+    BatchOrchestrator->>Disk: persist(.valora/batches/<id>.json)
+    BatchOrchestrator-->>StageExecutor: BatchSubmission { localId }
+    StageExecutor-->>CLI: { batchPending: true, localId }
+    Note over CLI,Disk: Later...
+    CLI->>BatchOrchestrator: getResults(localId, provider)
+    BatchOrchestrator->>Provider: getBatchResults(batchId)
+    Provider-->>BatchOrchestrator: BatchResult[]
+    BatchOrchestrator->>Disk: update persisted status
+    BatchOrchestrator-->>CLI: BatchResult[]
+```
+
+---
 
 ### CLI Layer (`src/cli/`)
 

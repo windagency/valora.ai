@@ -8,6 +8,16 @@
  * Self-registers with the LLM Provider Registry using dependency inversion pattern
  */
 
+import type { BatchableProvider } from 'batch/batch-provider.interface';
+import type { BatchRequest, BatchResult, BatchStatusInfo, BatchSubmission } from 'batch/batch.types';
+
+import { generateLocalId } from 'batch/batch-session';
+import {
+	cancelOpenAIBatch,
+	getOpenAIBatchResults,
+	getOpenAIBatchStatus,
+	submitOpenAIBatch
+} from 'batch/providers/openai.batch-provider';
 import { Agent as HttpsAgent } from 'https';
 import OpenAI from 'openai';
 
@@ -19,7 +29,7 @@ import { getProviderRegistry } from 'llm/registry';
 import { createErrorContext, ProviderError, withCircuitBreaker, withRetry } from 'utils/error-handler';
 import { checkRateLimit, getRateLimitStatus } from 'utils/rate-limiter';
 
-export class OpenAIProvider extends BaseLLMProvider {
+export class OpenAIProvider extends BaseLLMProvider implements BatchableProvider {
 	name = ProviderName.OPENAI;
 	private client: null | OpenAI = null;
 
@@ -252,6 +262,56 @@ export class OpenAIProvider extends BaseLLMProvider {
 			});
 		}
 		return this.client;
+	}
+
+	// ─── BatchableProvider implementation ────────────────────────────────────
+
+	async cancelBatch(batchId: string): Promise<void> {
+		return cancelOpenAIBatch(this.getClient(), batchId);
+	}
+
+	async getBatchResults(batchId: string): Promise<BatchResult[]> {
+		return getOpenAIBatchResults(this.getClient(), batchId);
+	}
+
+	async getBatchStatus(batchId: string): Promise<BatchStatusInfo> {
+		return getOpenAIBatchStatus(this.getClient(), batchId);
+	}
+
+	async submitBatch(requests: BatchRequest[]): Promise<BatchSubmission> {
+		const client = this.getClient();
+		const defaultModel = this.getDefaultModel() ?? 'gpt-5';
+
+		const formatted = requests.map((req) => ({
+			customId: req.id,
+			params: {
+				max_tokens: req.options.max_tokens,
+				messages: req.options.messages.map((m) => ({
+					content: m.content,
+					role: m.role as 'assistant' | 'system' | 'user'
+				})),
+				model: req.options.model ?? defaultModel,
+				stop: req.options.stop,
+				temperature: req.options.temperature,
+				tools: req.options.tools
+					? req.options.tools.map((tool) => ({
+							function: {
+								description: tool.description,
+								name: tool.name,
+								parameters: tool.parameters
+							},
+							type: 'function' as const
+						}))
+					: undefined,
+				top_p: req.options.top_p
+			} as OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming
+		}));
+
+		return submitOpenAIBatch(client, formatted, this.name, generateLocalId());
+	}
+
+	supportsBatch(): true {
+		return true;
 	}
 }
 

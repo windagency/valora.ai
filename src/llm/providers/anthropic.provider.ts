@@ -9,8 +9,18 @@
  * Self-registers with the LLM Provider Registry using dependency inversion pattern
  */
 
+import type { BatchableProvider } from 'batch/batch-provider.interface';
+import type { BatchRequest, BatchResult, BatchStatusInfo, BatchSubmission } from 'batch/batch.types';
+
 import Anthropic from '@anthropic-ai/sdk';
 import { AnthropicVertex } from '@anthropic-ai/vertex-sdk';
+import { generateLocalId } from 'batch/batch-session';
+import {
+	cancelAnthropicBatch,
+	getAnthropicBatchResults,
+	getAnthropicBatchStatus,
+	submitAnthropicBatch
+} from 'batch/providers/anthropic.batch-provider';
 import { createHash } from 'crypto';
 import { Agent as UndiciAgent, fetch as undiciFetch } from 'undici';
 
@@ -28,7 +38,7 @@ import { estimateTokensFromText } from 'utils/token-estimator';
 /** Minimum estimated tokens for a content block to be worth caching */
 const MIN_CACHEABLE_TOKENS = 1024;
 
-export class AnthropicProvider extends BaseLLMProvider {
+export class AnthropicProvider extends BaseLLMProvider implements BatchableProvider {
 	name = ProviderName.ANTHROPIC;
 	private client: Anthropic | AnthropicVertex | null = null;
 	private readonly modelMappingRegistry: ModelMappingRegistry;
@@ -674,6 +684,68 @@ export class AnthropicProvider extends BaseLLMProvider {
 
 		// Use the model mapping registry for resolution
 		return this.modelMappingRegistry.resolveWithMode(model, mode, useVertex);
+	}
+
+	// ─── BatchableProvider implementation ────────────────────────────────────
+
+	async cancelBatch(batchId: string): Promise<void> {
+		const client = this.getClient();
+		if (client instanceof AnthropicVertex) {
+			throw new Error('Anthropic Message Batches are not available when using Vertex AI');
+		}
+		return cancelAnthropicBatch(client, batchId);
+	}
+
+	async getBatchResults(batchId: string): Promise<BatchResult[]> {
+		const client = this.getClient();
+		if (client instanceof AnthropicVertex) {
+			throw new Error('Anthropic Message Batches are not available when using Vertex AI');
+		}
+		return getAnthropicBatchResults(client, batchId);
+	}
+
+	async getBatchStatus(batchId: string): Promise<BatchStatusInfo> {
+		const client = this.getClient();
+		if (client instanceof AnthropicVertex) {
+			throw new Error('Anthropic Message Batches are not available when using Vertex AI');
+		}
+		return getAnthropicBatchStatus(client, batchId);
+	}
+
+	async submitBatch(requests: BatchRequest[]): Promise<BatchSubmission> {
+		const client = this.getClient();
+		if (client instanceof AnthropicVertex) {
+			throw new Error('Anthropic Message Batches are not available when using Vertex AI');
+		}
+
+		const formatted = requests.map((req) => {
+			const { messages, system } = this.formatMessages(req.options.messages);
+			const resolvedModel = this.resolveModelName(req.options.model, req.options.mode);
+			const formattedTools = req.options.tools?.map((tool) => ({
+				description: tool.description,
+				input_schema: tool.parameters as Anthropic.Tool.InputSchema,
+				name: tool.name
+			}));
+
+			const params: Anthropic.MessageCreateParamsNonStreaming = {
+				max_tokens: req.options.max_tokens ?? DEFAULT_MAX_TOKENS,
+				messages: messages as Anthropic.MessageParam[],
+				model: resolvedModel,
+				stop_sequences: req.options.stop,
+				system,
+				temperature: req.options.temperature,
+				tools: formattedTools,
+				top_p: req.options.top_p
+			};
+
+			return { customId: req.id, params };
+		});
+
+		return submitAnthropicBatch(client, formatted, this.name, generateLocalId());
+	}
+
+	supportsBatch(): true {
+		return true;
 	}
 }
 

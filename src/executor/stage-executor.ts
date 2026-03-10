@@ -4,6 +4,10 @@
  * MAINT-002: Large Files Need Splitting - Extracted from pipeline.ts
  */
 
+import { isEligible } from 'batch/batch-eligibility';
+import { getBatchOrchestrator } from 'batch/batch-orchestrator';
+import { isBatchableProvider } from 'batch/batch-provider.interface';
+import { createHash } from 'crypto';
 import { existsSync } from 'fs';
 
 import type { AgentDefinition } from 'types/agent.types';
@@ -197,6 +201,12 @@ export class StageExecutor {
 				if (cachedResult) {
 					return cachedResult;
 				}
+			}
+
+			// Batch path — submit to provider batch API if eligible
+			const batchResult = await this.tryBatchPath(stage, executionContext, startTime, options);
+			if (batchResult) {
+				return batchResult;
 			}
 
 			const stageResult = await this.performStageExecution(stage, executionContext, startTime, options);
@@ -460,6 +470,107 @@ export class StageExecutor {
 			duration,
 			logger
 		);
+	}
+
+	/**
+	 * Check batch eligibility and delegate to executeBatchStage if eligible.
+	 * Returns the batch StageOutput on success, or null to fall through to real-time.
+	 */
+	private async tryBatchPath(
+		stage: PipelineStage,
+		executionContext: ExecutionContext,
+		startTime: number,
+		options?: StageExecutionOptions
+	): Promise<null | StageOutput> {
+		const logger = getLogger();
+		const eligibility = isEligible(stage, executionContext, executionContext.provider);
+		if (eligibility.eligible && isBatchableProvider(executionContext.provider)) {
+			return this.executeBatchStage(stage, executionContext, startTime, options);
+		}
+		if (executionContext.flags['batch'] && !eligibility.eligible) {
+			logger.warn(`Stage "${stage.stage}" is not batch-eligible: ${eligibility.reason}. Falling back to real-time.`);
+		}
+		return null;
+	}
+
+	/**
+	 * Execute a stage via the provider's batch API.
+	 * Builds messages exactly as real-time execution does, then submits a single
+	 * BatchRequest. Returns immediately with batchPending outputs.
+	 */
+	private async executeBatchStage(
+		stage: PipelineStage,
+		executionContext: ExecutionContext,
+		startTime: number,
+		options?: StageExecutionOptions
+	): Promise<StageOutput> {
+		const logger = getLogger();
+
+		// Build messages using the same path as real-time execution
+		const resources = await this.loadStageResources(stage, executionContext);
+		const enrichedInputs = await this.resolveStageInputs(stage, executionContext, options, logger);
+		const { systemMessage, userMessage } = this.buildStageMessages(stage, resources, enrichedInputs);
+		const config = this.getExecutionConfig(executionContext);
+
+		const messages: LLMMessage[] = [
+			{ content: systemMessage, role: 'system' },
+			{ content: userMessage, role: 'user' }
+		];
+
+		const completionOptions: LLMCompletionOptions = {
+			max_tokens: DEFAULT_MAX_TOKENS,
+			messages,
+			mode: config.modeOverride ?? executionContext.mode,
+			model: config.modelOverride ?? executionContext.model
+		};
+
+		// Generate content hash for idempotent request ID
+		const requestId = createHash('sha256')
+			.update(JSON.stringify({ model: completionOptions.model, stage: stage.stage, userMessage }))
+			.digest('hex')
+			.substring(0, 32);
+
+		const batchRequest = {
+			id: requestId,
+			metadata: {
+				command: executionContext.commandName,
+				prompt: stage.prompt,
+				stage: stage.stage
+			},
+			options: completionOptions
+		};
+
+		const provider = executionContext.provider;
+		if (!isBatchableProvider(provider)) {
+			throw new Error(`Provider "${provider.name}" does not support batch (unexpected)`);
+		}
+
+		const orchestrator = getBatchOrchestrator();
+		const submission = await orchestrator.submit([batchRequest], provider);
+		const duration = Date.now() - startTime;
+
+		logger.info(`Batch submitted for stage "${stage.stage}"`, {
+			batchId: submission.batchId,
+			localId: submission.localId
+		});
+
+		return {
+			duration_ms: duration,
+			metadata: {
+				batchId: submission.batchId,
+				batchPending: true,
+				localId: submission.localId,
+				provider: provider.name
+			},
+			outputs: {
+				batchId: submission.batchId,
+				batchPending: true,
+				localId: submission.localId
+			},
+			prompt: stage.prompt,
+			stage: stage.stage,
+			success: true
+		};
 	}
 
 	/**

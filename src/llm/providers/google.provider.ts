@@ -220,6 +220,14 @@ export class GoogleProvider extends BaseLLMProvider {
 	}
 
 	/**
+	 * Returns false — Google Vertex AI batch requires @google-cloud/aiplatform.
+	 * Install the package and configure vertex_project to enable batch support.
+	 */
+	supportsBatch(): false {
+		return false;
+	}
+
+	/**
 	 * Handle Google API errors with proper error messages
 	 * @param error - The error to handle
 	 * @param context - The context where the error occurred (e.g., 'API', 'streaming')

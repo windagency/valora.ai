@@ -19,6 +19,7 @@ import type { CliOptions } from './types/cli-options.types';
 import { configureCompletionCommand } from './autocomplete';
 import { configureTemplateCommand } from './command-templates';
 import { createCommand } from './commander-adapter';
+import { configureBatchCommand } from './commands/batch.command';
 import { configureConfigCommand } from './commands/config';
 import { configureDashboardCommand } from './commands/dashboard';
 import { configureDoctorCommand } from './commands/doctor';
@@ -103,6 +104,9 @@ program.addOption(globalFlags.documentAutoApprove);
 program.addOption(globalFlags.documentCategory);
 program.addOption(globalFlags.documentPath);
 
+// Batch processing flag
+program.addOption(globalFlags.batch);
+
 // Configure all command modules
 configureConfigCommand(program);
 configureSessionCommand(program);
@@ -118,6 +122,7 @@ configureShortcutCommands(program);
 configureCompletionCommand(program);
 configureTemplateCommand(program);
 configureInitCommand(program);
+configureBatchCommand(program);
 
 /**
  * Initialize cleanup schedulers if not in test/MCP mode
