@@ -312,6 +312,20 @@ LLM is rushing):
   required: false # pipeline continues even if documentation stage fails
 ```
 
+**Solution D — Set a tolerant failure policy** (if the stage is exploratory / read-only):
+
+```yaml
+- stage: review
+  prompt: code.validate-prerequisites
+  required: true
+  failure_policy: tolerant # only fatal (mutating) failures count toward hard-stop
+```
+
+The `failure_policy` controls which failures count: `strict` (all — default for
+`code`/`test`), `tolerant` (only `write`/`search_replace`/`delete_file` failures —
+default for `context`/`review`/`plan`), or `lenient` (never hard-stops). See
+[Pipeline Resilience](../operations/pipeline-resilience.md#failure-policy) for details.
+
 **Diagnose root cause** by checking the `tool:execution:failed` pipeline events in the
 session log — they include `toolName` and `errorMessage` for each counted failure:
 

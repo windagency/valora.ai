@@ -213,6 +213,11 @@
 								"minimum": 1000,
 								"maximum": 300000,
 								"default": 30000
+							},
+							"failure_policy": {
+								"type": "string",
+								"description": "Controls how tool failures affect stage success. 'strict' = all failures count, 'tolerant' = only fatal (mutating) failures count, 'lenient' = never hard-stop.",
+								"enum": ["strict", "tolerant", "lenient"]
 							}
 						},
 						"additionalProperties": false

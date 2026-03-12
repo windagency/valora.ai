@@ -11,7 +11,7 @@ import { createHash } from 'crypto';
 import { existsSync } from 'fs';
 
 import type { AgentDefinition } from 'types/agent.types';
-import type { PipelineStage, StageOutput } from 'types/command.types';
+import type { FailurePolicy, PipelineStage, StageOutput, StageType } from 'types/command.types';
 import type { EscalationContext, EscalationSignal } from 'types/escalation.types';
 import type {
 	LLMCompletionOptions,
@@ -65,6 +65,31 @@ import { getToolExecutionService, type ToolExecutionService } from './tool-execu
  */
 const MAX_TOOL_FAILURES_BEFORE_HARD_STOP = 5;
 
+/**
+ * Tools whose failures are classified as *fatal* (mutating operations).
+ * All other tools are considered *recoverable* (read-only / exploratory).
+ */
+const FATAL_TOOLS = new Set(['delete_file', 'search_replace', 'write']);
+
+/**
+ * Default failure policy per stage type.
+ * Read-only / exploratory stages default to 'tolerant' (only fatal failures count).
+ * Mutating stages default to 'strict' (all failures count).
+ */
+export const DEFAULT_FAILURE_POLICY: Record<StageType, FailurePolicy> = {
+	breakdown: 'tolerant',
+	code: 'strict',
+	context: 'tolerant',
+	deployment: 'strict',
+	documentation: 'tolerant',
+	maintenance: 'strict',
+	onboard: 'tolerant',
+	plan: 'tolerant',
+	refactor: 'strict',
+	review: 'tolerant',
+	test: 'strict'
+};
+
 export interface PipelineExecutionContext {
 	executionContext: ExecutionContext;
 }
@@ -104,6 +129,10 @@ interface CompletionHandlerContext {
 interface ExecutionSummary {
 	/** Number of tool result messages that contained an error */
 	toolFailureCount: number;
+	/** Number of failures from mutating tools (write, search_replace, delete_file) */
+	fatalFailureCount: number;
+	/** Number of failures from read-only/exploratory tools */
+	recoverableFailureCount: number;
 	/** Files that were successfully written, modified, or deleted by tool calls */
 	verifiedModifiedFiles: string[];
 	/** Whether the stage hit the iteration ceiling and required a forced output */
@@ -779,7 +808,13 @@ export class StageExecutor {
 				logger.debug('LLM completed without tool calls', { iterations, stage: `${stage.stage}.${stage.prompt}` });
 				return {
 					completion,
-					summary: { toolFailureCount: 0, verifiedModifiedFiles: [], wasLoopExhausted: false }
+					summary: {
+						fatalFailureCount: 0,
+						recoverableFailureCount: 0,
+						toolFailureCount: 0,
+						verifiedModifiedFiles: [],
+						wasLoopExhausted: false
+					}
 				};
 			}
 
@@ -982,18 +1017,27 @@ export class StageExecutor {
 	private extractExecutionSummary(messages: LLMMessage[]): Omit<ExecutionSummary, 'wasLoopExhausted'> {
 		const mutatingTools = new Set(['delete_file', 'search_replace', 'write']);
 		const pendingFiles = new Map<string, string>(); // tool_call_id → path
+		const toolCallNames = new Map<string, string>(); // tool_call_id → tool_name
 		let toolFailureCount = 0;
+		let fatalFailureCount = 0;
+		let recoverableFailureCount = 0;
 		const verifiedModifiedFiles: string[] = [];
 
 		for (const msg of messages) {
 			if (msg.role === 'assistant' && msg.tool_calls) {
 				this.registerMutatingToolCalls(msg.tool_calls, mutatingTools, pendingFiles);
+				for (const tc of msg.tool_calls) {
+					toolCallNames.set(tc.id, tc.name);
+				}
 			} else if (msg.role === 'tool') {
-				toolFailureCount += this.processToolResult(msg, pendingFiles, verifiedModifiedFiles);
+				const result = this.processToolResult(msg, pendingFiles, verifiedModifiedFiles, toolCallNames);
+				toolFailureCount += result.failure;
+				fatalFailureCount += result.fatal;
+				recoverableFailureCount += result.recoverable;
 			}
 		}
 
-		return { toolFailureCount, verifiedModifiedFiles };
+		return { fatalFailureCount, recoverableFailureCount, toolFailureCount, verifiedModifiedFiles };
 	}
 
 	/**
@@ -1014,21 +1058,23 @@ export class StageExecutor {
 
 	/**
 	 * Process a tool result message: count failures and track verified file writes.
-	 * Returns 1 if this result is a failure, 0 otherwise.
+	 * Returns an object with failure (0 or 1), fatal (0 or 1), and recoverable (0 or 1).
 	 *
 	 * A failure is defined as a tool result whose content starts with "Error:".
-	 * Plain-string guidance responses (file-not-found hints, too-large redirects,
-	 * no-matches, missing-argument messages, etc.) do not start with "Error:" and
-	 * are not counted as failures. See ToolExecutionService for the full policy.
+	 * Fatal failures are from mutating tools (write, search_replace, delete_file).
+	 * Recoverable failures are from read-only/exploratory tools.
 	 */
 	private processToolResult(
 		msg: LLMMessage,
 		pendingFiles: Map<string, string>,
-		verifiedModifiedFiles: string[]
-	): number {
+		verifiedModifiedFiles: string[],
+		toolCallNames: Map<string, string>
+	): { failure: number; fatal: number; recoverable: number } {
 		if (msg.content.startsWith('Error:')) {
 			if (msg.name) pendingFiles.delete(msg.name);
-			return 1;
+			const toolName = msg.name ? toolCallNames.get(msg.name) : undefined;
+			const isFatal = FATAL_TOOLS.has(toolName ?? '');
+			return { failure: 1, fatal: isFatal ? 1 : 0, recoverable: isFatal ? 0 : 1 };
 		}
 		if (msg.name) {
 			const path = pendingFiles.get(msg.name);
@@ -1037,7 +1083,7 @@ export class StageExecutor {
 			}
 			pendingFiles.delete(msg.name);
 		}
-		return 0;
+		return { failure: 0, fatal: 0, recoverable: 0 };
 	}
 
 	/**
@@ -1055,7 +1101,8 @@ export class StageExecutor {
 		logger: ReturnType<typeof getLogger>
 	): Promise<{ completion: LLMCompletionResult; summary: ExecutionSummary }> {
 		const stageId = `${stage.stage}.${stage.prompt}`;
-		const { toolFailureCount, verifiedModifiedFiles } = this.extractExecutionSummary(messages);
+		const { fatalFailureCount, recoverableFailureCount, toolFailureCount, verifiedModifiedFiles } =
+			this.extractExecutionSummary(messages);
 		const lastToolsInvoked = this.extractLastToolsInvoked(messages);
 		const messageDepth = messages.length;
 
@@ -1081,7 +1128,13 @@ export class StageExecutor {
 			stage: stageId
 		});
 
-		const summary: ExecutionSummary = { toolFailureCount, verifiedModifiedFiles, wasLoopExhausted: true };
+		const summary: ExecutionSummary = {
+			fatalFailureCount,
+			recoverableFailureCount,
+			toolFailureCount,
+			verifiedModifiedFiles,
+			wasLoopExhausted: true
+		};
 		const completion = await this.requestFinalOutput(
 			executionContext,
 			messages,
@@ -1256,6 +1309,44 @@ Summarize ALL changes you made during tool execution. Output ONLY the JSON code 
 	}
 
 	/**
+	 * Determine whether a stage should hard-stop based on its failure policy,
+	 * the execution summary, and the read-only grace safety net.
+	 */
+	private shouldHardStopStage(
+		stage: PipelineStage,
+		executionSummary: ExecutionSummary | undefined,
+		logger: ReturnType<typeof getLogger>
+	): boolean {
+		if (executionSummary === undefined) return false;
+
+		const maxToolFailures = stage.max_tool_failures ?? MAX_TOOL_FAILURES_BEFORE_HARD_STOP;
+		const policy = stage.failure_policy ?? DEFAULT_FAILURE_POLICY[stage.stage] ?? 'strict';
+
+		let hardStop = false;
+		if (policy === 'strict') {
+			hardStop = executionSummary.toolFailureCount >= maxToolFailures;
+		} else if (policy === 'tolerant') {
+			hardStop = executionSummary.fatalFailureCount >= maxToolFailures;
+		}
+		// 'lenient' never hard-stops
+
+		// Read-only grace: if no files were modified and no fatal failures occurred,
+		// tool failures cannot have left corrupted state. Downgrade hard-stop to degraded.
+		if (hardStop && executionSummary.verifiedModifiedFiles.length === 0 && executionSummary.fatalFailureCount === 0) {
+			logger.warn('Read-only stage grace: downgrading hard-stop to degraded', {
+				fatalFailureCount: executionSummary.fatalFailureCount,
+				policy,
+				recoverableFailureCount: executionSummary.recoverableFailureCount,
+				stage: `${stage.stage}.${stage.prompt}`,
+				toolFailureCount: executionSummary.toolFailureCount
+			});
+			hardStop = false;
+		}
+
+		return hardStop;
+	}
+
+	/**
 	 * Handle normal completion result
 	 */
 	private handleNormalCompletion(ctx: CompletionHandlerContext): StageOutput {
@@ -1263,9 +1354,9 @@ Summarize ALL changes you made during tool execution. Output ONLY the JSON code 
 		const isDegraded =
 			executionSummary !== undefined && (executionSummary.wasLoopExhausted || executionSummary.toolFailureCount > 0);
 
-		// Hard-stop: too many tool failures means the output cannot be trusted
 		const maxToolFailures = stage.max_tool_failures ?? MAX_TOOL_FAILURES_BEFORE_HARD_STOP;
-		if (executionSummary !== undefined && executionSummary.toolFailureCount >= maxToolFailures) {
+
+		if (this.shouldHardStopStage(stage, executionSummary, logger) && executionSummary !== undefined) {
 			const errorMsg =
 				`Stage hard-stopped: ${executionSummary.toolFailureCount} tool failures exceeded ` +
 				`the threshold of ${maxToolFailures} (stage: ${stage.stage}.${stage.prompt})`;
@@ -1277,7 +1368,9 @@ Summarize ALL changes you made during tool execution. Output ONLY the JSON code 
 				metadata: {
 					executionQuality: {
 						degraded: true,
+						fatalFailureCount: executionSummary.fatalFailureCount,
 						hardStopped: true,
+						recoverableFailureCount: executionSummary.recoverableFailureCount,
 						toolFailureCount: executionSummary.toolFailureCount,
 						verifiedModifiedFiles: executionSummary.verifiedModifiedFiles,
 						wasLoopExhausted: executionSummary.wasLoopExhausted

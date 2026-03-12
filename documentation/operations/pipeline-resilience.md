@@ -92,14 +92,15 @@ Not every non-success tool result is counted as a failure. Tools distinguish bet
 
 Common guidance situations (do not count as failures):
 
-| Tool               | Situation                                                                         |
-| ------------------ | --------------------------------------------------------------------------------- |
-| `read_file`        | File not found, line count > 100, byte size > 1 MB, structured file (.json/.yaml) |
-| `search_replace`   | `old_str` not found in file, file not found                                       |
-| `delete_file`      | File not found (idempotent — nothing to delete)                                   |
-| `list_dir`         | Directory not found, path is a file                                               |
-| `run_terminal_cmd` | `rg`/`grep` exits with code 1 (no matches found)                                  |
-| All tools          | Missing required arguments                                                        |
+| Tool               | Situation                                                                                           |
+| ------------------ | --------------------------------------------------------------------------------------------------- |
+| `read_file`        | File not found, line count > 100, byte size > 1 MB, structured file (.json/.yaml)                   |
+| `search_replace`   | `old_str` not found in file, file not found                                                         |
+| `delete_file`      | File not found (idempotent — nothing to delete)                                                     |
+| `list_dir`         | Directory not found, path is a file                                                                 |
+| `run_terminal_cmd` | `rg`/`grep` exits with code 1 (no matches found)                                                    |
+| `run_terminal_cmd` | Exploratory commands exit with code 1 (`which`, `test`, `[`, `command -v`, `type`, `fd`, `cd && …`) |
+| All tools          | Missing required arguments                                                                          |
 
 This distinction matters because the LLM frequently reads large source files during
 documentation or test-writing stages. Without it, every "File too large" redirect would
@@ -120,6 +121,8 @@ Check `StageOutput.metadata.executionQuality` in the pipeline result:
 const quality = stageOutput.metadata?.executionQuality as
 	| {
 			degraded: boolean;
+			fatalFailureCount: number;
+			recoverableFailureCount: number;
 			toolFailureCount: number;
 			verifiedModifiedFiles: string[];
 			wasLoopExhausted: boolean;
@@ -136,7 +139,7 @@ if (quality?.degraded) {
 
 ## Hard-stop threshold
 
-If a stage accumulates **5 or more** tool call failures, it is hard-stopped:
+If a stage accumulates too many tool call failures, it is hard-stopped:
 
 - `StageOutput.success` is set to `false`.
 - `StageOutput.error` contains a human-readable explanation.
@@ -148,7 +151,75 @@ If a stage accumulates **5 or more** tool call failures, it is hard-stopped:
 - Required stages (`required: true`) trigger `ExecutionError`, which halts the pipeline.
 - Optional stages (`required: false`) allow the pipeline to continue.
 
-**Tuning the threshold:**
+### Failure severity
+
+Not all tool failures carry the same weight. Each failure is classified as either
+**fatal** or **recoverable**:
+
+| Severity        | Tools                                                                                                | Meaning                                                    |
+| --------------- | ---------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| **Fatal**       | `write`, `search_replace`, `delete_file`                                                             | Mutating operation failed — state may be corrupted         |
+| **Recoverable** | All others (`read_file`, `run_terminal_cmd`, `grep`, `list_dir`, `codebase_search`, MCP tools, etc.) | Read-only / exploratory operation failed — no side-effects |
+
+`ExecutionSummary` tracks both counts:
+
+```typescript
+interface ExecutionSummary {
+	toolFailureCount: number; // total (fatal + recoverable)
+	fatalFailureCount: number; // mutating tools only
+	recoverableFailureCount: number; // read-only / exploratory tools
+	verifiedModifiedFiles: string[];
+	wasLoopExhausted: boolean;
+}
+```
+
+### Failure policy
+
+The `failure_policy` setting controls **which** failures count toward the hard-stop
+threshold:
+
+| Policy     | Failures that count     | Default for stage types                                              |
+| ---------- | ----------------------- | -------------------------------------------------------------------- |
+| `strict`   | All failures            | `code`, `test`, `refactor`, `deployment`, `maintenance`              |
+| `tolerant` | Fatal failures only     | `context`, `review`, `plan`, `breakdown`, `onboard`, `documentation` |
+| `lenient`  | None (never hard-stops) | _(none by default)_                                                  |
+
+The policy is resolved as: explicit `failure_policy` on the stage → default for the
+stage type (see `DEFAULT_FAILURE_POLICY` in `stage-executor.ts`) → `strict`.
+
+**Configure per stage in command YAML:**
+
+```yaml
+- stage: context
+  prompt: context.load-implementation-context
+  required: true
+  failure_policy: tolerant # only fatal (mutating) failures trigger hard-stop
+
+- stage: code
+  prompt: code.implement-changes
+  required: true
+  failure_policy: strict # all failures count (this is the default for code stages)
+```
+
+### Read-only grace
+
+Even under `strict` policy, there is a final safety net: if a stage would hard-stop but
+
+1. no files were modified (`verifiedModifiedFiles` is empty), and
+2. no fatal failures occurred (`fatalFailureCount` is 0),
+
+then tool failures cannot have left corrupted state. The hard-stop is downgraded to
+degraded and the stage completes with `success: true`. A warning is logged:
+
+```
+Read-only stage grace: downgrading hard-stop to degraded
+```
+
+This protects stages that happen to be read-only in practice (e.g. a `code` stage that
+only explored the codebase but did not write any files before hitting the failure
+threshold).
+
+### Tuning the threshold
 
 The global default (`MAX_TOOL_FAILURES_BEFORE_HARD_STOP = 5`) is defined in
 `src/executor/stage-executor.ts`. Override it for individual stages in the command YAML:
@@ -226,13 +297,15 @@ Control the tool loop budget and hard-stop sensitivity independently per stage:
   max_tool_failures: 10
 ```
 
-| Field                 | Default | Effect                          |
-| --------------------- | ------- | ------------------------------- |
-| `max_tool_iterations` | 20      | Iterations before forced output |
-| `max_tool_failures`   | 5       | Failures before hard-stop       |
+| Field                 | Default        | Effect                                                  |
+| --------------------- | -------------- | ------------------------------------------------------- |
+| `max_tool_iterations` | 20             | Iterations before forced output                         |
+| `max_tool_failures`   | 5              | Failures before hard-stop                               |
+| `failure_policy`      | per stage type | Which failures count: `strict` / `tolerant` / `lenient` |
 
 Only genuine failures (`"Error:"` prefix) count toward `max_tool_failures`. Guidance
-responses (file-not-found hints, no-matches, too-large redirects) do not.
+responses (file-not-found hints, no-matches, too-large redirects, exploratory command
+exit-code-1) do not. Under `tolerant` policy, only fatal (mutating) failures count.
 
 ---
 

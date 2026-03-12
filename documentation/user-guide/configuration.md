@@ -542,16 +542,29 @@ pipeline:
     required: true
     max_tool_iterations: 30
     max_tool_failures: 10 # genuine failures before hard-stop (default: 5)
+
+  - stage: context
+    prompt: context.load-implementation-context
+    required: true
+    failure_policy: tolerant # only fatal (mutating) failures trigger hard-stop
 ```
 
-| Field                 | Default | When to raise                                           |
-| --------------------- | ------- | ------------------------------------------------------- |
-| `max_tool_iterations` | 20      | Stage writes many files or has many steps               |
-| `max_tool_failures`   | 5       | Stage involves heavy file navigation (many large files) |
+| Field                 | Default        | When to change                                                              |
+| --------------------- | -------------- | --------------------------------------------------------------------------- |
+| `max_tool_iterations` | 20             | Stage writes many files or has many steps                                   |
+| `max_tool_failures`   | 5              | Stage involves heavy file navigation (many large files)                     |
+| `failure_policy`      | per stage type | Stage is read-only/exploratory (`tolerant`) or must never block (`lenient`) |
 
 **What counts as a failure:** only tool results whose content starts with `"Error:"`.
 Guidance responses — file-not-found hints, "file too large" redirects, "no matches
-found" from `rg`/`grep` — do **not** count and will not trigger the hard-stop.
+found" from `rg`/`grep`, and exploratory commands (`which`, `test`, `cd`, `fd`) exiting
+with code 1 — do **not** count and will not trigger the hard-stop.
+
+**Failure policy** controls which counted failures affect the hard-stop threshold:
+
+- `strict` — all failures count (default for `code`, `test`, `refactor`, `deployment`, `maintenance`)
+- `tolerant` — only fatal failures from mutating tools (`write`, `search_replace`, `delete_file`) count (default for `context`, `review`, `plan`, `breakdown`, `onboard`, `documentation`)
+- `lenient` — never hard-stops regardless of failures
 
 See [Pipeline Resilience](../operations/pipeline-resilience.md) for detailed
 diagnostics guidance.

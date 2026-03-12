@@ -33,6 +33,7 @@ prompts:
     - stage: context
       prompt: context.load-implementation-context
       required: true
+      failure_policy: tolerant
       inputs:
         implementation_plan: $ARG_1
         agent_type: $ARG_agent
@@ -48,6 +49,7 @@ prompts:
     - stage: review
       prompt: code.validate-prerequisites
       required: true
+      failure_policy: tolerant
       inputs:
         plan_summary: $STAGE_context.plan_summary
         dependencies: $STAGE_context.dependencies

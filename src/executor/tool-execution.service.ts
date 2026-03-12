@@ -1376,12 +1376,8 @@ export class ToolExecutionService {
 			const execError = error as { code?: number; stderr?: string; stdout?: string };
 			const output = [execError.stdout, execError.stderr].filter(Boolean).join('');
 
-			// Search tools (rg, grep) exit with code 1 when there are no matches.
-			// This is a valid result, not a broken command — return guidance rather
-			// than throwing so it is not counted as a tool failure.
-			if (execError.code === 1 && isNoMatchesExitCode(command)) {
-				return `No matches found for: ${command}`;
-			}
+			const guidance = exitCodeOneGuidance(execError.code, command);
+			if (guidance) return guidance;
 
 			throw new Error(`Command failed: ${truncateTerminalOutput(output) || (error as Error).message}`);
 		}
@@ -1534,9 +1530,46 @@ function truncateMcpOutput(output: unknown): string {
  * rg (ripgrep) and grep family: exit 0 = matches, exit 1 = no matches, exit 2 = error.
  * git grep follows the same convention.
  */
+/**
+ * If the command exited with code 1 and is a known search/exploratory tool,
+ * return a guidance string instead of treating it as an error. Returns
+ * undefined when the failure should propagate as a real error.
+ */
+function exitCodeOneGuidance(code: number | undefined, command: string): string | undefined {
+	if (code !== 1) return undefined;
+	if (isNoMatchesExitCode(command)) return `No matches found for: ${command}`;
+	if (isExploratoryExitCode(command)) return `Command returned no results: ${command}`;
+	return undefined;
+}
+
 function isNoMatchesExitCode(command: string): boolean {
 	const trimmed = command.trimStart();
 	return /^(rg|grep|egrep|fgrep|git grep)\b/.test(trimmed);
+}
+
+/**
+ * Returns true if a command is an exploratory/probing command that commonly
+ * exits with code 1 to signal "not found" or "false" rather than an error.
+ *
+ * - `which`, `command -v`, `type` — command existence checks
+ * - `test`, `[` — file/condition tests
+ * - `fd` — file finder (same convention as rg)
+ * - Piped commands where the first segment is `cd` — directory probing
+ */
+export function isExploratoryExitCode(command: string): boolean {
+	const trimmed = command.trimStart();
+
+	// Direct exploratory commands
+	if (/^(which|command\s+-v|type|test|fd)\b/.test(trimmed)) return true;
+
+	// Shell test bracket syntax: [ -d /foo ] or [[ -f bar ]]
+	if (/^\[{1,2}\s/.test(trimmed)) return true;
+
+	// Piped commands starting with cd (directory probing)
+	// e.g. "cd workspace && pwd" or "cd /some/path && which tsc"
+	if (/^cd\b/.test(trimmed)) return true;
+
+	return false;
 }
 
 function truncateTerminalOutput(output: string): string {

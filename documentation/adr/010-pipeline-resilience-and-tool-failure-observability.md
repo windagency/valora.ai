@@ -303,3 +303,98 @@ content starts with `"Error:"` is a failure; all others are not.
 - `src/executor/tools/search-tools.service.ts` — `executeGlobSearch`, `executeGrep`, `executeCodebaseSearch`
 - `src/executor/tools/session-tools.service.ts` — `executeQuerySession`, `getSessionDetails`
 - `data/commands/implement.md` — `max_tool_iterations` and `max_tool_failures` on `test` and `documentation` stages
+
+---
+
+## Amendment — 2026-03-11: Failure severity, failure policy, and exploratory command guidance
+
+### Context
+
+Pipelines hard-stopped and aborted when exploratory tool failures accumulated during
+read-only stages. In the observed case, the `validate-prerequisites` stage ran `which`,
+`cd workspace && pwd`, `rg` on non-existent directories, etc. — all returning exit code 1.
+Each became an `"Error: Command failed: ..."` result, counted as a failure. After 6
+failures (threshold: 5), the stage hard-stopped. Since it was `required: true`, the entire
+pipeline aborted before any code was written.
+
+Root causes:
+
+1. `executeTerminalCmd` only converted `rg`/`grep` exit-code-1 to guidance; all other
+   commands threw → `"Error:"` → counted as a failure.
+2. All tool failures were weighted equally — a failed `which` counted the same as a
+   failed `write`.
+3. No stage-level policy to distinguish read-only exploration from mutating operations.
+
+### Changes
+
+#### Expanded exploratory command guidance
+
+`isExploratoryExitCode` recognises common exploratory commands that exit with code 1 to
+signal "not found" rather than an error:
+
+- `which`, `command -v`, `type` — command existence checks
+- `test`, `[`, `[[` — file/condition tests
+- `fd` — file finder (same convention as `rg`)
+- `cd`-prefixed commands — directory probing
+
+These now return `"Command returned no results: ..."` (guidance) instead of throwing,
+so they are not counted as failures.
+
+#### Failure severity classification
+
+`ExecutionSummary` gains two new fields:
+
+```typescript
+interface ExecutionSummary {
+	toolFailureCount: number; // total (unchanged)
+	fatalFailureCount: number; // write/search_replace/delete_file failures
+	recoverableFailureCount: number; // all other tool failures
+	verifiedModifiedFiles: string[];
+	wasLoopExhausted: boolean;
+}
+```
+
+`processToolResult` now looks up the tool name via a `tool_call_id → tool_name` map
+built from assistant messages. Fatal tools (`write`, `search_replace`, `delete_file`)
+increment `fatalFailureCount`; all others increment `recoverableFailureCount`.
+
+#### Failure policy (`failure_policy`)
+
+`PipelineStage` gains an optional `failure_policy` field:
+
+```typescript
+type FailurePolicy = 'strict' | 'tolerant' | 'lenient';
+```
+
+| Policy     | Failures that count toward hard-stop |
+| ---------- | ------------------------------------ |
+| `strict`   | All failures (total)                 |
+| `tolerant` | Fatal failures only                  |
+| `lenient`  | None (never hard-stops)              |
+
+Default policies per stage type (`DEFAULT_FAILURE_POLICY`):
+
+| Tolerant (read-only)                                                 | Strict (mutating)                                       |
+| -------------------------------------------------------------------- | ------------------------------------------------------- |
+| `context`, `review`, `plan`, `breakdown`, `onboard`, `documentation` | `code`, `test`, `refactor`, `deployment`, `maintenance` |
+
+#### Read-only grace (safety net)
+
+Even under `strict` policy, if a stage would hard-stop but has zero modified files and
+zero fatal failures, the hard-stop is downgraded to degraded. This protects stages that
+are read-only in practice from being killed by recoverable failures.
+
+### Updated Neutral consequences
+
+- `failure_policy` defaults are chosen so that existing `code` and `test` stages retain
+  their strict behaviour. Only read-only stage types benefit from the relaxed policy.
+- The read-only grace is a conservative safety net — it can never cause harm because no
+  files were modified and no mutating operations failed.
+
+### Implementation references
+
+- `src/types/command.types.ts` — `FailurePolicy`, `PipelineStage.failure_policy`
+- `src/executor/stage-executor.ts` — `FATAL_TOOLS`, `DEFAULT_FAILURE_POLICY`, `shouldHardStopStage`, updated `processToolResult` and `extractExecutionSummary`
+- `src/executor/tool-execution.service.ts` — `isExploratoryExitCode`, `exitCodeOneGuidance`
+- `data/commands/_meta/schema.json` — `failure_policy` in pipeline stage schema
+- `data/commands/implement.md` — explicit `failure_policy: tolerant` on `context` and `review` stages

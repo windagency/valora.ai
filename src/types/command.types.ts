@@ -151,6 +151,14 @@ export interface IsolatedExecutionOptions {
 	forceRequired?: boolean;
 }
 
+/**
+ * Controls how tool failures affect stage success.
+ * - 'strict': all failures count toward hard-stop (default for code/test/refactor)
+ * - 'tolerant': only fatal (mutating) failures count toward hard-stop (default for context/review)
+ * - 'lenient': never hard-stop; stage always completes (possibly degraded)
+ */
+export type FailurePolicy = 'lenient' | 'strict' | 'tolerant';
+
 export type MergeStrategy = 'conditional' | 'parallel' | 'sequential' | 'waterfall';
 
 /**
@@ -171,6 +179,11 @@ export interface PipelineStage {
 	/** Cache configuration for this stage */
 	cache?: PipelineStageCacheConfig;
 	conditional?: string;
+	/**
+	 * Controls how tool failures affect stage success.
+	 * Defaults vary by stage type — see DEFAULT_FAILURE_POLICY in stage-executor.ts.
+	 */
+	failure_policy?: FailurePolicy;
 	inputs?: Record<string, string>;
 	/**
 	 * Maximum number of tool-call failures before hard-stopping the stage.
