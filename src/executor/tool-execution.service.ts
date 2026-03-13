@@ -45,6 +45,8 @@
 import { exec } from 'child_process';
 import { existsSync, readdirSync, rmSync, statSync } from 'fs';
 import { dirname, resolve } from 'path';
+import { getCommandGuard } from 'security/command-guard';
+import { getCredentialGuard } from 'security/credential-guard';
 import { fileURLToPath } from 'url';
 import { promisify } from 'util';
 
@@ -1068,6 +1070,11 @@ export class ToolExecutionService {
 			return `Cannot read files in ${blockedPath} — these files may be very large or contain session data`;
 		}
 
+		// Block sensitive files (credentials, keys, etc.)
+		if (getCredentialGuard().isSensitiveFile(path)) {
+			return `Cannot read sensitive file: ${path} — this file may contain credentials or private keys`;
+		}
+
 		const fullPath = this.resolvePath(path);
 
 		if (!existsSync(fullPath)) {
@@ -1362,14 +1369,23 @@ export class ToolExecutionService {
 		const command = await this.resolveCommand(raw);
 		this.logger.info(`Executing command: ${command}`);
 
+		// Validate command against security blocklist
+		const commandCheck = getCommandGuard().validate(command);
+		if (!commandCheck.allowed) {
+			return `Command blocked by security policy: ${commandCheck.reason}\n\nUse a different approach that does not involve blocked commands or patterns.`;
+		}
+
+		const credentialGuard = getCredentialGuard();
+
 		try {
 			const { stderr, stdout } = await execAsync(command, {
 				cwd: this.workingDir,
-				env: { ...process.env, PATH: this.buildAugmentedPath() },
+				env: { ...credentialGuard.sanitiseEnvironment(process.env), PATH: this.buildAugmentedPath() },
 				timeout: timeoutMs
 			});
 
-			const output = stdout + (stderr ? `\nStderr: ${stderr}` : '');
+			const rawOutput = stdout + (stderr ? `\nStderr: ${stderr}` : '');
+			const output = credentialGuard.scanOutput(rawOutput);
 
 			return truncateTerminalOutput(output) || 'Command completed successfully (no output)';
 		} catch (error) {

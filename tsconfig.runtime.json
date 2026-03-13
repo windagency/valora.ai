@@ -4,6 +4,7 @@
 		"paths": {
 			"src/*": ["./*"],
 			"batch/*": ["./batch/*"],
+			"security/*": ["./security/*"],
 			"cleanup/*": ["./cleanup/*"],
 			"cli/*": ["./cli/*"],
 			"config/*": ["./config/*"],

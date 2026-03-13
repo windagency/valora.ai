@@ -9,6 +9,7 @@ import { getBatchOrchestrator } from 'batch/batch-orchestrator';
 import { isBatchableProvider } from 'batch/batch-provider.interface';
 import { createHash } from 'crypto';
 import { existsSync } from 'fs';
+import { getPromptInjectionDetector } from 'security/prompt-injection-detector';
 
 import type { AgentDefinition } from 'types/agent.types';
 import type { FailurePolicy, PipelineStage, StageOutput, StageType } from 'types/command.types';
@@ -975,15 +976,18 @@ export class StageExecutor {
 			tool_calls: toolCalls
 		});
 
-		// Execute tools and add results
+		// Execute tools and add results (with prompt injection scanning)
 		const toolResults = await this.toolExecutionService.executeTools(toolCalls);
-		toolResults.forEach((result) =>
+		const injectionDetector = getPromptInjectionDetector();
+		toolResults.forEach((result) => {
+			const formatted = this.formatToolResult(result);
+			const sanitised = injectionDetector.sanitiseToolResult(result.tool_call_id, formatted);
 			messages.push({
-				content: this.formatToolResult(result),
+				content: sanitised,
 				name: result.tool_call_id,
 				role: 'tool'
-			})
-		);
+			});
+		});
 
 		logger.debug('Tool results added to conversation', { iterations, resultCount: toolResults.length });
 	}

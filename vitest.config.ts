@@ -9,6 +9,7 @@ export default defineConfig({
 	resolve: {
 		alias: {
 			batch: path.resolve(__dirname, './src/batch'),
+			security: path.resolve(__dirname, './src/security'),
 			cleanup: path.resolve(__dirname, './src/cleanup'),
 			cli: path.resolve(__dirname, './src/cli'),
 			config: path.resolve(__dirname, './src/config'),

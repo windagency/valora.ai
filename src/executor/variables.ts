@@ -2,6 +2,8 @@
  * Variable resolver - resolves $ARG_*, $STAGE_*, $CONTEXT_* placeholders
  */
 
+import { getCredentialGuard } from 'security/credential-guard';
+
 import { ValidationError } from 'utils/error-handler';
 
 export interface VariableContext {
@@ -208,6 +210,11 @@ export class VariableResolver {
 	 * Resolve environment variable ($ENV_NAME)
 	 */
 	private resolveEnv(path: string): unknown {
+		// Block access to sensitive environment variables
+		if (getCredentialGuard().isSensitiveEnvVar(path)) {
+			return '[REDACTED]';
+		}
+
 		const envVars = this.context.env ?? process.env;
 		const value = envVars[path];
 

@@ -23,6 +23,12 @@ import { ExternalMCPIntegrator } from 'mcp/external-mcp-integrator';
 import { MCPApprovalWorkflow } from 'mcp/mcp-approval-workflow';
 // Initialize providers before importing registry (triggers self-registration)
 import 'llm/providers';
+import { getCommandGuard } from 'security/command-guard';
+import { getCredentialGuard } from 'security/credential-guard';
+import { getPromptInjectionDetector } from 'security/prompt-injection-detector';
+import { getToolDefinitionValidator } from 'security/tool-definition-validator';
+import { getToolIntegrityMonitor } from 'security/tool-integrity-monitor';
+
 import type { ToolCallArgs } from 'types/mcp.types';
 
 import { getProviderRegistry } from 'llm/registry';
@@ -98,10 +104,17 @@ export const SERVICE_IDENTIFIERS = {
 
 	PROVIDER_RESOLVER: Symbol('CLIProviderResolver'),
 	RATE_LIMITER: Symbol('RateLimiter'),
+
+	// Security services
 	RENDERER: Symbol('Renderer'),
 	REQUEST_HANDLER: Symbol('MCPRequestHandler'),
-
 	SAMPLING_SERVICE: Symbol('MCPSamplingServiceImpl'),
+	SECURITY_COMMAND_GUARD: Symbol('CommandGuard'),
+	SECURITY_CREDENTIAL_GUARD: Symbol('CredentialGuard'),
+	SECURITY_PROMPT_INJECTION_DETECTOR: Symbol('PromptInjectionDetector'),
+	SECURITY_TOOL_DEFINITION_VALIDATOR: Symbol('ToolDefinitionValidator'),
+
+	SECURITY_TOOL_INTEGRITY_MONITOR: Symbol('ToolIntegrityMonitor'),
 
 	// Session management
 	SESSION_LIFECYCLE: Symbol('SessionLifecycle'),
@@ -361,6 +374,13 @@ function setupDefaultServices(container: DIContainer): void {
 
 		return new DynamicAgentResolverService(taskClassifier, contextAnalyzer, capabilityMatcher, registry);
 	});
+
+	// Security services
+	container.register(SERVICE_IDENTIFIERS.SECURITY_CREDENTIAL_GUARD, getCredentialGuard());
+	container.register(SERVICE_IDENTIFIERS.SECURITY_COMMAND_GUARD, getCommandGuard());
+	container.register(SERVICE_IDENTIFIERS.SECURITY_PROMPT_INJECTION_DETECTOR, getPromptInjectionDetector());
+	container.register(SERVICE_IDENTIFIERS.SECURITY_TOOL_DEFINITION_VALIDATOR, getToolDefinitionValidator());
+	container.register(SERVICE_IDENTIFIERS.SECURITY_TOOL_INTEGRITY_MONITOR, getToolIntegrityMonitor());
 
 	// MCP services - these will be registered when MCP server is created
 	// They depend on the MCP server instance itself

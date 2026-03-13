@@ -9,6 +9,8 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { existsSync } from 'fs';
 import { join, resolve } from 'path';
+import { getToolDefinitionValidator } from 'security/tool-definition-validator';
+import { getToolIntegrityMonitor } from 'security/tool-integrity-monitor';
 
 import type {
 	ConnectedMCPServer,
@@ -163,6 +165,18 @@ export class MCPClientManagerService {
 		try {
 			const client = await this.createClient(config);
 			const tools = await this.discoverTools(client, serverId);
+
+			// Check tool integrity (rug pull detection)
+			const integrityMonitor = getToolIntegrityMonitor();
+			const integrityCheck = integrityMonitor.checkIntegrity(serverId, tools);
+			if (integrityCheck.changed) {
+				logger.warn('MCP tool set changed since last connection — approval invalidated', {
+					diff: integrityCheck.diff,
+					serverId
+				});
+				// Invalidate cached approval so user is re-prompted
+				await this.approvalCache.revokeApproval(serverId);
+			}
 
 			const connectedServer: ConnectedMCPServer = {
 				availableTools: tools,
@@ -420,12 +434,26 @@ export class MCPClientManagerService {
 
 		try {
 			const result = await client.listTools();
-			const tools: ExternalMCPTool[] = result.tools.map((tool) => ({
-				description: tool.description ?? '',
-				inputSchema: (tool.inputSchema as Record<string, unknown>) ?? {},
-				name: tool.name,
-				serverId
-			}));
+			const validator = getToolDefinitionValidator();
+			const tools: ExternalMCPTool[] = result.tools.map((tool) => {
+				const rawTool: ExternalMCPTool = {
+					description: tool.description ?? '',
+					inputSchema: (tool.inputSchema as Record<string, unknown>) ?? {},
+					name: tool.name,
+					serverId
+				};
+
+				// Validate and sanitise each tool definition
+				const validation = validator.validateToolDefinition(rawTool);
+				if (!validation.valid) {
+					logger.warn('MCP tool definition has issues', {
+						issues: validation.issues,
+						serverId,
+						toolName: tool.name
+					});
+				}
+				return validation.tool;
+			});
 
 			logger.debug('Discovered tools from MCP server', {
 				serverId,

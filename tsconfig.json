@@ -27,6 +27,7 @@
 		"outDir": "./dist",
 		"paths": {
 			"batch/*": ["./src/batch/*"],
+			"security/*": ["./src/security/*"],
 			"cleanup/*": ["./src/cleanup/*"],
 			"cli/*": ["./src/cli/*"],
 			"config/*": ["./src/config/*"],

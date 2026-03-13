@@ -8,6 +8,9 @@
  * - Logs results to processing feedback and audit log
  */
 
+import { getCredentialGuard } from 'security/credential-guard';
+import { getPromptInjectionDetector } from 'security/prompt-injection-detector';
+
 import type { ExternalMCPServerConfig, MCPAccessRequest } from 'types/mcp-client.types';
 
 import { getLogger } from 'output/logger';
@@ -102,10 +105,24 @@ export class MCPToolHandler {
 			// Show result in processing feedback
 			feedback.showMCPToolCall(serverId, toolName, result.success, durationMs);
 
+			// Scan output for credentials and prompt injection
+			let sanitisedOutput: unknown = result.content;
+			if (typeof result.content === 'string') {
+				const scanned = getCredentialGuard().scanOutput(result.content);
+				sanitisedOutput = getPromptInjectionDetector().sanitiseToolResult(toolName, scanned);
+			} else if (result.content && typeof result.content === 'object') {
+				const outputStr = JSON.stringify(result.content);
+				const scannedStr = getCredentialGuard().scanOutput(outputStr);
+				const sanitisedStr = getPromptInjectionDetector().sanitiseToolResult(toolName, scannedStr);
+				if (sanitisedStr !== outputStr) {
+					sanitisedOutput = sanitisedStr;
+				}
+			}
+
 			return {
 				durationMs,
 				error: result.error,
-				output: result.content,
+				output: sanitisedOutput,
 				serverId,
 				success: result.success,
 				toolName

@@ -520,6 +520,63 @@ stateDiagram-v2
 
 ---
 
+## Security Components
+
+```mermaid
+C4Component
+    title Component Diagram - Security Layer
+
+    Container_Boundary(sec, "Security Layer") {
+        Component(cred_guard, "Credential Guard", "TypeScript", "Env sanitisation, output scanning, file blocking")
+        Component(cmd_guard, "Command Guard", "TypeScript", "Command validation and exfiltration prevention")
+        Component(injection, "Injection Detector", "TypeScript", "Prompt injection risk scoring")
+        Component(tool_validator, "Tool Validator", "TypeScript", "MCP tool definition sanitisation")
+        Component(integrity, "Integrity Monitor", "TypeScript", "Tool-set drift detection")
+    }
+
+    Container_Boundary(exec_int, "Executor Layer") {
+        Component(tool_exec, "Tool Execution", "TypeScript", "Executes tools")
+        Component(stage_exec, "Stage Executor", "TypeScript", "Executes stages")
+        Component(variables, "Variable Resolver", "TypeScript", "Resolves variables")
+    }
+
+    Container_Boundary(mcp_int, "MCP Layer") {
+        Component(mcp_handler, "Tool Handler", "TypeScript", "MCP tool execution")
+        Component(mcp_client, "Client Manager", "TypeScript", "MCP connections")
+    }
+
+    Rel(tool_exec, cmd_guard, "Validates commands")
+    Rel(tool_exec, cred_guard, "Sanitises env + output")
+    Rel(stage_exec, injection, "Scans tool results")
+    Rel(mcp_handler, cred_guard, "Scans MCP output")
+    Rel(mcp_handler, injection, "Scans MCP output")
+    Rel(mcp_client, tool_validator, "Validates tool defs")
+    Rel(mcp_client, integrity, "Checks fingerprints")
+    Rel(variables, cred_guard, "Filters sensitive vars")
+```
+
+### Vulnerability Coverage
+
+| Component          | Vulnerability Class                        | Severity |
+| ------------------ | ------------------------------------------ | -------- |
+| Credential Guard   | Credential leakage via env/output/files    | Critical |
+| Command Guard      | Command injection and data exfiltration    | Critical |
+| Injection Detector | Indirect prompt injection via tool results | High     |
+| Tool Validator     | MCP tool poisoning via descriptions        | High     |
+| Integrity Monitor  | Rug pull attacks via tool-set drift        | High     |
+
+### Component Descriptions
+
+| Component          | File                           | Responsibility                                                 |
+| ------------------ | ------------------------------ | -------------------------------------------------------------- |
+| Credential Guard   | `credential-guard.ts`          | Redacts sensitive env vars, scans output for leaked secrets    |
+| Command Guard      | `command-guard.ts`             | Blocks network, eval, remote access, and exfiltration patterns |
+| Injection Detector | `prompt-injection-detector.ts` | Weighted risk scoring with quarantine/redaction thresholds     |
+| Tool Validator     | `tool-definition-validator.ts` | Validates MCP tool names, descriptions, and schema safety      |
+| Integrity Monitor  | `tool-integrity-monitor.ts`    | SHA-256 fingerprinting with diff-based change detection        |
+
+---
+
 ## Cross-Cutting Concerns
 
 ### Logging

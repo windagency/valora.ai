@@ -107,12 +107,12 @@ Strategic AI model assignment for cost efficiency:
 
 Enterprise-grade security controls:
 
-- **Supply Chain Hardening** — Frozen lockfile, blocked install scripts, vulnerability overrides, Dependabot
-- **User Approval Flow** — Interactive consent before connections
-- **Risk Assessment** — Low/Medium/High/Critical classification
-- **Tool Filtering** — Allowlist and blocklist per server
-- **Audit Logging** — Complete operation trail
-- **Session Caching** — Remember approvals per session
+- **Credential Guard** — Env var redaction, output scanning, sensitive file blocking
+- **Command Guard** — Blocks exfiltration, network, eval, and remote access patterns
+- **Prompt Injection Detection** — Risk-scored scanning of tool results with quarantine/redaction
+- **MCP Hardening** — Tool definition validation, tool-set drift detection, approval workflows
+- **Supply Chain Hardening** — Frozen lockfile, blocked install scripts, vulnerability overrides
+- **Audit Logging** — Complete operation trail with security event tracking
 
 </td>
 </tr>
@@ -403,6 +403,7 @@ valora/                          # npm package root
 │   ├── executor/                # Pipeline execution
 │   ├── llm/                     # LLM provider integrations
 │   ├── mcp/                     # MCP server implementation
+│   ├── security/                # Agentic AI security (credential, command, injection guards)
 │   ├── session/                 # Session management
 │   │   └── worktree-stats-tracker.ts  # Worktree usage statistics
 │   ├── ui/                      # Terminal UI (dashboard, panels)

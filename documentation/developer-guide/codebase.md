@@ -20,6 +20,7 @@ src/
 │   └── providers/     # Individual provider implementations
 ├── mcp/               # MCP server implementation
 ├── output/            # Output formatting and rendering
+├── security/          # Agentic AI security (credential guard, command guard, injection detection)
 ├── services/          # Shared services
 ├── session/           # Session management
 ├── types/             # Global type definitions
@@ -364,6 +365,43 @@ src/mcp/
 ├── tool-handler.ts               # Tool execution
 └── types.ts                      # Type definitions
 ```
+
+---
+
+### Security Layer (`src/security/`)
+
+The security layer provides agentic AI attack detection and prevention.
+
+```plaintext
+src/security/
+├── index.ts                          # Barrel exports
+├── security-event.types.ts           # Shared event types (SecurityEvent, SecurityEventType)
+├── credential-guard.ts               # Env sanitisation, output scanning, sensitive file blocking
+├── command-guard.ts                  # Command validation (network, eval, exfiltration patterns)
+├── prompt-injection-detector.ts      # 0–1 risk scoring for injection in tool results
+├── tool-definition-validator.ts      # MCP tool name/description/schema validation
+└── tool-integrity-monitor.ts         # SHA-256 fingerprinting for tool-set drift detection
+```
+
+Key components:
+
+| Component                      | Responsibility                                                           |
+| ------------------------------ | ------------------------------------------------------------------------ |
+| `credential-guard.ts`          | Redacts sensitive env vars in subprocess env; scans output for secrets   |
+| `command-guard.ts`             | Blocks network, remote access, eval, and exfiltration command patterns   |
+| `prompt-injection-detector.ts` | Scores tool results for injection markers; quarantines or redacts        |
+| `tool-definition-validator.ts` | Validates MCP tool names, descriptions, and schemas against poisoning    |
+| `tool-integrity-monitor.ts`    | Fingerprints MCP tool sets; detects rug pull attacks between connections |
+
+Integration points:
+
+- **`tool-execution.service.ts`** — command guard before exec, env sanitisation, output scanning, sensitive file blocking
+- **`stage-executor.ts`** — prompt injection scanning of all tool results before LLM context
+- **`mcp-tool-handler.ts`** — credential and injection scanning of MCP tool output
+- **`mcp-client-manager.service.ts`** — tool definition validation and integrity checking on connection
+- **`variables.ts`** — sensitive env var filtering in `$ENV_*` resolution
+
+All services are registered in the DI container (`src/di/container.ts`) and use singleton patterns.
 
 ---
 
