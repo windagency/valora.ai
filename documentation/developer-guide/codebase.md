@@ -6,6 +6,8 @@
 
 ```plaintext
 src/
+├── ast/               # AST-based code intelligence (parsing, indexing, queries)
+│   └── grammars/      # Tree-sitter WASM grammar loading and language mapping
 ├── batch/             # Async batch processing (LLM batch APIs)
 │   └── providers/     # Provider-specific batch implementations
 ├── cleanup/           # Resource cleanup coordination
@@ -18,6 +20,7 @@ src/
 ├── exploration/       # Parallel exploration system
 ├── llm/               # LLM provider integrations
 │   └── providers/     # Individual provider implementations
+├── lsp/               # LSP integration (language server client, tools)
 ├── mcp/               # MCP server implementation
 ├── output/            # Output formatting and rendering
 ├── security/          # Agentic AI security (credential guard, command guard, injection detection)
@@ -82,6 +85,63 @@ sequenceDiagram
     BatchOrchestrator->>Disk: update persisted status
     BatchOrchestrator-->>CLI: BatchResult[]
 ```
+
+---
+
+### AST Layer (`src/ast/`)
+
+The AST layer provides code intelligence via tree-sitter parsing — symbol extraction, codebase indexing, semantic search, and smart context selection for token reduction.
+
+```plaintext
+src/ast/
+├── ast.types.ts                  # Type definitions (IndexedSymbol, IndexedFile, CodebaseIndex)
+├── ast-parser.service.ts         # tree-sitter wrapper: parse files, extract symbols/imports
+├── ast-index.service.ts          # Build, persist, load, and query the symbol index
+├── ast-index-watcher.service.ts  # File watching + incremental updates
+├── ast-query.service.ts          # High-level queries (symbol search, file outline, references)
+├── ast-tools.service.ts          # LLM tool handlers (symbol_search, file_outline, etc.)
+├── ast-context.service.ts        # Smart context extraction for token reduction
+└── grammars/
+    ├── grammar-loader.ts         # Lazy WASM grammar loading
+    └── language-map.ts           # Extension → language + tree-sitter query patterns
+```
+
+Key components:
+
+| Component                | Responsibility                                                                            |
+| ------------------------ | ----------------------------------------------------------------------------------------- |
+| `ast-parser.service.ts`  | Parses files via tree-sitter WASM, extracts symbols and imports                           |
+| `ast-index.service.ts`   | Builds and persists sharded symbol index under `.valora/index/`                           |
+| `ast-query.service.ts`   | Symbol search, file outline, and cross-file reference finding                             |
+| `ast-context.service.ts` | Budget-aware context extraction at multiple detail levels                                 |
+| `ast-tools.service.ts`   | LLM tool handlers for `symbol_search`, `file_outline`, `find_references`, `smart_context` |
+
+---
+
+### LSP Layer (`src/lsp/`)
+
+The LSP layer integrates with language servers to provide compiler-level intelligence — go-to-definition, hover information, diagnostics, and type info.
+
+```plaintext
+src/lsp/
+├── lsp.types.ts                      # Type definitions
+├── lsp-client.ts                     # JSON-RPC stdio wrapper for a single language server
+├── lsp-client-manager.service.ts     # Multi-language client pool (spawn-on-demand, idle timeout)
+├── lsp-language-registry.ts          # Extension → server command mapping
+├── lsp-lifecycle.service.ts          # Session-scoped lifecycle (spawn, timeout, shutdown)
+├── lsp-tools.service.ts              # LLM tool handlers (goto_definition, hover_info, etc.)
+├── lsp-result-cache.ts               # LRU cache (500 entries, 30s TTL)
+└── lsp-context-enricher.ts           # Inject diagnostics/type info into message context
+```
+
+Key components:
+
+| Component                       | Responsibility                                                                            |
+| ------------------------------- | ----------------------------------------------------------------------------------------- |
+| `lsp-client.ts`                 | JSON-RPC stdio wrapper for communicating with language servers                            |
+| `lsp-client-manager.service.ts` | Manages a pool of language server clients with idle timeout                               |
+| `lsp-tools.service.ts`          | LLM tool handlers for `goto_definition`, `get_type_info`, `get_diagnostics`, `hover_info` |
+| `lsp-context-enricher.ts`       | Injects compiler diagnostics into LLM message context                                     |
 
 ---
 

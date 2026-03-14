@@ -577,6 +577,103 @@ C4Component
 
 ---
 
+## AST Code Intelligence Components
+
+```mermaid
+C4Component
+    title Component Diagram - AST Code Intelligence Layer
+
+    Container_Boundary(ast, "AST Layer") {
+        Component(parser, "AST Parser", "TypeScript", "tree-sitter WASM parsing")
+        Component(index, "Index Service", "TypeScript", "Symbol index build/query")
+        Component(watcher, "Index Watcher", "TypeScript", "Incremental updates")
+        Component(query, "Query Service", "TypeScript", "Symbol search and outline")
+        Component(context, "Context Service", "TypeScript", "Smart context extraction")
+        Component(tools, "AST Tools", "TypeScript", "LLM tool handlers")
+        Component(grammars, "Grammar Loader", "TypeScript", "WASM grammar loading")
+    }
+
+    ContainerDb(idx_store, "Index Store", "JSON shards", ".valora/index/")
+
+    Rel(parser, grammars, "Loads grammars")
+    Rel(index, parser, "Parses files")
+    Rel(index, idx_store, "Persists/loads")
+    Rel(watcher, index, "Triggers updates")
+    Rel(query, index, "Queries index")
+    Rel(context, index, "Reads symbols")
+    Rel(context, query, "Searches symbols")
+    Rel(tools, query, "Delegates queries")
+    Rel(tools, context, "Extracts context")
+```
+
+### Component Descriptions
+
+| Component       | File                           | Responsibility                                                                    |
+| --------------- | ------------------------------ | --------------------------------------------------------------------------------- |
+| AST Parser      | `ast-parser.service.ts`        | Parse source files via tree-sitter WASM, extract symbols and imports              |
+| Index Service   | `ast-index.service.ts`         | Build, persist, load, and incrementally update the codebase symbol index          |
+| Index Watcher   | `ast-index-watcher.service.ts` | Watch file system for changes and trigger incremental re-indexing                 |
+| Query Service   | `ast-query.service.ts`         | Fuzzy symbol search, file outline, and cross-file reference finding               |
+| Context Service | `ast-context.service.ts`       | Budget-aware context extraction at multiple detail levels                         |
+| AST Tools       | `ast-tools.service.ts`         | LLM tool handlers for symbol_search, file_outline, find_references, smart_context |
+| Grammar Loader  | `grammars/grammar-loader.ts`   | Lazy WASM grammar loading with concurrency-safe initialisation                    |
+
+### Smart Context Levels
+
+| Level             | What Is Sent                             | When Used                          |
+| ----------------- | ---------------------------------------- | ---------------------------------- |
+| 0 — Codebase Map  | Compact file/symbol listing              | Always in system message           |
+| 1 — Signatures    | Function signatures, type definitions    | Referenced-but-not-focal files     |
+| 2 — Focal symbols | Full body of directly relevant functions | Files in task inputs               |
+| 3 — Full file     | Complete content                         | Only on explicit `request_context` |
+
+---
+
+## LSP Integration Components
+
+```mermaid
+C4Component
+    title Component Diagram - LSP Integration Layer
+
+    Container_Boundary(lsp, "LSP Layer") {
+        Component(client, "LSP Client", "TypeScript", "JSON-RPC stdio wrapper")
+        Component(manager, "Client Manager", "TypeScript", "Multi-language client pool")
+        Component(lifecycle, "Lifecycle Service", "TypeScript", "Spawn/timeout/shutdown")
+        Component(lsp_tools, "LSP Tools", "TypeScript", "LLM tool handlers")
+        Component(cache, "Result Cache", "TypeScript", "LRU response cache")
+        Component(enricher, "Context Enricher", "TypeScript", "Diagnostics injection")
+        Component(registry, "Language Registry", "TypeScript", "Server config mapping")
+    }
+
+    System_Ext(ts_server, "typescript-language-server", "TypeScript/JS")
+    System_Ext(pyright, "Pyright", "Python")
+    System_Ext(gopls, "gopls", "Go")
+
+    Rel(manager, client, "Creates/manages")
+    Rel(manager, registry, "Resolves server")
+    Rel(lifecycle, manager, "Controls lifecycle")
+    Rel(lsp_tools, manager, "Gets clients")
+    Rel(lsp_tools, cache, "Caches results")
+    Rel(enricher, manager, "Gets diagnostics")
+    Rel(client, ts_server, "stdio")
+    Rel(client, pyright, "stdio")
+    Rel(client, gopls, "stdio")
+```
+
+### Component Descriptions
+
+| Component         | File                            | Responsibility                                                                    |
+| ----------------- | ------------------------------- | --------------------------------------------------------------------------------- |
+| LSP Client        | `lsp-client.ts`                 | JSON-RPC stdio wrapper for a single language server process                       |
+| Client Manager    | `lsp-client-manager.service.ts` | Multi-language client pool with spawn-on-demand and idle timeout                  |
+| Lifecycle Service | `lsp-lifecycle.service.ts`      | Session-scoped server lifecycle coordination                                      |
+| LSP Tools         | `lsp-tools.service.ts`          | LLM tool handlers for goto_definition, get_type_info, get_diagnostics, hover_info |
+| Result Cache      | `lsp-result-cache.ts`           | LRU cache (500 entries, 30-second TTL)                                            |
+| Context Enricher  | `lsp-context-enricher.ts`       | Injects compiler diagnostics into LLM message context                             |
+| Language Registry | `lsp-language-registry.ts`      | Maps file extensions to language server commands                                  |
+
+---
+
 ## Cross-Cutting Concerns
 
 ### Logging

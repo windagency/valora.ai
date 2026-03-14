@@ -3,6 +3,7 @@
 		"baseUrl": ".",
 		"paths": {
 			"src/*": ["./*"],
+			"ast/*": ["./ast/*"],
 			"batch/*": ["./batch/*"],
 			"security/*": ["./security/*"],
 			"cleanup/*": ["./cleanup/*"],
@@ -10,6 +11,7 @@
 			"config/*": ["./config/*"],
 			"executor/*": ["./executor/*"],
 			"llm/*": ["./llm/*"],
+			"lsp/*": ["./lsp/*"],
 			"mcp/*": ["./mcp/*"],
 			"output/*": ["./output/*"],
 			"session/*": ["./session/*"],

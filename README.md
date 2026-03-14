@@ -398,10 +398,12 @@ valora/                          # npm package root
 │   ├── valora.js                # Main CLI
 │   └── mcp.js                   # MCP server
 ├── src/                         # TypeScript source
+│   ├── ast/                     # AST-based code intelligence (tree-sitter parsing, symbol index)
 │   ├── cli/                     # Command-line interface
 │   ├── config/                  # Configuration management
 │   ├── executor/                # Pipeline execution
 │   ├── llm/                     # LLM provider integrations
+│   ├── lsp/                     # LSP integration (language server protocol client)
 │   ├── mcp/                     # MCP server implementation
 │   ├── security/                # Agentic AI security (credential, command, injection guards)
 │   ├── session/                 # Session management
@@ -437,6 +439,7 @@ When installed in a project, VALORA supports a `.valora/` directory for local ov
 ├── templates/                   # Custom/override templates
 ├── sessions/                    # Session state (gitignored)
 ├── logs/                        # Execution logs (gitignored)
+├── index/                       # Codebase symbol index (gitignored)
 └── cache/                       # Cache data (gitignored)
 ```
 
@@ -487,16 +490,17 @@ Resources in `.valora/` take precedence over built-in `data/` resources.
 
 ## 🛠️ Technology Stack
 
-| Category            | Technologies                                     |
-| ------------------- | ------------------------------------------------ |
-| **Runtime**         | Node.js 18+, TypeScript 5.x                      |
-| **Package Manager** | pnpm 10.x                                        |
-| **Build**           | tsc, tsc-alias                                   |
-| **Testing**         | Vitest, Playwright                               |
-| **LLM SDKs**        | @anthropic-ai/sdk, openai, @google/generative-ai |
-| **CLI UI**          | Ink (React), Chalk, Commander                    |
-| **Validation**      | Zod                                              |
-| **MCP**             | @modelcontextprotocol/sdk                        |
+| Category              | Technologies                                     |
+| --------------------- | ------------------------------------------------ |
+| **Runtime**           | Node.js 18+, TypeScript 5.x                      |
+| **Package Manager**   | pnpm 10.x                                        |
+| **Build**             | tsc, tsc-alias                                   |
+| **Testing**           | Vitest, Playwright                               |
+| **LLM SDKs**          | @anthropic-ai/sdk, openai, @google/generative-ai |
+| **CLI UI**            | Ink (React), Chalk, Commander                    |
+| **Validation**        | Zod                                              |
+| **Code Intelligence** | web-tree-sitter                                  |
+| **MCP**               | @modelcontextprotocol/sdk                        |
 
 ---
 

@@ -13,6 +13,7 @@ const __dirname = dirname(__filename);
 export default defineConfig({
 	resolve: {
 		alias: {
+			ast: path.resolve(__dirname, './src/ast'),
 			batch: path.resolve(__dirname, './src/batch'),
 			security: path.resolve(__dirname, './src/security'),
 			cleanup: path.resolve(__dirname, './src/cleanup'),
@@ -22,6 +23,7 @@ export default defineConfig({
 			executor: path.resolve(__dirname, './src/executor'),
 			exploration: path.resolve(__dirname, './src/exploration'),
 			llm: path.resolve(__dirname, './src/llm'),
+			lsp: path.resolve(__dirname, './src/lsp'),
 			mcp: path.resolve(__dirname, './src/mcp'),
 			output: path.resolve(__dirname, './src/output'),
 			services: path.resolve(__dirname, './src/services'),

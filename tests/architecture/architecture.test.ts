@@ -231,7 +231,11 @@ describe('Architecture Tests', () => {
 					'llm..',
 					'config..',
 					'output..',
-					'utils..'
+					'utils..',
+					'security..',
+					'ast..',
+					'lsp..',
+					'batch..'
 				)
 				.because('DI container is the composition root and must wire all layers together')
 				.check(srcProject.allClasses());
@@ -322,7 +326,11 @@ describe('Architecture Tests', () => {
 					'cleanup..',
 					'cli..',
 					'ui..',
-					'mcp..'
+					'mcp..',
+					'ast..',
+					'lsp..',
+					'batch..',
+					'security..'
 				)
 				.because(
 					'Executor orchestrates workflow and can use logging, CLI utilities, MCP infrastructure, and UI adapters for prompting'
@@ -438,6 +446,36 @@ describe('Architecture Tests', () => {
 				const violationList = violations.map((v) => `'${v.library}' in ${v.file}`).join('\n  - ');
 				throw new Error(
 					`Archive libraries should only be imported in adapter files.\nViolations:\n  - ${violationList}\n\nUse ArchiveAdapter from 'session/archive-adapter' instead.`
+				);
+			}
+		});
+
+		it('vscode-languageserver-protocol should only be imported in adapter files', () => {
+			const violations = findLibraryImportViolations(
+				['vscode-languageserver-protocol'],
+				[/\/lsp\/lsp-protocol-adapter\.ts$/],
+				path.join(__dirname, '../../src')
+			);
+
+			if (violations.length > 0) {
+				const violationList = violations.map((v) => `'${v.library}' in ${v.file}`).join('\n  - ');
+				throw new Error(
+					`vscode-languageserver-protocol should only be imported in adapter files.\nViolations:\n  - ${violationList}\n\nUse LSPProtocolAdapter from 'lsp/lsp-protocol-adapter.interface' instead.`
+				);
+			}
+		});
+
+		it('tree-sitter libraries should only be imported in adapter files', () => {
+			const violations = findLibraryImportViolations(
+				['web-tree-sitter', 'tree-sitter-wasms'],
+				[/\/ast\/grammars\/tree-sitter-adapter\.ts$/],
+				path.join(__dirname, '../../src')
+			);
+
+			if (violations.length > 0) {
+				const violationList = violations.map((v) => `'${v.library}' in ${v.file}`).join('\n  - ');
+				throw new Error(
+					`Tree-sitter libraries should only be imported in adapter files.\nViolations:\n  - ${violationList}\n\nUse TreeSitterAdapter from 'ast/grammars/tree-sitter-adapter.interface' instead.`
 				);
 			}
 		});

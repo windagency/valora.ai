@@ -4,6 +4,8 @@
  * MAINT-002: Large Files Need Splitting - Extracted from pipeline.ts
  */
 
+import { getASTIndexService } from 'ast/ast-index.service';
+import { generateCodebaseMap } from 'ast/ast-query.service';
 import { isEligible } from 'batch/batch-eligibility';
 import { getBatchOrchestrator } from 'batch/batch-orchestrator';
 import { isBatchableProvider } from 'batch/batch-provider.interface';
@@ -612,6 +614,7 @@ export class StageExecutor {
 	): Promise<{
 		agent: AgentDefinition;
 		availableAgents: null | string;
+		codebaseMap: null | string;
 		escalationCriteria?: string[];
 		projectGuidance: null | string;
 		projectKnowledge: null | string;
@@ -630,9 +633,26 @@ export class StageExecutor {
 			: promptAgents;
 		const availableAgents = await loadAvailableAgents(filteredAgents);
 
+		// Build AST index if not already built, and generate codebase map
+		let codebaseMap: null | string = null;
+		try {
+			const indexService = getASTIndexService();
+			if (!indexService.isBuilt() && !indexService.isBuilding()) {
+				if (!indexService.loadIndex()) {
+					await indexService.buildIndex();
+				}
+			}
+			if (indexService.isBuilt()) {
+				codebaseMap = generateCodebaseMap();
+			}
+		} catch {
+			// Non-fatal: continue without codebase map
+		}
+
 		return {
 			agent,
 			availableAgents,
+			codebaseMap,
 			escalationCriteria: agent.decision_making?.escalation_criteria,
 			projectGuidance,
 			projectKnowledge,
@@ -667,6 +687,7 @@ export class StageExecutor {
 		resources: {
 			agent: AgentDefinition;
 			availableAgents: null | string;
+			codebaseMap: null | string;
 			escalationCriteria?: string[];
 			projectGuidance: null | string;
 			projectKnowledge: null | string;
@@ -677,6 +698,7 @@ export class StageExecutor {
 		const systemMessage = this.messageBuilderService.buildSystemMessage({
 			agentProfile: resources.agent.content,
 			availableAgents: resources.availableAgents,
+			codebaseMap: resources.codebaseMap,
 			escalationCriteria: resources.escalationCriteria,
 			expectedOutputs: stage.outputs,
 			projectGuidance: resources.projectGuidance,

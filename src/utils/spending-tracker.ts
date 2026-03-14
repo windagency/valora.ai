@@ -31,10 +31,14 @@ export interface SpendingRecord {
 	cacheWriteTokens: number;
 	command: string;
 	completionTokens: number;
+	contextSavingsPercent?: number;
+	contextTokensAfter?: number;
+	contextTokensBefore?: number;
 	costUsd: number;
 	durationMs: number;
 	id: string;
 	model: string;
+	progressiveDisclosureCalls?: number;
 	promptTokens: number;
 	stage: string;
 	timestamp: string;

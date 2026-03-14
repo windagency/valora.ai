@@ -107,7 +107,12 @@ describe('File Organization', () => {
 			typeClasses.forEach((typeClass) => {
 				const pkgPath = typeClass.packagePath.get();
 				// Check for both dot and slash formats: types, src/types, src.types
-				if (!pkgPath.includes('types') && !pkgPath.startsWith('types')) {
+				// Also allow co-located type files within a module directory (e.g. ast.types.ts in src/ast)
+				const simpleName = typeClass.getSimpleName();
+				// Extract base module name: 'security' from 'security-event.types.ts', 'ast' from 'ast.types.ts'
+				const modulePrefix = simpleName.split('.types')[0]!.split('-')[0]!;
+				const isColocated = pkgPath.includes(modulePrefix);
+				if (!pkgPath.includes('types') && !pkgPath.startsWith('types') && !isColocated) {
 					throw new Error(
 						`Type definition ${typeClass.getSimpleName()} is in ${pkgPath} but should be in types directory`
 					);
