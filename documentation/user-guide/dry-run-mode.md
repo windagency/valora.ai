@@ -28,7 +28,7 @@ Dry-run mode works with all other flags:
 
 ```bash
 valora implement --dry-run --agent=@software-engineer-typescript-backend
-valora plan "Refactor auth module" -n --model=claude-sonnet-4.5
+valora plan "Refactor auth module" -n --model=claude-sonnet-4.6
 ```
 
 ## What Happens in Dry Run Mode

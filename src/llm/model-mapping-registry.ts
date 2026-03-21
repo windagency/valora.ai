@@ -15,7 +15,10 @@ export type ModelMappingType = 'extended-thinking' | 'standard' | 'vertex';
  * See https://platform.claude.com/docs/en/about-claude/models/overview
  */
 const DEFAULT_STANDARD_MAPPINGS: Record<string, string> = {
-	// Claude 4.5 series (latest)
+	// Claude 4.6 series (latest)
+	'claude-opus-4.6': 'claude-opus-4-6',
+	'claude-sonnet-4.6': 'claude-sonnet-4-6',
+	// Claude 4.5 series (legacy)
 	'claude-haiku-4.5': 'claude-haiku-4-5-20251001',
 	'claude-opus-4.5': 'claude-opus-4-5-20251101',
 	'claude-sonnet-4.5': 'claude-sonnet-4-5-20250929',
@@ -36,7 +39,10 @@ const DEFAULT_STANDARD_MAPPINGS: Record<string, string> = {
  * Default Vertex AI model mappings
  */
 const DEFAULT_VERTEX_MAPPINGS: Record<string, string> = {
-	// Claude 4.5 series (latest)
+	// Claude 4.6 series (latest)
+	'claude-opus-4.6': 'claude-opus-4-6',
+	'claude-sonnet-4.6': 'claude-sonnet-4-6',
+	// Claude 4.5 series (legacy)
 	'claude-haiku-4.5': 'claude-haiku-4-5@20251001',
 	'claude-opus-4.5': 'claude-opus-4-5@20251101',
 	'claude-sonnet-4.5': 'claude-sonnet-4-5@20250929',
@@ -60,9 +66,11 @@ const DEFAULT_EXTENDED_THINKING_MAPPINGS: Record<string, string> = {
 	'claude-haiku-4.5-extended thinking': 'claude-haiku-4-5-20251001',
 	'claude-opus-4.1-extended thinking': 'claude-opus-4-1-20250805',
 	'claude-opus-4.5-extended thinking': 'claude-opus-4-5-20251101',
+	'claude-opus-4.6-extended thinking': 'claude-opus-4-6',
 	'claude-sonnet-3.7-extended thinking': 'claude-3-7-sonnet-20250219',
 	'claude-sonnet-4-extended thinking': 'claude-sonnet-4-20250514',
-	'claude-sonnet-4.5-extended thinking': 'claude-sonnet-4-5-20250929'
+	'claude-sonnet-4.5-extended thinking': 'claude-sonnet-4-5-20250929',
+	'claude-sonnet-4.6-extended thinking': 'claude-sonnet-4-6'
 };
 
 /**

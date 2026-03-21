@@ -11,7 +11,7 @@ allowed-tools:
   - glob_file_search
   - run_terminal_cmd
   - read_lints
-model: claude-opus-4.5
+model: claude-opus-4.6
 agent: asserter
 prompts:
   pipeline:

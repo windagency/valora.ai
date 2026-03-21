@@ -17,6 +17,8 @@ describe('ModelMappingRegistry', () => {
 		it('should initialize with default standard mappings', () => {
 			const mappings = registry.getAllMappings('standard');
 
+			expect(mappings['claude-opus-4.6']).toBe('claude-opus-4-6');
+			expect(mappings['claude-sonnet-4.6']).toBe('claude-sonnet-4-6');
 			expect(mappings['claude-sonnet-4.5']).toBe('claude-sonnet-4-5-20250929');
 			expect(mappings['claude-opus-4.5']).toBe('claude-opus-4-5-20251101');
 			expect(mappings['claude-haiku-4.5']).toBe('claude-haiku-4-5-20251001');
@@ -25,6 +27,8 @@ describe('ModelMappingRegistry', () => {
 		it('should initialize with default vertex mappings', () => {
 			const mappings = registry.getAllMappings('vertex');
 
+			expect(mappings['claude-opus-4.6']).toBe('claude-opus-4-6');
+			expect(mappings['claude-sonnet-4.6']).toBe('claude-sonnet-4-6');
 			expect(mappings['claude-sonnet-4.5']).toBe('claude-sonnet-4-5@20250929');
 			expect(mappings['claude-opus-4.5']).toBe('claude-opus-4-5@20251101');
 		});
@@ -32,6 +36,8 @@ describe('ModelMappingRegistry', () => {
 		it('should initialize with default extended thinking mappings', () => {
 			const mappings = registry.getAllMappings('extended-thinking');
 
+			expect(mappings['claude-opus-4.6-extended thinking']).toBe('claude-opus-4-6');
+			expect(mappings['claude-sonnet-4.6-extended thinking']).toBe('claude-sonnet-4-6');
 			expect(mappings['claude-sonnet-4.5-extended thinking']).toBe('claude-sonnet-4-5-20250929');
 			expect(mappings['claude-opus-4.5-extended thinking']).toBe('claude-opus-4-5-20251101');
 		});
@@ -131,6 +137,8 @@ describe('ModelMappingRegistry', () => {
 		it('should return all standard aliases', () => {
 			const aliases = registry.getAliases('standard');
 
+			expect(aliases).toContain('claude-opus-4.6');
+			expect(aliases).toContain('claude-sonnet-4.6');
 			expect(aliases).toContain('claude-sonnet-4.5');
 			expect(aliases).toContain('claude-opus-4.5');
 			expect(aliases).toContain('claude-haiku-4.5');

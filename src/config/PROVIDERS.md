@@ -25,7 +25,7 @@ enum ProviderName {
 
 // Model names - commonly used models as constants
 const ModelName = {
-	CLAUDE_SONNET_4_5: 'claude-sonnet-4.5',
+	CLAUDE_SONNET_4_5: 'claude-sonnet-4.6',
 	CURSOR_SONNET_4_5: 'cursor-sonnet-4.5',
 	GPT_5: 'gpt-5',
 	GEMINI_2_5_PRO: 'gemini-2.5-pro',
@@ -90,7 +90,7 @@ Each provider in the registry contains:
 
 - `key`: Internal provider identifier (e.g., "anthropic")
 - `label`: Display name for UI (e.g., "Anthropic")
-- `defaultModel`: Default model for this provider (e.g., "claude-sonnet-4.5")
+- `defaultModel`: Default model for this provider (e.g., "claude-sonnet-4.6")
 - `modelModes`: Array of available models with their modes
 - `requiresApiKey`: Boolean indicating if API key is needed
 - `description`: Optional description for setup wizard

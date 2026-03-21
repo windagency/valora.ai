@@ -238,7 +238,7 @@ Commands specify preferred models:
 ```json
 {
 	"plan": { "model": "gpt-5-thinking-high" },
-	"implement": { "model": "claude-sonnet-4.5" },
+	"implement": { "model": "claude-sonnet-4.6" },
 	"test": { "model": "claude-haiku-4.5" }
 }
 ```

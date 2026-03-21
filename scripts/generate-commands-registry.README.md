@@ -60,7 +60,7 @@ The script generates `data/commands/registry.json` with this structure:
 			"experimental": true,
 			"argument-hint": "[--option=value]",
 			"allowed-tools": ["tool1", "tool2"],
-			"model": "claude-sonnet-4.5",
+			"model": "claude-sonnet-4.6",
 			"agent": "lead",
 			"dynamic_agent_selection": true,
 			"fallback_agent": "software-engineer-typescript",

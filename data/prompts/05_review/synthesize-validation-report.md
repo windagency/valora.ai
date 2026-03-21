@@ -12,6 +12,7 @@ tags:
 model_requirements:
   min_context: 200000
   recommended:
+    - claude-sonnet-4.6
     - claude-sonnet-4.5
     - gpt-5-thinking-high
 agents:

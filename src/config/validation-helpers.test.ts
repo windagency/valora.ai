@@ -35,7 +35,7 @@ describe('validation-helpers', () => {
 		});
 
 		it('should have default models for all providers', () => {
-			expect(DEFAULT_MODELS[ProviderName.ANTHROPIC]).toBe('claude-opus-4.5');
+			expect(DEFAULT_MODELS[ProviderName.ANTHROPIC]).toBe('claude-opus-4.6');
 			expect(DEFAULT_MODELS[ProviderName.GOOGLE]).toBe('gemini-2.5-pro');
 			expect(DEFAULT_MODELS[ProviderName.MOONSHOT]).toBe('kimi-k2');
 			expect(DEFAULT_MODELS[ProviderName.OPENAI]).toBe('gpt-5');

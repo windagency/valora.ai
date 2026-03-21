@@ -14,6 +14,7 @@ tags:
 model_requirements:
   min_context: 8192
   recommended:
+    - claude-sonnet-4.6
     - claude-sonnet-4.5
     - claude-haiku-4.5
 agents:

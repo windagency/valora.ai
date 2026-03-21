@@ -142,6 +142,8 @@ describe('providers.config', () => {
 
 	describe('hasModel', () => {
 		it('should return true for existing model', () => {
+			expect(hasModel(ProviderName.ANTHROPIC, 'claude-opus-4.6')).toBe(true);
+			expect(hasModel(ProviderName.ANTHROPIC, 'claude-sonnet-4.6')).toBe(true);
 			expect(hasModel(ProviderName.ANTHROPIC, 'claude-opus-4.5')).toBe(true);
 			expect(hasModel(ProviderName.OPENAI, 'gpt-5')).toBe(true);
 			expect(hasModel(ProviderName.CURSOR, 'cursor-sonnet-4.5')).toBe(true);
@@ -158,6 +160,8 @@ describe('providers.config', () => {
 		it('should return models for valid provider', () => {
 			const models = getProviderModels(ProviderName.ANTHROPIC);
 			expect(models.length).toBeGreaterThan(0);
+			expect(models).toContain('claude-opus-4.6');
+			expect(models).toContain('claude-sonnet-4.6');
 			expect(models).toContain('claude-opus-4.5');
 		});
 
@@ -198,7 +202,7 @@ describe('providers.config', () => {
 
 	describe('getDefaultModel', () => {
 		it('should return default model for valid provider', () => {
-			expect(getDefaultModel(ProviderName.ANTHROPIC)).toBe('claude-opus-4.5');
+			expect(getDefaultModel(ProviderName.ANTHROPIC)).toBe('claude-opus-4.6');
 			expect(getDefaultModel(ProviderName.OPENAI)).toBe('gpt-5');
 			expect(getDefaultModel(ProviderName.CURSOR)).toBe('cursor-sonnet-4.5');
 			expect(getDefaultModel(ProviderName.XAI)).toBe('grok-code');

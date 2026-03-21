@@ -32,7 +32,7 @@ The primary configuration file is located at `.valora/config.json` (project-leve
 		"providers": {
 			"anthropic": {
 				"api_key_env": "ANTHROPIC_API_KEY",
-				"default_model": "claude-sonnet-4.5",
+				"default_model": "claude-sonnet-4.6",
 				"timeout_ms": 300000
 			},
 			"openai": {
@@ -91,7 +91,7 @@ Override models per command:
 
 ```bash
 # Use specific model
-valora plan --model claude-sonnet-4.5 "Add auth"
+valora plan --model claude-sonnet-4.6 "Add auth"
 
 # Use cheaper model for simple tasks
 valora implement --model claude-haiku "Fix typo"
@@ -144,7 +144,7 @@ Customize model settings in `.valora/config.json`:
 		"providers": {
 			"anthropic": {
 				"models": {
-					"claude-sonnet-4.5": {
+					"claude-sonnet-4.6": {
 						"max_tokens": 8192,
 						"temperature": 0.7,
 						"top_p": 1.0
@@ -301,7 +301,7 @@ name: custom-agent
 role: 'Custom Specialist'
 expertise:
   - 'Custom domain knowledge'
-llm_model: claude-sonnet-4.5
+llm_model: claude-sonnet-4.6
 ---
 
 # Custom Agent
@@ -891,7 +891,7 @@ Add custom commands in `.valora/commands/`:
 name: custom-command
 description: Custom workflow command
 agent: lead
-model: claude-sonnet-4.5
+model: claude-sonnet-4.6
 prompts:
   pipeline:
     - stage: step1
@@ -940,7 +940,7 @@ Create team-specific configuration:
 			"avgWorkflowTime": 180 // Team-specific baseline
 		},
 		"default_agent": "software-engineer-typescript-backend",
-		"preferred_model": "claude-sonnet-4.5"
+		"preferred_model": "claude-sonnet-4.6"
 	}
 }
 ```
@@ -1025,7 +1025,7 @@ See `data/config.default.json` for the full default configuration with all optio
 		"default_provider": "anthropic",
 		"providers": {
 			"anthropic": {
-				"default_model": "claude-sonnet-4.5"
+				"default_model": "claude-sonnet-4.6"
 			}
 		}
 	},

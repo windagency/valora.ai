@@ -29,7 +29,7 @@ valora <command> [arguments] [flags]
 | `--session <id>`    | Use specific session      | `valora --session abc123 plan`          |
 | `--new-session`     | Start new session         | `valora --new-session plan`             |
 | `--resume`          | Resume last session       | `valora --resume implement`             |
-| `--model <name>`    | Override LLM model        | `valora plan --model claude-sonnet-4.5` |
+| `--model <name>`    | Override LLM model        | `valora plan --model claude-sonnet-4.6` |
 | `--provider <name>` | Override LLM provider     | `valora plan --provider openai`         |
 | `--mode <mode>`     | Execution mode            | `valora plan --mode api`                |
 
@@ -182,7 +182,7 @@ import { Orchestrator } from 'valora';
 const orchestrator = new Orchestrator({
 	llm: {
 		provider: 'anthropic',
-		model: 'claude-sonnet-4.5'
+		model: 'claude-sonnet-4.6'
 	}
 });
 
@@ -346,7 +346,7 @@ registry.register({
 	name: 'custom-agent',
 	role: 'Custom Specialist',
 	expertise: ['Custom domain'],
-	model: 'claude-sonnet-4.5',
+	model: 'claude-sonnet-4.6',
 	systemPrompt: 'You are a custom agent...'
 });
 
