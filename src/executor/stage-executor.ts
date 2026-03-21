@@ -487,8 +487,8 @@ export class StageExecutor {
 		);
 		const duration = Date.now() - startTime;
 
-		// Emit LLM response event
-		const model = config.modelOverride ?? executionContext.model ?? 'default';
+		// Emit LLM response event - prefer actual model returned by provider over configured model
+		const model = completion.model ?? config.modelOverride ?? executionContext.model ?? 'default';
 		this.emitLLMResponseEvent(stage, model, duration, completion);
 
 		// Handle completion
@@ -1452,6 +1452,7 @@ Summarize ALL changes you made during tool execution. Output ONLY the JSON code 
 					stage: stage.stage
 				}
 			},
+			model: completion.model,
 			outputs: {
 				...outputsWithDefaults,
 				result: completion.content,

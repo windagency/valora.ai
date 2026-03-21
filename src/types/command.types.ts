@@ -249,6 +249,8 @@ export interface StageOutput {
 	duration_ms: number;
 	error?: string;
 	metadata?: Record<string, unknown>;
+	/** The actual model name used by the provider for this stage */
+	model?: string;
 	outputs: Record<string, unknown>;
 	prompt: string;
 	stage: string;

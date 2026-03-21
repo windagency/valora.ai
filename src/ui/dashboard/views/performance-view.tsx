@@ -23,7 +23,7 @@ export function PerformanceView({ data }: { data: PerformanceData }): React.JSX.
 				<Text bold color="cyan">
 					Performance Metrics
 				</Text>
-				<Text dimColor>No metrics collected yet. Run some commands to generate metrics.</Text>
+				<Text dimColor>No metrics yet — run commands in this session to populate (resets on restart)</Text>
 			</Box>
 		);
 	}

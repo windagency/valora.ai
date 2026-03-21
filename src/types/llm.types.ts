@@ -19,6 +19,8 @@ export interface LLMCompletionOptions {
 export interface LLMCompletionResult {
 	content: string;
 	finish_reason?: string;
+	/** The actual model name returned by the provider (may differ from the requested model) */
+	model?: string;
 	role: LLMRole;
 	tool_calls?: LLMToolCall[];
 	usage?: LLMUsage;

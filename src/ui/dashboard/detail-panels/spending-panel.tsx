@@ -39,20 +39,45 @@ export function SpendingPanel({ session }: { session: Session }): React.JSX.Elem
 					<Text bold color="yellow">
 						${totals.totalCostUsd.toFixed(4)}
 					</Text>
-					{totals.cacheSavingsUsd > 0 && (
-						<>
-							<Text dimColor> Cache saved: </Text>
-							<Text bold color="green">
-								${totals.cacheSavingsUsd.toFixed(4)}
-							</Text>
-						</>
-					)}
+					{totals.hasUnknownModelPricing && <Text color="red"> (estimated — model pricing unknown)</Text>}
 				</Box>
 				<Box>
 					<Text dimColor>Requests: </Text>
 					<Text color="cyan">{totals.requestCount}</Text>
 					<Text dimColor> Tokens: </Text>
 					<Text color="cyan">{formatNumber(totals.totalTokens)}</Text>
+				</Box>
+				<Box flexDirection="column" marginTop={1}>
+					<Text dimColor>Cost Breakdown:</Text>
+					<Box>
+						<Text dimColor>{'  Input:        '}</Text>
+						<Text color="cyan">{formatNumber(totals.totalInputTokens).padStart(7)}</Text>
+						<Text dimColor> tok </Text>
+						<Text color="yellow">${totals.totalInputCostUsd.toFixed(4)}</Text>
+					</Box>
+					<Box>
+						<Text dimColor>{'  Output:       '}</Text>
+						<Text color="cyan">{formatNumber(totals.totalOutputTokens).padStart(7)}</Text>
+						<Text dimColor> tok </Text>
+						<Text color="yellow">${totals.totalOutputCostUsd.toFixed(4)}</Text>
+					</Box>
+					{totals.totalCacheReadTokens > 0 && (
+						<Box>
+							<Text dimColor>{'  Cache read:   '}</Text>
+							<Text color="cyan">{formatNumber(totals.totalCacheReadTokens).padStart(7)}</Text>
+							<Text dimColor> tok </Text>
+							<Text color="yellow">${totals.totalCacheReadCostUsd.toFixed(4)}</Text>
+							{totals.cacheSavingsUsd > 0 && <Text color="green"> (saved ${totals.cacheSavingsUsd.toFixed(4)})</Text>}
+						</Box>
+					)}
+					{totals.totalCacheWriteTokens > 0 && (
+						<Box>
+							<Text dimColor>{'  Cache write:  '}</Text>
+							<Text color="cyan">{formatNumber(totals.totalCacheWriteTokens).padStart(7)}</Text>
+							<Text dimColor> tok </Text>
+							<Text color="yellow">${totals.totalCacheWriteCostUsd.toFixed(4)}</Text>
+						</Box>
+					)}
 				</Box>
 			</Box>
 
@@ -79,13 +104,24 @@ export function SpendingPanel({ session }: { session: Session }): React.JSX.Elem
 					<Text dimColor>Top Expensive Requests:</Text>
 					{topExpensive.map((r, index) => {
 						const date = new Date(r.timestamp).toLocaleTimeString();
+						const tokenParts = [`in:${formatNumber(r.promptTokens)}`, `out:${formatNumber(r.completionTokens)}`];
+						if (r.cacheReadTokens > 0) tokenParts.push(`cr:${formatNumber(r.cacheReadTokens)}`);
+						if (r.cacheWriteTokens > 0) tokenParts.push(`cw:${formatNumber(r.cacheWriteTokens)}`);
 						return (
-							<Box key={index}>
-								<Text dimColor>{index + 1}. </Text>
-								<Text color="cyan">{r.command.padEnd(12)}</Text>
-								<Text dimColor> {date} </Text>
-								<Text color="yellow">${r.costUsd.toFixed(4)}</Text>
-								<Text dimColor> {formatNumber(r.totalTokens)} tok</Text>
+							<Box flexDirection="column" key={index}>
+								<Box>
+									<Text dimColor>{index + 1}. </Text>
+									<Text color="cyan">{r.command.padEnd(12)}</Text>
+									<Text dimColor> {date} </Text>
+									<Text color="yellow">${r.costUsd.toFixed(4)}</Text>
+									{(r.unknownModelPricing ?? false) && <Text color="red"> ~est</Text>}
+								</Box>
+								<Box>
+									<Text dimColor>
+										{'   '}
+										{tokenParts.join(' ')}
+									</Text>
+								</Box>
 							</Box>
 						);
 					})}

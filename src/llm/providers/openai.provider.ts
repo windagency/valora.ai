@@ -97,6 +97,7 @@ export class OpenAIProvider extends BaseLLMProvider implements BatchableProvider
 			return {
 				content: choice.message.content ?? '',
 				finish_reason: choice.finish_reason,
+				model: response.model,
 				role: 'assistant' as const,
 				tool_calls: choice.message.tool_calls?.map((tc) => ({
 					arguments: JSON.parse(tc.function.arguments) as Record<string, unknown>,

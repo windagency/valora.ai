@@ -16,6 +16,7 @@ import { CommandLoader } from 'executor/command-loader';
 import { PipelineExecutor } from 'executor/pipeline';
 import { PromptLoader } from 'executor/prompt-loader';
 import { StageExecutor } from 'executor/stage-executor';
+import { getStageOutputCache } from 'executor/stage-output-cache';
 import { getConsoleOutput } from 'output/console-output';
 import { getRenderer } from 'output/markdown';
 import { createGitStashProtection, type GitStashProtectionService } from 'services/git-stash-protection.service';
@@ -337,7 +338,9 @@ export class CommandExecutor {
 					await this.restoreStashProtection(stashProtection);
 
 					// Compute cost from token breakdown and record to spending ledger
-					const model = resolvedCommand.command.model;
+					// Prefer the actual model returned by the provider over the configured model name
+					const actualModelFromStage = [...result.stages].reverse().find((s) => s.model)?.model;
+					const model = actualModelFromStage ?? resolvedCommand.command.model;
 					const costResult = this.computeAndRecordSpending(
 						commandName,
 						options,
@@ -534,19 +537,24 @@ export class CommandExecutor {
 		);
 		getSpendingTracker().record({
 			batchDiscounted: options.flags['batch'] === true,
+			cacheReadCostUsd: costResult.cacheReadCost,
 			cacheReadTokens: tokenBreakdown.cache_read ?? 0,
 			cacheSavingsUsd: costResult.cacheSavings,
+			cacheWriteCostUsd: costResult.cacheWriteCost,
 			cacheWriteTokens: tokenBreakdown.cache_write ?? 0,
 			command: commandName,
 			completionTokens: tokenBreakdown.generation,
 			costUsd: costResult.totalCost,
 			durationMs: duration,
 			id: `${Date.now()}-${commandName}`,
+			inputCostUsd: costResult.inputCost,
 			model: model ?? 'unknown',
+			outputCostUsd: costResult.outputCost,
 			promptTokens: tokenBreakdown.context,
 			stage: result.stages.map((s) => s.stage).join('+'),
 			timestamp: new Date().toISOString(),
-			totalTokens: tokenBreakdown.total
+			totalTokens: tokenBreakdown.total,
+			unknownModelPricing: costResult.unknownModel
 		});
 		return costResult;
 	}
@@ -649,6 +657,79 @@ export class CommandExecutor {
 	}
 
 	/**
+	 * Derive optimization metrics from execution data.
+	 * Fields that require workflow signals (early_exit, pattern detection, etc.) are left
+	 * undefined — they can be set by the relevant stage outputs when those features exist.
+	 */
+	private computeOptimizationMetrics(
+		options: CommandExecutionOptions,
+		tokenBreakdown: TokenBreakdown,
+		result: CommandResult
+	): OptimizationMetrics {
+		// Complexity: 1 point per 15k input tokens, capped at 10
+		const complexityScore = Math.min(10, Math.round(tokenBreakdown.context / 15_000));
+
+		// Planning mode: infer from flags or stage names
+		let planningMode: OptimizationMetrics['planning_mode'] = 'standard';
+		if (options.flags['express'] === true) {
+			planningMode = 'express';
+		} else if (result.stages.some((s) => s.stage.toLowerCase().includes('template'))) {
+			planningMode = 'template';
+		}
+
+		// Time saved: sum savedTime_ms from stage cache entries for stages in this result
+		const stageIds = new Set(result.stages.map((s) => s.stage));
+		const cacheStats = getStageOutputCache().getStats();
+		const savedMs = cacheStats.entries
+			.filter((e) => stageIds.has(e.stageId))
+			.reduce((sum, e) => sum + e.savedTime_ms, 0);
+		const timeSavedMinutes = savedMs > 0 ? Math.round((savedMs / 60_000) * 100) / 100 : undefined;
+
+		// Preserve any metrics set directly by stage outputs
+		const fromOutputs = result.outputs['optimization_metrics'] as OptimizationMetrics | undefined;
+
+		return {
+			...fromOutputs,
+			complexity_score: complexityScore,
+			planning_mode: planningMode,
+			...(timeSavedMinutes !== undefined ? { time_saved_minutes: timeSavedMinutes } : {})
+		};
+	}
+
+	/**
+	 * Count files referenced in stage outputs (proxy for files_generated).
+	 */
+	private countFilesGenerated(result: CommandResult): number | undefined {
+		const FILE_EXT = /\.[a-zA-Z0-9]{1,6}$/;
+		const FILE_KEYS = new Set(['file_path', 'files', 'files_generated', 'generated_files', 'output_file']);
+		let count = 0;
+
+		const inspect = (val: unknown): void => {
+			if (typeof val === 'string' && FILE_EXT.test(val)) {
+				count++;
+			} else if (Array.isArray(val)) {
+				val.forEach(inspect);
+			}
+		};
+
+		for (const [key, val] of Object.entries(result.outputs)) {
+			if (FILE_KEYS.has(key)) {
+				if (Array.isArray(val)) {
+					count += val.length;
+				} else if (typeof val === 'string') {
+					count++;
+				} else if (typeof val === 'number') {
+					count += val;
+				}
+			} else {
+				inspect(val);
+			}
+		}
+
+		return count > 0 ? count : undefined;
+	}
+
+	/**
 	 * Update session state after execution (history, context, caches)
 	 */
 	private updateSessionState(
@@ -659,8 +740,9 @@ export class CommandExecutor {
 		tokenBreakdown: TokenBreakdown,
 		sessionManager: Awaited<ReturnType<CLISessionManager['getOrCreateSession']>>
 	): void {
-		// Extract optimisation and quality metrics from outputs
-		const optimizationMetrics = result.outputs['optimization_metrics'] as OptimizationMetrics | undefined;
+		// Compute optimization metrics from execution data
+		const optimizationMetrics = this.computeOptimizationMetrics(options, tokenBreakdown, result);
+
 		const baseQualityMetrics = result.outputs['quality_metrics'] as QualityMetrics | undefined;
 
 		// Aggregate tool failure and loop exhaustion counts from per-stage execution quality metadata
@@ -673,14 +755,14 @@ export class CommandExecutor {
 			const eq = s.metadata?.['executionQuality'] as Record<string, unknown> | undefined;
 			return sum + (eq?.['wasLoopExhausted'] === true ? 1 : 0);
 		}, 0);
-		const qualityMetrics: QualityMetrics | undefined =
-			toolFailures > 0 || toolLoopExhaustions > 0
-				? {
-						...baseQualityMetrics,
-						tool_failures: toolFailures || undefined,
-						tool_loop_exhaustions: toolLoopExhaustions || undefined
-					}
-				: baseQualityMetrics;
+		const filesGenerated = this.countFilesGenerated(result);
+		const qualityMetrics: QualityMetrics = {
+			...baseQualityMetrics,
+			files_generated: filesGenerated,
+			iterations: result.stages.length,
+			tool_failures: toolFailures > 0 ? toolFailures : undefined,
+			tool_loop_exhaustions: toolLoopExhaustions > 0 ? toolLoopExhaustions : undefined
+		};
 
 		sessionManager.addCommand(
 			commandName,

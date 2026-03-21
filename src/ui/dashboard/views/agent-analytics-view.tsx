@@ -21,7 +21,7 @@ export function AgentAnalyticsView({ data }: { data: AgentAnalyticsData }): Reac
 				<Text bold color="cyan">
 					Agent Analytics
 				</Text>
-				<Text dimColor>No agent selection events recorded yet.</Text>
+				<Text dimColor>No events — agent analytics populate when dynamic agent selection is active</Text>
 			</Box>
 		);
 	}
