@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Valora — Command Execution Sequence</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=Fira+Code:wght@300;400;500&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="styles/shared.css">
+  <link rel="stylesheet" href="styles/command-execution-sequence.css">
+</head>
+
+<body>
+
+  <div class="page-wrap">
+
+    <!-- ── Header ── -->
+    <header class="bp-header fade-in">
+      <div class="header-eyebrow">Technical Schematic · Sequence Diagram</div>
+      <h1 class="header-title">Valora — Command Execution Sequence</h1>
+      <p class="header-subtitle">src/cli/index.ts → CommandExecutor → Pipeline → LLM Tool Loop → ResultPresenter</p>
+      <div class="stat-bar">
+        <div class="stat-item">
+          <span class="stat-value">6</span>
+          <span class="stat-label">Providers</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-value">N</span>
+          <span class="stat-label">Stages</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-value">10+</span>
+          <span class="stat-label">Tools</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-value">35%</span>
+          <span class="stat-label">Context Guard</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-value">5</span>
+          <span class="stat-label">Error Limit</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-value">3-tier</span>
+          <span class="stat-label">Provider Fallback</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- ── Sequence Diagram ── -->
+    <section class="diagram-section fade-in">
+      <div class="section-label">Execution Sequence</div>
+      <div class="diagram-shell">
+        <div class="mermaid-wrap">
+          <div class="zoom-controls">
+            <span class="zoom-label" id="zoom-label-main">loading…</span>
+            <button class="zoom-btn" data-action="zoom-in" title="Zoom in">+</button>
+            <button class="zoom-btn" data-action="zoom-out" title="Zoom out">−</button>
+            <button class="zoom-btn" data-action="zoom-fit" title="Fit to view">⊡</button>
+            <button class="zoom-btn" data-action="zoom-one" title="Actual size">1:1</button>
+            <button class="zoom-btn" data-action="zoom-expand" title="Open in new tab">↗</button>
+          </div>
+          <div class="mermaid-viewport">
+            <div class="mermaid-canvas"></div>
+          </div>
+          <script type="text/plain" class="diagram-source">sequenceDiagram
+    participant U as User
+    participant CLI as CLI Entry
+    participant CE as CommandExecutor
+    participant CR as CommandResolver
+    participant SM as SessionManager
+    participant EC as ExecutionCoordinator
+    participant PE as PipelineExecutor
+    participant SE as StageExecutor
+    participant LLM as LLM Provider
+    participant T as Tool Execution
+    participant RP as ResultPresenter
+
+    U->>CLI: valora command [args]
+    Note over CLI: Commander.js · first-run check
+    CLI->>CE: execute(command, options)
+    CE->>CR: resolve(command)
+    Note over CR: loads YAML · 3-tier provider fallback
+    CR-->>CE: provider + command def
+    CE->>SM: create / resume session
+    SM-->>CE: session context
+    CE->>EC: executeCommand(context)
+    Note over EC: agent selection · strategy factory
+    EC->>PE: execute(pipeline)
+    Note over PE: validate · pre-resolve $ARG_* $CONTEXT_* $ENV_*
+    loop For each stage (sequential or parallel)
+        PE->>SE: execute(stage)
+        SE->>LLM: complete(messages, tools)
+        loop Tool Loop (max_iterations)
+            LLM-->>SE: response + tool_calls
+            SE->>T: execute(tool_calls)
+            Note over T: built-in or MCP · Error limit 5
+            T-->>SE: tool results
+            SE->>LLM: complete(messages + results)
+        end
+        LLM-->>SE: final answer
+        SE-->>PE: stage output
+    end
+    PE-->>EC: CommandResult
+    EC-->>CE: result + token usage
+    CE->>SM: save session + context
+    CE->>RP: display(result)
+    Note over RP: context >= 35% guard · token stats
+    RP-->>U: formatted output</script>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Reference Grid ── -->
+    <section class="ref-section fade-in">
+      <div class="section-label amber">Component Reference</div>
+      <div class="ref-grid">
+        <!-- Col 1: CLI → Resolution -->
+        <div class="ref-col">
+          <div class="ref-col-title">CLI → Resolution</div>
+          <div class="ref-item">
+            <div class="ref-item-name">CLI Entry</div>
+            <div class="ref-item-path">src/cli/index.ts</div>
+            <div class="ref-item-desc">Commander.js arg parsing, first-run check, interactive palette</div>
+          </div>
+          <div class="ref-item">
+            <div class="ref-item-name">CommandExecutor</div>
+            <div class="ref-item-path">src/cli/command-executor.ts</div>
+            <div class="ref-item-desc">Validates prerequisites, git stash protection, session save</div>
+          </div>
+          <div class="ref-item">
+            <div class="ref-item-name">CommandResolver</div>
+            <div class="ref-item-path">src/cli/command-resolver.ts</div>
+            <div class="ref-item-desc">Loads YAML from data/commands/, 3-tier provider fallback</div>
+          </div>
+          <div class="ref-item">
+            <div class="ref-item-name">SessionManager</div>
+            <div class="ref-item-path">src/session/</div>
+            <div class="ref-item-desc">Creates or resumes sessions via --session-id flag</div>
+          </div>
+        </div>
+        <!-- Col 2: Pipeline → LLM -->
+        <div class="ref-col">
+          <div class="ref-col-title">Pipeline → LLM</div>
+          <div class="ref-item">
+            <div class="ref-item-name">ExecutionCoordinator</div>
+            <div class="ref-item-path">src/cli/execution-coordinator.ts</div>
+            <div class="ref-item-desc">Resolves effective agent (static/dynamic), creates ExecutionContext</div>
+          </div>
+          <div class="ref-item">
+            <div class="ref-item-name">PipelineExecutor</div>
+            <div class="ref-item-path">src/executor/pipeline.ts</div>
+            <div class="ref-item-desc">Validates pipeline, pre-resolves variables, schedules stages</div>
+          </div>
+          <div class="ref-item">
+            <div class="ref-item-name">StageExecutor</div>
+            <div class="ref-item-path">src/executor/stage-executor.ts</div>
+            <div class="ref-item-desc">Loads prompt + agent defs, builds message history, calls LLM</div>
+          </div>
+          <div class="ref-item">
+            <div class="ref-item-name">LLM Providers</div>
+            <div class="ref-item-path">src/llm/providers/</div>
+            <div class="ref-item-desc">Anthropic, OpenAI, Google, Cursor, XAI, Moonshot</div>
+          </div>
+        </div>
+        <!-- Col 3: Tools → Output -->
+        <div class="ref-col">
+          <div class="ref-col-title">Tools → Output</div>
+          <div class="ref-item">
+            <div class="ref-item-name">Tool Execution</div>
+            <div class="ref-item-path">src/executor/tool-execution.service.ts</div>
+            <div class="ref-item-desc">Dispatches built-in or MCP tools, 5-error hard stop</div>
+          </div>
+          <div class="ref-item">
+            <div class="ref-item-name">Built-in Tools</div>
+            <div class="ref-item-path">src/tools/</div>
+            <div class="ref-item-desc">write, read_file, search_replace, run_terminal_cmd, glob, grep…</div>
+          </div>
+          <div class="ref-item">
+            <div class="ref-item-name">MCP Tools</div>
+            <div class="ref-item-path">src/mcp/</div>
+            <div class="ref-item-desc">Lazy-loaded: mcp_github, mcp_playwright, mcp_postgres, …</div>
+          </div>
+          <div class="ref-item">
+            <div class="ref-item-name">ResultPresenter</div>
+            <div class="ref-item-path">src/cli/result-presenter.ts</div>
+            <div class="ref-item-desc">Formatted output, token stats, &gt;= 35% context guard, doc output</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Variable Resolution Strip ── -->
+    <section class="var-section fade-in">
+      <div class="section-label teal">Variable Resolution — PipelineExecutor pre-pass</div>
+      <div class="var-strip">
+        <div class="var-flow">
+          <div class="var-node">
+            <div class="var-tag">$ARG_*</div>
+            <div class="var-name">CLI Arguments</div>
+            <div class="var-desc">Positional and named arguments passed by the user on the command line</div>
+            <div class="var-examples">
+              <span class="var-example">$ARG_0</span>
+              <span class="var-example">$ARG_FILE</span>
+              <span class="var-example">$ARG_TARGET</span>
+            </div>
+          </div>
+          <div class="var-node">
+            <div class="var-tag">$CONTEXT_*</div>
+            <div class="var-name">Session Context</div>
+            <div class="var-desc">Values derived from the current session, prior stage outputs, and inferred state</div>
+            <div class="var-examples">
+              <span class="var-example">$CONTEXT_BRANCH</span>
+              <span class="var-example">$CONTEXT_PREV</span>
+            </div>
+          </div>
+          <div class="var-node">
+            <div class="var-tag">$ENV_*</div>
+            <div class="var-name">Environment</div>
+            <div class="var-desc">System environment variables and ~/.config/valora/config.yaml settings</div>
+            <div class="var-examples">
+              <span class="var-example">$ENV_HOME</span>
+              <span class="var-example">$ENV_API_KEY</span>
+            </div>
+          </div>
+          <div class="var-node" style="background: rgba(78,205,196,0.06); border-color: rgba(78,205,196,0.25);">
+            <div class="var-tag" style="color: var(--third);">Resolved</div>
+            <div class="var-name">Stage Prompt</div>
+            <div class="var-desc">All variables substituted; prompt passed to StageExecutor with full message context
+            </div>
+            <div class="var-examples">
+              <span class="var-example"
+                style="color: var(--primary); background: rgba(59,158,221,0.08); border-color: rgba(59,158,221,0.2);">data/prompts/</span>
+              <span class="var-example"
+                style="color: var(--primary); background: rgba(59,158,221,0.08); border-color: rgba(59,158,221,0.2);">data/agents/</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Footer ── -->
+    <footer class="bp-footer fade-in">
+      <span class="footer-text">valora · ai-assisted development workflow · command execution sequence</span>
+      <span class="footer-tag">// generated schematic</span>
+    </footer>
+
+  </div>
+
+  <script type="module" src="scripts/command-execution-sequence.js"></script>
+
+</body>
+
+</html>

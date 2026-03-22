@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Valora — Session State Machine</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=Fira+Code:wght@300;400;500&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="styles/shared.css">
+  <link rel="stylesheet" href="styles/session-state.css">
+</head>
+
+<body>
+  <div class="page-wrap">
+
+    <!-- ── Header ── -->
+    <header class="bp-header fade-in">
+      <div class="header-eyebrow">Technical Schematic · State Machine</div>
+      <h1 class="header-title">Valora — Session State Machine</h1>
+      <p class="header-subtitle">src/session/ · lifecycle · persistence · retention</p>
+      <div class="stat-bar">
+        <div class="stat-item"><span class="stat-value">4</span><span class="stat-label">States</span></div>
+        <div class="stat-item"><span class="stat-value">3</span><span class="stat-label">Resume Paths</span></div>
+        <div class="stat-item"><span class="stat-value">30d</span><span class="stat-label">Compression</span></div>
+        <div class="stat-item"><span class="stat-value">90d</span><span class="stat-label">Max Age</span></div>
+        <div class="stat-item"><span class="stat-value">50 MB</span><span class="stat-label">Size Limit</span></div>
+        <div class="stat-item"><span class="stat-value">100</span><span class="stat-label">Count Limit</span></div>
+      </div>
+    </header>
+
+    <!-- ── State Legend ── -->
+    <section class="ref-section fade-in">
+      <div class="section-label amber">State Legend</div>
+      <div class="stat-bar">
+        <div class="stat-item"><span class="stat-value" style="color:var(--state-active)">active</span><span class="stat-label">executing</span></div>
+        <div class="stat-item"><span class="stat-value" style="color:var(--state-completed)">completed</span><span class="stat-label">terminal</span></div>
+        <div class="stat-item"><span class="stat-value" style="color:var(--state-failed)">failed</span><span class="stat-label">error</span></div>
+        <div class="stat-item"><span class="stat-value" style="color:var(--state-paused)">paused</span><span class="stat-label">suspended</span></div>
+        <div class="stat-item"><span class="stat-value" style="color:var(--state-archived)">compressed</span><span class="stat-label">archived</span></div>
+        <div class="stat-item"><span class="stat-value" style="color:var(--faint)">resume</span><span class="stat-label">transitions</span></div>
+      </div>
+    </section>
+
+    <!-- ── Diagram ── -->
+    <section class="diagram-section fade-in">
+      <div class="section-label">State Machine — stateDiagram-v2</div>
+      <div class="diagram-shell">
+        <div class="mermaid-wrap">
+          <div class="zoom-controls">
+            <span class="zoom-label">loading&#8230;</span>
+            <button class="zoom-btn" data-action="zoom-in" title="Zoom in">+</button>
+            <button class="zoom-btn" data-action="zoom-out" title="Zoom out">&#8722;</button>
+            <button class="zoom-btn" data-action="zoom-fit" title="Fit to view">&#8861;</button>
+            <button class="zoom-btn" data-action="zoom-one" title="Actual size">1:1</button>
+            <button class="zoom-btn" data-action="zoom-expand" title="Open in new tab">&#8599;</button>
+          </div>
+          <div class="mermaid-viewport">
+            <div class="mermaid-canvas"></div>
+          </div>
+          <script type="text/plain" class="diagram-source">stateDiagram-v2
+    direction TB
+
+    [*] --> active : create()
+    [*] --> active : resume(id) [any prior status]
+
+    state active {
+        direction LR
+        [*] --> idle
+        idle --> idle : addCommand() / updateContext()
+    }
+
+    note right of active
+        Debounced persist: 1s normal, 5s for rapid
+        Snapshot saved on every persist
+        context.$CONTEXT_key accumulates
+    end note
+
+    active --> completed : complete()
+    active --> failed : fail(error)
+    active --> paused : pause()
+
+    note right of failed
+        context.error = errorMessage
+        resetContext clears it on resume
+    end note
+
+    completed --> active : resume(id)
+    failed --> active : resume(id)
+    paused --> active : resume(id)
+
+    completed --> compressed : age > 30d
+    failed --> compressed : age > 30d
+    paused --> compressed : age > 30d
+
+    state compressed {
+        [*] --> stored
+        stored : .gz file, status unchanged
+    }
+
+    note right of compressed
+        File compressed, state label unchanged
+        Still resumable from disk
+    end note
+
+    completed --> [*] : age > 90d / size > 50MB / count > 100
+    failed --> [*] : age > 90d / size > 50MB / count > 100
+    paused --> [*] : age > 90d / size > 50MB / count > 100
+    compressed --> [*] : age > 90d / size > 50MB / count > 100</script>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── State Reference ── -->
+    <section class="ref-section fade-in">
+      <div class="section-label">State Reference</div>
+      <div class="ref-grid">
+        <div class="ref-col">
+          <div class="ref-col-title">Active &amp; Paused</div>
+          <div class="ref-item">
+            <div class="ref-item-name active">active</div>
+            <div class="ref-item-path">create() or resume(id) from any prior status</div>
+            <div class="ref-item-desc">Commands recorded, context accumulated. Persist debounced: 1s normally, 5s for rapid commands (&lt;10s apart). A .snapshot.json is saved alongside every persist &#8212; last 3 commands + keys _loaderCache and _stageOutputs</div>
+          </div>
+          <div class="ref-item">
+            <div class="ref-item-name paused">paused</div>
+            <div class="ref-item-path">pause() &#8594; resume(id) &#8594; active</div>
+            <div class="ref-item-desc">Soft suspend &#8212; currentSession retained in memory (unlike completed/failed which null it). Immediate persist. Resumes back to active without reloading from disk</div>
+          </div>
+        </div>
+        <div class="ref-col">
+          <div class="ref-col-title">Terminal States</div>
+          <div class="ref-item">
+            <div class="ref-item-name completed">completed</div>
+            <div class="ref-item-path">complete() &#8594; persist(true) &#8594; currentSession = null</div>
+            <div class="ref-item-desc">Terminal but resumable. persist(true) fires immediately (no debounce). Token usage and worktree stats are collected. currentSession set to null afterwards</div>
+          </div>
+          <div class="ref-item">
+            <div class="ref-item-name failed">failed</div>
+            <div class="ref-item-path">fail(error) &#8594; context.error stored &#8594; persist</div>
+            <div class="ref-item-desc">Error message stored in context.error before persist. resume(id, resetContext: true) clears the error key and resurrects the session to active</div>
+          </div>
+        </div>
+        <div class="ref-col">
+          <div class="ref-col-title">Retention Scheduler</div>
+          <div class="ref-item">
+            <div class="ref-item-name archived">compressed (.gz)</div>
+            <div class="ref-item-path">age &gt; 30d &#8594; gzip in-place</div>
+            <div class="ref-item-desc">File compressed with gzip. Status label unchanged in metadata. Still fully resumable &#8212; the session manager decompresses transparently on load</div>
+          </div>
+          <div class="ref-item">
+            <div class="ref-item-name" style="color:var(--state-failed)">deleted</div>
+            <div class="ref-item-path">age &gt; 90d or size &gt; 50 MB or count &gt; 100</div>
+            <div class="ref-item-desc">Background cleanup runs every 24h. Rules applied in order: max-age (90d), then size limit (50 MB oldest-first), then count limit (100 oldest-first)</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Retention Timeline ── -->
+    <section class="var-section fade-in">
+      <div class="section-label teal">Retention Schedule &#8212; Background Cleanup (24h interval)</div>
+      <div class="var-strip">
+        <div class="var-flow">
+          <div class="var-node">
+            <div class="var-tag" style="color:var(--state-active)">t = 0</div>
+            <div class="var-name">Session Created</div>
+            <div class="var-desc">Active, persisting to disk with 1s debounce. Snapshot saved alongside every write</div>
+          </div>
+          <div class="var-node">
+            <div class="var-tag" style="color:var(--state-paused)">+ 30d</div>
+            <div class="var-name">Compressed</div>
+            <div class="var-desc">File compressed to .gz in-place. Status label unchanged. Still resumable from disk</div>
+            <div class="var-examples">
+              <span class="var-example" style="color:var(--state-paused);background:rgba(245,200,66,0.08);border-color:rgba(245,200,66,0.2)">completed &#183; failed &#183; paused</span>
+            </div>
+          </div>
+          <div class="var-node">
+            <div class="var-tag" style="color:var(--state-failed)">+ 90d</div>
+            <div class="var-name">Deleted</div>
+            <div class="var-desc">Max-age limit reached. Session file removed permanently</div>
+          </div>
+          <div class="var-node" style="background:rgba(122,124,245,0.06);border-color:rgba(122,124,245,0.25)">
+            <div class="var-tag" style="color:var(--state-archived)">Limits</div>
+            <div class="var-name">Size &amp; Count</div>
+            <div class="var-desc">Oldest sessions deleted first when total exceeds size or count cap</div>
+            <div class="var-examples">
+              <span class="var-example" style="color:var(--dim);background:rgba(59,158,221,0.08);border-color:rgba(59,158,221,0.2)">&gt; 50 MB</span>
+              <span class="var-example" style="color:var(--dim);background:rgba(59,158,221,0.08);border-color:rgba(59,158,221,0.2)">&gt; 100 sessions</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Footer ── -->
+    <footer class="bp-footer fade-in">
+      <span class="footer-text">valora · ai-assisted development workflow · session state machine</span>
+      <span class="footer-tag">// generated schematic</span>
+    </footer>
+
+  </div>
+
+  <script type="module" src="scripts/session-state.js"></script>
+
+</body>
+
+</html>

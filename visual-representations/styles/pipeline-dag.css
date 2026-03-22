@@ -1,0 +1,73 @@
+/* ── Pipeline DAG — Pattern display, algorithm steps, legend swatches ── */
+
+/* Semantic colour aliases (used by Mermaid node inline styles) */
+:root {
+  --blue:   #3b9edd;
+  --cyan:   #4ecdc4;
+  --teal:   #4ecdc4;
+  --yellow: #f5c842;
+  --orange: #ff9e64;
+  --purple: #7a7cf5;
+  --red:    #ff6b6b;
+  --green:  #9ece6a;
+}
+@media (prefers-color-scheme: light) {
+  :root {
+    --blue:   #1a6ba0;
+    --cyan:   #1a8080;
+    --teal:   #1a8080;
+    --yellow: #8a6700;
+    --orange: #c05000;
+    --purple: #5050c0;
+    --red:    #cc2200;
+    --green:  #3a6020;
+  }
+}
+
+/* ── Grouping pattern strip ── */
+.pat-flow { display: flex; align-items: center; gap: 0; overflow-x: auto; flex-wrap: nowrap; }
+
+.pat-box {
+  border-radius: 5px;
+  border: 1.5px solid;
+  padding: 6px 10px;
+  white-space: nowrap;
+  font-family: var(--mono);
+  font-size: 10px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.pat-box span { font-size: 9px; opacity: 0.7; }
+
+.pat-arrow { padding: 0 8px; color: var(--faint); font-size: 16px; flex-shrink: 0; }
+
+.pat-par {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  border: 1.5px solid rgba(78, 205, 196, 0.4);
+  border-radius: 5px;
+  padding: 6px 8px;
+  flex-shrink: 0;
+}
+
+.pat-note { font-family: var(--mono); font-size: 10px; color: var(--faint); margin-left: auto; flex-shrink: 0; white-space: nowrap; }
+.pat-note code { color: var(--third); background: rgba(78, 205, 196, 0.08); padding: 1px 5px; border-radius: 3px; }
+
+/* ── Algorithm steps ── */
+.alg-step { display: flex; gap: 10px; margin-bottom: 10px; align-items: flex-start; }
+.alg-step:last-child { margin-bottom: 0; }
+.alg-num  { font-family: var(--mono); font-size: 10px; color: var(--third); background: rgba(78, 205, 196, 0.1); border-radius: 3px; padding: 2px 6px; flex-shrink: 0; margin-top: 1px; }
+.alg-text { font-family: var(--sans); font-size: 12px; color: var(--faint); line-height: 1.55; }
+.alg-text code { font-family: var(--mono); font-size: 10px; background: rgba(59, 158, 221, 0.08); color: var(--dim); padding: 1px 4px; border-radius: 3px; }
+
+/* ── Legend swatches ── */
+.leg-swatch-row { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 10px; }
+.leg-swatch-row:last-child { margin-bottom: 0; }
+.leg-swatch { width: 32px; height: 18px; border-radius: 4px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-family: var(--mono); font-size: 9px; }
+.leg-label  { font-family: var(--mono); font-size: 11px; color: var(--dim); line-height: 1.5; }
+.leg-label strong { color: var(--text); }
+.leg-label code { font-family: var(--mono); font-size: 10px; background: rgba(59, 158, 221, 0.08); color: var(--dim); padding: 1px 4px; border-radius: 3px; }

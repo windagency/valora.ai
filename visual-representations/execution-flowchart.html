@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Valora — Execution Flowchart</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=Fira+Code:wght@300;400;500&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="styles/shared.css">
+  <link rel="stylesheet" href="styles/execution-flowchart.css">
+</head>
+
+<body>
+  <div class="page-wrap">
+
+    <!-- ── Header ── -->
+    <header class="bp-header fade-in">
+      <div class="header-eyebrow">Technical Schematic · Execution Flowchart</div>
+      <h1 class="header-title">Valora — Execution Flowchart</h1>
+      <p class="header-subtitle">src/cli/index.ts → CommandExecutor → PipelineExecutor → StageExecutor → LLM → Tool Loop → ResultPresenter</p>
+      <div class="stat-bar">
+        <div class="stat-item"><span class="stat-value">8</span><span class="stat-label">Components</span></div>
+        <div class="stat-item"><span class="stat-value">3-tier</span><span class="stat-label">Provider Fallback</span></div>
+        <div class="stat-item"><span class="stat-value">20</span><span class="stat-label">Max Iterations</span></div>
+        <div class="stat-item"><span class="stat-value">5</span><span class="stat-label">Error Limit</span></div>
+        <div class="stat-item"><span class="stat-value">35%</span><span class="stat-label">Context Guard</span></div>
+        <div class="stat-item"><span class="stat-value">ELK</span><span class="stat-label">Layout Engine</span></div>
+      </div>
+    </header>
+
+    <!-- ── Node Legend ── -->
+    <section class="ref-section fade-in">
+      <div class="section-label amber">Node Legend</div>
+      <div class="stat-bar">
+        <div class="stat-item"><span class="stat-value" style="color:#3b9edd">&#9632;</span><span class="stat-label">CLI Layer</span></div>
+        <div class="stat-item"><span class="stat-value" style="color:#4ecdc4">&#9632;</span><span class="stat-label">Pipeline</span></div>
+        <div class="stat-item"><span class="stat-value" style="color:#f5c842">&#9632;</span><span class="stat-label">LLM Provider</span></div>
+        <div class="stat-item"><span class="stat-value" style="color:#4ecdc4;opacity:0.6">&#9632;</span><span class="stat-label">Tool Loop</span></div>
+        <div class="stat-item"><span class="stat-value" style="color:#ff6b6b">&#9632;</span><span class="stat-label">Hard Stop</span></div>
+        <div class="stat-item"><span class="stat-value" style="color:var(--faint);letter-spacing:3px">- -</span><span class="stat-label">Session (dashed)</span></div>
+      </div>
+    </section>
+
+    <!-- ── Diagram ── -->
+    <section class="diagram-section fade-in">
+      <div class="section-label">Execution Flow</div>
+      <div class="diagram-shell">
+        <div class="mermaid-wrap">
+          <div class="zoom-controls">
+            <span class="zoom-label">loading&#8230;</span>
+            <button class="zoom-btn" data-action="zoom-in" title="Zoom in">+</button>
+            <button class="zoom-btn" data-action="zoom-out" title="Zoom out">&#8722;</button>
+            <button class="zoom-btn" data-action="zoom-fit" title="Fit to view">&#8861;</button>
+            <button class="zoom-btn" data-action="zoom-one" title="Actual size">1:1</button>
+            <button class="zoom-btn" data-action="zoom-expand" title="Open in new tab">&#8599;</button>
+          </div>
+          <div class="mermaid-viewport">
+            <div class="mermaid-canvas"></div>
+          </div>
+          <script type="text/plain" class="diagram-source">flowchart TD
+    CLI["CLI Entry<br/>src/cli/index.ts"]
+    CE["CommandExecutor<br/>src/cli/command-executor.ts"]
+    CR["CommandResolver<br/>src/cli/command-resolver.ts"]
+    SM["SessionManager<br/>src/session/"]
+    CTX[("Session Context<br/>$CONTEXT_key")]
+    EC["ExecutionCoordinator<br/>src/cli/execution-coordinator.ts"]
+    PE["PipelineExecutor<br/>src/executor/pipeline.ts"]
+    SE["StageExecutor<br/>src/executor/stage-executor.ts"]
+    LLM["LLM Provider<br/>Anthropic · OpenAI · Google"]
+    TC{Tool calls?}
+    TE["Tool Execution<br/>tool-execution.service.ts"]
+    STOP(["Hard Stop<br/>max 5 errors"])
+    FINAL["Final Response<br/>parsed + validated"]
+    RP["ResultPresenter<br/>src/cli/result-presenter.ts"]
+    CLI --> CE
+    CE --> CR
+    CE --> SM
+    CE --> EC
+    CR --> EC
+    SM <--> CTX
+    EC --> PE
+    PE --> SE
+    SE --> LLM
+    LLM --> TC
+    TC -->|Yes| TE
+    TE -->|results| LLM
+    TE -->|5 errors| STOP
+    TC -->|No| FINAL
+    FINAL --> RP
+    CTX -.->|"$CONTEXT_*"| SE
+    style CLI fill:#0d1e35,stroke:#3b9edd,color:#cce0f5
+    style CE fill:#0d1e35,stroke:#3b9edd,color:#cce0f5
+    style CR fill:#0d1e35,stroke:#3b9edd,color:#cce0f5
+    style SM fill:#0d1e35,stroke:#3b9edd,color:#cce0f5
+    style EC fill:#0d1e35,stroke:#3b9edd,color:#cce0f5
+    style CTX fill:#122540,stroke:#3b9edd,color:#cce0f5,stroke-dasharray:4
+    style PE fill:#091525,stroke:#4ecdc4,color:#cce0f5
+    style SE fill:#091525,stroke:#4ecdc4,color:#cce0f5
+    style LLM fill:#091a1a,stroke:#f5c842,color:#cce0f5
+    style TC fill:#1a1500,stroke:#f5c842,color:#cce0f5
+    style TE fill:#091a14,stroke:#4ecdc4,color:#cce0f5
+    style STOP fill:#1a0909,stroke:#ff6b6b,color:#ff6b6b
+    style FINAL fill:#091525,stroke:#4ecdc4,color:#cce0f5
+    style RP fill:#0d1e35,stroke:#3b9edd,color:#cce0f5</script>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Component Reference ── -->
+    <section class="ref-section fade-in">
+      <div class="section-label">Component Reference</div>
+      <div class="ref-grid">
+        <div class="ref-col">
+          <div class="ref-col-title">CLI Layer</div>
+          <div class="ref-item">
+            <div class="ref-item-name">CLI Entry</div>
+            <div class="ref-item-path">src/cli/index.ts</div>
+            <div class="ref-item-desc">Commander.js arg parsing, first-run check, interactive command palette when no args given</div>
+          </div>
+          <div class="ref-item">
+            <div class="ref-item-name">CommandExecutor</div>
+            <div class="ref-item-path">src/cli/command-executor.ts</div>
+            <div class="ref-item-desc">Validates prerequisites, creates/resumes session, tracks token usage, calls ResultPresenter</div>
+          </div>
+          <div class="ref-item">
+            <div class="ref-item-name">CommandResolver</div>
+            <div class="ref-item-path">src/cli/command-resolver.ts</div>
+            <div class="ref-item-desc">Loads YAML from data/commands/. 3-tier provider fallback: requested &#8594; default &#8594; any available. Validates model name</div>
+          </div>
+          <div class="ref-item">
+            <div class="ref-item-name">SessionManager</div>
+            <div class="ref-item-path">src/session/</div>
+            <div class="ref-item-desc">Creates or resumes sessions. Commands share state via $CONTEXT_key across stages and sessions</div>
+          </div>
+        </div>
+        <div class="ref-col">
+          <div class="ref-col-title">Pipeline &amp; Execution</div>
+          <div class="ref-item">
+            <div class="ref-item-name">ExecutionCoordinator</div>
+            <div class="ref-item-path">src/cli/execution-coordinator.ts</div>
+            <div class="ref-item-desc">Resolves effective agent (static config or dynamic resolver), creates ExecutionContext, selects strategy via factory</div>
+          </div>
+          <div class="ref-item">
+            <div class="ref-item-name">PipelineExecutor</div>
+            <div class="ref-item-path">src/executor/pipeline.ts</div>
+            <div class="ref-item-desc">Pre-resolves $ARG_*, $ENV_*, $CONTEXT_* before any stage runs. Groups: sequential via reduce(), parallel via Promise.all()</div>
+          </div>
+          <div class="ref-item">
+            <div class="ref-item-name">StageExecutor</div>
+            <div class="ref-item-path">src/executor/stage-executor.ts</div>
+            <div class="ref-item-desc">Loads prompt + agent defs, builds message history, drives the LLM &#8596; tool loop until no tool_calls remain or iterations exhausted</div>
+          </div>
+          <div class="ref-item">
+            <div class="ref-item-name">ResultPresenter</div>
+            <div class="ref-item-path">src/cli/result-presenter.ts</div>
+            <div class="ref-item-desc">Displays outputs, token usage, session ID. Validates context influence &#8805; 35% — architectural guard ensuring grounded responses</div>
+          </div>
+        </div>
+        <div class="ref-col">
+          <div class="ref-col-title">LLM &amp; Tools</div>
+          <div class="ref-item">
+            <div class="ref-item-name">LLM Providers</div>
+            <div class="ref-item-path">src/llm/providers/</div>
+            <div class="ref-item-desc">Anthropic (prompt caching), OpenAI, Google, Cursor, XAI, Moonshot. Returns LLMCompletionResult with full token usage breakdown</div>
+          </div>
+          <div class="ref-item">
+            <div class="ref-item-name">Tool Execution</div>
+            <div class="ref-item-path">src/executor/tool-execution.service.ts</div>
+            <div class="ref-item-desc">Dispatches built-in tools (write, read_file, grep, glob, run_terminal_cmd&#8230;) or MCP tools. Error results count toward limit of 5</div>
+          </div>
+          <div class="ref-item">
+            <div class="ref-item-name">Tool Loop</div>
+            <div class="ref-item-path">StageExecutor · max_tool_iterations default 20</div>
+            <div class="ref-item-desc">Cycles LLM &#8596; tools until finish_reason is stop. On exhaustion, a forced final call with no tools extracts JSON output</div>
+          </div>
+          <div class="ref-item">
+            <div class="ref-item-name">Hard Stop</div>
+            <div class="ref-item-path">MAX_TOOL_FAILURES = 5</div>
+            <div class="ref-item-desc">Results prefixed &#8220;Error:&#8221; count toward the limit. Guidance results (plain strings) do not &#8212; they are recoverable LLM mistakes</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Footer ── -->
+    <footer class="bp-footer fade-in">
+      <span class="footer-text">valora · ai-assisted development workflow · execution flowchart</span>
+      <span class="footer-tag">// generated schematic</span>
+    </footer>
+
+  </div>
+
+  <script type="module" src="scripts/execution-flowchart.js"></script>
+
+</body>
+
+</html>

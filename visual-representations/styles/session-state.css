@@ -1,0 +1,24 @@
+/* ── Session State Machine — state colour tokens and labels ── */
+
+:root {
+  --state-active:    #4ecdc4;
+  --state-completed: #3b9edd;
+  --state-failed:    #ff6b6b;
+  --state-paused:    #f5c842;
+  --state-archived:  #7a7cf5;
+}
+@media (prefers-color-scheme: light) {
+  :root {
+    --state-active:    #1a8080;
+    --state-completed: #1a6ba0;
+    --state-failed:    #cc2200;
+    --state-paused:    #8a6700;
+    --state-archived:  #4a4cb0;
+  }
+}
+
+.ref-item-name.active    { color: var(--state-active); }
+.ref-item-name.completed { color: var(--state-completed); }
+.ref-item-name.failed    { color: var(--state-failed); }
+.ref-item-name.paused    { color: var(--state-paused); }
+.ref-item-name.archived  { color: var(--state-archived); }

@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Valora — Execution Sequence</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=Fira+Code:wght@300;400;500&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="styles/shared.css">
+</head>
+
+<body>
+  <div class="page-wrap">
+
+    <!-- ── Header ── -->
+    <header class="bp-header fade-in">
+      <div class="header-eyebrow">Technical Schematic · Sequence Diagram</div>
+      <h1 class="header-title">Valora — Execution Sequence</h1>
+      <p class="header-subtitle">CLI entry &#8594; CommandExecutor &#8594; Pipeline &#8594; LLM tool loop &#8594; Session persistence</p>
+      <div class="stat-bar">
+        <div class="stat-item"><span class="stat-value">9</span><span class="stat-label">Participants</span></div>
+        <div class="stat-item"><span class="stat-value">3</span><span class="stat-label">Rect Groups</span></div>
+        <div class="stat-item"><span class="stat-value">20</span><span class="stat-label">Max Iterations</span></div>
+        <div class="stat-item"><span class="stat-value">5</span><span class="stat-label">Error Limit</span></div>
+        <div class="stat-item"><span class="stat-value">3-tier</span><span class="stat-label">Provider Fallback</span></div>
+        <div class="stat-item"><span class="stat-value">35%</span><span class="stat-label">Context Guard</span></div>
+      </div>
+    </header>
+
+    <!-- ── Diagram ── -->
+    <section class="diagram-section fade-in">
+      <div class="section-label">Detailed Execution Sequence</div>
+      <div class="diagram-shell">
+        <div class="mermaid-wrap">
+          <div class="zoom-controls">
+            <span class="zoom-label">loading&#8230;</span>
+            <button class="zoom-btn" data-action="zoom-in" title="Zoom in">+</button>
+            <button class="zoom-btn" data-action="zoom-out" title="Zoom out">&#8722;</button>
+            <button class="zoom-btn" data-action="zoom-fit" title="Fit to view">&#8861;</button>
+            <button class="zoom-btn" data-action="zoom-one" title="Actual size">1:1</button>
+            <button class="zoom-btn" data-action="zoom-expand" title="Open in new tab">&#8599;</button>
+          </div>
+          <div class="mermaid-viewport">
+            <div class="mermaid-canvas"></div>
+          </div>
+          <script type="text/plain" class="diagram-source">sequenceDiagram
+    autonumber
+    participant U  as User
+    participant CE as CommandExecutor
+    participant SM as Session
+    participant CR as CommandResolver
+    participant EC as Coordinator
+    participant PE as PipelineExecutor
+    participant SE as StageExecutor
+    participant LLM as LLM Provider
+    participant TE as ToolExecution
+
+    U->>CE: valora implement src/feature.ts
+    activate CE
+
+    CE->>SM: getOrCreateSession(options)
+    Note over SM: create() or resume(sessionId)
+    SM-->>CE: sessionManager · isResumed
+
+    CE->>CR: resolveCommand(commandName, options)
+    Note over CR: 3-tier fallback: requested → default → any available
+    CR-->>CE: command · provider · model
+
+    rect rgb(13, 30, 53)
+    Note over EC,PE: Execution Coordination
+    CE->>EC: executeCommand(resolvedCommand, session)
+    activate EC
+    EC->>EC: resolveEffectiveAgent()
+    Note over EC: static config or dynamic resolver
+    EC->>EC: createExecutionContext()
+    Note over EC: provider · model · session context · stage outputs
+    EC->>PE: strategy.execute(stages, context)
+    activate PE
+    end
+
+    PE->>PE: validatePipeline()
+    PE->>PE: preResolveStaticInputs()
+    Note over PE: resolves $ARG_* / $ENV_* / $CONTEXT_* variables
+
+    PE->>SE: executeStage(stage, context, index)
+    activate SE
+    SE->>SE: checkStageCache()
+    SE->>SE: loadStageResources()
+    Note over SE: prompt · agent · knowledge files · escalation criteria
+    SE->>SE: resolveStageInputs()
+    SE->>SE: buildStageMessages()
+    Note over SE: system = agent instructions · user = prompt + resolved inputs
+
+    rect rgb(13, 30, 53)
+    Note over SE,TE: Tool Loop (max_tool_iterations · default 20)
+    loop Iteration 1..N
+        SE->>LLM: provider.complete(messages, tools)
+        activate LLM
+        Note over LLM: Anthropic SDK · prompt caching · circuit breaker + retry
+        LLM-->>SE: content · tool_calls? · usage · finish_reason
+        deactivate LLM
+
+        alt tool_calls present
+            SE->>TE: executeTools(tool_calls)
+            activate TE
+            Note over TE: write · read_file · run_terminal_cmd · grep · glob · codebase_search · MCP
+            TE-->>SE: [{tool_call_id, content}]
+            deactivate TE
+            SE->>SE: classify: Error prefix=failure++ else guidance
+            SE->>SE: append assistant + tool messages to history
+        else no tool_calls — loop exits
+            Note over SE: LLM finished · return completion
+        end
+    end
+    end
+
+    opt max iterations exhausted
+        SE->>SE: extractExecutionSummary()
+        Note over SE: scan messages · count Error: prefixes · collect verified files
+        SE->>LLM: requestFinalOutput() with no tools
+        activate LLM
+        LLM-->>SE: forced completion
+        deactivate LLM
+    end
+
+    SE->>SE: handleStageCompletion()
+    Note over SE: parse JSON outputs · validate · build StageOutput
+    SE-->>PE: StageOutput {success · outputs · metadata · duration_ms}
+    deactivate SE
+
+    PE->>PE: flushPendingWrites()
+    PE-->>EC: CommandResult {success · stages · outputs}
+    deactivate PE
+
+    EC-->>CE: ExecutionResult {result · sessionManager · startTime}
+    deactivate EC
+
+    rect rgb(13, 30, 53)
+    Note over CE,SM: Session Persistence
+    CE->>SM: updateSessionState()
+    Note over SM: commands · context · stage outputs · token usage
+    CE->>SM: complete() or fail(error)
+    Note over SM: persist(true) · immediate flush · no debounce
+    SM-->>CE: persisted
+    end
+
+    CE-->>U: result · token usage · session ID
+    deactivate CE</script>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Reference Grid ── -->
+    <section class="ref-section fade-in">
+      <div class="section-label">Sequence Notes</div>
+      <div class="ref-grid">
+        <div class="ref-col">
+          <div class="ref-col-title">Command Resolution</div>
+          <div class="ref-item">
+            <div class="ref-item-name">CommandResolver · 3-tier fallback</div>
+            <div class="ref-item-path">src/cli/command-resolver.ts</div>
+            <div class="ref-item-desc">Tries requested provider first, then default, then any available. Validates model name before returning. Throws if no provider can satisfy</div>
+          </div>
+          <div class="ref-item">
+            <div class="ref-item-name">Coordinator · agent resolution</div>
+            <div class="ref-item-path">src/cli/execution-coordinator.ts</div>
+            <div class="ref-item-desc">Static path reads data/agents/*.yaml. Dynamic path calls dynamicAgentResolver and may prompt the user if confidence &lt; 50%</div>
+          </div>
+          <div class="ref-item">
+            <div class="ref-item-name">PipelineExecutor · stage scheduling</div>
+            <div class="ref-item-path">src/executor/pipeline.ts</div>
+            <div class="ref-item-desc">Stages grouped as parallel or sequential. Parallel groups run via Promise.all(). Sequential via async reduce(). Variables pre-resolved before any stage starts</div>
+          </div>
+        </div>
+        <div class="ref-col">
+          <div class="ref-col-title">Tool Loop</div>
+          <div class="ref-item">
+            <div class="ref-item-name">Loop termination conditions</div>
+            <div class="ref-item-path">StageExecutor · max_tool_iterations default 20</div>
+            <div class="ref-item-desc">Loop exits when LLM returns no tool_calls, or when max_tool_iterations is reached. On exhaustion, a forced final LLM call with no tools extracts JSON output</div>
+          </div>
+          <div class="ref-item">
+            <div class="ref-item-name">Error vs Guidance</div>
+            <div class="ref-item-path">tool-execution.service.ts · MAX_TOOL_FAILURES = 5</div>
+            <div class="ref-item-desc">Results starting with &#8220;Error:&#8221; count toward MAX_TOOL_FAILURES (5). Plain strings are guidance &#8212; recoverable LLM mistakes like file-not-found that don&#8217;t trigger the hard stop</div>
+          </div>
+          <div class="ref-item">
+            <div class="ref-item-name">Message history accumulation</div>
+            <div class="ref-item-path">Each iteration appends to messages[]</div>
+            <div class="ref-item-desc">Each iteration appends {role:&#8217;assistant&#8217;, tool_calls} then {role:&#8217;tool&#8217;, content} messages. Full history sent to LLM on every call &#8212; enabling multi-turn tool reasoning</div>
+          </div>
+        </div>
+        <div class="ref-col">
+          <div class="ref-col-title">Session &amp; Caching</div>
+          <div class="ref-item">
+            <div class="ref-item-name">Session post-execution</div>
+            <div class="ref-item-path">src/session/</div>
+            <div class="ref-item-desc">After execution, complete() or fail(error) triggers persist(true) &#8212; immediate, non-debounced flush. Token usage, worktree stats, and stage outputs all committed</div>
+          </div>
+          <div class="ref-item">
+            <div class="ref-item-name">Anthropic Provider · prompt caching</div>
+            <div class="ref-item-path">src/llm/providers/anthropic.provider.ts</div>
+            <div class="ref-item-desc">Applies cache breakpoints to large system prompts. Token usage tracks prompt_tokens, completion_tokens, cache_creation_input_tokens, and cache_read_input_tokens per stage</div>
+          </div>
+          <div class="ref-item">
+            <div class="ref-item-name">ResultPresenter · context guard</div>
+            <div class="ref-item-path">src/cli/result-presenter.ts</div>
+            <div class="ref-item-desc">Validates context influence &#8805; 35% before displaying output. Ensures responses are grounded in actual session state, not hallucinated content</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Footer ── -->
+    <footer class="bp-footer fade-in">
+      <span class="footer-text">valora · ai-assisted development workflow · execution sequence</span>
+      <span class="footer-tag">// generated schematic</span>
+    </footer>
+
+  </div>
+
+  <script type="module" src="scripts/sequence.js"></script>
+
+</body>
+
+</html>

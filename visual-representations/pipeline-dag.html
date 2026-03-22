@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Valora — Pipeline Stage Scheduling</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=Fira+Code:wght@300;400;500&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="styles/shared.css">
+  <link rel="stylesheet" href="styles/pipeline-dag.css">
+</head>
+
+<body>
+  <div class="page-wrap">
+
+    <!-- ── Header ── -->
+    <header class="bp-header fade-in">
+      <div class="header-eyebrow">Technical Schematic · Pipeline DAG</div>
+      <h1 class="header-title">Valora — Pipeline Stage Scheduling</h1>
+      <p class="header-subtitle">src/executor/pipeline.ts · stage groups · parallel lanes · variable data flow</p>
+      <div class="stat-bar">
+        <div class="stat-item"><span class="stat-value">4</span><span class="stat-label">Stage Groups</span></div>
+        <div class="stat-item"><span class="stat-value">reduce()</span><span class="stat-label">Sequential</span></div>
+        <div class="stat-item"><span class="stat-value">Promise.all</span><span class="stat-label">Parallel</span></div>
+        <div class="stat-item"><span class="stat-value">1</span><span class="stat-label">Fan-in Stage</span></div>
+        <div class="stat-item"><span class="stat-value">1</span><span class="stat-label">Conditional</span></div>
+        <div class="stat-item"><span class="stat-value">ELK</span><span class="stat-label">Layout Engine</span></div>
+      </div>
+    </header>
+
+    <!-- ── Stage Grouping Pattern ── -->
+    <section class="var-section fade-in">
+      <div class="section-label teal">Stage Grouping Pattern</div>
+      <div class="var-strip">
+        <div class="pat-flow">
+          <div class="pat-box" style="border-color:var(--blue);color:var(--blue)">A<span>seq</span></div>
+          <div class="pat-arrow">&#8594;</div>
+          <div class="pat-par">
+            <div class="pat-box" style="border-color:var(--teal);color:var(--teal)">B<span>par</span></div>
+            <div class="pat-box" style="border-color:var(--teal);color:var(--teal)">C<span>par</span></div>
+          </div>
+          <div class="pat-arrow">&#8594;</div>
+          <div class="pat-box" style="border-color:var(--blue);color:var(--blue)">D<span>seq</span></div>
+          <div class="pat-arrow">&#8594;</div>
+          <div class="pat-par">
+            <div class="pat-box" style="border-color:var(--teal);color:var(--teal)">E<span>par</span></div>
+            <div class="pat-box" style="border-color:var(--teal);color:var(--teal)">F<span>par</span></div>
+            <div class="pat-box" style="border-color:var(--yellow);color:var(--yellow)">G<span>par · if?</span></div>
+          </div>
+          <div class="pat-arrow">&#8594;</div>
+          <div class="pat-box" style="border-color:var(--purple);color:var(--purple)">H<span>seq · fanin</span></div>
+          <div style="flex:1;min-width:16px"></div>
+          <span class="pat-note">consecutive <code>parallel: true</code> &#8594; one group</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Diagram ── -->
+    <section class="diagram-section fade-in">
+      <div class="section-label">Pipeline DAG — valora assert src/</div>
+      <div class="diagram-shell">
+        <div class="mermaid-wrap">
+          <div class="zoom-controls">
+            <span class="zoom-label">loading&#8230;</span>
+            <button class="zoom-btn" data-action="zoom-in" title="Zoom in">+</button>
+            <button class="zoom-btn" data-action="zoom-out" title="Zoom out">&#8722;</button>
+            <button class="zoom-btn" data-action="zoom-fit" title="Fit to view">&#8861;</button>
+            <button class="zoom-btn" data-action="zoom-one" title="Actual size">1:1</button>
+            <button class="zoom-btn" data-action="zoom-expand" title="Open in new tab">&#8599;</button>
+          </div>
+          <div class="mermaid-viewport">
+            <div class="mermaid-canvas"></div>
+          </div>
+          <script type="text/plain" class="diagram-source">flowchart TD
+    INPUT(["$ valora assert src/<br/>$ARG_scope resolved · preResolveStaticInputs()"])
+
+    subgraph G1 ["Group 1 · sequential · reduce()"]
+        CTX["context<br/>gather-validation-context<br/>required ◈<br/>outputs: implementation_details · coding_standards · frontend_changes"]
+    end
+
+    subgraph G2 ["Group 2 · sequential · reduce()"]
+        COMP["completeness<br/>validate-implementation-completeness<br/>required ◈<br/>input: $STAGE_context.implementation_details"]
+    end
+
+    subgraph G3 ["Group 3 · parallel · Promise.all()"]
+        direction LR
+        STD["standards<br/>validate-standards-compliance<br/>required ◈<br/>input: $STAGE_context.coding_standards"]
+        TYPE["type-safety<br/>validate-type-safety<br/>required ◈<br/>input: $STAGE_context.modified_files"]
+        SEC["security<br/>validate-security<br/>required ◈"]
+        ACC["accessibility<br/>validate-accessibility<br/>optional ◇<br/>conditional: $STAGE_context.frontend_changes"]
+    end
+
+    subgraph G4 ["Group 4 · sequential · reduce()"]
+        SYNTH["synthesis<br/>synthesize-validation-report<br/>required ◈<br/>inputs: $STAGE_completeness · $STAGE_standards · $STAGE_type-safety"]
+    end
+
+    DONE(["CommandResult · success"])
+
+    INPUT --> CTX
+    CTX --> COMP
+
+    COMP --> STD
+    COMP --> TYPE
+    COMP --> SEC
+    COMP --> ACC
+
+    STD --> SYNTH
+    TYPE --> SYNTH
+    SEC --> SYNTH
+    ACC -.->|"conditional: skipped when false · required:false so pipeline continues"| SYNTH
+
+    SYNTH --> DONE
+
+    CTX -.->|"$STAGE_context.implementation_details"| COMP
+    COMP -.->|"$STAGE_completeness.completeness_status"| SYNTH
+    STD -.->|"$STAGE_standards.linting_results"| SYNTH
+    TYPE -.->|"$STAGE_type-safety.type_errors"| SYNTH
+
+    style CTX  fill:#0d1e35,stroke:#3b9edd,color:#cce0f5,stroke-width:2px
+    style COMP fill:#0d1e35,stroke:#3b9edd,color:#cce0f5,stroke-width:2px
+    style STD  fill:#091a1a,stroke:#4ecdc4,color:#cce0f5,stroke-width:2px
+    style TYPE fill:#091a1a,stroke:#4ecdc4,color:#cce0f5,stroke-width:2px
+    style SEC  fill:#091a1a,stroke:#4ecdc4,color:#cce0f5,stroke-width:2px
+    style ACC  fill:#1a1400,stroke:#f5c842,color:#cce0f5,stroke-width:2px,stroke-dasharray:5
+    style SYNTH fill:#12103a,stroke:#7a7cf5,color:#cce0f5,stroke-width:2px
+    style INPUT fill:#122540,stroke:#4ecdc4,color:#cce0f5
+    style DONE  fill:#122540,stroke:#5ecb8b,color:#cce0f5</script>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Reference Grid ── -->
+    <section class="ref-section fade-in">
+      <div class="section-label">Scheduling Reference</div>
+      <div class="ref-grid">
+        <div class="ref-col">
+          <div class="ref-col-title">Node Legend</div>
+          <div class="leg-swatch-row">
+            <div class="leg-swatch" style="border:2px solid var(--blue);background:#0d1e35">&#9672;</div>
+            <div class="leg-label"><strong>required: true</strong> &#8212; failure blocks pipeline immediately</div>
+          </div>
+          <div class="leg-swatch-row">
+            <div class="leg-swatch" style="border:2px dashed var(--yellow);background:#1a1400">&#9671;</div>
+            <div class="leg-label"><strong>required: false</strong> &#8212; failure logged, pipeline continues</div>
+          </div>
+          <div class="leg-swatch-row">
+            <div class="leg-swatch" style="border:2px solid var(--teal);background:#091a1a"></div>
+            <div class="leg-label"><strong>parallel: true</strong> &#8212; concurrent within group</div>
+          </div>
+          <div class="leg-swatch-row">
+            <div class="leg-swatch" style="border:2px solid var(--purple);background:#12103a"></div>
+            <div class="leg-label"><strong>fan-in stage</strong> &#8212; consumes outputs from multiple prior stages</div>
+          </div>
+          <div class="leg-swatch-row">
+            <div style="width:32px;border-top:2px dashed var(--faint);margin-top:8px;flex-shrink:0"></div>
+            <div class="leg-label"><strong>dashed edge</strong> &#8212; <code>$STAGE_*</code> variable reference (data flow)</div>
+          </div>
+        </div>
+        <div class="ref-col">
+          <div class="ref-col-title">groupStages() Algorithm</div>
+          <div class="alg-step">
+            <div class="alg-num">1</div>
+            <div class="alg-text">For each stage, check <code>stage.parallel</code></div>
+          </div>
+          <div class="alg-step">
+            <div class="alg-num">2</div>
+            <div class="alg-text"><code>parallel:true</code> + current group empty &#8594; start new parallel group</div>
+          </div>
+          <div class="alg-step">
+            <div class="alg-num">3</div>
+            <div class="alg-text"><code>parallel:true</code> + current group already parallel &#8594; extend the group</div>
+          </div>
+          <div class="alg-step">
+            <div class="alg-num">4</div>
+            <div class="alg-text"><code>parallel:false</code> (or unset) &#8594; close current group, start new sequential group</div>
+          </div>
+          <div class="alg-step">
+            <div class="alg-num">5</div>
+            <div class="alg-text">Return array of <code>StageGroup[]</code> &#8212; each group executed as a unit</div>
+          </div>
+        </div>
+        <div class="ref-col">
+          <div class="ref-col-title">Execution &amp; Conditions</div>
+          <div class="ref-item">
+            <div class="ref-item-name">Execution Loop</div>
+            <div class="ref-item-path">async reduce() · Promise.all()</div>
+            <div class="ref-item-desc">Groups run sequentially via reduce(). Within a parallel group, all stages run via Promise.all() concurrently</div>
+          </div>
+          <div class="ref-item">
+            <div class="ref-item-name">Synchronisation Barrier</div>
+            <div class="ref-item-path">Every group boundary</div>
+            <div class="ref-item-desc">Promise.all() means all parallel lanes must complete before the next sequential stage can start &#8212; prevents reading partial results</div>
+          </div>
+          <div class="ref-item">
+            <div class="ref-item-name">Conditional Stages</div>
+            <div class="ref-item-path">conditional: $STAGE_*.key == value</div>
+            <div class="ref-item-desc">Evaluated at runtime via variable resolver. Falsy &#8594; stage filtered out before group executes. Safe if required: false</div>
+          </div>
+          <div class="ref-item">
+            <div class="ref-item-name">Implicit Dependencies</div>
+            <div class="ref-item-path">$STAGE_&lt;name&gt;.&lt;output_key&gt;</div>
+            <div class="ref-item-desc">No depends_on field. Dependencies declared as variable references. Missing outputs resolve to undefined &#8212; not validated at schedule time</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Footer ── -->
+    <footer class="bp-footer fade-in">
+      <span class="footer-text">valora · ai-assisted development workflow · pipeline stage scheduling</span>
+      <span class="footer-tag">// generated schematic</span>
+    </footer>
+
+  </div>
+
+  <script type="module" src="scripts/pipeline-dag.js"></script>
+
+</body>
+
+</html>

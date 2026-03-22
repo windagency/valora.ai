@@ -1,0 +1,7 @@
+/* ── Execution Flowchart — Mermaid SVG overrides ── */
+
+.mermaid-canvas .nodeLabel { font-family: var(--sans) !important; font-size: 13px !important; }
+.mermaid-canvas .edgeLabel { font-family: var(--mono) !important; font-size: 11px !important; }
+.mermaid-canvas .node rect,
+.mermaid-canvas .node circle,
+.mermaid-canvas .node polygon { stroke-width: 1.5px !important; }

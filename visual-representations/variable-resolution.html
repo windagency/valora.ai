@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Valora — Variable Resolution Cascade</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=Fira+Code:wght@300;400;500&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="styles/shared.css">
+  <link rel="stylesheet" href="styles/variable-resolution.css">
+</head>
+
+<body>
+  <div class="page-wrap">
+
+    <!-- ── Header ── -->
+    <header class="bp-header fade-in">
+      <div class="header-eyebrow">Technical Schematic · Variable Resolution</div>
+      <h1 class="header-title">Valora — Variable Resolution Cascade</h1>
+      <p class="header-subtitle">src/executor/variables.ts · input-pre-resolver.ts · stage-executor.ts · execution-context.ts</p>
+      <div class="stat-bar">
+        <div class="stat-item"><span class="stat-value">4</span><span class="stat-label">Scopes</span></div>
+        <div class="stat-item"><span class="stat-value">2</span><span class="stat-label">Phases</span></div>
+        <div class="stat-item"><span class="stat-value">regex</span><span class="stat-label">Interpolation</span></div>
+        <div class="stat-item"><span class="stat-value">dot</span><span class="stat-label">Nested paths</span></div>
+        <div class="stat-item"><span class="stat-value">null</span><span class="stat-label">Skip-safe</span></div>
+        <div class="stat-item"><span class="stat-value">cross</span><span class="stat-label">Command persist</span></div>
+      </div>
+    </header>
+
+    <!-- ── Scope Legend ── -->
+    <section class="ref-section fade-in">
+      <div class="section-label amber">Scope Legend</div>
+      <div class="stat-bar">
+        <div class="stat-item">
+          <span class="stat-value" style="color:var(--tn-blue)">$ARG_*</span>
+          <span class="stat-label">CLI args · flags</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-value" style="color:var(--tn-purple)">$CONTEXT_*</span>
+          <span class="stat-label">session context</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-value" style="color:var(--tn-green)">$ENV_*</span>
+          <span class="stat-label">process.env</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-value" style="color:var(--tn-yellow)">$STAGE_*</span>
+          <span class="stat-label">stage outputs</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-value" style="color:var(--tn-cyan)">pre-resolve</span>
+          <span class="stat-label">phase 1 · cached</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-value" style="color:var(--tn-orange)">runtime</span>
+          <span class="stat-label">phase 2 · dynamic</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Resolution Timeline Strip ── -->
+    <section class="var-section fade-in">
+      <div class="section-label teal">Resolution Cascade Timeline</div>
+      <div class="var-strip">
+        <div class="var-strip-title">execution-context.ts → input-pre-resolver.ts → stage-executor.ts → per-stage loop → session persistence</div>
+        <div class="var-flow">
+
+          <div class="var-node">
+            <div class="var-tag">$ARG · $CONTEXT · $ENV</div>
+            <div class="var-name">Pipeline Init</div>
+            <div class="var-desc">VariableResolver constructed with CLI args (4 forms), filtered session context, and process.env. All three scopes available immediately.</div>
+            <div class="var-examples">
+              <span class="var-example">$ARG_1</span>
+              <span class="var-example">$ARG_scope</span>
+              <span class="var-example">$CONTEXT_goal</span>
+              <span class="var-example">$ENV_HOME</span>
+            </div>
+          </div>
+
+          <div class="var-node">
+            <div class="var-tag">pre-resolve · cache</div>
+            <div class="var-name">Static Inputs Cached</div>
+            <div class="var-desc">Stages with no $STAGE_* refs are fully resolved upfront. File args (_file / _path) are read and stored as key_content. Result cached in preResolvedInputs.</div>
+            <div class="var-examples">
+              <span class="var-example">_file → _content</span>
+              <span class="var-example">cached</span>
+              <span class="var-example">deferred</span>
+            </div>
+          </div>
+
+          <div class="var-node">
+            <div class="var-tag">$STAGE_* · conditional</div>
+            <div class="var-name">Stage N Executes</div>
+            <div class="var-desc">Deferred stages resolve at runtime against the live resolver. Conditional evaluated — false skips the stage. Resolved inputs injected into LLM prompt.</div>
+            <div class="var-examples">
+              <span class="var-example">$STAGE_ctx.issues</span>
+              <span class="var-example">$STAGE_ctx.issues.0</span>
+              <span class="var-example">null if skipped</span>
+            </div>
+          </div>
+
+          <div class="var-node">
+            <div class="var-tag">recordStageCompletion()</div>
+            <div class="var-name">Resolver Updated</div>
+            <div class="var-desc">addStageOutputs(name, outputs) called. $STAGE_name.* now available to all remaining stages in the pipeline, including nested dot-paths.</div>
+            <div class="var-examples">
+              <span class="var-example">$STAGE_N → live</span>
+              <span class="var-example">deep path</span>
+              <span class="var-example">array index</span>
+            </div>
+          </div>
+
+          <div class="var-node">
+            <div class="var-tag">session._stageOutputs</div>
+            <div class="var-name">Cross-Command</div>
+            <div class="var-desc">After command completes, all stage outputs merged into session._stageOutputs. Next command restores them as initialStageOutputs in ExecutionContext.</div>
+            <div class="var-examples">
+              <span class="var-example">next cmd</span>
+              <span class="var-example">$STAGE_review.*</span>
+              <span class="var-example">persistent</span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Cascade Diagram ── -->
+    <section class="diagram-section fade-in">
+      <div class="section-label">Data Flow — Variable Resolution Cascade</div>
+      <div class="diagram-shell">
+        <div class="mermaid-wrap">
+          <div class="zoom-controls">
+            <span class="zoom-label">loading&#8230;</span>
+            <button class="zoom-btn" data-action="zoom-in"     title="Zoom in">+</button>
+            <button class="zoom-btn" data-action="zoom-out"    title="Zoom out">&#8722;</button>
+            <button class="zoom-btn" data-action="zoom-fit"    title="Fit to view">&#8861;</button>
+            <button class="zoom-btn" data-action="zoom-one"    title="Actual size">1:1</button>
+            <button class="zoom-btn" data-action="zoom-expand" title="Open in new tab">&#8599;</button>
+          </div>
+          <div class="mermaid-viewport">
+            <div class="mermaid-canvas"></div>
+          </div>
+          <script type="text/plain" class="diagram-source">flowchart TD
+
+  subgraph SRC ["Data Sources"]
+    direction LR
+    CLI(["$ valora cmd [flags]<br/>Commander.js"])
+    SCTX(["Session Context<br/>~/.config/valora/"])
+    PENV(["process.env"])
+    PREV(["Prior Stage Outputs<br/>session._stageOutputs"])
+  end
+
+  subgraph SCOPES ["Variable Scopes · VariableResolver · variables.ts:16"]
+    direction LR
+    ARG["$ARG_*<br/>positional $ARG_1 · named<br/>kebab-case · snake_case"]
+    CTX["$CONTEXT_*<br/>filtered keys only<br/>dot-notation supported"]
+    ENV["$ENV_*<br/>process.env lookup<br/>strict: throws if missing"]
+    STGV["$STAGE_*<br/>grows as stages complete<br/>null for skipped stages"]
+  end
+
+  subgraph PRE ["&#9312; Pre-Resolution · input-pre-resolver.ts:46"]
+    HASREF{"inputs contain<br/>$STAGE_* refs?"}
+    RESOLVE["resolve all inputs<br/>variableResolver.resolve()"]
+    ENRICH["enrich file args<br/>_file/_path &#8594; read &#8594; _content"]
+    CACHE["store in preResolvedInputs<br/>skip re-resolution at runtime"]
+    DEFER["mark stage as deferred<br/>resolve at execution time"]
+    HASREF -- "No" --> RESOLVE --> ENRICH --> CACHE
+    HASREF -- "Yes" --> DEFER
+  end
+
+  subgraph CORE ["&#9313; Interpolation · variables.ts:44 · single regex pass"]
+    REGEX["/\\$([A-Z]+)_([a-zA-Z0-9_.-]+)/g<br/>scope dispatch &#8594; resolvePath() &#8594; valueToString()"]
+  end
+
+  subgraph RT ["&#9314; Runtime · stage-executor.ts · per stage"]
+    CACHED{"preResolvedInputs<br/>available?"}
+    USEPRE["use cached inputs"]
+    RESOLVERT["resolve inputs now<br/>against live resolver"]
+    COND{"stage.conditional<br/>evaluateConditional()"}
+    SKIP(["stage skipped<br/>$STAGE_name &#8594; null"])
+    RUN["Stage N executes<br/>resolved inputs &#8594; LLM"]
+    RECORD["recordStageCompletion()<br/>addStageOutputs(name, outputs)<br/>execution-context.ts:111"]
+    CACHED -- "Yes" --> USEPRE --> COND
+    CACHED -- "No"  --> RESOLVERT --> COND
+    COND -- "false" --> SKIP
+    COND -- "true"  --> RUN --> RECORD
+  end
+
+  PERSIST(["session._stageOutputs<br/>command-executor.ts:785<br/>cross-command persistence"])
+
+  CLI  --> ARG
+  SCTX --> CTX
+  PENV --> ENV
+  PREV --> STGV
+
+  ARG  --> HASREF
+  CTX  --> HASREF
+  ENV  --> HASREF
+  STGV --> HASREF
+
+  PRE  --> CORE
+  CORE --> RT
+
+  RECORD -- "$STAGE_N.* now live" --> STGV
+  RECORD --> PERSIST
+
+  style CLI    fill:#1e2a45,stroke:#7aa2f7,color:#7aa2f7
+  style SCTX   fill:#281e40,stroke:#bb9af7,color:#bb9af7
+  style PENV   fill:#1e3020,stroke:#9ece6a,color:#9ece6a
+  style PREV   fill:#332010,stroke:#e0af68,color:#e0af68
+  style ARG    fill:#1a2540,stroke:#7aa2f7,color:#c0caf5
+  style CTX    fill:#221838,stroke:#bb9af7,color:#c0caf5
+  style ENV    fill:#182818,stroke:#9ece6a,color:#c0caf5
+  style STGV   fill:#2e1e08,stroke:#e0af68,color:#c0caf5
+  style HASREF fill:#1a2535,stroke:#2ac3de,color:#2ac3de
+  style RESOLVE fill:#152030,stroke:#2ac3de,color:#c0caf5
+  style ENRICH fill:#152030,stroke:#2ac3de,color:#c0caf5
+  style CACHE  fill:#152030,stroke:#2ac3de,color:#c0caf5
+  style DEFER  fill:#1e1e2e,stroke:#3b4261,color:#565f89
+  style REGEX  fill:#1a2030,stroke:#7aa2f7,color:#c0caf5
+  style CACHED fill:#1a2030,stroke:#7aa2f7,color:#7aa2f7
+  style USEPRE fill:#152030,stroke:#7aa2f7,color:#c0caf5
+  style RESOLVERT fill:#152030,stroke:#7aa2f7,color:#c0caf5
+  style COND   fill:#28200e,stroke:#e0af68,color:#e0af68
+  style SKIP   fill:#2a1010,stroke:#f7768e,color:#f7768e
+  style RUN    fill:#152030,stroke:#7dcfff,color:#c0caf5
+  style RECORD fill:#152030,stroke:#9ece6a,color:#c0caf5
+  style PERSIST fill:#1e1030,stroke:#9d7cd8,color:#9d7cd8
+          </script>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Reference Grid ── -->
+    <section class="ref-section fade-in">
+      <div class="section-label">Reference</div>
+      <div class="ref-grid">
+
+        <div class="ref-col">
+          <div class="ref-col-title">Variable Scopes</div>
+
+          <div class="ref-item">
+            <div class="ref-item-name">$ARG_* — CLI Arguments</div>
+            <div class="ref-item-path">variables.ts:102 · resolveArg()</div>
+            <div class="ref-item-desc">Normalised to four forms: positional index ($ARG_1), original Commander key, kebab-case, and snake_case. Missing args return "Not specified" rather than throwing.</div>
+          </div>
+
+          <div class="ref-item">
+            <div class="ref-item-name">$CONTEXT_* — Session</div>
+            <div class="ref-item-path">variables.ts:203 · resolveContext()</div>
+            <div class="ref-item-desc">Only keys referenced in the pipeline are fetched from the session (extractPipelineContextReferences). Dot-notation traverses nested objects. Missing returns "Not specified".</div>
+          </div>
+
+          <div class="ref-item">
+            <div class="ref-item-name">$ENV_* — Environment</div>
+            <div class="ref-item-path">variables.ts:210 · resolveEnv()</div>
+            <div class="ref-item-desc">Direct process.env lookup. In strict mode (default), an unresolved reference throws a ValidationError. No fallback chain — either present or error.</div>
+          </div>
+
+          <div class="ref-item">
+            <div class="ref-item-name">$STAGE_* — Stage Outputs</div>
+            <div class="ref-item-path">variables.ts:177 · resolveStage()</div>
+            <div class="ref-item-desc">Returns null (not an error) for skipped stages — allows downstream conditionals to handle gracefully. Supports deep paths: $STAGE_review.issues.0.severity.</div>
+          </div>
+        </div>
+
+        <div class="ref-col">
+          <div class="ref-col-title">Resolution Phases</div>
+
+          <div class="ref-item">
+            <div class="ref-item-name">&#9312; Pre-Resolution</div>
+            <div class="ref-item-path">input-pre-resolver.ts:46 · preResolveStaticInputs()</div>
+            <div class="ref-item-desc">Runs once before any stage executes. Stages without $STAGE_* refs are fully resolved and cached. ARG, CONTEXT, ENV are all known at this point. Avoids redundant re-resolution.</div>
+          </div>
+
+          <div class="ref-item">
+            <div class="ref-item-name">File Enrichment</div>
+            <div class="ref-item-path">input-pre-resolver.ts:147 · enrichWithFileContents()</div>
+            <div class="ref-item-desc">Input keys ending with _file, _file_arg, or _path are read from disk. Content stored as key_content alongside the original path. Deduplicates reads via a path cache.</div>
+          </div>
+
+          <div class="ref-item">
+            <div class="ref-item-name">&#9313; Runtime Resolution</div>
+            <div class="ref-item-path">stage-executor.ts:627 · resolveStageInputs()</div>
+            <div class="ref-item-desc">For deferred stages, inputs are resolved at execution time against the live VariableResolver — which by then has $STAGE_* from all completed upstream stages.</div>
+          </div>
+
+          <div class="ref-item">
+            <div class="ref-item-name">Conditional Evaluation</div>
+            <div class="ref-item-path">pipeline.ts:470 · evaluateConditional()</div>
+            <div class="ref-item-desc">Stage conditionals are variable-resolved first, then cast to boolean. The string "true" passes. Skipped stages leave $STAGE_name as null — downstream stages see null, not an error.</div>
+          </div>
+        </div>
+
+        <div class="ref-col">
+          <div class="ref-col-title">Advanced Features</div>
+
+          <div class="ref-item">
+            <div class="ref-item-name">Regex Interpolation</div>
+            <div class="ref-item-path">variables.ts:47 · resolveString()</div>
+            <div class="ref-item-desc">Pattern /\$([A-Z]+)_([a-zA-Z0-9_.-]+)/g replaces all matches in a single pass. Scope group dispatches to the appropriate resolver. valueToString() handles null, objects, arrays.</div>
+          </div>
+
+          <div class="ref-item">
+            <div class="ref-item-name">Deep Recursive Resolution</div>
+            <div class="ref-item-path">variables.ts:28 · resolve&lt;T&gt;()</div>
+            <div class="ref-item-desc">Accepts strings, arrays, and nested objects — recursively walks the entire structure. An entire stage inputs record can be passed and every string leaf is interpolated.</div>
+          </div>
+
+          <div class="ref-item">
+            <div class="ref-item-name">Stage Output Recording</div>
+            <div class="ref-item-path">execution-context.ts:111 · recordStageCompletion()</div>
+            <div class="ref-item-desc">Called by PipelineExecutor after each successful stage. Calls addStageOutputs() immediately — $STAGE_name.* becomes available to the next stage without waiting for the full pipeline to finish.</div>
+          </div>
+
+          <div class="ref-item">
+            <div class="ref-item-name">Cross-Command Persistence</div>
+            <div class="ref-item-path">command-executor.ts:785 · session._stageOutputs</div>
+            <div class="ref-item-desc">All stage outputs are merged into session._stageOutputs after the command completes. The next valora command restores them as initialStageOutputs so $STAGE_* from prior commands remains accessible.</div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ── Footer ── -->
+    <footer class="bp-footer fade-in">
+      <span class="footer-text">valora · variable resolution cascade · $ARG · $CONTEXT · $ENV · $STAGE</span>
+      <span class="footer-tag">// tokyo night schematic</span>
+    </footer>
+
+  </div>
+
+  <script type="module" src="scripts/variable-resolution.js"></script>
+
+</body>
+
+</html>

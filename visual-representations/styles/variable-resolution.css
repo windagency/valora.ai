@@ -1,0 +1,32 @@
+/* ── Variable Resolution — Tokyo Night diagram palette ── */
+
+/* Tokyo Night accent colours — used in diagram node styles and scope legend */
+:root {
+  --tn-blue:    #7aa2f7;
+  --tn-purple:  #bb9af7;
+  --tn-green:   #9ece6a;
+  --tn-yellow:  #e0af68;
+  --tn-cyan:    #2ac3de;
+  --tn-orange:  #ff9e64;
+  --tn-red:     #f7768e;
+  --tn-magenta: #9d7cd8;
+}
+@media (prefers-color-scheme: light) {
+  :root {
+    --tn-blue:    #2e7de9;
+    --tn-purple:  #7847bd;
+    --tn-green:   #587539;
+    --tn-yellow:  #8c6c3e;
+    --tn-cyan:    #007197;
+    --tn-orange:  #b15c00;
+    --tn-red:     #c64343;
+    --tn-magenta: #5a3e9e;
+  }
+}
+
+/* Override var-example chips to use Tokyo Night cyan */
+.var-example {
+  color: var(--tn-cyan);
+  background: rgba(42, 195, 222, 0.08);
+  border-color: rgba(42, 195, 222, 0.2);
+}

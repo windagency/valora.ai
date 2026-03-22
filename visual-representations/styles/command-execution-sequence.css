@@ -1,0 +1,5 @@
+/* ── Command Execution Sequence — Mermaid SVG overrides ── */
+
+.mermaid-canvas .messageText { font-family: var(--mono) !important; font-size: 12px !important; }
+.mermaid-canvas .loopText    { font-family: var(--mono) !important; }
+.mermaid-canvas .noteText    { font-family: var(--mono) !important; }
