@@ -2,6 +2,7 @@
 	"name": "Valora Sandbox",
 	"image": "mcr.microsoft.com/devcontainers/javascript-node:24",
 	"features": {
+		"ghcr.io/anthropics/devcontainer-features/claude-code:1.0": {},
 		"ghcr.io/devcontainers/features/common-utils:2": {
 			"username": "node",
 			"upgradePackages": true,
@@ -14,7 +15,8 @@
 	// Mount docker socket for docker-in-docker scenarios
 	"mounts": [
 		"source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind",
-		"source=valora-shellhistory-${devcontainerId},target=/shellhistory,type=volume"
+		"source=valora-shellhistory-${devcontainerId},target=/shellhistory,type=volume",
+		"source=valora-claudehistory-${devcontainerId},target=/claude-history,type=volume"
 	],
 	"onCreateCommand": {
 		"git-config": "git config --global --add safe.directory ${containerWorkspaceFolder}"
