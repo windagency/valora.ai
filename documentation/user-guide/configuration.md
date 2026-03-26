@@ -99,12 +99,12 @@ export LOCAL_DEFAULT_MODEL=llama3.1
 
 ```json
 {
-    "providers": {
-        "local": {
-            "baseUrl": "http://localhost:11434/v1",
-            "default_model": "llama3.1"
-        }
-    }
+	"providers": {
+		"local": {
+			"baseUrl": "http://localhost:11434/v1",
+			"default_model": "llama3.1"
+		}
+	}
 }
 ```
 

@@ -206,6 +206,42 @@ function getStatusColor(status: string) {
 - Cases with side effects or multi-step operations
 - Pattern matching on complex data structures
 
+### 2.3.1 Conditional Object Construction
+
+**PREFER conditional spreads over post-construction mutations for objects with optional properties:**
+
+```typescript
+// ✅ CORRECT: Single-expression conditional object
+const config = {
+	required: 'value',
+	...(optional && { key: optional }),
+	...(another && { other: another })
+};
+
+// ❌ INCORRECT: Post-construction mutations
+const config = { required: 'value' };
+if (optional) config.key = optional;
+if (another) config.other = another;
+```
+
+**With type assertion when TypeScript cannot infer the conditional spread type:**
+
+```typescript
+// ✅ CORRECT: Explicit cast where inference falls short
+return {
+	defaults: { ...base.defaults, overrideField: undefined },
+	providers: { ...(raw.providers ?? {}) },
+	...(raw.features && { features: raw.features }),
+	...(raw.logging && { logging: raw.logging })
+} as TargetType;
+```
+
+**Benefits:**
+
+- Object is fully formed at the point of assignment — no partial-state window
+- Declarative: expresses the final shape, not a sequence of mutations
+- Eliminates post-construction `if` blocks that violate the expression-based principle
+
 ### 2.4 Advanced Data Structures
 
 **ENFORCE usage of:**

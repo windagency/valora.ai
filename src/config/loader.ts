@@ -464,6 +464,21 @@ export class ConfigLoader {
 	}
 
 	/**
+	 * Load raw config file content without cascade, env vars, or DEFAULT_CONFIG merging.
+	 * Used by the setup wizard to preserve existing settings when updating config.
+	 */
+	async loadRaw(): Promise<Partial<Config>> {
+		if (!fileExists(this.configPath)) {
+			return {};
+		}
+		try {
+			return await readJSON<Partial<Config>>(this.configPath);
+		} catch {
+			return {};
+		}
+	}
+
+	/**
 	 * Load configuration from a specific file path
 	 */
 	async loadFromPath(filePath: string): Promise<Config> {

@@ -241,14 +241,19 @@ Targets any OpenAI-compatible local model server. No API key is required — use
 ```typescript
 class LocalProvider extends BaseLLMProvider {
 	// No API key needed — isConfigured() always returns true
-	isConfigured(): boolean { return true; }
+	isConfigured(): boolean {
+		return true;
+	}
 
 	// Model names are fully dynamic — validateModel() always returns true
-	validateModel(_model: string): Promise<boolean> { return Promise.resolve(true); }
+	validateModel(_model: string): Promise<boolean> {
+		return Promise.resolve(true);
+	}
 }
 ```
 
 Key differences from the OpenAI provider:
+
 - No API key required
 - No rate limiting or circuit breaker (local servers have no quotas)
 - Connection errors produce local-specific guidance ("Is your server running?")
