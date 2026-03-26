@@ -602,4 +602,4 @@ class CustomWorkflow {
 
 ---
 
-_For the latest API updates, see the [TypeScript source code](../../.bin/src/)._
+_For the latest API updates, see the [TypeScript source code](../../src/)._

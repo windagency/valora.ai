@@ -19,6 +19,7 @@
 import './anthropic.provider';
 import './cursor.provider';
 import './google.provider';
+import './local.provider';
 import './openai.provider';
 
 // Re-export provider classes for testing and special use cases
@@ -26,4 +27,5 @@ import './openai.provider';
 export { AnthropicProvider } from './anthropic.provider';
 export { CursorProvider } from './cursor.provider';
 export { GoogleProvider } from './google.provider';
+export { LocalProvider } from './local.provider';
 export { OpenAIProvider } from './openai.provider';

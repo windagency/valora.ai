@@ -56,7 +56,7 @@ The engine works immediately without any configuration using **Guided Completion
 
 ### API Key Configuration
 
-For autonomous execution, configure API keys:
+For autonomous execution with cloud providers, configure API keys:
 
 ```bash
 valora config setup --quick
@@ -69,6 +69,26 @@ export ANTHROPIC_API_KEY=sk-ant-your-key
 export OPENAI_API_KEY=sk-your-key
 export GOOGLE_API_KEY=your-key
 ```
+
+### Local Models (No API Key)
+
+Run fully offline with a local model server. No API key required:
+
+```bash
+# Ollama (recommended)
+ollama pull llama3.1 && ollama serve
+
+# Configure VALORA to use it
+valora config setup   # select "Local" from the provider list
+# or
+export LOCAL_BASE_URL=http://localhost:11434/v1
+export LOCAL_DEFAULT_MODEL=llama3.1
+
+# Use it
+valora plan "Add feature" --provider local --model llama3.1
+```
+
+Other compatible servers: LM Studio (`http://localhost:1234/v1`), vLLM, llama.cpp, LocalAI.
 
 Verify your configuration:
 

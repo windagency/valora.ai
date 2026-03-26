@@ -155,6 +155,15 @@ export const PROVIDER_REGISTRY: Record<string, ProviderMetadata> = {
 		],
 		requiresApiKey: true
 	},
+	[ProviderName.LOCAL]: {
+		defaultModel: 'llama3.1',
+		description: 'Local models via OpenAI-compatible API (Ollama, LM Studio, etc.)',
+		helpText: 'Connect to a local model server. No API key required. Default: http://localhost:11434/v1',
+		key: ProviderName.LOCAL,
+		label: 'Local',
+		modelModes: [{ mode: 'default', model: 'llama3.1' }],
+		requiresApiKey: false
+	},
 	[ProviderName.MOONSHOT]: {
 		defaultModel: ModelName.KIMI_K2,
 		description: 'Kimi models from Moonshot',

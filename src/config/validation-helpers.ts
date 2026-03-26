@@ -66,6 +66,97 @@ export const QUICK_SETUP_CHOICES = [
 ];
 
 /**
+ * Configure the local provider — prompts for base URL and default model
+ */
+async function configureLocalProvider(
+	metadata: object & ReturnType<typeof getProviderMetadata>,
+	config: Config
+): Promise<void> {
+	const color = getColorAdapter();
+	if (metadata.helpText) {
+		console.info(color.gray(`  ${metadata.helpText}`));
+	}
+
+	const { baseUrl, defaultModel } = await prompt.prompt([
+		{
+			default: 'http://localhost:11434/v1',
+			message: 'Local server URL:',
+			name: 'baseUrl',
+			type: 'input'
+		},
+		{
+			default: metadata.defaultModel,
+			message: 'Default model name (e.g. llama3.1, mistral):',
+			name: 'defaultModel',
+			type: 'input'
+		}
+	]);
+
+	config.providers[ProviderName.LOCAL as keyof typeof config.providers] = {
+		baseUrl: (baseUrl as string).trim() || 'http://localhost:11434/v1',
+		default_model: (defaultModel as string).trim() || metadata.defaultModel
+	};
+}
+
+/**
+ * Configure Anthropic provider — offers Vertex AI option before standard API key prompt
+ * Returns true if Vertex AI was configured (caller should skip standard API key prompt)
+ */
+async function configureAnthropicVertexOption(
+	metadata: object & ReturnType<typeof getProviderMetadata>,
+	providerName: string,
+	config: Config
+): Promise<boolean> {
+	const { useVertex } = await prompt.prompt([
+		{
+			default: false,
+			message: 'Use Vertex AI for Claude? (Recommended for enterprise environments)',
+			name: 'useVertex',
+			type: 'confirm'
+		}
+	]);
+
+	if (!useVertex) {
+		return false;
+	}
+
+	const vertexAnswers = await prompt.prompt([
+		{
+			message: 'Vertex AI Project ID:',
+			name: 'vertexProjectId',
+			type: 'input',
+			validate: (input: unknown) => {
+				if (typeof input !== 'string' || !input || input.trim().length === 0) {
+					return 'Vertex AI Project ID is required';
+				}
+				return true;
+			}
+		},
+		{
+			default: 'global',
+			message: 'Cloud ML Region:',
+			name: 'vertexRegion',
+			type: 'input'
+		},
+		{
+			default: metadata.defaultModel,
+			message: 'Default model:',
+			name: 'defaultModel',
+			type: 'input'
+		}
+	]);
+
+	config.providers[providerName as keyof typeof config.providers] = {
+		default_model: (vertexAnswers['defaultModel'] as string).trim() || metadata.defaultModel,
+		vertexAI: true,
+		vertexProjectId: (vertexAnswers['vertexProjectId'] as string).trim(),
+		vertexRegion: (vertexAnswers['vertexRegion'] as string).trim()
+	};
+
+	return true;
+}
+
+/**
  * Configure a specific LLM provider
  */
 export async function configureProvider(providerName: string, config: Config): Promise<void> {
@@ -78,6 +169,13 @@ export async function configureProvider(providerName: string, config: Config): P
 	console.group(color.cyan(`\n📦 Configuring ${metadata.label}`));
 
 	try {
+		// Local provider — prompt for base URL instead of API key
+		if (providerName === ProviderName.LOCAL) {
+			await configureLocalProvider(metadata, config);
+			console.groupEnd();
+			return;
+		}
+
 		// Providers that don't require API key
 		if (!metadata.requiresApiKey) {
 			if (metadata.helpText) {
@@ -104,50 +202,8 @@ export async function configureProvider(providerName: string, config: Config): P
 
 		// Check if this is Anthropic provider - offer Vertex AI option
 		if (providerName === ProviderName.ANTHROPIC) {
-			const { useVertex } = await prompt.prompt([
-				{
-					default: false,
-					message: 'Use Vertex AI for Claude? (Recommended for enterprise environments)',
-					name: 'useVertex',
-					type: 'confirm'
-				}
-			]);
-
-			if (useVertex) {
-				// Configure Vertex AI
-				const vertexAnswers = await prompt.prompt([
-					{
-						message: 'Vertex AI Project ID:',
-						name: 'vertexProjectId',
-						type: 'input',
-						validate: (input: unknown) => {
-							if (typeof input !== 'string' || !input || input.trim().length === 0) {
-								return 'Vertex AI Project ID is required';
-							}
-							return true;
-						}
-					},
-					{
-						default: 'global',
-						message: 'Cloud ML Region:',
-						name: 'vertexRegion',
-						type: 'input'
-					},
-					{
-						default: metadata.defaultModel,
-						message: 'Default model:',
-						name: 'defaultModel',
-						type: 'input'
-					}
-				]);
-
-				config.providers[providerName as keyof typeof config.providers] = {
-					default_model: (vertexAnswers['defaultModel'] as string).trim() || metadata.defaultModel,
-					vertexAI: true,
-					vertexProjectId: (vertexAnswers['vertexProjectId'] as string).trim(),
-					vertexRegion: (vertexAnswers['vertexRegion'] as string).trim()
-				};
-
+			const usedVertex = await configureAnthropicVertexOption(metadata, providerName, config);
+			if (usedVertex) {
 				console.groupEnd();
 				return;
 			}

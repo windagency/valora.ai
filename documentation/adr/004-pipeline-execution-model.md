@@ -269,6 +269,6 @@ Full workflow orchestration platform.
 
 ## References
 
-- [Pipeline](../../.bin/src/executor/pipeline.ts)
-- [Stage Executor](../../.bin/src/executor/stage-executor.ts)
-- [Pipeline Events](../../.bin/src/executor/pipeline-events.ts)
+- [Pipeline](../../src/executor/pipeline.ts)
+- [Stage Executor](../../src/executor/stage-executor.ts)
+- [Pipeline Events](../../src/executor/pipeline-events.ts)

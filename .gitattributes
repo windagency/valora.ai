@@ -6,6 +6,10 @@
 *.jpg       binary
 *.jpeg      binary
 *.webp      binary
+*.gif       binary
+*.mov       binary
+*.mp4       binary
+*.webm      binary
 
 #
 # Exclude files from exporting

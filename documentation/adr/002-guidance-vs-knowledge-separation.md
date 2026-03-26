@@ -122,4 +122,4 @@ const knowledge = await loadProjectKnowledge(['PRD.md', 'FUNCTIONAL.md']);
 
 - [ADR-001: Multi-Agent Architecture](./001-multi-agent-architecture.md)
 - [Command Registry](../../commands/registry.json)
-- [Project Guidance Loader](../../.bin/src/executor/project-guidance-loader.ts)
+- [Project Guidance Loader](../../src/executor/project-guidance-loader.ts)

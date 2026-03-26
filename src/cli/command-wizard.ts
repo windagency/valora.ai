@@ -142,7 +142,8 @@ export class CommandWizard {
 							{ name: 'Cursor (recommended)', value: 'cursor' },
 							{ name: 'Anthropic', value: 'anthropic' },
 							{ name: 'OpenAI', value: 'openai' },
-							{ name: 'Google', value: 'google' }
+							{ name: 'Google', value: 'google' },
+							{ name: 'Local (Ollama, LM Studio, etc.)', value: 'local' }
 						],
 						default: 'cursor',
 						message: 'AI Provider:',
@@ -329,7 +330,8 @@ ${color.green('  $ ' + config.preview(answers))}
 						{ name: 'Default', value: '' },
 						{ name: 'Cursor', value: 'cursor' },
 						{ name: 'Anthropic', value: 'anthropic' },
-						{ name: 'OpenAI', value: 'openai' }
+						{ name: 'OpenAI', value: 'openai' },
+						{ name: 'Local (Ollama, LM Studio, etc.)', value: 'local' }
 					],
 					default: '',
 					message: 'Provider override (optional):',

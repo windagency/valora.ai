@@ -13,6 +13,7 @@ export enum ProviderName {
 	ANTHROPIC = 'anthropic',
 	CURSOR = 'cursor',
 	GOOGLE = 'google',
+	LOCAL = 'local',
 	MOONSHOT = 'moonshot',
 	OPENAI = 'openai',
 	XAI = 'xai'

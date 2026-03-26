@@ -28,6 +28,7 @@
   <img src="https://img.shields.io/badge/OpenAI-GPT--5-412991?style=flat-square" alt="OpenAI" />
   <img src="https://img.shields.io/badge/Google-Gemini-4285f4?style=flat-square" alt="Google" />
   <img src="https://img.shields.io/badge/Cursor-MCP-000000?style=flat-square" alt="Cursor" />
+  <img src="https://img.shields.io/badge/Local-LLM-34d399?style=flat-square" alt="Local" />
 </p>
 
 ---
@@ -78,8 +79,10 @@ Flexible execution modes for every use case:
 | 1    | MCP Sampling      | Free\*      |
 | 2    | Guided Completion | Free        |
 | 3    | API Fallback      | Pay-per-use |
+| 3    | Local Models      | Free\*\*    |
 
 _\*When available in Cursor_
+_\*\*Requires a running local model server (e.g. Ollama)_
 
 **Zero configuration required** — works immediately with your Cursor subscription.
 
@@ -215,7 +218,7 @@ valora plan "Add dark mode toggle"
 
 ### Optional: API Configuration
 
-For fully autonomous execution:
+For fully autonomous execution with cloud providers:
 
 ```bash
 valora config setup --quick
@@ -223,6 +226,23 @@ valora config setup --quick
 # Or set environment variables
 export ANTHROPIC_API_KEY=sk-ant-...
 export OPENAI_API_KEY=sk-...
+```
+
+### Optional: Local Models (No API Key)
+
+Run fully offline with Ollama or any OpenAI-compatible server:
+
+```bash
+# Install and start Ollama
+ollama pull llama3.1
+ollama serve
+
+# Use it directly
+valora plan "Add auth" --provider local --model llama3.1
+
+# Or configure as default
+export LOCAL_BASE_URL=http://localhost:11434/v1
+export LOCAL_DEFAULT_MODEL=llama3.1
 ```
 
 ---
@@ -240,6 +260,7 @@ export OPENAI_API_KEY=sk-...
 │   │ • Commands  │  │ • Pipeline   │  │ • Registry  │  │ • Anthropic │   │
 │   │ • Wizard    │  │ • Executor   │  │ • Selection │  │ • OpenAI    │   │
 │   │ • Output    │  │ • Context    │  │ • Loading   │  │ • Google    │   │
+│   │             │  │              │  │             │  │ • Local     │   │
 │   └─────────────┘  └──────────────┘  └─────────────┘  └─────────────┘   │
 │                                                                         │
 │   ┌─────────────┐  ┌──────────────┐  ┌─────────────┐  ┌─────────────┐   │
