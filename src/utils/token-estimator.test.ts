@@ -98,17 +98,17 @@ describe('calculateActualCost', () => {
 			total_tokens: 5500
 		};
 
-		const result = calculateActualCost(usage, 'gpt-4o');
+		const result = calculateActualCost(usage, 'gpt-5');
 
-		// input: 5000/1M * 2.5 = 0.0125
+		// input: 5000/1M * 1.25 = 0.00625
 		// output: 500/1M * 10.0 = 0.005
-		// cache_read: 20000/1M * 1.25 = 0.025
+		// cache_read: 20000/1M * 0.125 = 0.0025
 		// no cache_write surcharge for OpenAI
-		// total = 0.0425
-		expect(result.totalCost).toBe(0.0425);
+		// total = 0.01375
+		expect(result.totalCost).toBe(0.0138); // rounded to 4 decimal places
 
-		// savings: (20000/1M * 2.5) - (20000/1M * 1.25) = 0.05 - 0.025 = 0.025
-		expect(result.cacheSavings).toBe(0.025);
+		// savings: (20000/1M * 1.25) - (20000/1M * 0.125) = 0.025 - 0.0025 = 0.0225
+		expect(result.cacheSavings).toBe(0.0225);
 	});
 
 	it('should calculate correctly for Google model with context caching', () => {
@@ -119,16 +119,16 @@ describe('calculateActualCost', () => {
 			total_tokens: 11000
 		};
 
-		const result = calculateActualCost(usage, 'gemini-1.5-pro');
+		const result = calculateActualCost(usage, 'gemini-2.5-pro');
 
 		// input: 10000/1M * 1.25 = 0.0125
-		// output: 1000/1M * 5.0 = 0.005
-		// cache_read: 100000/1M * 0.3125 = 0.03125
-		// total = 0.04875
-		expect(result.totalCost).toBe(0.0488); // rounded to 4 decimal places
+		// output: 1000/1M * 10.0 = 0.01
+		// cache_read: 100000/1M * 0.125 = 0.0125
+		// total = 0.035
+		expect(result.totalCost).toBe(0.035);
 
-		// savings: (100000/1M * 1.25) - (100000/1M * 0.3125) = 0.125 - 0.03125 = 0.09375
-		expect(result.cacheSavings).toBe(0.0938); // rounded
+		// savings: (100000/1M * 1.25) - (100000/1M * 0.125) = 0.125 - 0.0125 = 0.1125
+		expect(result.cacheSavings).toBe(0.1125);
 	});
 
 	it('should calculate correctly for haiku model with caching', () => {
@@ -140,7 +140,7 @@ describe('calculateActualCost', () => {
 			total_tokens: 3000
 		};
 
-		const result = calculateActualCost(usage, 'claude-3-5-haiku-latest');
+		const result = calculateActualCost(usage, 'claude-haiku-4.5');
 
 		// input: 2000/1M * 1.0 = 0.002
 		// output: 1000/1M * 5.0 = 0.005
@@ -156,7 +156,7 @@ describe('calculateActualCost', () => {
 
 describe('getModelPricing', () => {
 	it('should return cache pricing for Anthropic models', () => {
-		const pricing = getModelPricing('claude-3-5-sonnet-latest');
+		const pricing = getModelPricing('claude-sonnet-4.6');
 
 		expect(pricing).toBeDefined();
 		expect(pricing?.cache_read).toBeDefined();
@@ -166,7 +166,7 @@ describe('getModelPricing', () => {
 	});
 
 	it('should include cache_read pricing for OpenAI models with automatic caching', () => {
-		const pricing = getModelPricing('gpt-4o');
+		const pricing = getModelPricing('gpt-5');
 
 		expect(pricing).toBeDefined();
 		expect(pricing?.cache_read).toBeDefined();
@@ -176,7 +176,7 @@ describe('getModelPricing', () => {
 	});
 
 	it('should include cache_read pricing for Google models with context caching', () => {
-		const pricing = getModelPricing('gemini-1.5-pro');
+		const pricing = getModelPricing('gemini-2.5-pro');
 
 		expect(pricing).toBeDefined();
 		expect(pricing?.cache_read).toBeDefined();

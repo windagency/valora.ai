@@ -149,6 +149,6 @@ Located in `src/cli/provider-fallback-service.ts`:
 
 ## References
 
-- [Provider Resolver](../../.bin/src/cli/provider-resolver.ts)
-- [Provider Fallback Service](../../.bin/src/cli/provider-fallback-service.ts)
+- [Provider Resolver](../../src/cli/provider-resolver.ts)
+- [Provider Fallback Service](../../src/cli/provider-fallback-service.ts)
 - [User Guide - Execution Modes](../user-guide/README.md)

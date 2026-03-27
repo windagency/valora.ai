@@ -12,6 +12,7 @@ VALORA needs to support multiple LLM providers:
 2. **OpenAI**: GPT models (GPT-4, GPT-5)
 3. **Google AI**: Gemini models
 4. **Cursor**: IDE-integrated AI (via MCP)
+5. **Local**: Any OpenAI-compatible local server (Ollama, LM Studio, vLLM, llama.cpp, LocalAI)
 
 Each provider has different:
 
@@ -113,6 +114,7 @@ Each provider implements prompt caching according to its API's capabilities. Cac
 | **OpenAI**    | Automatic prompt caching                                                            | No — metrics extracted automatically            | Read: 0.5× input (50% off), no write surcharge |
 | **Google**    | Context caching                                                                     | No — metrics extracted automatically            | Read: 0.25× input (75% off)                    |
 | **Cursor**    | N/A (MCP protocol)                                                                  | N/A                                             | N/A                                            |
+| **Local**     | Server-dependent                                                                    | Server-dependent                                | N/A (local compute)                            |
 
 ### Anthropic Cache Strategy
 
@@ -153,6 +155,7 @@ The `isBatchableProvider()` type guard performs a runtime check so the stage exe
 | **OpenAI**    | Batch API (`/v1/batches`)                | ~50%     | `true`            |
 | **Google**    | Vertex AI (not yet implemented)          | ~50%     | `false`           |
 | **Cursor**    | Not supported                            | —        | N/A               |
+| **Local**     | Not supported                            | —        | N/A               |
 
 Batch results include `batch_discount_applied: true` on the `LLMUsage` object so cost reporting can distinguish batch from real-time calls.
 
@@ -231,6 +234,32 @@ class CursorProvider implements LLMProvider {
 }
 ```
 
+### Local Provider
+
+Targets any OpenAI-compatible local model server. No API key is required — uses the `openai` SDK with a configurable `baseURL` (default: `http://localhost:11434/v1`).
+
+```typescript
+class LocalProvider extends BaseLLMProvider {
+	// No API key needed — isConfigured() always returns true
+	isConfigured(): boolean {
+		return true;
+	}
+
+	// Model names are fully dynamic — validateModel() always returns true
+	validateModel(_model: string): Promise<boolean> {
+		return Promise.resolve(true);
+	}
+}
+```
+
+Key differences from the OpenAI provider:
+
+- No API key required
+- No rate limiting or circuit breaker (local servers have no quotas)
+- Connection errors produce local-specific guidance ("Is your server running?")
+- Tool call JSON parsing failures are handled gracefully (some local models return malformed JSON)
+- Model names are pass-through; keywords like `llama`, `mistral`, `phi`, `qwen`, `codellama`, `deepseek`, `yi` auto-route to this provider
+
 ## Model Assignment
 
 Commands specify preferred models:
@@ -238,7 +267,7 @@ Commands specify preferred models:
 ```json
 {
 	"plan": { "model": "gpt-5-thinking-high" },
-	"implement": { "model": "claude-sonnet-4.5" },
+	"implement": { "model": "claude-sonnet-4.6" },
 	"test": { "model": "claude-haiku-4.5" }
 }
 ```
@@ -312,7 +341,8 @@ Provider configuration in `config.json`:
 
 ## References
 
-- [Provider Interface](../../.bin/src/llm/provider.interface.ts)
-- [Provider Registry](../../.bin/src/llm/registry.ts)
-- [Anthropic Provider](../../.bin/src/llm/providers/anthropic.provider.ts)
-- [OpenAI Provider](../../.bin/src/llm/providers/openai.provider.ts)
+- [Provider Interface](../../src/llm/provider.interface.ts)
+- [Provider Registry](../../src/llm/registry.ts)
+- [Anthropic Provider](../../src/llm/providers/anthropic.provider.ts)
+- [OpenAI Provider](../../src/llm/providers/openai.provider.ts)
+- [Local Provider](../../src/llm/providers/local.provider.ts)

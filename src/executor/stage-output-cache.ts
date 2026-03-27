@@ -86,8 +86,8 @@ export class StageOutputCache {
 	private cleanupTimer: NodeJS.Timeout | null = null;
 	private defaultTtl: number;
 
-	constructor(projectRoot: string = process.cwd(), defaultTtl: number = DEFAULT_TTL_MS) {
-		this.cacheDir = join(projectRoot, CACHE_DIR);
+	constructor(defaultTtl: number = DEFAULT_TTL_MS) {
+		this.cacheDir = CACHE_DIR;
 		this.defaultTtl = defaultTtl;
 		this.ensureCacheDir();
 		this.startCleanupTimer();
@@ -96,8 +96,8 @@ export class StageOutputCache {
 	/**
 	 * Get singleton instance
 	 */
-	static getInstance(projectRoot?: string): StageOutputCache {
-		StageOutputCache.instance ??= new StageOutputCache(projectRoot);
+	static getInstance(): StageOutputCache {
+		StageOutputCache.instance ??= new StageOutputCache();
 		return StageOutputCache.instance;
 	}
 
@@ -516,6 +516,6 @@ export class StageOutputCache {
 /**
  * Get the singleton stage output cache instance
  */
-export function getStageOutputCache(projectRoot?: string): StageOutputCache {
-	return StageOutputCache.getInstance(projectRoot);
+export function getStageOutputCache(): StageOutputCache {
+	return StageOutputCache.getInstance();
 }

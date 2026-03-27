@@ -47,7 +47,7 @@ export function CacheStatsView({ data }: { data: CacheData }): React.JSX.Element
 						)}
 					</Box>
 				) : (
-					<Text dimColor>No cached entries</Text>
+					<Text dimColor>No entries — run a command with --dry-run to populate</Text>
 				)}
 			</Box>
 
@@ -79,7 +79,7 @@ export function CacheStatsView({ data }: { data: CacheData }): React.JSX.Element
 						)}
 					</Box>
 				) : (
-					<Text dimColor>No cached entries</Text>
+					<Text dimColor>No entries — cache populates after stage execution (1hr TTL)</Text>
 				)}
 			</Box>
 		</Box>

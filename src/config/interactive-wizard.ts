@@ -49,11 +49,7 @@ ${color.gray('   API keys are optional - only needed for CLI or specific provide
 
 		console.log();
 
-		const config: Config = {
-			defaults: { ...DEFAULT_CONFIG.defaults },
-			paths: { ...DEFAULT_CONFIG.paths },
-			providers: {}
-		};
+		const config = await this.buildBaseConfig();
 
 		try {
 			// Ask which providers to configure
@@ -111,6 +107,25 @@ ${color.gray(`Config file: ${this.configLoader.getConfigPath()}`)}`);
 	}
 
 	/**
+	 * Build a base Config by loading the existing config file and preserving all
+	 * non-wizard-managed settings (features, logging, sessions, hooks, paths).
+	 * Providers are preserved from the existing file; default_provider is cleared
+	 * so the wizard can set it fresh.
+	 */
+	private async buildBaseConfig(): Promise<Config> {
+		const raw = await this.configLoader.loadRaw();
+		return {
+			defaults: { ...DEFAULT_CONFIG.defaults, ...(raw.defaults ?? {}), default_provider: undefined },
+			paths: raw.paths ?? DEFAULT_CONFIG.paths,
+			providers: { ...(raw.providers ?? {}) },
+			...(raw.features && { features: raw.features }),
+			...(raw.logging && { logging: raw.logging }),
+			...(raw.sessions && { sessions: raw.sessions }),
+			...(raw.hooks && { hooks: raw.hooks })
+		} as Config;
+	}
+
+	/**
 	 * Select default provider based on configured providers
 	 */
 	private async selectDefaultProvider(
@@ -157,20 +172,11 @@ ${color.gray(`Config file: ${this.configLoader.getConfigPath()}`)}`);
 		try {
 			const { apiKey, providerChoice } = await this.getProviderFromEnvOrPrompt(color);
 
-			const config: Config = {
-				...DEFAULT_CONFIG,
-				defaults: {
-					...DEFAULT_CONFIG.defaults,
-					default_provider: providerChoice
-				},
-				providers: apiKey
-					? {
-							[providerChoice]: {
-								apiKey: apiKey
-							}
-						}
-					: {}
-			};
+			const config = await this.buildBaseConfig();
+			config.defaults.default_provider = providerChoice;
+			if (apiKey) {
+				config.providers[providerChoice as keyof typeof config.providers] = { apiKey };
+			}
 
 			await this.configLoader.save(config);
 

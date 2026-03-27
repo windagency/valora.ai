@@ -15,7 +15,11 @@ export interface EndpointSummary {
 	cacheSavingsUsd: number;
 	command: string;
 	requestCount: number;
+	totalCacheReadTokens: number;
+	totalCacheWriteTokens: number;
 	totalCostUsd: number;
+	totalInputTokens: number;
+	totalOutputTokens: number;
 	totalTokens: number;
 }
 
@@ -26,25 +30,43 @@ export interface GetRecordsOptions {
 
 export interface SpendingRecord {
 	batchDiscounted: boolean;
+	cacheReadCostUsd: number;
 	cacheReadTokens: number;
 	cacheSavingsUsd: number;
+	cacheWriteCostUsd: number;
 	cacheWriteTokens: number;
 	command: string;
 	completionTokens: number;
+	contextSavingsPercent?: number;
+	contextTokensAfter?: number;
+	contextTokensBefore?: number;
 	costUsd: number;
 	durationMs: number;
 	id: string;
+	inputCostUsd: number;
 	model: string;
+	outputCostUsd: number;
+	progressiveDisclosureCalls?: number;
 	promptTokens: number;
 	stage: string;
 	timestamp: string;
 	totalTokens: number;
+	unknownModelPricing: boolean;
 }
 
 export interface SpendingTotals {
 	cacheSavingsUsd: number;
+	hasUnknownModelPricing: boolean;
 	requestCount: number;
+	totalCacheReadCostUsd: number;
+	totalCacheReadTokens: number;
+	totalCacheWriteCostUsd: number;
+	totalCacheWriteTokens: number;
 	totalCostUsd: number;
+	totalInputCostUsd: number;
+	totalInputTokens: number;
+	totalOutputCostUsd: number;
+	totalOutputTokens: number;
 	totalTokens: number;
 }
 
@@ -100,6 +122,10 @@ export class SpendingTracker {
 			if (existing) {
 				existing.totalCostUsd += r.costUsd;
 				existing.totalTokens += r.totalTokens;
+				existing.totalInputTokens += r.promptTokens;
+				existing.totalOutputTokens += r.completionTokens;
+				existing.totalCacheReadTokens += r.cacheReadTokens;
+				existing.totalCacheWriteTokens += r.cacheWriteTokens;
 				existing.requestCount += 1;
 				existing.cacheSavingsUsd += r.cacheSavingsUsd;
 				existing.avgCostUsd = existing.totalCostUsd / existing.requestCount;
@@ -109,7 +135,11 @@ export class SpendingTracker {
 					cacheSavingsUsd: r.cacheSavingsUsd,
 					command: r.command,
 					requestCount: 1,
+					totalCacheReadTokens: r.cacheReadTokens,
+					totalCacheWriteTokens: r.cacheWriteTokens,
 					totalCostUsd: r.costUsd,
+					totalInputTokens: r.promptTokens,
+					totalOutputTokens: r.completionTokens,
 					totalTokens: r.totalTokens
 				});
 			}
@@ -132,14 +162,38 @@ export class SpendingTracker {
 	 */
 	getTotals(opts?: GetRecordsOptions): SpendingTotals {
 		const records = this.getRecords(opts);
+		const initial: SpendingTotals = {
+			cacheSavingsUsd: 0,
+			hasUnknownModelPricing: false,
+			requestCount: 0,
+			totalCacheReadCostUsd: 0,
+			totalCacheReadTokens: 0,
+			totalCacheWriteCostUsd: 0,
+			totalCacheWriteTokens: 0,
+			totalCostUsd: 0,
+			totalInputCostUsd: 0,
+			totalInputTokens: 0,
+			totalOutputCostUsd: 0,
+			totalOutputTokens: 0,
+			totalTokens: 0
+		};
 		return records.reduce(
 			(acc, r) => ({
 				cacheSavingsUsd: acc.cacheSavingsUsd + r.cacheSavingsUsd,
+				hasUnknownModelPricing: acc.hasUnknownModelPricing || (r.unknownModelPricing ?? false),
 				requestCount: acc.requestCount + 1,
+				totalCacheReadCostUsd: acc.totalCacheReadCostUsd + (r.cacheReadCostUsd ?? 0),
+				totalCacheReadTokens: acc.totalCacheReadTokens + r.cacheReadTokens,
+				totalCacheWriteCostUsd: acc.totalCacheWriteCostUsd + (r.cacheWriteCostUsd ?? 0),
+				totalCacheWriteTokens: acc.totalCacheWriteTokens + r.cacheWriteTokens,
 				totalCostUsd: acc.totalCostUsd + r.costUsd,
+				totalInputCostUsd: acc.totalInputCostUsd + (r.inputCostUsd ?? 0),
+				totalInputTokens: acc.totalInputTokens + r.promptTokens,
+				totalOutputCostUsd: acc.totalOutputCostUsd + (r.outputCostUsd ?? 0),
+				totalOutputTokens: acc.totalOutputTokens + r.completionTokens,
 				totalTokens: acc.totalTokens + r.totalTokens
 			}),
-			{ cacheSavingsUsd: 0, requestCount: 0, totalCostUsd: 0, totalTokens: 0 }
+			initial
 		);
 	}
 }

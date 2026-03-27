@@ -74,5 +74,8 @@ export function shouldTriggerFirstRun(args: string[]): boolean {
 	const hasHelpFlag = args.some((arg) => helpFlags.includes(arg));
 	const hasVersionFlag = args.some((arg) => versionFlags.includes(arg));
 
-	return !hasHelpFlag && !hasVersionFlag;
+	// Don't trigger when user is explicitly running config setup
+	const isConfigSetup = args[0] === 'config' && args[1] === 'setup';
+
+	return !hasHelpFlag && !hasVersionFlag && !isConfigSetup;
 }

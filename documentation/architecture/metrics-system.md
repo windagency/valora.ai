@@ -801,7 +801,7 @@ For detailed per-stage and per-tool breakdown, switch to the **Performance** tab
 - [User Guide: Metrics](../user-guide/metrics.md) - User-facing documentation
 - [Automated Reporting](../../AUTOMATED_REPORTING.md) - Complete automation guide
 - [Workflow Optimizations](../../WORKFLOW_OPTIMIZATIONS.md) - Optimization details
-- [Session Types](../../.bin/src/types/session.types.ts) - TypeScript definitions
+- [Session Types](../../src/types/session.types.ts) - TypeScript definitions
 
 ---
 

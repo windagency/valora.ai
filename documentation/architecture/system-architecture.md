@@ -121,6 +121,18 @@ C4Container
 | Variable Resolution | Resolve template variables |
 | Coordinator         | Multi-step coordination    |
 
+### Code Intelligence Layer
+
+**Purpose**: AST-based codebase understanding and language server integration
+
+| Component          | Responsibility                                      |
+| ------------------ | --------------------------------------------------- |
+| AST Parser         | Parse source files via tree-sitter WASM             |
+| Symbol Index       | Build and query a persistent codebase symbol index  |
+| Smart Context      | Budget-aware context extraction for token reduction |
+| LSP Client Manager | Manage language server connections                  |
+| LSP Tools          | Go-to-definition, hover info, diagnostics           |
+
 ### Agent Layer
 
 **Purpose**: AI agent management and selection

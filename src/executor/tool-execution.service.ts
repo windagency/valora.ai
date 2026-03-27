@@ -42,9 +42,13 @@
  * not when the LLM is working through normal search/navigation patterns.
  */
 
+import { type ASTToolsService, getASTToolsService } from 'ast/ast-tools.service';
 import { exec } from 'child_process';
 import { existsSync, readdirSync, rmSync, statSync } from 'fs';
+import { getLSPToolsService, type LSPToolsService } from 'lsp/lsp-tools.service';
 import { dirname, resolve } from 'path';
+import { getCommandGuard } from 'security/command-guard';
+import { getCredentialGuard } from 'security/credential-guard';
 import { fileURLToPath } from 'url';
 import { promisify } from 'util';
 
@@ -128,6 +132,86 @@ const BUILT_IN_TOOL_DEFINITIONS: Record<BuiltInTool, LLMToolDefinition> = {
 			type: 'object'
 		}
 	},
+	file_outline: {
+		description:
+			'Get a structured outline of a file showing all symbols (functions, classes, types) with their signatures and line numbers. ' +
+			'Uses the AST index for fast, precise results.',
+		name: 'file_outline',
+		parameters: {
+			properties: {
+				path: {
+					description: 'Path to the file to outline',
+					type: 'string'
+				}
+			},
+			required: ['path'],
+			type: 'object'
+		}
+	},
+	find_references: {
+		description:
+			'Find all files and locations that reference a given symbol name. ' +
+			'Uses the AST index for cross-file reference finding. Falls back to grep when index unavailable.',
+		name: 'find_references',
+		parameters: {
+			properties: {
+				path: {
+					description: 'Optional scope: only search within this directory',
+					type: 'string'
+				},
+				symbol: {
+					description: 'Symbol name to find references for',
+					type: 'string'
+				}
+			},
+			required: ['symbol'],
+			type: 'object'
+		}
+	},
+	get_diagnostics: {
+		description:
+			'Get compiler errors and warnings for a file from the language server. ' +
+			'Requires a running language server for the file type.',
+		name: 'get_diagnostics',
+		parameters: {
+			properties: {
+				file_path: {
+					description: 'Path to the file to check',
+					type: 'string'
+				}
+			},
+			required: ['file_path'],
+			type: 'object'
+		}
+	},
+	get_type_info: {
+		description:
+			'Get the type signature of a symbol from the language server. ' +
+			'Accepts either a symbol name or a line/character position.',
+		name: 'get_type_info',
+		parameters: {
+			properties: {
+				character: {
+					description: '0-based character offset (alternative to symbol)',
+					type: 'number'
+				},
+				file_path: {
+					description: 'Path to the file',
+					type: 'string'
+				},
+				line: {
+					description: '0-based line number (alternative to symbol)',
+					type: 'number'
+				},
+				symbol: {
+					description: 'Symbol name to look up',
+					type: 'string'
+				}
+			},
+			required: ['file_path'],
+			type: 'object'
+		}
+	},
 	glob_file_search: {
 		description: `Find files matching a glob pattern.
 
@@ -156,6 +240,34 @@ This tool (glob_file_search) is acceptable for simple patterns, but fd is faster
 				}
 			},
 			required: ['pattern'],
+			type: 'object'
+		}
+	},
+	goto_definition: {
+		description:
+			'Find where a symbol is defined using the language server. ' +
+			'Accepts either a symbol name or a line/character position.',
+		name: 'goto_definition',
+		parameters: {
+			properties: {
+				character: {
+					description: '0-based character offset (alternative to symbol)',
+					type: 'number'
+				},
+				file_path: {
+					description: 'Path to the file containing the symbol usage',
+					type: 'string'
+				},
+				line: {
+					description: '0-based line number (alternative to symbol)',
+					type: 'number'
+				},
+				symbol: {
+					description: 'Symbol name to look up',
+					type: 'string'
+				}
+			},
+			required: ['file_path'],
 			type: 'object'
 		}
 	},
@@ -199,6 +311,32 @@ Only use this legacy grep tool if:
 				}
 			},
 			required: ['pattern'],
+			type: 'object'
+		}
+	},
+	hover_info: {
+		description: 'Get full documentation and type signature for a symbol from the language server.',
+		name: 'hover_info',
+		parameters: {
+			properties: {
+				character: {
+					description: '0-based character offset (alternative to symbol)',
+					type: 'number'
+				},
+				file_path: {
+					description: 'Path to the file',
+					type: 'string'
+				},
+				line: {
+					description: '0-based line number (alternative to symbol)',
+					type: 'number'
+				},
+				symbol: {
+					description: 'Symbol name to look up',
+					type: 'string'
+				}
+			},
+			required: ['file_path'],
 			type: 'object'
 		}
 	},
@@ -277,6 +415,27 @@ Violating these restrictions wastes tokens and degrades performance.`,
 			type: 'object'
 		}
 	},
+	request_context: {
+		description:
+			'Request additional code context for a file or symbol. ' +
+			'Use this when smart_context provided insufficient detail. ' +
+			'Returns signatures-only or full content based on level.',
+		name: 'request_context',
+		parameters: {
+			properties: {
+				level: {
+					description: 'Detail level: "signatures" (declarations only) or "full" (complete source)',
+					type: 'string'
+				},
+				target: {
+					description: 'File path or symbol name to get context for',
+					type: 'string'
+				}
+			},
+			required: ['target'],
+			type: 'object'
+		}
+	},
 	run_terminal_cmd: {
 		description: 'Execute a shell command and return the output',
 		name: 'run_terminal_cmd',
@@ -317,6 +476,59 @@ Violating these restrictions wastes tokens and degrades performance.`,
 			type: 'object'
 		}
 	},
+	smart_context: {
+		description:
+			'Get minimal, budget-aware code context relevant to a task. ' +
+			'Returns only the most relevant symbols and signatures, reducing token usage by 40-60%.',
+		name: 'smart_context',
+		parameters: {
+			properties: {
+				budget: {
+					description: 'Maximum token budget for the context',
+					type: 'number'
+				},
+				files: {
+					description: 'Specific files to focus on',
+					items: { type: 'string' },
+					type: 'array'
+				},
+				mode: {
+					description: 'Context mode: "focused" (fewer files, more detail) or "broad" (more files, less detail)',
+					type: 'string'
+				},
+				task: {
+					description: 'Task description to determine relevant context',
+					type: 'string'
+				}
+			},
+			required: ['task'],
+			type: 'object'
+		}
+	},
+	symbol_search: {
+		description:
+			'Find functions, classes, types, and other symbols by name using the AST index. ' +
+			'Supports fuzzy matching. Much faster and more precise than grep for finding definitions.',
+		name: 'symbol_search',
+		parameters: {
+			properties: {
+				kind: {
+					description: 'Filter by symbol kind: function, class, interface, type, enum, method, variable, constant',
+					type: 'string'
+				},
+				language: {
+					description: 'Filter by language: typescript, javascript, python, go, rust, java',
+					type: 'string'
+				},
+				query: {
+					description: 'Symbol name to search for (supports fuzzy matching)',
+					type: 'string'
+				}
+			},
+			required: ['query'],
+			type: 'object'
+		}
+	},
 	web_search: {
 		description: 'Search the web for information',
 		name: 'web_search',
@@ -352,9 +564,11 @@ Violating these restrictions wastes tokens and degrades performance.`,
 };
 
 export class ToolExecutionService {
+	private readonly astToolsService: ASTToolsService;
 	private readonly hookExecutionService = getHookExecutionService();
 	private readonly idempotencyStore: IdempotencyStoreService;
 	private readonly logger = getLogger();
+	private readonly lspToolsService: LSPToolsService;
 	private mcpClientManager: MCPClientManagerService | null = null;
 	private mcpToolHandler: MCPToolHandler | null = null;
 	private readonly searchToolsService: SearchToolsService;
@@ -406,6 +620,8 @@ export class ToolExecutionService {
 	constructor(workingDir: string = process.cwd()) {
 		this.workingDir = workingDir;
 		this.idempotencyStore = getIdempotencyStore();
+		this.astToolsService = getASTToolsService(workingDir);
+		this.lspToolsService = getLSPToolsService(workingDir);
 		this.searchToolsService = getSearchToolsService(workingDir);
 		this.sessionToolsService = getSessionToolsService(workingDir);
 	}
@@ -844,13 +1060,22 @@ export class ToolExecutionService {
 		const toolHandlers: Record<BuiltInTool, (args: Record<string, unknown>) => Promise<string>> = {
 			['codebase_search']: (a) => this.searchToolsService.executeCodebaseSearch(a),
 			['delete_file']: (a) => this.executeDeleteFile(a),
+			['file_outline']: (a) => Promise.resolve(this.astToolsService.executeFileOutline(a)),
+			['find_references']: (a) => Promise.resolve(this.astToolsService.executeFindReferences(a)),
+			['get_diagnostics']: (a) => this.lspToolsService.executeGetDiagnostics(a),
+			['get_type_info']: (a) => this.lspToolsService.executeGetTypeInfo(a),
 			['glob_file_search']: (a) => this.searchToolsService.executeGlobSearch(a),
+			['goto_definition']: (a) => this.lspToolsService.executeGotoDefinition(a),
 			['grep']: (a) => this.searchToolsService.executeGrep(a),
+			['hover_info']: (a) => this.lspToolsService.executeHoverInfo(a),
 			['list_dir']: (a) => this.executeListDir(a),
 			['query_session']: (a) => this.sessionToolsService.executeQuerySession(a),
 			['read_file']: (a) => this.executeReadFile(a),
+			['request_context']: (a) => this.astToolsService.executeRequestContext(a),
 			['run_terminal_cmd']: (a) => this.executeTerminalCmd(a),
 			['search_replace']: (a) => this.executeSearchReplace(a),
+			['smart_context']: (a) => Promise.resolve(this.astToolsService.executeSmartContext(a)),
+			['symbol_search']: (a) => Promise.resolve(this.astToolsService.executeSymbolSearch(a)),
 			['web_search']: (a) => this.executeWebSearch(a),
 			['write']: (a) => this.executeWrite(a)
 		};
@@ -1066,6 +1291,11 @@ export class ToolExecutionService {
 		const blockedPath = ToolExecutionService.BLOCKED_READ_PATHS.find((blocked) => path.includes(blocked));
 		if (blockedPath) {
 			return `Cannot read files in ${blockedPath} — these files may be very large or contain session data`;
+		}
+
+		// Block sensitive files (credentials, keys, etc.)
+		if (getCredentialGuard().isSensitiveFile(path)) {
+			return `Cannot read sensitive file: ${path} — this file may contain credentials or private keys`;
 		}
 
 		const fullPath = this.resolvePath(path);
@@ -1362,14 +1592,23 @@ export class ToolExecutionService {
 		const command = await this.resolveCommand(raw);
 		this.logger.info(`Executing command: ${command}`);
 
+		// Validate command against security blocklist
+		const commandCheck = getCommandGuard().validate(command);
+		if (!commandCheck.allowed) {
+			return `Command blocked by security policy: ${commandCheck.reason}\n\nUse a different approach that does not involve blocked commands or patterns.`;
+		}
+
+		const credentialGuard = getCredentialGuard();
+
 		try {
 			const { stderr, stdout } = await execAsync(command, {
 				cwd: this.workingDir,
-				env: { ...process.env, PATH: this.buildAugmentedPath() },
+				env: { ...credentialGuard.sanitiseEnvironment(process.env), PATH: this.buildAugmentedPath() },
 				timeout: timeoutMs
 			});
 
-			const output = stdout + (stderr ? `\nStderr: ${stderr}` : '');
+			const rawOutput = stdout + (stderr ? `\nStderr: ${stderr}` : '');
+			const output = credentialGuard.scanOutput(rawOutput);
 
 			return truncateTerminalOutput(output) || 'Command completed successfully (no output)';
 		} catch (error) {

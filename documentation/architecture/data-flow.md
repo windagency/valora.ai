@@ -421,15 +421,16 @@ flowchart TD
 
 ### What's Cached
 
-| Data Type         | Cache Location      | TTL              |
-| ----------------- | ------------------- | ---------------- |
-| Agent definitions | Memory              | Session lifetime |
-| Command specs     | Memory              | Session lifetime |
-| Prompt templates  | Memory              | Session lifetime |
-| Configuration     | Memory              | Until reload     |
-| Session data      | File                | Configurable     |
-| LLM prompt tokens | Provider-side (API) | ~5 minutes       |
-| LLM responses     | None                | Not cached       |
+| Data Type         | Cache Location        | TTL                |
+| ----------------- | --------------------- | ------------------ |
+| Agent definitions | Memory                | Session lifetime   |
+| Command specs     | Memory                | Session lifetime   |
+| Prompt templates  | Memory                | Session lifetime   |
+| Configuration     | Memory                | Until reload       |
+| Session data      | File                  | Configurable       |
+| LLM prompt tokens | Provider-side (API)   | ~5 minutes         |
+| LLM responses     | None                  | Not cached         |
+| AST symbol index  | File (.valora/index/) | Until file changes |
 
 **LLM prompt token caching** is handled server-side by the provider APIs. When prompt caching is active, the system prompt, tool definitions, and conversation history are cached by the API and reused across tool-loop iterations. This is transparent to the application — the provider injects cache markers in the request and extracts cache metrics from the response.
 
@@ -530,6 +531,10 @@ sequenceDiagram
 │   └── latest.log -> 2024-01-15.log
 ├── batches/
 │   └── <localId>.json
+├── index/               ← AST symbol index (sharded JSON)
+│   ├── manifest.json
+│   ├── files.json
+│   └── symbols-*.json
 ├── spending.jsonl        ← append-only per-request cost ledger
 └── config.json
 ```

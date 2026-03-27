@@ -10,6 +10,8 @@
  * - Codebase semantic search
  */
 
+import { getASTIndexService } from 'ast/ast-index.service';
+import { searchSymbols } from 'ast/ast-query.service';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 
@@ -105,7 +107,7 @@ export class SearchToolsService {
 
 	/**
 	 * Semantic codebase search
-	 * Currently falls back to grep-based search
+	 * Uses AST symbol index when available, falls back to grep
 	 */
 	async executeCodebaseSearch(args: Record<string, unknown>): Promise<string> {
 		const query = args['query'] as string;
@@ -114,8 +116,28 @@ export class SearchToolsService {
 			return 'codebase_search requires query argument';
 		}
 
-		// For now, fall back to grep-based search
-		// A real implementation would use embeddings/semantic search
+		// Try AST index first for symbol-aware search
+		try {
+			const indexService = getASTIndexService(this.workingDir);
+			if (indexService.isBuilt()) {
+				const results = searchSymbols(query, { limit: 20 });
+				if (results.length > 0) {
+					const lines = results.map((r) => {
+						const loc = `${r.symbol.filePath}:${r.symbol.startLine}`;
+						const exp = r.symbol.exported ? 'exported ' : '';
+						return `${loc} — ${exp}${r.symbol.kind} ${r.symbol.name} (${r.matchType})`;
+					});
+					const header = `Found ${results.length} symbol(s) matching "${query}":\n`;
+					const grepNote = '\n\n(Also searching file contents with grep...)';
+					const grepResults = await this.executeGrep({ path: '.', pattern: query });
+					const grepSection = grepResults !== 'No matches found' ? `\n\nGrep results:\n${grepResults}` : '';
+					return header + lines.join('\n') + grepNote + grepSection;
+				}
+			}
+		} catch {
+			// Fall through to grep
+		}
+
 		return this.executeGrep({ path: '.', pattern: query });
 	}
 }

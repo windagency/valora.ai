@@ -24,13 +24,22 @@ export type AIModel = 'gpt-5-codex' | 'gpt-5-thinking-high' | ModelNameValue;
 export type BuiltInTool =
 	| 'codebase_search'
 	| 'delete_file'
+	| 'file_outline'
+	| 'find_references'
+	| 'get_diagnostics'
+	| 'get_type_info'
 	| 'glob_file_search'
+	| 'goto_definition'
 	| 'grep'
+	| 'hover_info'
 	| 'list_dir'
 	| 'query_session'
 	| 'read_file'
+	| 'request_context'
 	| 'run_terminal_cmd'
 	| 'search_replace'
+	| 'smart_context'
+	| 'symbol_search'
 	| 'web_search'
 	| 'write';
 
@@ -240,6 +249,8 @@ export interface StageOutput {
 	duration_ms: number;
 	error?: string;
 	metadata?: Record<string, unknown>;
+	/** The actual model name used by the provider for this stage */
+	model?: string;
 	outputs: Record<string, unknown>;
 	prompt: string;
 	stage: string;

@@ -144,7 +144,7 @@ valora review-plan  # Validate before implementing
 
 ```bash
 # Complex planning
-valora plan --model claude-sonnet-4.5 "Design microservices architecture"
+valora plan --model claude-sonnet-4.6 "Design microservices architecture"
 
 # Simple tasks
 valora implement --model claude-haiku "Fix typo in README"
@@ -379,7 +379,7 @@ tail -f .valora/logs/ai-$(date +%Y-%m-%d).log
 valora plan --timeout=900000 "Complex task"
 
 # Use different model
-valora plan --model=claude-sonnet-4.5 "Task"
+valora plan --model=claude-sonnet-4.6 "Task"
 ```
 
 ### Preserve Failed Sessions

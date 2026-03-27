@@ -313,7 +313,7 @@ Add a new file in `data/commands/` (built-in) or `.valora/commands/` (project-le
 name: my-command
 description: Description of what it does
 agent: lead
-model: claude-sonnet-4.5
+model: claude-sonnet-4.6
 ---
 
 # My Command
@@ -347,7 +347,7 @@ Update `data/commands/registry.json`:
 			"name": "my-command",
 			"description": "...",
 			"agent": "lead",
-			"model": "claude-sonnet-4.5"
+			"model": "claude-sonnet-4.6"
 		}
 	}
 }

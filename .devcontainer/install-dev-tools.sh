@@ -50,6 +50,6 @@ fi
 # Install modern CLI tools (from documentation modern-cli-toolkit)
 echo "Installing modern CLI tools..."
 SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-bash "${SCRIPT_DIR}/.devcontainer/install-cli-tools.sh" jq yq rg fd
+bash "${SCRIPT_DIR}/scripts/install-cli-tools.sh" jq yq rg fd
 
 echo "Development tools installation complete."

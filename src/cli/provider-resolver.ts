@@ -124,6 +124,12 @@ export class CLIProviderResolver {
 		if (providerName === ProviderName.CURSOR) {
 			return { config: {} }; // Empty config for cursor provider
 		}
+		if (providerName === ProviderName.LOCAL) {
+			const configLoader = getConfigLoader();
+			const config = await configLoader.load();
+			const localConfig = config.providers?.local;
+			return { config: localConfig ?? {} };
+		}
 		return this.getProviderConfig(providerName, requestedModel);
 	}
 
@@ -178,6 +184,7 @@ export class CLIProviderResolver {
 			[ProviderName.ANTHROPIC]: ['claude', 'anthropic'],
 			[ProviderName.CURSOR]: ['cursor'],
 			[ProviderName.GOOGLE]: ['gemini', 'google'],
+			[ProviderName.LOCAL]: ['local', 'llama', 'mistral', 'phi', 'qwen', 'codellama', 'deepseek', 'yi'],
 			[ProviderName.MOONSHOT]: ['kimi', 'moonshot'],
 			[ProviderName.OPENAI]: ['gpt', 'openai'],
 			[ProviderName.XAI]: ['grok', 'xai']
@@ -349,6 +356,11 @@ export class CLIProviderResolver {
 
 			// Cursor provider doesn't need API key
 			if (providerName === ProviderName.CURSOR) {
+				return true;
+			}
+
+			// Local provider doesn't need API key
+			if (providerName === ProviderName.LOCAL) {
 				return true;
 			}
 

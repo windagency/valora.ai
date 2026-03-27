@@ -47,6 +47,7 @@ export const PROVIDERS_CONFIG_SCHEMA = z.object({
 	anthropic: PROVIDER_CONFIG_SCHEMA.optional(),
 	cursor: PROVIDER_CONFIG_SCHEMA.optional(),
 	google: PROVIDER_CONFIG_SCHEMA.optional(),
+	local: PROVIDER_CONFIG_SCHEMA.optional(),
 	moonshot: PROVIDER_CONFIG_SCHEMA.optional(),
 	openai: PROVIDER_CONFIG_SCHEMA.optional(),
 	xai: PROVIDER_CONFIG_SCHEMA.optional()

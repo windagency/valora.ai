@@ -6,6 +6,8 @@
 
 ```plaintext
 src/
+├── ast/               # AST-based code intelligence (parsing, indexing, queries)
+│   └── grammars/      # Tree-sitter WASM grammar loading and language mapping
 ├── batch/             # Async batch processing (LLM batch APIs)
 │   └── providers/     # Provider-specific batch implementations
 ├── cleanup/           # Resource cleanup coordination
@@ -18,8 +20,10 @@ src/
 ├── exploration/       # Parallel exploration system
 ├── llm/               # LLM provider integrations
 │   └── providers/     # Individual provider implementations
+├── lsp/               # LSP integration (language server client, tools)
 ├── mcp/               # MCP server implementation
 ├── output/            # Output formatting and rendering
+├── security/          # Agentic AI security (credential guard, command guard, injection detection)
 ├── services/          # Shared services
 ├── session/           # Session management
 ├── types/             # Global type definitions
@@ -81,6 +85,63 @@ sequenceDiagram
     BatchOrchestrator->>Disk: update persisted status
     BatchOrchestrator-->>CLI: BatchResult[]
 ```
+
+---
+
+### AST Layer (`src/ast/`)
+
+The AST layer provides code intelligence via tree-sitter parsing — symbol extraction, codebase indexing, semantic search, and smart context selection for token reduction.
+
+```plaintext
+src/ast/
+├── ast.types.ts                  # Type definitions (IndexedSymbol, IndexedFile, CodebaseIndex)
+├── ast-parser.service.ts         # tree-sitter wrapper: parse files, extract symbols/imports
+├── ast-index.service.ts          # Build, persist, load, and query the symbol index
+├── ast-index-watcher.service.ts  # File watching + incremental updates
+├── ast-query.service.ts          # High-level queries (symbol search, file outline, references)
+├── ast-tools.service.ts          # LLM tool handlers (symbol_search, file_outline, etc.)
+├── ast-context.service.ts        # Smart context extraction for token reduction
+└── grammars/
+    ├── grammar-loader.ts         # Lazy WASM grammar loading
+    └── language-map.ts           # Extension → language + tree-sitter query patterns
+```
+
+Key components:
+
+| Component                | Responsibility                                                                            |
+| ------------------------ | ----------------------------------------------------------------------------------------- |
+| `ast-parser.service.ts`  | Parses files via tree-sitter WASM, extracts symbols and imports                           |
+| `ast-index.service.ts`   | Builds and persists sharded symbol index under `.valora/index/`                           |
+| `ast-query.service.ts`   | Symbol search, file outline, and cross-file reference finding                             |
+| `ast-context.service.ts` | Budget-aware context extraction at multiple detail levels                                 |
+| `ast-tools.service.ts`   | LLM tool handlers for `symbol_search`, `file_outline`, `find_references`, `smart_context` |
+
+---
+
+### LSP Layer (`src/lsp/`)
+
+The LSP layer integrates with language servers to provide compiler-level intelligence — go-to-definition, hover information, diagnostics, and type info.
+
+```plaintext
+src/lsp/
+├── lsp.types.ts                      # Type definitions
+├── lsp-client.ts                     # JSON-RPC stdio wrapper for a single language server
+├── lsp-client-manager.service.ts     # Multi-language client pool (spawn-on-demand, idle timeout)
+├── lsp-language-registry.ts          # Extension → server command mapping
+├── lsp-lifecycle.service.ts          # Session-scoped lifecycle (spawn, timeout, shutdown)
+├── lsp-tools.service.ts              # LLM tool handlers (goto_definition, hover_info, etc.)
+├── lsp-result-cache.ts               # LRU cache (500 entries, 30s TTL)
+└── lsp-context-enricher.ts           # Inject diagnostics/type info into message context
+```
+
+Key components:
+
+| Component                       | Responsibility                                                                            |
+| ------------------------------- | ----------------------------------------------------------------------------------------- |
+| `lsp-client.ts`                 | JSON-RPC stdio wrapper for communicating with language servers                            |
+| `lsp-client-manager.service.ts` | Manages a pool of language server clients with idle timeout                               |
+| `lsp-tools.service.ts`          | LLM tool handlers for `goto_definition`, `get_type_info`, `get_diagnostics`, `hover_info` |
+| `lsp-context-enricher.ts`       | Injects compiler diagnostics into LLM message context                                     |
 
 ---
 
@@ -364,6 +425,43 @@ src/mcp/
 ├── tool-handler.ts               # Tool execution
 └── types.ts                      # Type definitions
 ```
+
+---
+
+### Security Layer (`src/security/`)
+
+The security layer provides agentic AI attack detection and prevention.
+
+```plaintext
+src/security/
+├── index.ts                          # Barrel exports
+├── security-event.types.ts           # Shared event types (SecurityEvent, SecurityEventType)
+├── credential-guard.ts               # Env sanitisation, output scanning, sensitive file blocking
+├── command-guard.ts                  # Command validation (network, eval, exfiltration patterns)
+├── prompt-injection-detector.ts      # 0–1 risk scoring for injection in tool results
+├── tool-definition-validator.ts      # MCP tool name/description/schema validation
+└── tool-integrity-monitor.ts         # SHA-256 fingerprinting for tool-set drift detection
+```
+
+Key components:
+
+| Component                      | Responsibility                                                           |
+| ------------------------------ | ------------------------------------------------------------------------ |
+| `credential-guard.ts`          | Redacts sensitive env vars in subprocess env; scans output for secrets   |
+| `command-guard.ts`             | Blocks network, remote access, eval, and exfiltration command patterns   |
+| `prompt-injection-detector.ts` | Scores tool results for injection markers; quarantines or redacts        |
+| `tool-definition-validator.ts` | Validates MCP tool names, descriptions, and schemas against poisoning    |
+| `tool-integrity-monitor.ts`    | Fingerprints MCP tool sets; detects rug pull attacks between connections |
+
+Integration points:
+
+- **`tool-execution.service.ts`** — command guard before exec, env sanitisation, output scanning, sensitive file blocking
+- **`stage-executor.ts`** — prompt injection scanning of all tool results before LLM context
+- **`mcp-tool-handler.ts`** — credential and injection scanning of MCP tool output
+- **`mcp-client-manager.service.ts`** — tool definition validation and integrity checking on connection
+- **`variables.ts`** — sensitive env var filtering in `$ENV_*` resolution
+
+All services are registered in the DI container (`src/di/container.ts`) and use singleton patterns.
 
 ---
 

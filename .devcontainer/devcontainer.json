@@ -1,33 +1,44 @@
 {
-	"name": "Secure development workspace",
+	"name": "Valora Sandbox",
 	"image": "mcr.microsoft.com/devcontainers/javascript-node:24",
 	"features": {
-		"ghcr.io/devcontainers/features/git:1": {},
 		"ghcr.io/devcontainers/features/common-utils:2": {
-			"username": "node"
-		}
+			"username": "node",
+			"upgradePackages": true,
+			"installZsh": true,
+			"installOhMyZsh": true,
+			"configureZshAsDefaultShell": true
+		},
+		"ghcr.io/devcontainers/features/git:1": {}
 	},
+	// Mount docker socket for docker-in-docker scenarios
+	"mounts": [
+		"source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind",
+		"source=valora-shellhistory-${devcontainerId},target=/shellhistory,type=volume"
+	],
 	"onCreateCommand": {
 		"git-config": "git config --global --add safe.directory ${containerWorkspaceFolder}"
 	},
 	"postCreateCommand": {
+		"prepare-terminal": "bash ${containerWorkspaceFolder}/.devcontainer/prepare-terminal.sh",
 		"install-tools": "bash ${containerWorkspaceFolder}/.devcontainer/install-dev-tools.sh"
 	},
 	// postAttachCommand runs every time you attach - keep it minimal!
 	"postAttachCommand": {
-		"welcome": "echo '✅ Secure Development Workspace Ready!'",
-		"docker-socket": "[ -S /var/run/docker.sock ] && sudo chmod 666 /var/run/docker.sock || true"
+		"docker-socket": "[ -S /var/run/docker.sock ] && sudo chmod 666 /var/run/docker.sock || true",
+		"welcome": "echo '✅ Sandbox Ready!'"
 	},
 	"remoteEnv": {
+		"COMPOSE_DOCKER_CLI_BUILD": "1",
 		// Enable BuildKit for faster builds
 		"DOCKER_BUILDKIT": "1",
-		"COMPOSE_DOCKER_CLI_BUILD": "1",
-		// Configure pnpm global bin directory (shell-agnostic)
-		"PNPM_HOME": "/home/node/.local/share/pnpm",
 		// Configure npm to use user-local prefix instead of system directory
 		"NPM_CONFIG_PREFIX": "/home/node/.npm-global",
-		"PATH": "/home/node/.local/bin:/home/node/.npm-global/bin:/home/node/.local/share/pnpm:${containerEnv:PATH}"
+		"PATH": "/home/node/.local/bin:/home/node/.npm-global/bin:/home/node/.local/share/pnpm:${containerEnv:PATH}",
+		// Configure pnpm global bin directory (shell-agnostic)
+		"PNPM_HOME": "/home/node/.local/share/pnpm"
 	},
+	"remoteUser": "node",
 	"customizations": {
 		"vscode": {
 			"extensions": [
@@ -59,14 +70,60 @@
 				"oouo-diogo-perdigao.docthis",
 				"YoavBls.pretty-ts-errors",
 				"mattpocock.ts-error-translator"
-			]
+			],
+			"settings": {
+				"[dockerfile]": {
+					"editor.defaultFormatter": "ms-azuretools.vscode-docker"
+				},
+				"[json]": {
+					"editor.defaultFormatter": "esbenp.prettier-vscode"
+				},
+				"[jsonc]": {
+					"editor.defaultFormatter": "esbenp.prettier-vscode"
+				},
+				"[markdown]": {
+					"editor.defaultFormatter": "esbenp.prettier-vscode",
+					"editor.wordWrap": "on"
+				},
+				"diffEditor.codeLens": true,
+				"diffEditor.ignoreTrimWhitespace": false,
+				"diffEditor.renderIndicators": true,
+				"diffEditor.renderSideBySide": false,
+				"editor.bracketPairColorization.enabled": true,
+				"editor.codeActionsOnSave": {
+					"source.fixAll.eslint": "explicit"
+				},
+				"editor.defaultFormatter": "esbenp.prettier-vscode",
+				"editor.guides.bracketPairs": true,
+				"errorLens.enabledDiagnosticLevels": ["error", "warning"],
+				"errorLens.excludeBySource": ["ts(80001)"],
+				"eslint.useFlatConfig": true,
+				"eslint.validate": ["javascript", "javascriptreact", "typescript", "typescriptreact"],
+				"gitlens.codeLens.enabled": true,
+				"gitlens.currentLine.enabled": true,
+				"gitlens.hovers.currentLine.over": "line",
+				"importCost.typescriptExtensions": ["\\.tsx?$"],
+				"js.updateImportsOnFileMove.enabled": "always",
+				"path-intellisense.autoTriggerNextSuggestion": true,
+				"path-intellisense.extensionOnImport": true,
+				"terminal.integrated.defaultProfile.linux": "zsh",
+				"terminal.integrated.profiles.linux": {
+					"bash": {
+						"icon": "terminal-bash",
+						"path": "bash"
+					},
+					"zsh": {
+						"path": "zsh"
+					}
+				},
+				"todo-tree.highlights.defaultHighlight": {
+					"gutterIcon": true
+				},
+				"ts.suggest.autoImports": true,
+				"ts.updateImportsOnFileMove.enabled": "always",
+				"yaml.schemaStore.enable": true,
+				"yaml.validate": true
+			}
 		}
-	},
-	// Mount docker socket for docker-in-docker scenarios
-	"mounts": ["source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"],
-	"remoteUser": "node",
-	// Enable persistent command history
-	"containerEnv": {
-		"HISTFILE": "/workspace/.devcontainer/.bash_history"
 	}
 }

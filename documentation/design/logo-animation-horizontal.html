@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Valora — Horizontal</title>
+  <style>
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --cyan: #00d4ff;
+      --violet: #8b5cf6;
+      --bg: #060b17;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    body {
+      background: var(--bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Century Gothic', 'Gill Sans MT', 'Trebuchet MS', sans-serif;
+    }
+
+    /* Dot grid */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: radial-gradient(rgba(0, 212, 255, 0.055) 1px, transparent 1px);
+      background-size: 38px 38px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* CRT scanlines */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(0deg,
+          transparent 0px, transparent 2px,
+          rgba(0, 0, 0, 0.025) 2px, rgba(0, 0, 0, 0.025) 4px);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    #bg {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    /* ── SCENE: horizontal row ── */
+    .scene {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      gap: 0;
+      animation: scene-float 9s ease-in-out infinite;
+      animation-delay: 6s;
+      animation-fill-mode: both;
+    }
+
+    @keyframes scene-float {
+
+      0%,
+      100% {
+        transform: translateY(0);
+      }
+
+      50% {
+        transform: translateY(-8px);
+      }
+    }
+
+    /* ── MARK ── */
+    .mark-wrap {
+      position: relative;
+      width: 180px;
+      height: 180px;
+      flex-shrink: 0;
+    }
+
+    .mark-halo {
+      position: absolute;
+      inset: -56px;
+      background: radial-gradient(circle,
+          rgba(0, 212, 255, 0.07) 0%,
+          rgba(139, 92, 246, 0.05) 38%,
+          transparent 68%);
+      opacity: 0;
+      border-radius: 50%;
+      animation: halo-in 1.2s ease 0.6s forwards;
+    }
+
+    @keyframes halo-in {
+      to {
+        opacity: 1;
+      }
+    }
+
+    /* ── SEPARATOR LINE ── */
+    .sep {
+      width: 1px;
+      height: 0;
+      background: linear-gradient(to bottom,
+          transparent 0%,
+          rgba(0, 212, 255, 0.25) 30%,
+          rgba(0, 212, 255, 0.25) 70%,
+          transparent 100%);
+      margin: 0 44px;
+      flex-shrink: 0;
+      animation: sep-draw 0.5s cubic-bezier(0.4, 0, 0.2, 1) 3.4s forwards;
+    }
+
+    @keyframes sep-draw {
+      to {
+        height: 110px;
+      }
+    }
+
+    /* ── WORDMARK (left-aligned) ── */
+    .wordmark {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 10px;
+    }
+
+    .wm-name {
+      font-size: 52px;
+      font-weight: 300;
+      letter-spacing: 0.17em;
+      text-transform: uppercase;
+      line-height: 1;
+    }
+
+    /* Letters slide in from the right — gradient lives on each span so it renders */
+    .wm-name .l {
+      display: inline-block;
+      opacity: 0;
+      transform: translateX(18px);
+      animation: l-in 0.55s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      background: linear-gradient(108deg,
+          #c0dcff 0%, #eef4ff 38%,
+          #a5f3fc 70%, #c4b5fd 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .wm-name .l:nth-child(1) {
+      animation-delay: 3.60s;
+    }
+
+    .wm-name .l:nth-child(2) {
+      animation-delay: 3.72s;
+    }
+
+    .wm-name .l:nth-child(3) {
+      animation-delay: 3.84s;
+    }
+
+    .wm-name .l:nth-child(4) {
+      animation-delay: 3.96s;
+    }
+
+    .wm-name .l:nth-child(5) {
+      animation-delay: 4.08s;
+    }
+
+    .wm-name .l:nth-child(6) {
+      animation-delay: 4.20s;
+    }
+
+    @keyframes l-in {
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+
+    /* Tagline */
+    .wm-tag {
+      font-family: 'Courier New', 'DejaVu Sans Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.33em;
+      padding-right: 0.33em;
+      text-transform: uppercase;
+      color: var(--cyan);
+      opacity: 0;
+      animation: tag-in 0.7s ease 4.5s forwards;
+    }
+
+    @keyframes tag-in {
+      to {
+        opacity: 0.68;
+      }
+    }
+
+    /* Replay */
+    #replay {
+      position: fixed;
+      bottom: 28px;
+      right: 28px;
+      width: 40px;
+      height: 40px;
+      background: transparent;
+      border: 1px solid rgba(0, 212, 255, 0.22);
+      border-radius: 50%;
+      color: rgba(0, 212, 255, 0.5);
+      font-size: 18px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      animation: btn-in 0.4s ease 5.5s forwards;
+      transition: border-color 0.2s, color 0.2s, transform 0.25s;
+      z-index: 10;
+    }
+
+    #replay:hover {
+      border-color: rgba(0, 212, 255, 0.7);
+      color: var(--cyan);
+      transform: rotate(-40deg);
+    }
+
+    @keyframes btn-in {
+      to {
+        opacity: 1;
+      }
+    }
+
+    /* Corner accents */
+    .corner {
+      position: fixed;
+      width: 32px;
+      height: 32px;
+      opacity: 0;
+      animation: corner-in 0.5s ease 0.3s forwards;
+    }
+
+    @keyframes corner-in {
+      to {
+        opacity: 0.2;
+      }
+    }
+
+    .corner--tl {
+      top: 24px;
+      left: 24px;
+      border-top: 1px solid var(--cyan);
+      border-left: 1px solid var(--cyan);
+    }
+
+    .corner--tr {
+      top: 24px;
+      right: 24px;
+      border-top: 1px solid var(--cyan);
+      border-right: 1px solid var(--cyan);
+    }
+
+    .corner--bl {
+      bottom: 24px;
+      left: 24px;
+      border-bottom: 1px solid var(--cyan);
+      border-left: 1px solid var(--cyan);
+    }
+
+    .corner--br {
+      bottom: 24px;
+      right: 24px;
+      border-bottom: 1px solid var(--cyan);
+      border-right: 1px solid var(--cyan);
+    }
+  </style>
+</head>
+
+<body>
+
+  <canvas id="bg"></canvas>
+  <div class="corner corner--tl"></div>
+  <div class="corner corner--tr"></div>
+  <div class="corner corner--bl"></div>
+  <div class="corner corner--br"></div>
+
+  <div class="scene">
+
+    <!-- ══════════════════ LEFT: ANIMATED MARK ══════════════════ -->
+    <div class="mark-wrap">
+      <div class="mark-halo"></div>
+
+      <svg viewBox="0 0 200 200" width="180" height="180" xmlns="http://www.w3.org/2000/svg" overflow="visible">
+        <defs>
+
+          <linearGradient id="vGrad" x1="50%" y1="0%" x2="50%" y2="100%">
+            <stop offset="0%" stop-color="#00d4ff" />
+            <stop offset="52%" stop-color="#8b5cf6" />
+            <stop offset="100%" stop-color="#6d28d9" />
+          </linearGradient>
+
+          <linearGradient id="hexGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#00d4ff" stop-opacity="1" />
+            <stop offset="45%" stop-color="#8b5cf6" stop-opacity="0.7" />
+            <stop offset="100%" stop-color="#00d4ff" stop-opacity="0.42" />
+          </linearGradient>
+
+          <filter id="glow" x="-80%" y="-80%" width="260%" height="260%">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="b" />
+            <feMerge>
+              <feMergeNode in="b" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+
+          <filter id="softBlur" x="-100%" y="-100%" width="300%" height="300%">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="11" />
+          </filter>
+
+          <filter id="pGlow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="2.2" result="b" />
+            <feMerge>
+              <feMergeNode in="b" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+
+          <clipPath id="vClip">
+            <rect x="-10" y="-10" width="220" height="0">
+              <animate attributeName="height" from="0" to="220" dur="0.95s" begin="1.9s" fill="freeze" calcMode="spline"
+                keySplines="0.22 0.1 0.25 1" />
+            </rect>
+          </clipPath>
+
+          <path id="pathL" d="M 52,57 L 100,158" />
+          <path id="pathR" d="M 148,57 L 100,158" />
+        </defs>
+
+
+        <!-- 1. HEX BACKGROUND -->
+        <polygon points="100,8 180,54 180,146 100,192 20,146 20,54" fill="#0b1422" opacity="0">
+          <animate attributeName="opacity" from="0" to="1" dur="0.45s" begin="0.2s" fill="freeze" />
+        </polygon>
+
+        <!-- 2. HEX BORDER — trace -->
+        <polygon points="100,8 180,54 180,146 100,192 20,146 20,54" fill="none" stroke="url(#hexGrad)"
+          stroke-width="1.5" stroke-dasharray="556" stroke-dashoffset="556" opacity="0">
+          <animate attributeName="opacity" from="0" to="0.9" dur="0.05s" begin="0.5s" fill="freeze" />
+          <animate attributeName="stroke-dashoffset" from="556" to="0" dur="1.5s" begin="0.5s" fill="freeze"
+            calcMode="spline" keySplines="0.4 0 0.2 1" />
+          <animate attributeName="opacity" values="0.9;1;0.62;1;0.9" dur="4.2s" repeatCount="indefinite" begin="5.2s" />
+        </polygon>
+
+        <!-- 3. V SHAPE — top→bottom clip reveal -->
+        <g clip-path="url(#vClip)">
+          <polygon points="42,55 58,55 100,155 142,55 158,55 100,165" fill="#6d28d9" filter="url(#softBlur)"
+            opacity="0.48" />
+          <polygon points="42,55 58,55 100,155 142,55 158,55 100,165" fill="url(#vGrad)" />
+          <polygon points="42,55 58,55 100,155 142,55 158,55 100,165" fill="none" stroke="rgba(0,212,255,0.2)"
+            stroke-width="0.8" />
+        </g>
+
+        <!-- 4. PIPELINE CONNECTORS -->
+        <g opacity="0">
+          <animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="2.1s" fill="freeze" />
+          <line x1="20" y1="100" x2="42" y2="100" stroke="#00d4ff" stroke-width="1.2" opacity="0.3" />
+          <line x1="158" y1="100" x2="180" y2="100" stroke="#00d4ff" stroke-width="1.2" opacity="0.3" />
+          <circle cx="20" cy="100" r="2.5" fill="#00d4ff" opacity="0.35" />
+          <circle cx="180" cy="100" r="2.5" fill="#00d4ff" opacity="0.35" />
+        </g>
+
+        <!-- 5. ENTRY NODES — spring pop -->
+        <circle cx="42" cy="55" fill="#00d4ff" filter="url(#glow)" r="0" opacity="0">
+          <animate attributeName="opacity" to="1" dur="0.01s" begin="2.2s" fill="freeze" />
+          <animate attributeName="r" values="0;9;3.5;6;4.5;4" keyTimes="0;0.28;0.5;0.7;0.86;1" dur="0.55s" begin="2.2s"
+            fill="freeze" />
+          <animate attributeName="opacity" values="1;0.42;1" dur="2.9s" repeatCount="indefinite" begin="5.1s" />
+        </circle>
+        <circle cx="158" cy="55" fill="#00d4ff" filter="url(#glow)" r="0" opacity="0">
+          <animate attributeName="opacity" to="1" dur="0.01s" begin="2.36s" fill="freeze" />
+          <animate attributeName="r" values="0;9;3.5;6;4.5;4" keyTimes="0;0.28;0.5;0.7;0.86;1" dur="0.55s" begin="2.36s"
+            fill="freeze" />
+          <animate attributeName="opacity" values="1;0.42;1" dur="2.9s" repeatCount="indefinite" begin="5.7s" />
+        </circle>
+
+        <!-- 6. CIRCUIT NODES — left arm -->
+        <circle cx="64" cy="82" fill="#00d4ff" r="0" opacity="0">
+          <animate attributeName="opacity" to="0.75" dur="0.01s" begin="2.52s" fill="freeze" />
+          <animate attributeName="r" values="0;5.5;2;3.5;2.5" keyTimes="0;0.3;0.55;0.75;1" dur="0.42s" begin="2.52s"
+            fill="freeze" />
+        </circle>
+        <circle cx="76" cy="103" fill="#00d4ff" r="0" opacity="0">
+          <animate attributeName="opacity" to="0.48" dur="0.01s" begin="2.66s" fill="freeze" />
+          <animate attributeName="r" values="0;4.5;1.5;3;2" keyTimes="0;0.3;0.55;0.75;1" dur="0.4s" begin="2.66s"
+            fill="freeze" />
+        </circle>
+        <circle cx="88" cy="126" fill="#8b5cf6" r="0" opacity="0">
+          <animate attributeName="opacity" to="0.62" dur="0.01s" begin="2.80s" fill="freeze" />
+          <animate attributeName="r" values="0;4;1.5;2.5;2" keyTimes="0;0.3;0.55;0.75;1" dur="0.4s" begin="2.80s"
+            fill="freeze" />
+        </circle>
+
+        <!-- 6b. CIRCUIT NODES — right arm -->
+        <circle cx="136" cy="82" fill="#00d4ff" r="0" opacity="0">
+          <animate attributeName="opacity" to="0.75" dur="0.01s" begin="2.58s" fill="freeze" />
+          <animate attributeName="r" values="0;5.5;2;3.5;2.5" keyTimes="0;0.3;0.55;0.75;1" dur="0.42s" begin="2.58s"
+            fill="freeze" />
+        </circle>
+        <circle cx="124" cy="103" fill="#00d4ff" r="0" opacity="0">
+          <animate attributeName="opacity" to="0.48" dur="0.01s" begin="2.72s" fill="freeze" />
+          <animate attributeName="r" values="0;4.5;1.5;3;2" keyTimes="0;0.3;0.55;0.75;1" dur="0.4s" begin="2.72s"
+            fill="freeze" />
+        </circle>
+        <circle cx="112" cy="126" fill="#8b5cf6" r="0" opacity="0">
+          <animate attributeName="opacity" to="0.62" dur="0.01s" begin="2.86s" fill="freeze" />
+          <animate attributeName="r" values="0;4;1.5;2.5;2" keyTimes="0;0.3;0.55;0.75;1" dur="0.4s" begin="2.86s"
+            fill="freeze" />
+        </circle>
+
+        <!-- 7. APEX BURST — one-time shockwave -->
+        <circle cx="100" cy="160" r="8" fill="none" stroke="#00d4ff" stroke-width="2.5" opacity="0">
+          <animate attributeName="r" from="8" to="50" dur="0.75s" begin="2.9s" fill="freeze" />
+          <animate attributeName="opacity" values="0;0.85;0" dur="0.75s" begin="2.9s" fill="freeze" />
+        </circle>
+        <circle cx="100" cy="160" r="8" fill="none" stroke="#8b5cf6" stroke-width="1.8" opacity="0">
+          <animate attributeName="r" from="8" to="38" dur="0.65s" begin="3.02s" fill="freeze" />
+          <animate attributeName="opacity" values="0;0.7;0" dur="0.65s" begin="3.02s" fill="freeze" />
+        </circle>
+        <circle cx="100" cy="160" r="8" fill="none" stroke="#00d4ff" stroke-width="1" opacity="0">
+          <animate attributeName="r" from="8" to="22" dur="0.45s" begin="3.06s" fill="freeze" />
+          <animate attributeName="opacity" values="0;0.5;0" dur="0.45s" begin="3.06s" fill="freeze" />
+        </circle>
+
+        <!-- 8. APEX NODE — spring pop -->
+        <circle cx="100" cy="160" fill="#00d4ff" filter="url(#glow)" r="0" opacity="0">
+          <animate attributeName="opacity" to="1" dur="0.01s" begin="2.9s" fill="freeze" />
+          <animate attributeName="r" values="0;14;6;10;7;7.5" keyTimes="0;0.28;0.48;0.68;0.86;1" dur="0.65s"
+            begin="2.9s" fill="freeze" />
+          <animate attributeName="r" values="7.5;9.5;7.5" dur="2.8s" repeatCount="indefinite" begin="5.1s" />
+        </circle>
+        <circle cx="100" cy="160" r="3.5" fill="white" opacity="0">
+          <animate attributeName="opacity" from="0" to="1" dur="0.25s" begin="3.25s" fill="freeze" />
+        </circle>
+
+        <!-- 9. BRACKET DECORATIONS -->
+        <g opacity="0">
+          <animate attributeName="opacity" from="0" to="0.22" dur="0.4s" begin="3.3s" fill="freeze" />
+          <path d="M 26,83 L 20,83 L 20,117 L 26,117" fill="none" stroke="#00d4ff" stroke-width="1"
+            stroke-linecap="round" stroke-linejoin="round" />
+          <path d="M 174,83 L 180,83 L 180,117 L 174,117" fill="none" stroke="#00d4ff" stroke-width="1"
+            stroke-linecap="round" stroke-linejoin="round" />
+        </g>
+
+        <!-- 10. IDLE: APEX PULSE RINGS -->
+        <circle cx="100" cy="160" r="8" fill="none" stroke="#00d4ff" stroke-width="1.4">
+          <animate attributeName="r" values="8;30;8" dur="2.9s" repeatCount="indefinite" begin="5.1s" />
+          <animate attributeName="opacity" values="0.62;0;0.62" dur="2.9s" repeatCount="indefinite" begin="5.1s" />
+        </circle>
+        <circle cx="100" cy="160" r="8" fill="none" stroke="#8b5cf6" stroke-width="0.9">
+          <animate attributeName="r" values="8;22;8" dur="2.9s" repeatCount="indefinite" begin="6.55s" />
+          <animate attributeName="opacity" values="0.45;0;0.45" dur="2.9s" repeatCount="indefinite" begin="6.55s" />
+        </circle>
+
+        <!-- 11. IDLE: FLOWING DATA PARTICLES — left arm -->
+        <circle r="2.8" fill="#00d4ff" filter="url(#pGlow)" opacity="0">
+          <animateMotion dur="2.2s" repeatCount="indefinite" begin="5s">
+            <mpath href="#pathL" />
+          </animateMotion>
+          <animate attributeName="opacity" values="0;0.95;0.95;0" keyTimes="0;0.12;0.82;1" dur="2.2s"
+            repeatCount="indefinite" begin="5s" />
+        </circle>
+        <circle r="2.2" fill="#8b5cf6" opacity="0">
+          <animateMotion dur="2.2s" repeatCount="indefinite" begin="6.1s">
+            <mpath href="#pathL" />
+          </animateMotion>
+          <animate attributeName="opacity" values="0;0.75;0.75;0" keyTimes="0;0.12;0.82;1" dur="2.2s"
+            repeatCount="indefinite" begin="6.1s" />
+        </circle>
+        <circle r="1.5" fill="#00d4ff" opacity="0">
+          <animateMotion dur="2.2s" repeatCount="indefinite" begin="5.6s">
+            <mpath href="#pathL" />
+          </animateMotion>
+          <animate attributeName="opacity" values="0;0.5;0.5;0" keyTimes="0;0.12;0.82;1" dur="2.2s"
+            repeatCount="indefinite" begin="5.6s" />
+        </circle>
+
+        <!-- 11b. IDLE: FLOWING DATA PARTICLES — right arm -->
+        <circle r="2.8" fill="#00d4ff" filter="url(#pGlow)" opacity="0">
+          <animateMotion dur="2.2s" repeatCount="indefinite" begin="5.45s">
+            <mpath href="#pathR" />
+          </animateMotion>
+          <animate attributeName="opacity" values="0;0.95;0.95;0" keyTimes="0;0.12;0.82;1" dur="2.2s"
+            repeatCount="indefinite" begin="5.45s" />
+        </circle>
+        <circle r="2.2" fill="#8b5cf6" opacity="0">
+          <animateMotion dur="2.2s" repeatCount="indefinite" begin="6.55s">
+            <mpath href="#pathR" />
+          </animateMotion>
+          <animate attributeName="opacity" values="0;0.75;0.75;0" keyTimes="0;0.12;0.82;1" dur="2.2s"
+            repeatCount="indefinite" begin="6.55s" />
+        </circle>
+        <circle r="1.5" fill="#00d4ff" opacity="0">
+          <animateMotion dur="2.2s" repeatCount="indefinite" begin="6.05s">
+            <mpath href="#pathR" />
+          </animateMotion>
+          <animate attributeName="opacity" values="0;0.5;0.5;0" keyTimes="0;0.12;0.82;1" dur="2.2s"
+            repeatCount="indefinite" begin="6.05s" />
+        </circle>
+
+      </svg>
+    </div><!-- end .mark-wrap -->
+
+
+    <!-- ══════════════════ SEPARATOR ══════════════════ -->
+    <div class="sep"></div>
+
+
+    <!-- ══════════════════ RIGHT: WORDMARK ══════════════════ -->
+    <div class="wordmark">
+      <div class="wm-name">
+        <span class="l">V</span><span class="l">A</span><span class="l">L</span><span class="l">O</span><span
+          class="l">R</span><span class="l">A</span>
+      </div>
+      <div class="wm-tag">AI Workflow Orchestration</div>
+    </div>
+
+  </div><!-- end .scene -->
+
+  <button id="replay" title="Replay">↺</button>
+
+  <script>
+    /* ─── Background floating particles ─── */
+    const canvas = document.getElementById('bg');
+    const ctx = canvas.getContext('2d');
+
+    function resize() {
+      canvas.width = innerWidth;
+      canvas.height = innerHeight;
+    }
+    resize();
+    addEventListener('resize', resize);
+
+    const pts = Array.from({ length: 65 }, () => ({
+      x: Math.random() * innerWidth,
+      y: Math.random() * innerHeight,
+      r: Math.random() * 1.5 + 0.3,
+      vy: -(Math.random() * 0.32 + 0.07),
+      vx: (Math.random() - 0.5) * 0.1,
+      a: Math.random() * 0.11 + 0.02,
+      c: Math.random() > 0.55 ? '#00d4ff' : '#8b5cf6',
+    }));
+
+    (function tick() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      for (const p of pts) {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+        ctx.fillStyle = p.c;
+        ctx.globalAlpha = p.a;
+        ctx.fill();
+        p.x += p.vx;
+        p.y += p.vy;
+        if (p.y < -4) { p.y = canvas.height + 4; p.x = Math.random() * canvas.width; }
+        if (p.x < -4) p.x = canvas.width + 4;
+        if (p.x > canvas.width + 4) p.x = -4;
+      }
+      ctx.globalAlpha = 1;
+      requestAnimationFrame(tick);
+    })();
+
+    /* ─── Replay ─── */
+    document.getElementById('replay').addEventListener('click', () => location.reload());
+  </script>
+</body>
+
+</html>

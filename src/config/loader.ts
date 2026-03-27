@@ -188,6 +188,16 @@ export class ConfigLoader {
 			}
 		}
 
+		// Load local provider configuration from environment variables
+		const localBaseUrl = process.env['LOCAL_BASE_URL'];
+		const localModel = process.env['LOCAL_DEFAULT_MODEL'];
+		if (localBaseUrl && config.providers) {
+			(config.providers as Record<string, { baseUrl: string; default_model?: string }>)['local'] = {
+				baseUrl: localBaseUrl,
+				default_model: localModel
+			};
+		}
+
 		// Load Vertex AI configuration for Anthropic provider
 		const useVertex = process.env['CLAUDE_CODE_USE_VERTEX'];
 		const vertexRegion = process.env['CLOUD_ML_REGION'];
@@ -451,6 +461,21 @@ export class ConfigLoader {
 	 */
 	getConfigPath(): string {
 		return this.configPath;
+	}
+
+	/**
+	 * Load raw config file content without cascade, env vars, or DEFAULT_CONFIG merging.
+	 * Used by the setup wizard to preserve existing settings when updating config.
+	 */
+	async loadRaw(): Promise<Partial<Config>> {
+		if (!fileExists(this.configPath)) {
+			return {};
+		}
+		try {
+			return await readJSON<Partial<Config>>(this.configPath);
+		} catch {
+			return {};
+		}
 	}
 
 	/**

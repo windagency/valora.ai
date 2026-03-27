@@ -23,6 +23,9 @@ export interface ModelMode {
  * These are approximate maximum context sizes for each model
  */
 export const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
+	// Anthropic models - 1M context (4.6+)
+	[ModelName.CLAUDE_OPUS_4_6]: 1_000_000,
+	[ModelName.CLAUDE_SONNET_4_6]: 1_000_000,
 	// Anthropic models - 200K context
 	[ModelName.CLAUDE_HAIKU_3_5]: 200_000,
 	[ModelName.CLAUDE_HAIKU_4_5]: 200_000,
@@ -100,11 +103,15 @@ export interface ProviderMetadata {
  */
 export const PROVIDER_REGISTRY: Record<string, ProviderMetadata> = {
 	[ProviderName.ANTHROPIC]: {
-		defaultModel: ModelName.CLAUDE_OPUS_4_5,
+		defaultModel: ModelName.CLAUDE_OPUS_4_6,
 		description: 'Claude models from Anthropic',
 		key: ProviderName.ANTHROPIC,
 		label: 'Anthropic',
 		modelModes: [
+			{ mode: 'normal', model: ModelName.CLAUDE_OPUS_4_6 },
+			{ mode: 'extended thinking', model: ModelName.CLAUDE_OPUS_4_6 },
+			{ mode: 'normal', model: ModelName.CLAUDE_SONNET_4_6 },
+			{ mode: 'extended thinking', model: ModelName.CLAUDE_SONNET_4_6 },
 			{ mode: 'normal', model: ModelName.CLAUDE_OPUS_4_5 },
 			{ mode: 'extended thinking', model: ModelName.CLAUDE_OPUS_4_5 },
 			{ mode: 'normal', model: ModelName.CLAUDE_OPUS_4 },
@@ -147,6 +154,15 @@ export const PROVIDER_REGISTRY: Record<string, ProviderMetadata> = {
 			{ mode: 'default', model: ModelName.GEMMA_2 }
 		],
 		requiresApiKey: true
+	},
+	[ProviderName.LOCAL]: {
+		defaultModel: 'llama3.1',
+		description: 'Local models via OpenAI-compatible API (Ollama, LM Studio, etc.)',
+		helpText: 'Connect to a local model server. No API key required. Default: http://localhost:11434/v1',
+		key: ProviderName.LOCAL,
+		label: 'Local',
+		modelModes: [{ mode: 'default', model: 'llama3.1' }],
+		requiresApiKey: false
 	},
 	[ProviderName.MOONSHOT]: {
 		defaultModel: ModelName.KIMI_K2,

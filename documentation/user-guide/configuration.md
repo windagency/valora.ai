@@ -32,7 +32,7 @@ The primary configuration file is located at `.valora/config.json` (project-leve
 		"providers": {
 			"anthropic": {
 				"api_key_env": "ANTHROPIC_API_KEY",
-				"default_model": "claude-sonnet-4.5",
+				"default_model": "claude-sonnet-4.6",
 				"timeout_ms": 300000
 			},
 			"openai": {
@@ -85,13 +85,54 @@ Or use the setup command:
 valora config setup
 ```
 
+### Local Models (No API Key)
+
+Run against any OpenAI-compatible local server — Ollama, LM Studio, vLLM, llama.cpp, LocalAI, etc. No API key is required.
+
+```bash
+# Configure via environment variables
+export LOCAL_BASE_URL=http://localhost:11434/v1  # default
+export LOCAL_DEFAULT_MODEL=llama3.1
+
+# Or via config file
+```
+
+```json
+{
+	"providers": {
+		"local": {
+			"baseUrl": "http://localhost:11434/v1",
+			"default_model": "llama3.1"
+		}
+	}
+}
+```
+
+```bash
+# Or use the setup wizard
+valora config setup   # select "Local" from the provider list
+
+# Use via CLI flags — model name auto-routes to local provider
+valora plan "Add auth" --provider local --model llama3.1
+valora commit --model deepseek-coder    # keyword 'deepseek' → local
+```
+
+Model names containing `llama`, `mistral`, `phi`, `qwen`, `codellama`, `deepseek`, or `yi` automatically route to the local provider when no `--provider` flag is given.
+
+**Error messages** guide you when the server is not reachable:
+
+```
+Cannot connect to local model server at http://localhost:11434/v1.
+Is your server running? For Ollama: `ollama serve`
+```
+
 ### Model Selection
 
 Override models per command:
 
 ```bash
 # Use specific model
-valora plan --model claude-sonnet-4.5 "Add auth"
+valora plan --model claude-sonnet-4.6 "Add auth"
 
 # Use cheaper model for simple tasks
 valora implement --model claude-haiku "Fix typo"
@@ -107,6 +148,7 @@ Prompt caching reduces input token costs by reusing previously sent content acro
 | **OpenAI**    | Automatic                  | No configuration needed — always active |
 | **Google**    | Automatic                  | No configuration needed — always active |
 | **Cursor**    | Not applicable             | N/A (MCP protocol)                      |
+| **Local**     | Server-dependent           | Depends on the local server             |
 
 To enable Anthropic prompt caching:
 
@@ -144,7 +186,7 @@ Customize model settings in `.valora/config.json`:
 		"providers": {
 			"anthropic": {
 				"models": {
-					"claude-sonnet-4.5": {
+					"claude-sonnet-4.6": {
 						"max_tokens": 8192,
 						"temperature": 0.7,
 						"top_p": 1.0
@@ -301,7 +343,7 @@ name: custom-agent
 role: 'Custom Specialist'
 expertise:
   - 'Custom domain knowledge'
-llm_model: claude-sonnet-4.5
+llm_model: claude-sonnet-4.6
 ---
 
 # Custom Agent
@@ -891,7 +933,7 @@ Add custom commands in `.valora/commands/`:
 name: custom-command
 description: Custom workflow command
 agent: lead
-model: claude-sonnet-4.5
+model: claude-sonnet-4.6
 prompts:
   pipeline:
     - stage: step1
@@ -940,7 +982,7 @@ Create team-specific configuration:
 			"avgWorkflowTime": 180 // Team-specific baseline
 		},
 		"default_agent": "software-engineer-typescript-backend",
-		"preferred_model": "claude-sonnet-4.5"
+		"preferred_model": "claude-sonnet-4.6"
 	}
 }
 ```
@@ -1025,7 +1067,7 @@ See `data/config.default.json` for the full default configuration with all optio
 		"default_provider": "anthropic",
 		"providers": {
 			"anthropic": {
-				"default_model": "claude-sonnet-4.5"
+				"default_model": "claude-sonnet-4.6"
 			}
 		}
 	},

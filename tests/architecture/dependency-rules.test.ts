@@ -153,7 +153,11 @@ describe('Dependency Rules', () => {
 				'services',
 				'llm',
 				'exploration',
-				'ui'
+				'ui',
+				'batch',
+				'security',
+				'ast',
+				'lsp'
 			];
 
 			presentationClasses.forEach((presClass) => {

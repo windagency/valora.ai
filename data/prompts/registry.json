@@ -80,7 +80,7 @@
 			"outputs": ["coding_patterns", "architectural_style", "conventions"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.5", "gpt-5-thinking-high"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5", "gpt-5-thinking-high"]
 			},
 			"dependencies": {
 				"requires": ["context.scan-codebase"]
@@ -123,7 +123,7 @@
 			"outputs": ["answers", "summary", "questions_answered", "questions_skipped"],
 			"model_requirements": {
 				"min_context": 32000,
-				"recommended": ["claude-sonnet-4.5", "claude-haiku-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5", "claude-haiku-4.5"]
 			},
 			"dependencies": {
 				"requires": ["onboard.refine-specifications"]
@@ -161,7 +161,7 @@
 			"outputs": ["internal_dependencies", "external_dependencies", "integration_points"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.5", "gpt-5-thinking-high"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5", "gpt-5-thinking-high"]
 			},
 			"dependencies": {
 				"requires": ["context.scan-codebase"]
@@ -224,7 +224,7 @@
 			"outputs": ["change_type", "affected_areas", "breaking_changes", "change_summary", "risk_level"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
 			},
 			"dependencies": {
 				"requires": ["context.analyze-git-status"]
@@ -243,7 +243,7 @@
 			"outputs": ["changed_files", "change_scope", "review_focus_areas", "risk_level"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
 			},
 			"dependencies": {},
 			"inputs": []
@@ -260,7 +260,7 @@
 			"outputs": ["impact_areas", "test_coverage_delta", "complexity_metrics", "dependencies_changed"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
 			},
 			"dependencies": {
 				"requires": ["context.analyze-commits-for-pr"]
@@ -286,7 +286,7 @@
 			],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
 			},
 			"dependencies": {
 				"requires": ["context.identify-completed-workflow"]
@@ -305,7 +305,7 @@
 			"outputs": ["commit_messages", "change_summary", "affected_files", "change_types", "breaking_changes", "authors"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
 			},
 			"dependencies": {
 				"requires": ["context.analyze-git-branch"]
@@ -324,7 +324,7 @@
 			"outputs": ["feature_scope", "requirements_list", "acceptance_criteria", "user_workflows", "integration_points"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
 			},
 			"dependencies": {
 				"requires": ["context.load-prd", "context.load-task"],
@@ -344,7 +344,7 @@
 			"outputs": ["current_branch", "base_branch", "branch_name_convention", "commits_ahead", "commits_behind"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
 			},
 			"dependencies": {},
 			"inputs": []
@@ -361,7 +361,7 @@
 			"outputs": ["changed_files", "staged_files", "untracked_files", "git_status_summary"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
 			},
 			"dependencies": {},
 			"inputs": []
@@ -378,7 +378,7 @@
 			"outputs": ["task_scope", "affected_components", "relevant_files", "scope_boundaries"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.5", "gpt-5-thinking-high"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5", "gpt-5-thinking-high"]
 			},
 			"dependencies": {
 				"requires": ["context.scan-codebase", "context.understand-intent"],
@@ -417,7 +417,7 @@
 			"outputs": ["ticket_number", "ticket_details"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
 			},
 			"dependencies": {},
 			"inputs": []
@@ -434,7 +434,7 @@
 			"outputs": ["related_issues", "ticket_numbers", "issue_titles"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
 			},
 			"dependencies": {
 				"requires": ["context.analyze-git-branch"]
@@ -460,7 +460,7 @@
 			],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
 			},
 			"dependencies": {},
 			"inputs": []
@@ -494,7 +494,7 @@
 			"outputs": ["workflow_executed", "commands_chain", "start_time", "end_time", "execution_duration"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
 			},
 			"dependencies": {},
 			"inputs": []
@@ -522,7 +522,7 @@
 			],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
 			},
 			"dependencies": {},
 			"inputs": []
@@ -556,7 +556,7 @@
 			"outputs": ["template_config", "required_fields"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
 			},
 			"dependencies": {},
 			"inputs": []
@@ -602,7 +602,7 @@
 			],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.5", "gpt-5-thinking-high"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5", "gpt-5-thinking-high"]
 			},
 			"dependencies": {},
 			"inputs": []
@@ -619,7 +619,7 @@
 			"outputs": ["plan_structure", "task_requirements", "complexity_assessment"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["gpt-5-thinking-high", "claude-sonnet-4.5"]
+				"recommended": ["gpt-5-thinking-high", "claude-sonnet-4.6", "claude-sonnet-4.5"]
 			},
 			"dependencies": {},
 			"inputs": []
@@ -636,7 +636,7 @@
 			"outputs": ["template_content", "required_sections", "checklist_items"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
 			},
 			"dependencies": {},
 			"inputs": []
@@ -704,7 +704,7 @@
 			"outputs": ["codebase_structure", "tech_stack", "entry_points"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.5", "gpt-5-thinking-high"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5", "gpt-5-thinking-high"]
 			},
 			"dependencies": {},
 			"inputs": []
@@ -737,7 +737,7 @@
 			"outputs": ["complexity_score", "complexity_factors", "implementation_mode", "confidence_level"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["gpt-5-thinking-high", "claude-sonnet-4.5"]
+				"recommended": ["gpt-5-thinking-high", "claude-sonnet-4.6", "claude-sonnet-4.5"]
 			},
 			"dependencies": {
 				"requires": ["context.analyze-task-context"]
@@ -756,7 +756,7 @@
 			"outputs": ["technical_risks", "business_risks", "operational_risks", "mitigation_strategies", "risk_score"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["gpt-5-thinking-high", "claude-sonnet-4.5"]
+				"recommended": ["gpt-5-thinking-high", "claude-sonnet-4.6", "claude-sonnet-4.5"]
 			},
 			"dependencies": {
 				"requires": ["context.analyze-task-context", "plan.assess-complexity"]
@@ -775,7 +775,7 @@
 			"outputs": ["implementation_steps", "estimated_effort", "testing_strategy", "rollback_strategy"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.5", "gpt-5-thinking-high"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5", "gpt-5-thinking-high"]
 			},
 			"dependencies": {
 				"requires": [
@@ -825,7 +825,7 @@
 			],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.5", "gpt-5-thinking-high"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5", "gpt-5-thinking-high"]
 			},
 			"dependencies": {
 				"requires": ["context.analyze-task-context"]
@@ -844,7 +844,7 @@
 			"outputs": ["technical_dependencies", "data_dependencies", "integration_dependencies", "execution_order"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.5", "gpt-5-thinking-high"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5", "gpt-5-thinking-high"]
 			},
 			"dependencies": {
 				"requires": ["context.analyze-task-context", "review.assess-constraints", "onboard.map-dependencies"],
@@ -864,7 +864,7 @@
 			"outputs": ["version_bump_type", "current_version", "next_version"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
 			},
 			"dependencies": {
 				"requires": ["context.analyze-change-scope"]
@@ -883,7 +883,7 @@
 			"outputs": ["tag_created", "tag_name"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
 			},
 			"dependencies": {
 				"requires": ["code.calculate-version-bump", "code.stage-and-commit"]
@@ -902,7 +902,7 @@
 			"outputs": ["should_split", "commit_groups", "commit_strategy"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
 			},
 			"dependencies": {
 				"requires": ["context.analyze-change-scope"]
@@ -921,7 +921,7 @@
 			"outputs": ["labels_list", "label_rationale"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
 			},
 			"dependencies": {
 				"requires": ["context.analyze-commits-for-pr", "context.analyze-codebase-changes"]
@@ -940,7 +940,7 @@
 			"outputs": ["reviewers_list", "reviewer_rationale"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
 			},
 			"dependencies": {
 				"requires": ["context.analyze-commits-for-pr", "context.analyze-codebase-changes"]
@@ -959,7 +959,7 @@
 			"outputs": ["commit_messages", "commit_descriptions", "commit_footers"],
 			"model_requirements": {
 				"min_context": 200000,
-				"recommended": ["claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
 			},
 			"dependencies": {
 				"requires": ["code.determine-commit-strategy"]
@@ -978,7 +978,7 @@
 			"outputs": ["pr_description", "description_sections"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
 			},
 			"dependencies": {
 				"requires": ["context.analyze-commits-for-pr", "context.analyze-codebase-changes"]
@@ -997,7 +997,7 @@
 			"outputs": ["pr_title", "title_format"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
 			},
 			"dependencies": {
 				"requires": ["context.analyze-commits-for-pr"]
@@ -1021,7 +1021,7 @@
 			"outputs": ["code_changes", "files_modified", "implementation_notes", "breaking_changes"],
 			"model_requirements": {
 				"min_context": 200000,
-				"recommended": ["claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
 			},
 			"dependencies": {
 				"requires": ["context.load-implementation-context", "code.validate-prerequisites"]
@@ -1045,7 +1045,7 @@
 			"outputs": ["test_files", "test_coverage", "test_results"],
 			"model_requirements": {
 				"min_context": 200000,
-				"recommended": ["claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
 			},
 			"dependencies": {
 				"requires": ["code.implement-changes", "review.validate-test-strategy"],
@@ -1065,7 +1065,7 @@
 			"outputs": ["approved_messages", "user_modifications"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
 			},
 			"dependencies": {
 				"requires": ["code.generate-commit-messages"]
@@ -1084,7 +1084,7 @@
 			"outputs": ["pr_url", "pr_number", "push_status"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
 			},
 			"dependencies": {
 				"requires": [
@@ -1109,7 +1109,7 @@
 			"outputs": ["commits_created", "commit_hashes", "commit_summary"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
 			},
 			"dependencies": {
 				"requires": ["code.generate-commit-messages"]
@@ -1133,7 +1133,7 @@
 			"outputs": ["prerequisites_met", "missing_dependencies", "environment_ready", "blockers"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
 			},
 			"dependencies": {
 				"requires": ["context.load-implementation-context"]
@@ -1165,7 +1165,7 @@
 			],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
 			},
 			"dependencies": {
 				"requires": [
@@ -1190,7 +1190,7 @@
 			"outputs": ["quality_score", "issues_found", "security_concerns", "blocking_issues", "review_decision"],
 			"model_requirements": {
 				"min_context": 200000,
-				"recommended": ["claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
 			},
 			"dependencies": {
 				"requires": [
@@ -1217,7 +1217,7 @@
 			"outputs": ["technical_constraints", "performance_considerations", "security_requirements"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.5", "gpt-5-thinking-high"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5", "gpt-5-thinking-high"]
 			},
 			"dependencies": {
 				"requires": ["context.scan-codebase", "onboard.analyze-patterns", "onboard.map-dependencies"]
@@ -1286,7 +1286,7 @@
 			"outputs": ["code_quality_score", "test_quality_score", "review_quality_score", "overall_quality_score"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
 			},
 			"dependencies": {
 				"requires": ["context.gather-git-metrics"]
@@ -1305,7 +1305,7 @@
 			"outputs": ["quality_score", "impact_analysis", "security_issues", "recommendations"],
 			"model_requirements": {
 				"min_context": 200000,
-				"recommended": ["claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
 			},
 			"dependencies": {
 				"requires": ["context.analyze-change-scope"]
@@ -1330,7 +1330,7 @@
 			],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
 			},
 			"dependencies": {
 				"requires": [
@@ -1353,7 +1353,7 @@
 			"outputs": ["overall_confidence", "go_no_go_decision", "improvement_recommendations", "critical_issues"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["gpt-5-thinking-high", "claude-sonnet-4.5"]
+				"recommended": ["gpt-5-thinking-high", "claude-sonnet-4.6", "claude-sonnet-4.5"]
 			},
 			"dependencies": {
 				"requires": [
@@ -1379,7 +1379,7 @@
 			"outputs": ["validation_status", "blocker_count", "validation_report"],
 			"model_requirements": {
 				"min_context": 200000,
-				"recommended": ["claude-sonnet-4.5", "gpt-5-thinking-high"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5", "gpt-5-thinking-high"]
 			},
 			"dependencies": {
 				"requires": [
@@ -1501,7 +1501,7 @@
 			"outputs": ["completeness_score", "requirements_coverage", "ux_issues", "functional_gaps", "workflow_validation"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
 			},
 			"dependencies": {
 				"requires": ["context.analyze-functional-scope", "review.validate-accessibility"],
@@ -1538,7 +1538,7 @@
 			"outputs": ["complexity_issues", "code_smells", "technical_debt_items", "refactoring_recommendations"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
 			},
 			"dependencies": {
 				"requires": ["context.analyze-changes-for-review"]
@@ -1557,7 +1557,7 @@
 			"outputs": ["performance_issues", "bottlenecks_identified", "optimization_recommendations"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
 			},
 			"dependencies": {
 				"requires": ["context.analyze-changes-for-review"]
@@ -1576,7 +1576,7 @@
 			"outputs": ["pr_status", "validation_result", "next_steps"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
 			},
 			"dependencies": {
 				"requires": ["code.push-and-create-pr"]
@@ -1595,7 +1595,7 @@
 			"outputs": ["pr_ready", "readiness_issues", "quality_score", "recommendations"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
 			},
 			"dependencies": {
 				"requires": ["context.analyze-commits-for-pr", "context.analyze-codebase-changes"]
@@ -1633,7 +1633,7 @@
 			"outputs": ["risk_coverage_score", "unaddressed_risks", "mitigation_gaps"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["gpt-5-thinking-high", "claude-sonnet-4.5"]
+				"recommended": ["gpt-5-thinking-high", "claude-sonnet-4.6", "claude-sonnet-4.5"]
 			},
 			"dependencies": {
 				"requires": ["review.load-plan-context", "plan.assess-risks"],
@@ -1691,7 +1691,7 @@
 			"outputs": ["step_quality_score", "vague_steps", "actionability_issues"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["gpt-5-thinking-high", "claude-sonnet-4.5"]
+				"recommended": ["gpt-5-thinking-high", "claude-sonnet-4.6", "claude-sonnet-4.5"]
 			},
 			"dependencies": {
 				"requires": ["review.load-plan-context"]
@@ -1710,7 +1710,7 @@
 			"outputs": ["feasibility_score", "technical_concerns", "blockers_identified"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["gpt-5-thinking-high", "claude-sonnet-4.5"]
+				"recommended": ["gpt-5-thinking-high", "claude-sonnet-4.6", "claude-sonnet-4.5"]
 			},
 			"dependencies": {
 				"requires": ["review.load-plan-context"]
@@ -1729,7 +1729,7 @@
 			"outputs": ["test_coverage_score", "testing_gaps"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["gpt-5-thinking-high", "claude-sonnet-4.5"]
+				"recommended": ["gpt-5-thinking-high", "claude-sonnet-4.6", "claude-sonnet-4.5"]
 			},
 			"dependencies": {
 				"requires": ["review.load-plan-context"]
@@ -1786,7 +1786,7 @@
 			"outputs": ["verification_status", "commit_log", "final_summary"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
 			},
 			"dependencies": {
 				"requires": ["code.stage-and-commit"]
@@ -1805,7 +1805,7 @@
 			"outputs": ["quality_assessment", "recommendations"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-haiku-4.5", "claude-sonnet-4.5"]
+				"recommended": ["claude-haiku-4.5", "claude-sonnet-4.6", "claude-sonnet-4.5"]
 			},
 			"dependencies": {
 				"requires": ["test.execute-tests", "review.validate-completeness"],
@@ -1825,7 +1825,7 @@
 			"outputs": ["test_framework", "test_structure", "existing_tests"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-haiku-4.5", "claude-sonnet-4.5"]
+				"recommended": ["claude-haiku-4.5", "claude-sonnet-4.6", "claude-sonnet-4.5"]
 			},
 			"dependencies": {
 				"requires": ["context.scan-codebase"],
@@ -1845,7 +1845,7 @@
 			"outputs": ["test_results", "coverage_metrics", "failed_tests"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-haiku-4.5", "claude-sonnet-4.5"]
+				"recommended": ["claude-haiku-4.5", "claude-sonnet-4.6", "claude-sonnet-4.5"]
 			},
 			"dependencies": {
 				"requires": ["test.analyze-test-infrastructure"]
@@ -1921,7 +1921,7 @@
 			"outputs": ["infrastructure_docs", "backend_docs", "frontend_docs", "generation_metrics"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
 			},
 			"dependencies": {
 				"requires": ["context.load-and-analyze-parallel"]
@@ -1984,7 +1984,7 @@
 			"outputs": ["review_report", "recommendations", "next_steps"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
 			},
 			"dependencies": {
 				"requires": ["review.assess-code-quality"]
@@ -2003,7 +2003,7 @@
 			"outputs": ["feedback_report", "report_path", "summary_statistics"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
 			},
 			"dependencies": {
 				"requires": [
@@ -2027,7 +2027,7 @@
 			"outputs": ["feedback_summary", "key_insights", "recommendations"],
 			"model_requirements": {
 				"min_context": 64000,
-				"recommended": ["claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
 			},
 			"dependencies": {
 				"requires": [
@@ -2070,7 +2070,7 @@
 			"outputs": ["functional_report", "go_no_go_decision", "recommendations"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
 			},
 			"dependencies": {
 				"requires": ["review.validate-functional-requirements"]
@@ -2116,7 +2116,7 @@
 			"outputs": ["prd_document", "executive_summary"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.5", "gpt-4o"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5", "gpt-4o"]
 			},
 			"dependencies": {
 				"requires": ["context.load-specifications", "onboard.analyze-requirements"]
@@ -2154,7 +2154,7 @@
 			"outputs": ["validation_results", "completeness_score", "written_files", "handoff_summary", "time_saved"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
 			},
 			"dependencies": {
 				"requires": ["documentation.generate-all-domains-parallel"]
@@ -2173,7 +2173,7 @@
 			"outputs": ["changelog_updated", "changelog_entry"],
 			"model_requirements": {
 				"min_context": 200000,
-				"recommended": ["claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
 			},
 			"dependencies": {
 				"requires": ["code.stage-and-commit"]
@@ -2197,7 +2197,7 @@
 			"outputs": ["documentation_updated", "inline_comments_added", "type_annotations_complete"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
 			},
 			"dependencies": {
 				"requires": ["code.implement-changes"]
@@ -2216,7 +2216,7 @@
 			"outputs": ["knowledge_base_updated", "patterns_learned", "best_practices_added"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
 			},
 			"dependencies": {
 				"requires": ["documentation.generate-feedback-report", "review.identify-improvement-areas"]

@@ -126,6 +126,8 @@ export class CommandWizard {
 						choices: [
 							{ name: 'Auto-select (recommended)', value: 'auto' },
 							{ name: 'gpt-5-thinking-high', value: 'gpt-5-thinking-high' },
+							{ name: 'claude-opus-4.6', value: 'claude-opus-4.6' },
+							{ name: 'claude-sonnet-4.6', value: 'claude-sonnet-4.6' },
 							{ name: 'claude-opus-4.5', value: 'claude-opus-4.5' },
 							{ name: 'claude-sonnet-4.5', value: 'claude-sonnet-4.5' },
 							{ name: 'claude-haiku-4.5', value: 'claude-haiku-4.5' }
@@ -140,7 +142,8 @@ export class CommandWizard {
 							{ name: 'Cursor (recommended)', value: 'cursor' },
 							{ name: 'Anthropic', value: 'anthropic' },
 							{ name: 'OpenAI', value: 'openai' },
-							{ name: 'Google', value: 'google' }
+							{ name: 'Google', value: 'google' },
+							{ name: 'Local (Ollama, LM Studio, etc.)', value: 'local' }
 						],
 						default: 'cursor',
 						message: 'AI Provider:',
@@ -312,6 +315,8 @@ ${color.green('  $ ' + config.preview(answers))}
 					choices: [
 						{ name: 'Auto-select', value: '' },
 						{ name: 'gpt-5-thinking-high', value: 'gpt-5-thinking-high' },
+						{ name: 'claude-opus-4.6', value: 'claude-opus-4.6' },
+						{ name: 'claude-sonnet-4.6', value: 'claude-sonnet-4.6' },
 						{ name: 'claude-opus-4.5', value: 'claude-opus-4.5' },
 						{ name: 'claude-sonnet-4.5', value: 'claude-sonnet-4.5' }
 					],
@@ -325,7 +330,8 @@ ${color.green('  $ ' + config.preview(answers))}
 						{ name: 'Default', value: '' },
 						{ name: 'Cursor', value: 'cursor' },
 						{ name: 'Anthropic', value: 'anthropic' },
-						{ name: 'OpenAI', value: 'openai' }
+						{ name: 'OpenAI', value: 'openai' },
+						{ name: 'Local (Ollama, LM Studio, etc.)', value: 'local' }
 					],
 					default: '',
 					message: 'Provider override (optional):',

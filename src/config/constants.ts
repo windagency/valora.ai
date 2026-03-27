@@ -226,6 +226,26 @@ export const IDEMPOTENCY_CLEANUP_INTERVAL_MS = MS_PER_HOUR;
 export const HOOKS_CONFIG_FILE = 'hooks.default.json';
 
 /**
+ * AST Index Constants
+ */
+export const AST_INDEX_VERSION = 1;
+export const AST_MAX_INDEXABLE_FILES = 50_000;
+export const AST_INDEX_BATCH_SIZE = 100;
+export const AST_WATCHER_DEBOUNCE_MS = 500;
+export const AST_DEFAULT_CONTEXT_BUDGET = 50_000;
+export const AST_CODEBASE_MAP_MAX_TOKENS = 2000;
+
+/**
+ * LSP Constants
+ */
+export const LSP_REQUEST_TIMEOUT_MS = 10 * MS_PER_SECOND;
+export const LSP_IDLE_TIMEOUT_MS = 5 * MS_PER_MINUTE;
+export const LSP_CACHE_MAX_ENTRIES = 500;
+export const LSP_CACHE_TTL_MS = 30 * MS_PER_SECOND;
+export const LSP_DIAGNOSTICS_WAIT_MS = 2 * MS_PER_SECOND;
+export const LSP_MAX_DIAGNOSTICS_DISPLAY = 20;
+
+/**
  * Documentation URL
  */
 export function getDocsUrl(path?: string): string {

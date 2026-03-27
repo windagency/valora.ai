@@ -74,18 +74,20 @@ graph TB
 
 ## Key Directories
 
-| Directory          | Purpose                                |
-| ------------------ | -------------------------------------- |
-| `src/cli/`         | Command-line interface and commands    |
-| `src/executor/`    | Pipeline and execution logic           |
-| `src/exploration/` | Parallel exploration and collaboration |
-| `src/llm/`         | LLM provider integrations              |
-| `src/mcp/`         | MCP server implementation              |
-| `src/session/`     | Session state management               |
-| `src/config/`      | Configuration loading and validation   |
-| `src/services/`    | Shared services                        |
-| `src/types/`       | TypeScript type definitions            |
-| `src/utils/`       | Utility functions                      |
+| Directory          | Purpose                                                        |
+| ------------------ | -------------------------------------------------------------- |
+| `src/ast/`         | AST-based code intelligence (parsing, indexing, smart context) |
+| `src/cli/`         | Command-line interface and commands                            |
+| `src/executor/`    | Pipeline and execution logic                                   |
+| `src/exploration/` | Parallel exploration and collaboration                         |
+| `src/llm/`         | LLM provider integrations                                      |
+| `src/lsp/`         | Language server protocol integration                           |
+| `src/mcp/`         | MCP server implementation                                      |
+| `src/session/`     | Session state management                                       |
+| `src/config/`      | Configuration loading and validation                           |
+| `src/services/`    | Shared services                                                |
+| `src/types/`       | TypeScript type definitions                                    |
+| `src/utils/`       | Utility functions                                              |
 
 ## Getting Started
 

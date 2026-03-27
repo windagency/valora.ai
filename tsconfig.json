@@ -26,7 +26,9 @@
 		"noUnusedParameters": true,
 		"outDir": "./dist",
 		"paths": {
+			"ast/*": ["./src/ast/*"],
 			"batch/*": ["./src/batch/*"],
+			"security/*": ["./src/security/*"],
 			"cleanup/*": ["./src/cleanup/*"],
 			"cli/*": ["./src/cli/*"],
 			"config/*": ["./src/config/*"],
@@ -34,6 +36,7 @@
 			"executor/*": ["./src/executor/*"],
 			"exploration/*": ["./src/exploration/*"],
 			"llm/*": ["./src/llm/*"],
+			"lsp/*": ["./src/lsp/*"],
 			"mcp/*": ["./src/mcp/*"],
 			"output/*": ["./src/output/*"],
 			"services/*": ["./src/services/*"],

@@ -28,7 +28,7 @@ These flags can be used with any command:
 valora implement "Add feature" --dry-run
 
 # Use a specific model with verbose output
-valora plan "Refactor module" --model=claude-sonnet-4.5 --verbose
+valora plan "Refactor module" --model=claude-sonnet-4.6 --verbose
 
 # Run quietly without interactive prompts
 valora test --quiet --no-interactive

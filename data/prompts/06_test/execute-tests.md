@@ -13,6 +13,7 @@ model_requirements:
   min_context: 128000
   recommended:
     - claude-haiku-4.5
+    - claude-sonnet-4.6
     - claude-sonnet-4.5
 agents:
   - qa

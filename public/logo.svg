@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="480" height="120" viewBox="0 0 480 120"
+     xmlns="http://www.w3.org/2000/svg"
+     role="img" aria-label="Valora — AI Workflow Orchestration">
+  <defs>
+    <linearGradient id="vGrad" x1="50%" y1="0%" x2="50%" y2="100%">
+      <stop offset="0%"   stop-color="#00d4ff"/>
+      <stop offset="52%"  stop-color="#8b5cf6"/>
+      <stop offset="100%" stop-color="#6d28d9"/>
+    </linearGradient>
+    <linearGradient id="hexGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%"   stop-color="#00d4ff" stop-opacity="1"/>
+      <stop offset="45%"  stop-color="#8b5cf6" stop-opacity="0.7"/>
+      <stop offset="100%" stop-color="#00d4ff" stop-opacity="0.45"/>
+    </linearGradient>
+    <!-- Text gradient for wordmark -->
+    <linearGradient id="textGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%"   stop-color="#c8e4ff"/>
+      <stop offset="45%"  stop-color="#eef4ff"/>
+      <stop offset="80%"  stop-color="#a5f3fc"/>
+      <stop offset="100%" stop-color="#c4b5fd"/>
+    </linearGradient>
+    <filter id="glow" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="3.5" result="b"/>
+      <feMerge>
+        <feMergeNode in="b"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="softBlur" x="-100%" y="-100%" width="300%" height="300%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="8"/>
+    </filter>
+  </defs>
+
+  <!-- ── Icon mark (200×200 design scaled to fit 110×110, centred in 120px height) ── -->
+  <!-- scale(0.55), translate so mark is centred: hex runs 4.4–105.6 in y → offset 7 -->
+  <g transform="translate(12, 7) scale(0.55)">
+
+    <!-- Glow halo behind V -->
+    <polygon points="42,55 58,55 100,155 142,55 158,55 100,165"
+             fill="#6d28d9" filter="url(#softBlur)" opacity="0.5"/>
+
+    <!-- Hex fill -->
+    <polygon points="100,8 180,54 180,146 100,192 20,146 20,54"
+             fill="#0b1422"/>
+
+    <!-- Hex border -->
+    <polygon points="100,8 180,54 180,146 100,192 20,146 20,54"
+             fill="none" stroke="url(#hexGrad)" stroke-width="2" opacity="0.9"/>
+
+    <!-- V -->
+    <polygon points="42,55 58,55 100,155 142,55 158,55 100,165"
+             fill="url(#vGrad)"/>
+    <polygon points="42,55 58,55 100,155 142,55 158,55 100,165"
+             fill="none" stroke="rgba(0,212,255,0.22)" stroke-width="1"/>
+
+    <!-- Pipeline connectors -->
+    <line x1="20" y1="100" x2="42" y2="100" stroke="#00d4ff" stroke-width="1.5" opacity="0.3"/>
+    <line x1="158" y1="100" x2="180" y2="100" stroke="#00d4ff" stroke-width="1.5" opacity="0.3"/>
+    <circle cx="20"  cy="100" r="3" fill="#00d4ff" opacity="0.35"/>
+    <circle cx="180" cy="100" r="3" fill="#00d4ff" opacity="0.35"/>
+
+    <!-- Entry nodes -->
+    <circle cx="42"  cy="55" r="5" fill="#00d4ff" filter="url(#glow)"/>
+    <circle cx="158" cy="55" r="5" fill="#00d4ff" filter="url(#glow)"/>
+
+    <!-- Circuit nodes — left -->
+    <circle cx="64"  cy="82"  r="3" fill="#00d4ff" opacity="0.7"/>
+    <circle cx="76"  cy="103" r="2.5" fill="#00d4ff" opacity="0.45"/>
+    <circle cx="88"  cy="126" r="2.5" fill="#8b5cf6" opacity="0.6"/>
+
+    <!-- Circuit nodes — right -->
+    <circle cx="136" cy="82"  r="3" fill="#00d4ff" opacity="0.7"/>
+    <circle cx="124" cy="103" r="2.5" fill="#00d4ff" opacity="0.45"/>
+    <circle cx="112" cy="126" r="2.5" fill="#8b5cf6" opacity="0.6"/>
+
+    <!-- Apex node -->
+    <circle cx="100" cy="160" r="9" fill="#00d4ff" filter="url(#glow)"/>
+    <circle cx="100" cy="160" r="4" fill="white"/>
+  </g>
+
+  <!-- Vertical rule separator -->
+  <line x1="128" y1="22" x2="128" y2="98"
+        stroke="#00d4ff" stroke-width="0.5" opacity="0.18"/>
+
+  <!-- ── Wordmark ── -->
+  <text x="146" y="67"
+        font-family="'DejaVu Sans', 'Century Gothic', 'Gill Sans MT', 'Trebuchet MS', sans-serif"
+        font-size="40"
+        font-weight="300"
+        letter-spacing="9"
+        fill="url(#textGrad)">VALORA</text>
+
+  <!-- ── Tagline ── -->
+  <text x="148" y="89"
+        font-family="'DejaVu Sans Mono', 'Courier New', 'Lucida Console', monospace"
+        font-size="9.5"
+        font-weight="400"
+        letter-spacing="4"
+        fill="#00d4ff"
+        opacity="0.68">AI WORKFLOW ORCHESTRATION</text>
+</svg>

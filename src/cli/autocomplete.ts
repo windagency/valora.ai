@@ -82,13 +82,13 @@ _valora_completion() {
                     ;;
                 --model)
                     # Complete model names
-                    local models="gpt-5-thinking-high claude-opus-4.5 claude-sonnet-4.5 claude-haiku-4.5 auto"
+                    local models="gpt-5-thinking-high claude-opus-4.6 claude-sonnet-4.6 claude-opus-4.5 claude-sonnet-4.5 claude-haiku-4.5 auto"
                     COMPREPLY=( $(compgen -W "$models" -- "$cur") )
                     return 0
                     ;;
                 --provider)
                     # Complete provider names
-                    local providers="cursor anthropic openai google"
+                    local providers="cursor anthropic openai google local"
                     COMPREPLY=( $(compgen -W "$providers" -- "$cur") )
                     return 0
                     ;;
@@ -140,8 +140,8 @@ ${commandsList}
         '--interactive[Enable interactive prompts]'
         '--no-interactive[Disable interactive prompts]'
         '--session[Session ID]:session:_valora_sessions'
-        '--model[AI model]:model:(gpt-5-thinking-high claude-opus-4.5 claude-sonnet-4.5 claude-haiku-4.5 auto)'
-        '--provider[AI provider]:provider:(cursor anthropic openai google)'
+        '--model[AI model]:model:(gpt-5-thinking-high claude-opus-4.6 claude-sonnet-4.6 claude-opus-4.5 claude-sonnet-4.5 claude-haiku-4.5 auto)'
+        '--provider[AI provider]:provider:(cursor anthropic openai google local)'
         '--output[Output format]:format:(text json yaml markdown interactive)'
         '--log-level[Log level]:level:(error warn info debug)'
     )
@@ -191,9 +191,10 @@ _valora
 			{
 				desc: 'AI model',
 				long: 'model',
-				values: 'gpt-5-thinking-high claude-opus-4.5 claude-sonnet-4.5 claude-haiku-4.5 auto'
+				values:
+					'gpt-5-thinking-high claude-opus-4.6 claude-sonnet-4.6 claude-opus-4.5 claude-sonnet-4.5 claude-haiku-4.5 auto'
 			},
-			{ desc: 'AI provider', long: 'provider', values: 'cursor anthropic openai google' },
+			{ desc: 'AI provider', long: 'provider', values: 'cursor anthropic openai google local' },
 			{ desc: 'Output format', long: 'output', values: 'text json yaml markdown interactive' },
 			{ desc: 'Log level', long: 'log-level', values: 'error warn info debug' }
 		];

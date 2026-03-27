@@ -23,6 +23,8 @@ export interface SystemMessageOptions {
 	agentProfile: string;
 	/** Pre-loaded available agents content */
 	availableAgents?: null | string;
+	/** Compact codebase map from AST index */
+	codebaseMap?: null | string;
 	/** Escalation criteria to include */
 	escalationCriteria?: string[];
 	/** Expected output property names */
@@ -59,6 +61,7 @@ export class MessageBuilderService {
 		const {
 			agentProfile,
 			availableAgents,
+			codebaseMap,
 			escalationCriteria,
 			expectedOutputs,
 			projectGuidance,
@@ -93,6 +96,12 @@ export class MessageBuilderService {
 		if (projectKnowledge) {
 			messageParts.push('');
 			messageParts.push(projectKnowledge);
+		}
+
+		// 5.5. Append codebase map if available (AST-generated overview)
+		if (codebaseMap) {
+			messageParts.push('');
+			messageParts.push(codebaseMap);
 		}
 
 		let message = messageParts.join('\n');

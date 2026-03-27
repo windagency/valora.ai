@@ -31,7 +31,7 @@
 				"run_terminal_cmd",
 				"web_search"
 			],
-			"model": "claude-sonnet-4.5",
+			"model": "claude-sonnet-4.6",
 			"agent": "lead"
 		},
 		"create-backlog": {
@@ -57,7 +57,7 @@
 				"run_terminal_cmd",
 				"mcp_github"
 			],
-			"model": "claude-sonnet-4.5",
+			"model": "claude-sonnet-4.6",
 			"agent": "lead"
 		},
 		"create-prd": {
@@ -84,7 +84,7 @@
 				"query_session",
 				"mcp_github"
 			],
-			"model": "claude-sonnet-4.5",
+			"model": "claude-sonnet-4.6",
 			"agent": "product-manager"
 		},
 		"fetch-task": {
@@ -128,7 +128,7 @@
 				"grep",
 				"run_terminal_cmd"
 			],
-			"model": "claude-sonnet-4.5",
+			"model": "claude-sonnet-4.6",
 			"agent": "lead"
 		},
 		"generate-docs": {
@@ -159,7 +159,7 @@
 			"dynamic_agent_selection": true,
 			"fallback_agent": "software-engineer-typescript",
 			"agent_selection_criteria": ["analyze_task_description", "analyze_affected_files", "consider_dependencies"],
-			"model": "claude-sonnet-4.5",
+			"model": "claude-sonnet-4.6",
 			"agent": ""
 		},
 		"plan-architecture": {
@@ -168,7 +168,7 @@
 			"experimental": true,
 			"argument-hint": "'[--task-id=<id>] [--backlog-file=<path>]'",
 			"allowed-tools": ["codebase_search", "read_file", "grep", "list_dir", "glob_file_search"],
-			"model": "claude-sonnet-4.5",
+			"model": "claude-sonnet-4.6",
 			"agent": "lead"
 		},
 		"plan-implementation": {
@@ -177,7 +177,7 @@
 			"experimental": true,
 			"argument-hint": "'[--arch-plan=<path>] [--task-id=<id>]'",
 			"allowed-tools": ["codebase_search", "read_file", "grep", "list_dir", "glob_file_search"],
-			"model": "claude-sonnet-4.5",
+			"model": "claude-sonnet-4.6",
 			"agent": "lead"
 		},
 		"plan": {
@@ -186,7 +186,7 @@
 			"experimental": true,
 			"argument-hint": "'[--task-id=<id>] [--complexity-threshold=5] [--mode=<standard|incremental|tiered>]'",
 			"allowed-tools": ["codebase_search", "read_file", "grep", "list_dir", "glob_file_search"],
-			"model": "claude-sonnet-4.5",
+			"model": "claude-sonnet-4.6",
 			"agent": "lead"
 		},
 		"pre-check": {
@@ -222,7 +222,7 @@
 			"experimental": true,
 			"argument-hint": "'<scope> [--severity=critical|high|medium|low] [--focus=security|performance|maintainability|all] [--checklist] [--auto-only]'",
 			"allowed-tools": ["codebase_search", "read_file", "grep", "list_dir", "glob_file_search", "read_lints"],
-			"model": "claude-sonnet-4.5",
+			"model": "claude-sonnet-4.6",
 			"agent": "lead"
 		},
 		"review-functional": {
@@ -231,7 +231,7 @@
 			"experimental": true,
 			"argument-hint": "'<scope> [--severity=critical|high|medium|low] [--check-a11y=true|false]'",
 			"allowed-tools": ["codebase_search", "read_file", "grep", "list_dir", "glob_file_search", "run_terminal_cmd"],
-			"model": "claude-sonnet-4.5",
+			"model": "claude-sonnet-4.6",
 			"agent": "lead"
 		},
 		"review-plan": {
@@ -267,7 +267,7 @@
 			"experimental": true,
 			"argument-hint": "'[--quick] [--severity=<level>] [--focus=<area>]'",
 			"allowed-tools": ["codebase_search", "read_file", "grep", "list_dir", "glob_file_search", "run_terminal_cmd"],
-			"model": "claude-sonnet-4.5",
+			"model": "claude-sonnet-4.6",
 			"agent": "lead"
 		},
 		"validate-plan": {

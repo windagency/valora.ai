@@ -13,6 +13,7 @@ model_requirements:
   min_context: 128000
   recommended:
     - gpt-5-thinking-high
+    - claude-sonnet-4.6
     - claude-sonnet-4.5
 agents:
   - lead

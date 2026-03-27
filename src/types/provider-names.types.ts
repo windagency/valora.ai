@@ -13,6 +13,7 @@ export enum ProviderName {
 	ANTHROPIC = 'anthropic',
 	CURSOR = 'cursor',
 	GOOGLE = 'google',
+	LOCAL = 'local',
 	MOONSHOT = 'moonshot',
 	OPENAI = 'openai',
 	XAI = 'xai'
@@ -30,8 +31,10 @@ export const ModelName = {
 	CLAUDE_OPUS_4: 'claude-opus-4',
 	CLAUDE_OPUS_4_1: 'claude-opus-4.1',
 	CLAUDE_OPUS_4_5: 'claude-opus-4.5',
+	CLAUDE_OPUS_4_6: 'claude-opus-4.6',
 	CLAUDE_SONNET_4: 'claude-sonnet-4',
 	CLAUDE_SONNET_4_5: 'claude-sonnet-4.5',
+	CLAUDE_SONNET_4_6: 'claude-sonnet-4.6',
 
 	// Cursor models
 	CURSOR_CLAUDE_3_5: 'cursor-claude-3.5',

@@ -115,7 +115,11 @@ describe('Module Boundaries', () => {
 					'cleanup..',
 					'cli..',
 					'ui..',
-					'mcp..'
+					'mcp..',
+					'ast..',
+					'lsp..',
+					'batch..',
+					'security..'
 				)
 				.orShould()
 				.because(

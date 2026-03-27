@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="32" height="32" viewBox="0 0 32 32"
+     xmlns="http://www.w3.org/2000/svg"
+     role="img" aria-label="Valora">
+  <defs>
+    <linearGradient id="vg" x1="50%" y1="0%" x2="50%" y2="100%">
+      <stop offset="0%"   stop-color="#00d4ff"/>
+      <stop offset="55%"  stop-color="#8b5cf6"/>
+      <stop offset="100%" stop-color="#6d28d9"/>
+    </linearGradient>
+    <linearGradient id="hg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%"   stop-color="#00d4ff" stop-opacity="0.95"/>
+      <stop offset="50%"  stop-color="#8b5cf6" stop-opacity="0.65"/>
+      <stop offset="100%" stop-color="#00d4ff" stop-opacity="0.4"/>
+    </linearGradient>
+    <filter id="gl" x="-100%" y="-100%" width="300%" height="300%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="1.5" result="b"/>
+      <feMerge>
+        <feMergeNode in="b"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Hex fill -->
+  <polygon points="16,2 28,9 28,23 16,30 4,23 4,9"
+           fill="#0b1422"/>
+
+  <!-- Hex border -->
+  <polygon points="16,2 28,9 28,23 16,30 4,23 4,9"
+           fill="none" stroke="url(#hg)" stroke-width="1"/>
+
+  <!-- V shape -->
+  <polygon points="7,9 9,9 16,24 23,9 25,9 16,26"
+           fill="url(#vg)"/>
+
+  <!-- Apex node -->
+  <circle cx="16" cy="25" r="2.2" fill="#00d4ff" filter="url(#gl)"/>
+  <circle cx="16" cy="25" r="1"   fill="white"/>
+</svg>

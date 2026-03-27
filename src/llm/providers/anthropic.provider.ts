@@ -154,6 +154,7 @@ export class AnthropicProvider extends BaseLLMProvider implements BatchableProvi
 			return {
 				content: this.extractContent(response),
 				finish_reason: response.stop_reason ?? undefined,
+				model: response.model,
 				role: 'assistant' as const,
 				tool_calls: this.extractToolCalls(response),
 				usage
@@ -357,6 +358,7 @@ export class AnthropicProvider extends BaseLLMProvider implements BatchableProvi
 		onChunk: (chunk: string) => void
 	): Promise<LLMCompletionResult> {
 		let fullContent = '';
+		let responseModel: string | undefined;
 		const usage: LLMUsage = {
 			completion_tokens: 0,
 			prompt_tokens: 0,
@@ -400,6 +402,7 @@ export class AnthropicProvider extends BaseLLMProvider implements BatchableProvi
 			},
 			messageStart: (chunk: Anthropic.MessageStreamEvent) => {
 				if (chunk.type === 'message_start') {
+					responseModel = chunk.message.model;
 					usage.prompt_tokens = chunk.message.usage.input_tokens;
 					const msgUsage = chunk.message.usage as unknown as Record<string, unknown>;
 					if (typeof msgUsage['cache_creation_input_tokens'] === 'number') {
@@ -444,6 +447,7 @@ export class AnthropicProvider extends BaseLLMProvider implements BatchableProvi
 
 		return {
 			content: fullContent,
+			model: responseModel,
 			role: 'assistant',
 			tool_calls: toolCalls,
 			usage
@@ -679,7 +683,7 @@ export class AnthropicProvider extends BaseLLMProvider implements BatchableProvi
 	}
 
 	private resolveModelName(model?: string, mode?: string): string {
-		model ??= this.getDefaultModel() ?? 'claude-sonnet-4.5';
+		model ??= this.getDefaultModel() ?? 'claude-sonnet-4.6';
 		const useVertex = this.config['vertexAI'] as boolean;
 
 		// Use the model mapping registry for resolution
