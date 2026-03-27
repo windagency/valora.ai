@@ -2,13 +2,16 @@
  * Config command definitions for CLI
  */
 
+import * as path from 'node:path';
+
 import type { CommandAdapter } from 'cli/command-adapter.interface';
 
-import { getConfigLoader } from 'config/loader';
+import { ConfigLoader, getConfigLoader } from 'config/loader';
 import { SetupWizard } from 'config/wizard';
 import { getColorAdapter } from 'output/color-adapter.interface';
 import { sanitizeData } from 'utils/data-sanitizer';
 import { formatError } from 'utils/error-handler';
+import { getRuntimeDataDir } from 'utils/paths';
 
 /**
  * Configure config command
@@ -23,7 +26,8 @@ export function configureConfigCommand(program: CommandAdapter): void {
 		.action(async (options) => {
 			const color = getColorAdapter();
 			try {
-				const configLoader = getConfigLoader();
+				const userConfigPath = path.join(getRuntimeDataDir(), 'config.json');
+				const configLoader = new ConfigLoader(userConfigPath);
 				const wizard = new SetupWizard(configLoader);
 
 				if (options['quick'] as boolean | undefined) {
