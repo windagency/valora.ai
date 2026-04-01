@@ -226,7 +226,7 @@ documentation/
 ## Version
 
 - **Package**: `valora`
-- **Version**: 2.3.0
+- **Version**: 2.3.1
 - **Licence**: MIT
 
 ---
