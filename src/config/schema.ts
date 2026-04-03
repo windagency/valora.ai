@@ -35,7 +35,7 @@ export const PROVIDER_CONFIG_SCHEMA = z.object({
 			tokens_per_minute: z.number().optional()
 		})
 		.optional(),
-	timeout_ms: z.number().min(1000).max(300000).optional(),
+	timeout_ms: z.number().min(0).optional(),
 	// Vertex AI specific fields
 	vertexAI: z.boolean().optional(),
 	vertexProjectId: z.string().optional(),

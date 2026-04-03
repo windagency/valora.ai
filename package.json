@@ -1,6 +1,6 @@
 {
 	"name": "@windagency/valora",
-	"version": "2.3.3",
+	"version": "2.3.4",
 	"description": "VALORA - AI-assisted development workflow orchestration with agnostic multi-LLM support, session-based state, and Cursor MCP integration",
 	"keywords": [
 		"valora",
