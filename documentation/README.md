@@ -1,61 +1,50 @@
 # VALORA Documentation
 
-> A comprehensive TypeScript-based AI orchestration engine with multi-LLM support, session-based state management, and Cursor MCP integration.
+Valora is a TypeScript CLI tool that orchestrates 11 specialised AI agents across 24 commands to automate the software development lifecycle.
 
-## Quick Navigation
+## Navigation
 
-| Audience       | Documentation                                                                             |
-| -------------- | ----------------------------------------------------------------------------------------- |
-| **Users**      | [User Guide](./user-guide/README.md) - Getting started, workflows, and daily usage        |
-| **Developers** | [Developer Guide](./developer-guide/README.md) - Architecture, codebase, and contribution |
-| **Architects** | [Architecture Documentation](./architecture/README.md) - System design and decisions      |
-| **API Users**  | [API Reference](./api-reference/README.md) - CLI, MCP, and TypeScript APIs                |
-| **Operations** | [Operations Guide](./operations/README.md) - Deployment, monitoring, and maintenance      |
+| Guide                                          | Audience     | Contents                                        |
+| ---------------------------------------------- | ------------ | ----------------------------------------------- |
+| [User Guide](./user-guide/README.md)           | Users        | Quick start, workflows, commands, configuration |
+| [Developer Guide](./developer-guide/README.md) | Contributors | Setup, codebase, coding standards, testing      |
+| [Architecture](./architecture/README.md)       | Architects   | C4 diagrams, components, data flow              |
+| [API Reference](./api-reference/README.md)     | Integrators  | CLI flags, MCP tools, TypeScript API            |
+| [Operations](./operations/README.md)           | Operators    | Deployment, monitoring, maintenance             |
+| [ADRs](./adr/README.md)                        | All          | Architecture decisions and rationale            |
 
-## What is VALORA?
+## Getting Started
 
-VALORA (Versatile Agent Logic for Orchestrated Response Architecture) is a software development automation platform that orchestrates multiple AI agents to handle complete development workflows. It implements an 8-phase development lifecycle with 11 specialised agents and 24 commands.
+- **Using Valora** → [Quick Start](./user-guide/quick-start.md)
+- **Contributing to Valora** → [Development Setup](./developer-guide/setup.md)
+- **Understanding how it works** → [System Architecture](./architecture/system-architecture.md)
 
-### Key Capabilities
+---
 
-- **Multi-Agent Collaboration**: 11 specialised AI agents with distinct roles and expertise
-- **Three-Tier Execution**: MCP Sampling, Guided Completion, and API Fallback modes
-- **External MCP Integration**: Connect to 15 external MCP servers (Playwright, GitHub, Terraform, etc.) with user approval
-- **Session-Based State**: Persistent context across command executions
-- **Worktree Dashboard**: Live tree-diagram of git worktrees in the `valora dash` dashboard with exploration status indicators and per-session worktree usage statistics
-- **Interactive Clarification**: Pipelines pause to collect user answers, ensuring decisions are documented
-- **Model Optimisation**: Cost-efficient AI model selection (GPT-5, Claude Sonnet, Claude Haiku)
-- **Quality Gates**: Multi-layer validation preventing technical debt
-- **Workflow Metrics**: Automated tracking and reporting of optimisation effectiveness
-
-## System Overview
+<details>
+<summary><strong>System overview</strong></summary>
 
 ```mermaid
 C4Context
-    title System Context Diagram - VALORA
+    title System Context Diagram — VALORA
 
     Person(developer, "Developer", "Uses VALORA for development tasks")
-    Person(user, "End User", "Consumes the generated software")
 
     System(orchestrator, "VALORA", "Orchestrates AI agents for software development workflows")
 
     System_Ext(cursor, "Cursor IDE", "Development environment with AI integration")
     System_Ext(llm_providers, "LLM Providers", "Anthropic, OpenAI, Google AI")
     System_Ext(github, "GitHub", "Version control and collaboration")
-    System_Ext(mcp, "MCP Protocol", "Model Context Protocol for tool integration")
-    System_Ext(ext_mcp, "External MCP Servers", "Playwright, Fetch, Filesystem")
+    System_Ext(ext_mcp, "External MCP Servers", "Playwright, Fetch, Filesystem, and others")
 
     Rel(developer, orchestrator, "Uses", "CLI / MCP")
     Rel(orchestrator, cursor, "Integrates with", "MCP Server")
     Rel(orchestrator, llm_providers, "Sends prompts to", "API")
     Rel(orchestrator, github, "Creates PRs", "GitHub API")
     Rel(orchestrator, ext_mcp, "Connects to", "MCP Client")
-    Rel(cursor, mcp, "Implements", "MCP Protocol")
 ```
 
-## Architecture at a Glance
-
-The engine follows a modular, layered architecture:
+### Architecture layers
 
 | Layer                   | Components                      | Responsibility                            |
 | ----------------------- | ------------------------------- | ----------------------------------------- |
@@ -66,9 +55,12 @@ The engine follows a modular, layered architecture:
 | **External MCP Layer**  | Client Manager, Approval, Audit | External MCP server integration           |
 | **Service Layer**       | Session, Config, Cleanup        | Cross-cutting concerns                    |
 
-## Development Lifecycle
+</details>
 
-The engine implements an 8-phase development lifecycle:
+<details>
+<summary><strong>Development lifecycle phases</strong></summary>
+
+Valora implements an 8-phase development lifecycle:
 
 ```mermaid
 flowchart LR
@@ -81,20 +73,21 @@ flowchart LR
     G --> H[Feedback]
 ```
 
-| Phase            | Purpose                        | Key Commands                                                                                  |
-| ---------------- | ------------------------------ | --------------------------------------------------------------------------------------------- |
-| Initialisation   | Define scope, gather context   | `refine-specs`, `create-prd`, `create-backlog`, `generate-docs`, `generate-all-documentation` |
-| Task Preparation | Fetch and contextualise tasks  | `fetch-task`, `refine-task`, `gather-knowledge`                                               |
-| Planning         | Design implementation strategy | `plan`, `plan-architecture`, `plan-implementation`, `validate-plan`, `review-plan`            |
-| Implementation   | Execute code changes           | `implement`                                                                                   |
-| Validation       | Verify correctness             | `assert`, `test`, `validate-coverage`, `validate-parallel`                                    |
-| Review           | Quality assurance              | `pre-check`, `review-code`, `review-functional`                                               |
-| Commit & PR      | Finalise and merge             | `commit`, `create-pr`                                                                         |
-| Feedback         | Continuous improvement         | `feedback`                                                                                    |
+| Phase            | Purpose                        | Key Commands                                    |
+| ---------------- | ------------------------------ | ----------------------------------------------- |
+| Initialisation   | Define scope, gather context   | `refine-specs`, `create-prd`, `create-backlog`  |
+| Task Preparation | Fetch and contextualise tasks  | `fetch-task`, `refine-task`, `gather-knowledge` |
+| Planning         | Design implementation strategy | `plan`, `review-plan`                           |
+| Implementation   | Execute code changes           | `implement`                                     |
+| Validation       | Verify correctness             | `assert`, `test`                                |
+| Review           | Quality assurance              | `review-code`, `review-functional`              |
+| Commit & PR      | Finalise and merge             | `commit`, `create-pr`                           |
+| Feedback         | Continuous improvement         | `feedback`                                      |
 
-## Agent Ecosystem
+</details>
 
-The engine employs 11 specialised agents:
+<details>
+<summary><strong>Agent ecosystem</strong></summary>
 
 | Agent                                           | Domain         | Role                                       |
 | ----------------------------------------------- | -------------- | ------------------------------------------ |
@@ -110,125 +103,86 @@ The engine employs 11 specialised agents:
 | **secops-engineer**                             | Security       | Compliance, threat detection               |
 | **ui-ux-designer**                              | Design         | UI/UX, accessibility                       |
 
-## Workflow Optimisations
+</details>
 
-The engine includes 7 workflow optimisations that reduce development time by up to 32%:
+<details>
+<summary><strong>Workflow optimisations</strong></summary>
+
+Valora includes 7 workflow optimisations that reduce development time by up to 32%:
 
 | Optimisation            | Time Savings       | Target Adoption     |
 | ----------------------- | ------------------ | ------------------- |
-| **Plan Templates**      | 8-10 min/plan      | 40% of plans        |
-| **Early Exit Reviews**  | 10-15 min/review   | 30% of reviews      |
-| **Express Planning**    | 10-12 min/plan     | 15% of plans        |
-| **Parallel Validation** | 12-15 min/review   | All reviews         |
-| **Real-Time Linting**   | 3-5 min/workflow   | All implementations |
-| **Decision Criteria**   | 5-8 min/review     | All reviews         |
-| **Technical Defaults**  | 12-15 min/workflow | All workflows       |
+| **Plan Templates**      | 8–10 min/plan      | 40% of plans        |
+| **Early Exit Reviews**  | 10–15 min/review   | 30% of reviews      |
+| **Express Planning**    | 10–12 min/plan     | 15% of plans        |
+| **Parallel Validation** | 12–15 min/review   | All reviews         |
+| **Real-Time Linting**   | 3–5 min/workflow   | All implementations |
+| **Decision Criteria**   | 5–8 min/review     | All reviews         |
+| **Technical Defaults**  | 12–15 min/workflow | All workflows       |
 
-**Baseline Workflow**: 3h 12m → **Optimised**: ~2h 10m (32% reduction)
+**Baseline workflow**: 3h 12m → **Optimised**: ~2h 10m (32% reduction)
 
-See [Metrics and Optimisation Guide](./user-guide/metrics.md) for details.
+See [Metrics Guide](./user-guide/metrics.md) for details.
 
-## Getting Started
+</details>
 
-### For Users
+<details>
+<summary><strong>Documentation structure</strong></summary>
 
-Start with the [User Guide](./user-guide/README.md):
-
-1. [Quick Start](./user-guide/quick-start.md) - Get up and running in 5 minutes
-2. [Basic Workflows](./user-guide/workflows.md) - Common development patterns
-3. [Command Reference](./user-guide/commands.md) - All commands explained (incl. dashboard & worktree panels)
-4. [Metrics and Optimisation](./user-guide/metrics.md) - Track and improve efficiency
-
-### For Developers
-
-Start with the [Developer Guide](./developer-guide/README.md):
-
-1. [Development Setup](./developer-guide/setup.md) - Environment configuration
-2. [Codebase Overview](./developer-guide/codebase.md) - Project structure
-3. [Contributing](./developer-guide/contributing.md) - How to contribute
-4. [Code Quality Standards](./developer-guide/code-quality.md) - Coding standards and best practices
-
-### For Architects
-
-Start with the [Architecture Documentation](./architecture/README.md):
-
-1. [System Architecture](./architecture/system-architecture.md) - High-level design
-2. [Component Architecture](./architecture/components.md) - Module structure
-3. [Architecture Decision Records](./adr/README.md) - Key decisions
-
-## Documentation Structure
-
-```plaintext
+```
 documentation/
-├── README.md                       # This file - main entry point
-├── DESIGN.md                       # Design philosophy
-├── THOUGHTS.md                     # Design thoughts and rationale
-├── user-guide/                     # User-focused documentation
-│   ├── README.md                  # User guide overview
-│   ├── quick-start.md             # Getting started quickly
-│   ├── workflows.md               # Development workflows
-│   ├── commands.md                # Command reference
-│   ├── dry-run-mode.md            # Preview changes
-│   ├── metrics.md                 # Workflow optimisation metrics
-│   ├── metrics-quickstart.md      # 5-minute metrics setup
-│   ├── workflow-optimisations.md  # Detailed optimisation reference
-│   ├── configuration.md           # Configuration and customisation (incl. External MCP)
-│   ├── best-practices.md          # Recommended usage patterns
-│   └── troubleshooting.md         # Common issues and solutions
-├── developer-guide/                # Developer-focused documentation
-│   ├── README.md                  # Developer guide overview
-│   ├── setup.md                   # Development environment setup
-│   ├── codebase.md                # Codebase structure
-│   ├── contributing.md            # Contribution guidelines
-│   ├── code-quality.md            # Code quality standards
-│   ├── CODE-QUALITY-GUIDELINES.md # Detailed quality guidelines
-│   └── LANGUAGE_CONVENTION.md     # Language usage conventions
-├── architecture/                   # Architecture documentation
-│   ├── README.md                  # Architecture overview
-│   ├── system-architecture.md     # System-level design
-│   ├── components.md              # Component architecture
-│   ├── data-flow.md               # Data flow diagrams
-│   ├── session-optimization.md    # Session performance
-│   ├── metrics-system.md          # Metrics collection architecture
-│   └── metrics-dashboard.md       # Comprehensive metrics reference
-├── api-reference/                  # API documentation
-│   └── README.md                  # CLI, MCP, and TypeScript APIs
-├── operations/                     # Operations documentation
-│   ├── README.md                  # Deployment and maintenance
-│   └── automated-reporting.md     # Automated metrics reporting
-└── adr/                            # Architecture Decision Records
-    ├── README.md                  # ADR index
-    ├── 001-multi-agent-architecture.md
-    ├── 002-guidance-vs-knowledge-separation.md
-    ├── 002-three-tier-execution.md
-    ├── 003-session-based-state.md
-    ├── 004-pipeline-execution-model.md
-    ├── 005-llm-provider-abstraction.md
-    ├── 006-automatic-context-flush.md
-    ├── 007-persistent-stage-output-caching.md
-    ├── 008-pretooluse-cli-enforcement.md
-    └── 009-supply-chain-hardening.md
+├── README.md                        # This file — main entry point
+├── user-guide/
+│   ├── README.md                    # User guide overview
+│   ├── quick-start.md               # Getting started quickly
+│   ├── workflows.md                 # Development workflows
+│   ├── commands.md                  # Command reference
+│   ├── dry-run-mode.md              # Preview changes
+│   ├── metrics.md                   # Workflow optimisation metrics
+│   ├── metrics-quickstart.md        # 5-minute metrics setup
+│   ├── configuration.md             # Configuration and customisation
+│   ├── best-practices.md            # Recommended usage patterns
+│   └── troubleshooting.md           # Common issues and solutions
+├── developer-guide/
+│   ├── README.md                    # Developer guide overview
+│   ├── setup.md                     # Development environment setup
+│   ├── codebase.md                  # Codebase structure
+│   ├── contributing.md              # Contribution guidelines
+│   ├── code-quality.md              # Code quality standards
+│   ├── CODE-QUALITY-GUIDELINES.md   # Detailed quality guidelines
+│   └── LANGUAGE_CONVENTION.md       # Language usage conventions
+├── architecture/
+│   ├── README.md                    # Architecture overview
+│   ├── system-architecture.md       # System-level design
+│   ├── components.md                # Component architecture
+│   ├── data-flow.md                 # Data flow diagrams
+│   ├── session-optimization.md      # Session performance
+│   ├── metrics-system.md            # Metrics collection architecture
+│   └── metrics-dashboard.md         # Metrics tracking reference
+├── api-reference/
+│   └── README.md                    # CLI, MCP, and TypeScript APIs
+├── operations/
+│   ├── README.md                    # Deployment and maintenance
+│   ├── pipeline-resilience.md       # Pipeline error handling
+│   └── automated-reporting.md       # Automated metrics reporting
+├── adr/
+│   ├── README.md                    # ADR index
+│   ├── 001-multi-agent-architecture.md
+│   ├── 002-three-tier-execution.md
+│   ├── 003-session-based-state.md
+│   ├── 004-pipeline-execution-model.md
+│   ├── 005-llm-provider-abstraction.md
+│   ├── 006-automatic-context-flush.md
+│   ├── 007-persistent-stage-output-caching.md
+│   ├── 008-pretooluse-cli-enforcement.md
+│   └── 009-supply-chain-hardening.md
+└── design/
+    ├── DESIGN.md                    # Design philosophy
+    └── LOGO.md                      # Logo rationale
 ```
 
-## Technology Stack
-
-| Category            | Technologies                 |
-| ------------------- | ---------------------------- |
-| **Runtime**         | Node.js 18+, TypeScript 5.x  |
-| **Package Manager** | pnpm 10.x                    |
-| **Build**           | tsc, tsc-alias               |
-| **Testing**         | Vitest, Playwright           |
-| **LLM Providers**   | Anthropic, OpenAI, Google AI |
-| **UI**              | Ink (React for CLI), Chalk   |
-| **Validation**      | Zod                          |
-| **Documentation**   | Markdown, Mermaid            |
-
-## Version
-
-- **Package**: `valora`
-- **Version**: 2.3.4
-- **Licence**: MIT
+</details>
 
 ---
 
-_This documentation is maintained as part of the VALORA project. For updates and contributions, see the [Contributing Guide](./developer-guide/contributing.md)._
+**Version**: 2.3.4 · **Licence**: MIT · [Contributing](./developer-guide/contributing.md)

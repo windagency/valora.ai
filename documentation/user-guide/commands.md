@@ -1,30 +1,61 @@
 # Command Reference
 
-> Complete reference for all 24 commands in VALORA.
+> Complete reference for all 24 commands in VALORA v2.3.4.
+
+## Commands Quick Reference
+
+| Command                      | Agent            | Purpose                                            | Key flags                                                |
+| ---------------------------- | ---------------- | -------------------------------------------------- | -------------------------------------------------------- |
+| `refine-specs`               | @product-manager | Collaboratively refine specifications              | `--domain`, `--stakeholders`                             |
+| `create-prd`                 | @product-manager | Generate PRD from specifications                   | `--specs-file`, `--template`                             |
+| `create-backlog`             | @product-manager | Decompose PRD into tasks                           | `--granularity`, `--format`                              |
+| `generate-docs`              | @lead            | Generate technical documentation                   | `--domain`, `--quick`, `--extract-only`                  |
+| `generate-all-documentation` | @lead            | Parallel documentation generation (~6 min faster)  | `--skip-review`, `--cache-context`, `--security-context` |
+| `fetch-task`                 | @product-manager | Retrieve task from backlog                         | `--task-id`, `--priority`, `--domain`                    |
+| `refine-task`                | @product-manager | Clarify task requirements                          | `--task-id`, `--interactive`                             |
+| `gather-knowledge`           | @lead            | Analyse codebase context                           | `--scope`, `--domain`, `--depth`                         |
+| `plan`                       | @lead            | Create implementation plan                         | `--mode`, `--pattern`, `--complexity-threshold`          |
+| `plan-architecture`          | @lead            | High-level architecture plan (Phase 1)             | `--task-id`, `--backlog-file`                            |
+| `plan-implementation`        | @lead            | Detailed implementation plan (Phase 2)             | `--arch-plan`, `--task-id`                               |
+| `validate-plan`              | @lead            | Pre-review validation (catches 60–70% of issues)   | `--fix`, `--strict`                                      |
+| `validate-coverage`          | @qa              | Test coverage validation with quality scoring      | `--threshold`, `--strict`, `--fail-on-decrease`          |
+| `pre-check`                  | @qa              | Automated code quality pre-checks before review    | `--fix`, `--strict`, `--ci`                              |
+| `review-plan`                | @lead            | Validate implementation plan                       | `--strict-mode`, `--focus`, `--checklist`                |
+| `implement`                  | Dynamic          | Execute code changes                               | `--agent`, `--mode`, `--step`                            |
+| `assert`                     | @asserter        | Validate implementation                            | `--severity`, `--quick`                                  |
+| `test`                       | @qa              | Execute test suites                                | `--type`, `--coverage-threshold`                         |
+| `validate-parallel`          | @lead            | Run assert + review-code in parallel (~50% faster) | `--quick`, `--severity`, `--focus`                       |
+| `review-code`                | @lead            | Code quality review                                | `--severity`, `--focus`, `--checklist`, `--auto-only`    |
+| `review-functional`          | @lead            | Functional review                                  | `--severity`, `--check-a11y`                             |
+| `commit`                     | @lead            | Create conventional commits                        | `--scope`, `--breaking`, `--update-changelog`            |
+| `create-pr`                  | @lead            | Generate pull request                              | `--draft`, `--auto-assign`, `--link-issues`              |
+| `feedback`                   | @product-manager | Capture outcomes                                   | `--command`, `--satisfaction`, `--suggest-improvements`  |
+
+> **Note on batch stages:** Several commands have stages marked `batch: true`, eligible when `--batch` is set and the provider supports it (Anthropic and OpenAI only). See [Batch Processing](#batch-processing) for details.
+
+---
 
 ## Global Flags
 
-These flags can be used with any command:
+These flags apply to any command:
 
-| Flag                  | Short | Description                                                                                               |
-| --------------------- | ----- | --------------------------------------------------------------------------------------------------------- |
-| `--dry-run`           | `-n`  | Preview what would be executed without making changes. See [Dry Run Mode](./dry-run-mode.md) for details. |
-| `--verbose`           | `-v`  | Enable verbose output with detailed logging                                                               |
-| `--quiet`             | `-q`  | Suppress non-essential output                                                                             |
-| `--interactive`       |       | Enable interactive mode with approval prompts (default: true)                                             |
-| `--no-interactive`    |       | Disable interactive mode                                                                                  |
-| `--model <name>`      |       | Override the default AI model                                                                             |
-| `--agent <role>`      |       | Override the default agent                                                                                |
-| `--provider <name>`   |       | Override the default LLM provider                                                                         |
-| `--session-id <id>`   |       | Resume or use a specific session                                                                          |
-| `--output <format>`   |       | Output format: markdown, json, yaml                                                                       |
-| `--log-level <level>` |       | Set log level: debug, info, warn, error                                                                   |
-| `--batch`             |       | Submit LLM calls via batch API for ~50% token cost reduction (async, 24 h window)                         |
-
-### Example: Using Global Flags
+| Flag                  | Short | Description                                                                       |
+| --------------------- | ----- | --------------------------------------------------------------------------------- |
+| `--dry-run`           | `-n`  | Preview what would be executed without making changes                             |
+| `--verbose`           | `-v`  | Enable verbose output with detailed logging                                       |
+| `--quiet`             | `-q`  | Suppress non-essential output                                                     |
+| `--interactive`       |       | Enable interactive mode with approval prompts (default: true)                     |
+| `--no-interactive`    |       | Disable interactive mode                                                          |
+| `--model <name>`      |       | Override the default AI model                                                     |
+| `--agent <role>`      |       | Override the default agent                                                        |
+| `--provider <name>`   |       | Override the default LLM provider                                                 |
+| `--session-id <id>`   |       | Resume or use a specific session                                                  |
+| `--output <format>`   |       | Output format: `markdown`, `json`, `yaml`                                         |
+| `--log-level <level>` |       | Log level: `debug`, `info`, `warn`, `error`                                       |
+| `--batch`             |       | Submit LLM calls via batch API for ~50% token cost reduction (async, 24 h window) |
 
 ```bash
-# Preview implementation in dry-run mode
+# Preview implementation without making changes
 valora implement "Add feature" --dry-run
 
 # Use a specific model with verbose output
@@ -36,36 +67,13 @@ valora test --quiet --no-interactive
 
 ---
 
-## Command Overview
+## Model Tier Summary
 
-| Command                      | Agent            | Model               | Batch stages | Description                                        |
-| ---------------------------- | ---------------- | ------------------- | ------------ | -------------------------------------------------- |
-| `refine-specs`               | @product-manager | GPT-5 Thinking High | 2 of 5       | Collaboratively refine specifications              |
-| `create-prd`                 | @product-manager | GPT-5 Thinking High | 3 of 5       | Generate PRD from specifications                   |
-| `create-backlog`             | @product-manager | Claude Haiku 4.5    | 4 of 5       | Decompose PRD into tasks                           |
-| `generate-docs`              | @lead            | Claude Haiku 4.5    | 4 of 7       | Generate technical documentation                   |
-| `generate-all-documentation` | @lead            | Claude Sonnet 4.5   | —            | Parallel documentation generation (5-7 min faster) |
-| `fetch-task`                 | @product-manager | Claude Haiku 4.5    | —            | Retrieve task from backlog                         |
-| `refine-task`                | @product-manager | Claude Haiku 4.5    | 2 of 6       | Clarify task requirements                          |
-| `gather-knowledge`           | @lead            | GPT-5 Thinking High | —            | Analyse codebase context                           |
-| `validate-parallel`          | @lead            | Claude Sonnet 4.5   | —            | Run assert + review-code in parallel (~50% faster) |
-| `plan`                       | @lead            | GPT-5 Thinking High | —            | Create implementation plan                         |
-| `plan-architecture`          | @lead            | Claude Sonnet 4.5   | 1 of 3       | Create high-level architecture plan (Phase 1)      |
-| `plan-implementation`        | @lead            | Claude Sonnet 4.5   | 2 of 4       | Create detailed implementation plan (Phase 2)      |
-| `validate-plan`              | @lead            | Claude Haiku 4.5    | —            | Pre-review validation (catches 60-70% of issues)   |
-| `validate-coverage`          | @qa              | Claude Haiku 4.5    | —            | Test coverage validation gate with quality scoring |
-| `pre-check`                  | @qa              | Claude Haiku 4.5    | —            | Automated code quality pre-checks before review    |
-| `review-plan`                | @lead            | GPT-5 Thinking High | 5 of 7       | Validate implementation plan                       |
-| `implement`                  | Dynamic          | Claude Sonnet 4.5   | —            | Execute code changes                               |
-| `assert`                     | @asserter        | Claude Haiku 4.5    | —            | Validate implementation                            |
-| `test`                       | @qa              | Claude Haiku 4.5    | —            | Execute test suites                                |
-| `review-code`                | @lead            | Claude Sonnet 4.5   | 1 of 3       | Code quality review                                |
-| `review-functional`          | @lead            | Claude Sonnet 4.5   | 1 of 3       | Functional review                                  |
-| `commit`                     | @lead            | Claude Sonnet 4.5   | —            | Create conventional commits                        |
-| `create-pr`                  | @lead            | Claude Sonnet 4.5   | —            | Generate pull request                              |
-| `feedback`                   | @product-manager | Claude Haiku 4.5    | —            | Capture outcomes                                   |
-
-"Batch stages" shows how many stages in the pipeline have `batch: true` (eligible when `--batch` flag is set and provider supports batching). `—` means no stages opt in.
+| Tier          | Model               | Commands                                                                                                                                        |
+| ------------- | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Strategic** | GPT-5 Thinking High | `refine-specs`, `create-prd`, `gather-knowledge`, `plan`, `review-plan`                                                                         |
+| **Execution** | Claude Sonnet 4.5   | `implement`, `review-code`, `review-functional`, `commit`, `create-pr`, `generate-all-documentation`, `validate-parallel`                       |
+| **Fast**      | Claude Haiku 4.5    | `create-backlog`, `generate-docs`, `fetch-task`, `refine-task`, `assert`, `test`, `validate-plan`, `validate-coverage`, `pre-check`, `feedback` |
 
 ---
 
@@ -79,33 +87,31 @@ Collaboratively refine product specifications through structured questioning.
 valora refine-specs '<initial-concept>' [options]
 ```
 
-**Options:**
-
 | Option                  | Description                             |
 | ----------------------- | --------------------------------------- |
 | `--domain=<domain>`     | Target domain (backend, frontend, etc.) |
 | `--stakeholders=<list>` | Comma-separated stakeholder list        |
 
-**Example:**
-
 ```bash
 valora refine-specs "User authentication system" --domain=backend
 ```
 
-**Pipeline Stages:**
+<details>
+<summary><strong>Pipeline stages and interactive behaviour</strong></summary>
 
-1. `context.understand-intent` - Extract initial understanding
-2. `onboard.refine-specifications` - Generate clarifying questions ⚡
-3. `review.validate-completeness` - Validate quality (≥90% target) ⚡
-4. `onboard.collect-clarifications` - **Interactive**: Collect user answers
-5. `documentation.apply-specification-refinement` - Write answers into FUNCTIONAL.md
+1. `context.understand-intent` — Extract initial understanding
+2. `onboard.refine-specifications` — Generate clarifying questions ⚡
+3. `review.validate-completeness` — Validate quality (≥90% target) ⚡
+4. `onboard.collect-clarifications` — **Interactive**: Collect user answers
+5. `documentation.apply-specification-refinement` — Write answers into FUNCTIONAL.md
 
 ⚡ = batch-eligible when `--batch` is set
 
-**Interactive Stage:** When clarifying questions are generated, the pipeline pauses to collect user answers. These answers are incorporated into the final specification document with a "User Clarifications" section.
+When clarifying questions are generated, the pipeline pauses to collect user answers. These answers are incorporated into the final specification document under a "User Clarifications" section.
 
-**Agent:** @product-manager
-**Model:** GPT-5 Thinking High
+**Agent:** @product-manager | **Model:** GPT-5 Thinking High
+
+</details>
 
 ---
 
@@ -117,53 +123,47 @@ Generate a comprehensive Product Requirements Document from refined specificatio
 valora create-prd [options]
 ```
 
-**Options:**
-
-| Option                | Description                             |
-| --------------------- | --------------------------------------- |
-| `--specs-file=<path>` | Path to specifications file             |
-| `--template=<type>`   | Template: standard, technical, business |
-
-**Example:**
+| Option                | Description                                   |
+| --------------------- | --------------------------------------------- |
+| `--specs-file=<path>` | Path to specifications file                   |
+| `--template=<type>`   | Template: `standard`, `technical`, `business` |
 
 ```bash
 valora create-prd --template=technical
 ```
 
-**Pipeline Stages:**
+<details>
+<summary><strong>Pipeline stages and interactive behaviour</strong></summary>
 
-1. `context.load-specifications` - Load specs from file or knowledge-base
-2. `onboard.analyze-requirements` - Decompose requirements, generate clarifying questions ⚡
-3. `onboard.collect-clarifications` - **Interactive**: Collect user answers
-4. `documentation.generate-prd` - Generate PRD with user clarifications applied ⚡
-5. `review.validate-completeness` - Validate quality (≥95% target) ⚡
+1. `context.load-specifications` — Load specs from file or knowledge-base
+2. `onboard.analyze-requirements` — Decompose requirements, generate clarifying questions ⚡
+3. `onboard.collect-clarifications` — **Interactive**: Collect user answers
+4. `documentation.generate-prd` — Generate PRD with user clarifications applied ⚡
+5. `review.validate-completeness` — Validate quality (≥95% target) ⚡
 
 ⚡ = batch-eligible when `--batch` is set
 
-**Interactive Stage:** When requirements analysis generates clarifying questions, the pipeline pauses to collect user answers before generating the PRD.
+When requirements analysis generates clarifying questions, the pipeline pauses to collect user answers before generating the PRD.
 
-**Agent:** @product-manager
-**Model:** GPT-5 Thinking High
+**Agent:** @product-manager | **Model:** GPT-5 Thinking High
+
+</details>
 
 ---
 
 ### create-backlog
 
-Decompose Product Requirements Document into prioritised, actionable tasks.
+Decompose a Product Requirements Document into prioritised, actionable tasks.
 
 ```bash
 valora create-backlog [options]
 ```
 
-**Options:**
-
-| Option                  | Description                    |
-| ----------------------- | ------------------------------ |
-| `--prd-file=<path>`     | Path to PRD file               |
-| `--granularity=<level>` | Level: fine, medium, coarse    |
-| `--format=<type>`       | Format: github, jira, markdown |
-
-**Example:**
+| Option                  | Description                          |
+| ----------------------- | ------------------------------------ |
+| `--prd-file=<path>`     | Path to PRD file                     |
+| `--granularity=<level>` | Level: `fine`, `medium`, `coarse`    |
+| `--format=<type>`       | Format: `github`, `jira`, `markdown` |
 
 ```bash
 valora create-backlog --granularity=fine --format=github
@@ -171,8 +171,7 @@ valora create-backlog --granularity=fine --format=github
 
 **Batch-eligible stages:** `onboard`, `breakdown`, `review`, `generate` (4 of 5 stages — all after the PRD is loaded)
 
-**Agent:** @product-manager
-**Model:** Claude Haiku 4.5
+**Agent:** @product-manager | **Model:** Claude Haiku 4.5
 
 ---
 
@@ -184,44 +183,29 @@ Generate comprehensive technical documentation across infrastructure, backend, a
 valora generate-docs [options]
 ```
 
-**Options:**
-
-| Option                | Description                                                       |
-| --------------------- | ----------------------------------------------------------------- |
-| `--domain=<domain>`   | Domain: infrastructure, backend, frontend, all (default: all)     |
-| `--doc-type=<type>`   | Specific document type: HLD, API, ARCHITECTURE, etc.              |
-| `--output-dir=<path>` | Output directory (default: knowledge-base/)                       |
-| `--quick`             | Use quick templates for faster generation (~50% time reduction)   |
-| `--extract-only`      | Run extraction phase only (generates DOC_EXTRACTION_CHECKLIST.md) |
-
-**Quick Mode (`--quick`):**
-Uses pre-built templates for faster documentation:
-
-- `DOC_API_QUICK.md` - API documentation skeleton
-- `DOC_COMPONENT_QUICK.md` - Component documentation
-- Standard structures for all document types
-
-**Extraction Mode (`--extract-only`):**
-Generates extraction checklist with automated commands to extract documentation from code:
-
-- API endpoints, data models, services
-- Configuration, error handling, middleware
-- Tests, dependencies, infrastructure
-
-**Example:**
+| Option                | Description                                                             |
+| --------------------- | ----------------------------------------------------------------------- |
+| `--domain=<domain>`   | Domain: `infrastructure`, `backend`, `frontend`, `all` (default: `all`) |
+| `--doc-type=<type>`   | Specific document type: `HLD`, `API`, `ARCHITECTURE`, etc.              |
+| `--output-dir=<path>` | Output directory (default: `knowledge-base/`)                           |
+| `--quick`             | Use pre-built templates (~50% time reduction)                           |
+| `--extract-only`      | Run extraction phase only, generating `DOC_EXTRACTION_CHECKLIST.md`     |
 
 ```bash
-# Full generation
+# Full generation for a single domain
 valora generate-docs --domain=backend
 
-# Quick generation (~50% faster)
+# Faster generation with templates
 valora generate-docs --quick
 
-# Extraction only
+# Generate extraction checklist only
 valora generate-docs --extract-only
 ```
 
-**Target Documentation (15 files):**
+<details>
+<summary><strong>Target documentation, pipeline stages, and prerequisites</strong></summary>
+
+**Target documentation (15 files):**
 
 | Domain             | Files                                                               |
 | ------------------ | ------------------------------------------------------------------- |
@@ -229,78 +213,44 @@ valora generate-docs --extract-only
 | Backend (5)        | ARCHITECTURE.md, API.md, DATA.md, TESTING.md, CODING-ASSERTIONS.md  |
 | Frontend (4)       | ARCHITECTURE.md, DESIGN.md, TESTING.md, CODING-ASSERTIONS.md        |
 
-**Pipeline Stages:**
+**Quick mode (`--quick`)** uses pre-built templates: `DOC_API_QUICK.md`, `DOC_COMPONENT_QUICK.md`, and standard structures for all document types.
 
-1. **context** - Load PRD, FUNCTIONAL, BACKLOG, codebase
-2. **analyze** - Plan documentation structure, identify diagrams
-3. **generate-infra** - Generate 6 infrastructure docs (parallel) ⚡
-4. **generate-backend** - Generate 5 backend docs (parallel) ⚡
-5. **generate-frontend** - Generate 4 frontend docs (parallel) ⚡
-6. **review** - Validate completeness (>= 85% threshold) ⚡
-7. **persist** - Write files, create backups
+**Extraction mode (`--extract-only`)** generates a checklist with automated commands to extract: API endpoints, data models, services, configuration, error handling, middleware, tests, dependencies, and infrastructure.
+
+**Pipeline stages:**
+
+1. **context** — Load PRD, FUNCTIONAL, BACKLOG, codebase
+2. **analyze** — Plan documentation structure, identify diagrams
+3. **generate-infra** — Generate 6 infrastructure docs ⚡
+4. **generate-backend** — Generate 5 backend docs ⚡
+5. **generate-frontend** — Generate 4 frontend docs ⚡
+6. **review** — Validate completeness (≥85% threshold) ⚡
+7. **persist** — Write files, create backups
 
 ⚡ = batch-eligible when `--batch` is set
 
-**Prerequisites:**
+**Prerequisites:** `PRD.md`, `FUNCTIONAL.md`, and `BACKLOG.md` must exist in `knowledge-base/`.
 
-- PRD.md exists in knowledge-base/
-- FUNCTIONAL.md exists in knowledge-base/
-- BACKLOG.md exists in knowledge-base/
+**Agent:** @lead (orchestration), @platform-engineer (infra), @software-engineer-typescript-backend (backend), @software-engineer-typescript-frontend (frontend) | **Model:** Claude Haiku 4.5
 
-**Agent:** @lead (orchestration), @platform-engineer (infra), @software-engineer-typescript-backend (backend), @software-engineer-typescript-frontend (frontend)
-**Model:** Claude Haiku 4.5
+</details>
 
 ---
 
 ### generate-all-documentation
 
-Generate comprehensive technical documentation using parallel subprocesses, saving 5-7 minutes per workflow compared to sequential execution.
+Generate all 15 technical documentation files using parallel subprocesses, saving 5–7 minutes compared to sequential `generate-docs`.
 
 ```bash
 valora generate-all-documentation [options]
 ```
 
-**Options:**
-
-| Option                      | Description                                                     |
-| --------------------------- | --------------------------------------------------------------- |
-| `--output-dir=<path>`       | Output directory (default: knowledge-base/)                     |
-| `--skip-review`             | Skip validation stage for fastest generation (~5.5 min)         |
-| `--security-context=<path>` | Path to security requirements file for compliance documentation |
-| `--cache-context`           | Use cached context from previous run (saves ~30s)               |
-
-**Time Savings:**
-
-| Stage              | Sequential  | Parallel        | Saved      |
-| ------------------ | ----------- | --------------- | ---------- |
-| Context + Analyse  | 105s        | 90s (merged)    | 15s        |
-| Generate 3 Domains | 540s        | 240s (parallel) | 300s       |
-| Review + Persist   | 210s        | 150s (merged)   | 60s        |
-| **Total**          | **~14 min** | **~8 min**      | **~6 min** |
-
-**Optimisation Strategies:**
-
-1. **Merged Context + Analyse Stage** - Single stage instead of two
-2. **True Parallel Domain Generation** - 3 subprocesses run concurrently
-3. **Merged Review + Persist Stage** - Streaming validation and file writing
-4. **Aggressive Caching** - 2-hour TTL, includes analysis results
-
-**Pipeline Stages:**
-
-1. **contextAndAnalyse** - Load documents + plan documentation (merged, ~90s)
-2. **generateAll** - 3 parallel subprocesses for infra/backend/frontend (~240s)
-3. **reviewAndPersist** - Validate + write files (merged, ~150s)
-
-**Security Context Integration:**
-
-When `--security-context` is provided:
-
-- HLD.md includes full security architecture section
-- DEPLOYMENT.md includes security gates
-- LOGGING.md includes audit trail requirements
-- LZ.md includes compliance implementation details
-
-**Example:**
+| Option                      | Description                                        |
+| --------------------------- | -------------------------------------------------- |
+| `--output-dir=<path>`       | Output directory (default: `knowledge-base/`)      |
+| `--skip-review`             | Skip validation stage (~5.5 min total)             |
+| `--security-context=<path>` | Path to security requirements file                 |
+| `--cache-context`           | Use cached context from previous run (saves ~30 s) |
 
 ```bash
 # Standard parallel generation (~8 min)
@@ -309,34 +259,54 @@ valora generate-all-documentation
 # With cached context (~6.5 min)
 valora generate-all-documentation --cache-context
 
-# Fastest generation, skip review (~5.5 min)
+# Fastest, skip review (~5.5 min)
 valora generate-all-documentation --skip-review
 
-# With security documentation
+# Include security documentation
 valora generate-all-documentation --security-context=.valora/security-requirements.json
-
-# Custom output directory
-valora generate-all-documentation --output-dir=docs/technical/
 ```
 
-**Comparison with generate-docs:**
+<details>
+<summary><strong>Timing breakdown, optimisation strategies, and comparison with generate-docs</strong></summary>
 
-| Aspect           | generate-docs | generate-all-documentation |
-| ---------------- | ------------- | -------------------------- |
-| Pipeline stages  | 7             | 3                          |
-| Duration         | ~14 min       | ~8 min                     |
-| Time saved       | Baseline      | 5-7 min                    |
-| Skip review      | No            | Yes                        |
-| Security context | No            | Yes                        |
-| Cache TTL        | 1 hour        | 2 hours                    |
+**Time savings:**
 
-**When to Use:**
+| Stage              | Sequential  | Parallel         | Saved      |
+| ------------------ | ----------- | ---------------- | ---------- |
+| Context + Analyse  | 105 s       | 90 s (merged)    | 15 s       |
+| Generate 3 domains | 540 s       | 240 s (parallel) | 300 s      |
+| Review + Persist   | 210 s       | 150 s (merged)   | 60 s       |
+| **Total**          | **~14 min** | **~8 min**       | **~6 min** |
 
-- **generate-docs**: Single domain, quick templates, extraction mode, lower cost
-- **generate-all-documentation**: Full suite, time-critical, cached context, security documentation
+**Optimisation strategies:**
 
-**Agent:** @lead (orchestration), @platform-engineer (infra), @software-engineer-typescript-backend (backend), @software-engineer-typescript-frontend (frontend)
-**Model:** Claude Sonnet 4.5
+1. Merged context + analyse stage — single stage instead of two
+2. True parallel domain generation — 3 subprocesses run concurrently
+3. Merged review + persist stage — streaming validation and file writing
+4. Aggressive caching — 2-hour TTL, includes analysis results
+
+**Pipeline stages:**
+
+1. **contextAndAnalyse** — Load documents + plan documentation (merged, ~90 s)
+2. **generateAll** — 3 parallel subprocesses for infra/backend/frontend (~240 s)
+3. **reviewAndPersist** — Validate + write files (merged, ~150 s)
+
+**Security context integration:** When `--security-context` is provided, HLD.md gains a full security architecture section, DEPLOYMENT.md includes security gates, LOGGING.md includes audit trail requirements, and LZ.md includes compliance implementation details.
+
+**When to prefer generate-docs:** single domain, quick templates, extraction mode, or lower cost.
+**When to prefer generate-all-documentation:** full suite, time-critical workflows, cached context, or security documentation.
+
+| Aspect           | `generate-docs` | `generate-all-documentation` |
+| ---------------- | --------------- | ---------------------------- |
+| Pipeline stages  | 7               | 3                            |
+| Duration         | ~14 min         | ~8 min                       |
+| Skip review      | No              | Yes                          |
+| Security context | No              | Yes                          |
+| Cache TTL        | 1 hour          | 2 hours                      |
+
+**Agent:** @lead (orchestration), @platform-engineer (infra), @software-engineer-typescript-backend (backend), @software-engineer-typescript-frontend (frontend) | **Model:** Claude Sonnet 4.5
+
+</details>
 
 ---
 
@@ -348,23 +318,18 @@ Retrieve and contextualise a task from the project backlog.
 valora fetch-task [options]
 ```
 
-**Options:**
-
-| Option                | Description                                       |
-| --------------------- | ------------------------------------------------- |
-| `--task-id=<id>`      | Specific task ID                                  |
-| `--keywords=<search>` | Fuzzy search keywords                             |
-| `--priority=<level>`  | Priority: p0, p1, p2                              |
-| `--domain=<area>`     | Domain: frontend, backend, infra, data, test, doc |
-
-**Example:**
+| Option                | Description                                                   |
+| --------------------- | ------------------------------------------------------------- |
+| `--task-id=<id>`      | Specific task ID                                              |
+| `--keywords=<search>` | Fuzzy search keywords                                         |
+| `--priority=<level>`  | Priority: `p0`, `p1`, `p2`                                    |
+| `--domain=<area>`     | Domain: `frontend`, `backend`, `infra`, `data`, `test`, `doc` |
 
 ```bash
 valora fetch-task --priority=p0 --domain=backend
 ```
 
-**Agent:** @product-manager
-**Model:** Claude Haiku 4.5
+**Agent:** @product-manager | **Model:** Claude Haiku 4.5
 
 ---
 
@@ -376,35 +341,33 @@ Clarify task requirements, acceptance criteria, and implementation details.
 valora refine-task [options]
 ```
 
-**Options:**
-
 | Option                       | Description                  |
 | ---------------------------- | ---------------------------- |
 | `--task-id=<id>`             | Specific task ID             |
 | `--interactive`              | Interactive mode             |
 | `--acceptance-criteria-only` | Focus on acceptance criteria |
 
-**Example:**
-
 ```bash
 valora refine-task --interactive
 ```
 
-**Pipeline Stages:**
+<details>
+<summary><strong>Pipeline stages and interactive behaviour</strong></summary>
 
-1. `context.load-task` - Load task details from backlog
-2. `onboard.analyze-clarity` - Calculate clarity score, identify gaps ⚡
-3. `onboard.refine-requirements` - Generate clarifying questions
-4. `review.validate-testability` - Validate acceptance criteria ⚡
-5. `onboard.collect-clarifications` - **Interactive**: Collect user answers
-6. `documentation.apply-task-refinement` - Apply answers to task document
+1. `context.load-task` — Load task details from backlog
+2. `onboard.analyze-clarity` — Calculate clarity score, identify gaps ⚡
+3. `onboard.refine-requirements` — Generate clarifying questions
+4. `review.validate-testability` — Validate acceptance criteria ⚡
+5. `onboard.collect-clarifications` — **Interactive**: Collect user answers
+6. `documentation.apply-task-refinement` — Apply answers to task document
 
 ⚡ = batch-eligible when `--batch` is set
 
-**Interactive Stage:** When clarity gaps are identified, the pipeline pauses to collect user answers. These are incorporated into the refined task before proceeding to planning.
+When clarity gaps are identified, the pipeline pauses to collect user answers, which are incorporated into the refined task before proceeding to planning.
 
-**Agent:** @product-manager
-**Model:** Claude Haiku 4.5
+**Agent:** @product-manager | **Model:** Claude Haiku 4.5
+
+</details>
 
 ---
 
@@ -416,22 +379,17 @@ Analyse codebase, dependencies, patterns, and constraints.
 valora gather-knowledge [options]
 ```
 
-**Options:**
-
-| Option              | Description                                     |
-| ------------------- | ----------------------------------------------- |
-| `--scope=<scope>`   | Scope: project, task                            |
-| `--domain=<domain>` | Domain: backend, frontend, infrastructure, data |
-| `--depth=<depth>`   | Depth: shallow, deep                            |
-
-**Example:**
+| Option              | Description                                             |
+| ------------------- | ------------------------------------------------------- |
+| `--scope=<scope>`   | Scope: `project`, `task`                                |
+| `--domain=<domain>` | Domain: `backend`, `frontend`, `infrastructure`, `data` |
+| `--depth=<depth>`   | Depth: `shallow`, `deep`                                |
 
 ```bash
 valora gather-knowledge --scope=task --domain=backend --depth=deep
 ```
 
-**Agent:** @lead
-**Model:** GPT-5 Thinking High
+**Agent:** @lead | **Model:** GPT-5 Thinking High
 
 ---
 
@@ -439,229 +397,180 @@ valora gather-knowledge --scope=task --domain=backend --depth=deep
 
 ### plan
 
-Analyse task and create detailed implementation plan.
+Analyse a task and create a detailed implementation plan.
 
 ```bash
 valora plan '<task-description>' [options]
 ```
 
-**Options:**
-
-| Option                       | Description                                  |
-| ---------------------------- | -------------------------------------------- |
-| `--complexity-threshold=<n>` | Threshold for step-by-step mode (default: 5) |
-| `--mode=<mode>`              | Mode: standard, incremental, tiered          |
-
-**Modes:**
-
-- `standard` - Single-pass implementation (complexity <= 5)
-- `incremental` - Step-by-step implementation
-- `tiered` - Two-phase: architecture → implementation (recommended for complexity > 5)
-- `auto` - Automatically selects based on complexity score
-
-**Pattern Templates:**
-Use `--pattern` to accelerate planning with pre-built templates:
-
-- `rest-api` - REST API endpoints (`PLAN_PATTERN_REST_API.md`)
-- `react-feature` - React features/components (`PLAN_PATTERN_REACT_FEATURE.md`)
-- `database` - Database schema/migrations (`PLAN_PATTERN_DATABASE.md`)
-- `auth` - Authentication/authorization (`PLAN_PATTERN_AUTH.md`)
-- `background-job` - Background jobs/workers (`PLAN_PATTERN_BACKGROUND_JOB.md`)
-
-**Pipeline Stages:**
-
-1. `context.load-task` - Load task details from backlog
-2. `context.analyze-task-context` - Parse requirements, identify components
-3. `plan.assess-complexity` - Evaluate complexity, generate questions
-4. `plan.identify-dependencies` - Map dependencies, generate questions
-5. `plan.assess-risks` - Identify risks, generate questions
-6. `onboard.collect-clarifications` - **Interactive**: Collect user answers (aggregated from complexity, dependencies, risks)
-7. `plan.breakdown-implementation` - Create implementation steps with user clarifications applied
-
-**Interactive Stage:** Questions from complexity assessment, dependency analysis, and risk assessment are aggregated and presented to the user. Answers inform the final implementation breakdown.
-
-**Example:**
+| Option                       | Description                                       |
+| ---------------------------- | ------------------------------------------------- |
+| `--complexity-threshold=<n>` | Threshold for step-by-step mode (default: 5)      |
+| `--mode=<mode>`              | Mode: `standard`, `incremental`, `tiered`, `auto` |
+| `--pattern=<name>`           | Pattern template to accelerate planning           |
 
 ```bash
+# Standard plan
 valora plan "Add OAuth authentication" --mode=tiered
 
-# Using pattern templates
+# Accelerate with a pattern template
 valora plan "Add users API" --pattern=rest-api
 valora plan "Add dashboard" --pattern=react-feature
 ```
 
-**Agent:** @lead
-**Model:** GPT-5 Thinking High
+<details>
+<summary><strong>Modes, pattern templates, pipeline stages, and interactive behaviour</strong></summary>
+
+**Modes:**
+
+- `standard` — Single-pass implementation (complexity ≤ 5)
+- `incremental` — Step-by-step implementation
+- `tiered` — Two-phase: architecture → implementation (recommended for complexity > 5)
+- `auto` — Automatically selects based on complexity score
+
+**Pattern templates (`--pattern`):**
+
+| Value            | Template file                    | Use case                     |
+| ---------------- | -------------------------------- | ---------------------------- |
+| `rest-api`       | `PLAN_PATTERN_REST_API.md`       | REST API endpoints           |
+| `react-feature`  | `PLAN_PATTERN_REACT_FEATURE.md`  | React features/components    |
+| `database`       | `PLAN_PATTERN_DATABASE.md`       | Database schema/migrations   |
+| `auth`           | `PLAN_PATTERN_AUTH.md`           | Authentication/authorisation |
+| `background-job` | `PLAN_PATTERN_BACKGROUND_JOB.md` | Background jobs/workers      |
+
+**Pipeline stages:**
+
+1. `context.load-task` — Load task details from backlog
+2. `context.analyze-task-context` — Parse requirements, identify components
+3. `plan.assess-complexity` — Evaluate complexity, generate questions
+4. `plan.identify-dependencies` — Map dependencies, generate questions
+5. `plan.assess-risks` — Identify risks, generate questions
+6. `onboard.collect-clarifications` — **Interactive**: Collect aggregated user answers
+7. `plan.breakdown-implementation` — Create implementation steps with clarifications applied
+
+Questions from stages 3–5 are aggregated and presented together before the final breakdown.
+
+**Agent:** @lead | **Model:** GPT-5 Thinking High
+
+</details>
 
 ---
 
 ### plan-architecture
 
-Create high-level architectural plan (Phase 1 of tiered planning).
+Create a high-level architectural plan (Phase 1 of tiered planning). Output: `knowledge-base/PLAN-ARCH-[TASK-ID].md`. Target duration: ~5 minutes.
 
 ```bash
 valora plan-architecture [options]
 ```
-
-**Options:**
 
 | Option                  | Description                  |
 | ----------------------- | ---------------------------- |
 | `--task-id=<id>`        | Task ID to load from backlog |
 | `--backlog-file=<path>` | Path to backlog file         |
 
-**Output:** `knowledge-base/PLAN-ARCH-[TASK-ID].md`
-
-**Covers:**
-
-- Technology choices with rationale
-- Component boundaries and responsibilities
-- Integration points mapping
-- Constraints and trade-offs
-- Go/No-Go decision gate
-
-**Target Duration:** ~5 minutes
-
-**Batch-eligible stage:** `architecture` (the architecture definition runs entirely from pre-analysed context — no further file reads needed)
-
-**Example:**
-
 ```bash
 valora plan-architecture --task-id=TASK-001
 ```
 
-**Agent:** @lead
-**Model:** Claude Sonnet 4.5
+<details>
+<summary><strong>Output coverage and batch behaviour</strong></summary>
+
+**Covers:** technology choices with rationale, component boundaries and responsibilities, integration point mapping, constraints and trade-offs, and a Go/No-Go decision gate.
+
+**Batch-eligible stage:** `architecture` — the architecture definition runs entirely from pre-analysed context with no further file reads.
+
+**Agent:** @lead | **Model:** Claude Sonnet 4.5
+
+</details>
 
 ---
 
 ### plan-implementation
 
-Create detailed implementation plan (Phase 2 of tiered planning).
+Create a detailed implementation plan (Phase 2 of tiered planning). Requires an approved architecture plan from `plan-architecture`. Output: `knowledge-base/PLAN-IMPL-[TASK-ID].md`. Target duration: ~10 minutes.
 
 ```bash
 valora plan-implementation [options]
 ```
-
-**Options:**
 
 | Option               | Description                              |
 | -------------------- | ---------------------------------------- |
 | `--arch-plan=<path>` | Path to approved architecture plan       |
 | `--task-id=<id>`     | Task ID to derive architecture plan path |
 
-**Requires:** Approved architecture plan from `plan-architecture`
-
-**Output:** `knowledge-base/PLAN-IMPL-[TASK-ID].md`
-
-**Covers:**
-
-- Step-by-step tasks with file paths
-- Dependencies mapped explicitly
-- Risk mitigations per step
-- Testing strategy per step
-- Rollback procedures
-
-**Target Duration:** ~10 minutes
-
-**Batch-eligible stages:** `risks`, `breakdown` (risk assessment and implementation step decomposition both operate entirely on the pre-loaded architecture text)
-
-**Example:**
-
 ```bash
 valora plan-implementation --arch-plan=knowledge-base/PLAN-ARCH-TASK-001.md
 ```
 
-**Agent:** @lead
-**Model:** Claude Sonnet 4.5
+<details>
+<summary><strong>Output coverage and batch behaviour</strong></summary>
+
+**Covers:** step-by-step tasks with file paths, explicitly mapped dependencies, risk mitigations per step, testing strategy per step, and rollback procedures.
+
+**Batch-eligible stages:** `risks`, `breakdown` — risk assessment and implementation step decomposition both operate entirely on pre-loaded architecture text.
+
+**Agent:** @lead | **Model:** Claude Sonnet 4.5
+
+</details>
 
 ---
 
 ### validate-plan
 
-Automated pre-review validation to catch missing plan parameters early.
+Automated pre-review validation to catch missing plan parameters early. Catches 60–70% of review issues, reducing total review time from ~14 min to ~7 min.
 
 ```bash
 valora validate-plan [<plan-path>] [options]
 ```
-
-**Options:**
 
 | Option     | Description                                      |
 | ---------- | ------------------------------------------------ |
 | `--fix`    | Auto-fix missing sections with TODO placeholders |
 | `--strict` | Require 100% completeness for pass               |
 
-**Validation Checks:**
+```bash
+# Validate the current plan
+valora validate-plan
 
-- Required sections (overview, steps, dependencies, risks, testing, rollback, effort)
-- Step completeness (file paths, implementation details, validation criteria)
+# Validate a specific plan file with auto-fix
+valora validate-plan knowledge-base/PLAN-IMPL-TASK-001.md --fix
+
+# Strict mode requiring 100% completeness
+valora validate-plan --strict
+```
+
+<details>
+<summary><strong>Validation checks performed</strong></summary>
+
+- Required sections: overview, steps, dependencies, risks, testing, rollback, effort
+- Step completeness: file paths, implementation details, validation criteria
 - Dependency availability and versioning
 - Risk coverage with mitigations
 - Testing strategy defined
 - Effort estimates with confidence
 
-**Time Savings:**
+**Agent:** @lead | **Model:** Claude Haiku 4.5
 
-- Without pre-validation: ~14 min review (multiple iterations)
-- With pre-validation: ~2 min validation + ~5 min review = **~7 min total**
-
-**Example:**
-
-```bash
-# Basic validation
-valora validate-plan
-
-# Validate specific plan
-valora validate-plan knowledge-base/PLAN-IMPL-TASK-001.md
-
-# With auto-fix
-valora validate-plan --fix
-
-# Strict mode (100% required)
-valora validate-plan --strict
-```
-
-**Agent:** @lead
-**Model:** Claude Haiku 4.5
+</details>
 
 ---
 
 ### validate-coverage
 
-Automated test coverage validation gate with specific thresholds and quality scoring. Addresses low test quality scores by enforcing minimum coverage requirements.
+Automated test coverage validation gate with specific thresholds and quality scoring.
 
 ```bash
 valora validate-coverage [options]
 ```
 
-**Options:**
-
-| Option                     | Description                                         |
-| -------------------------- | --------------------------------------------------- |
-| `--threshold=<n>`          | Minimum line coverage percentage (default: 80)      |
-| `--strict`                 | Enable strict mode requiring ALL thresholds to pass |
-| `--new-code-only`          | Only validate changed/new files                     |
-| `--report-format=<format>` | Output: summary, detailed, json (default: summary)  |
-| `--fail-on-decrease`       | Fail if coverage decreased from baseline            |
-
-**Coverage Thresholds:**
-
-| Metric            | Default | Strict Mode |
-| ----------------- | ------- | ----------- |
-| Line Coverage     | >= 80%  | >= 85%      |
-| Branch Coverage   | >= 70%  | >= 75%      |
-| Function Coverage | >= 85%  | >= 90%      |
-| New Code Coverage | >= 85%  | >= 95%      |
-
-**Quality Score Grades:**
-
-- A (>= 80): PASS
-- B (70-79): PASS with recommendations
-- C (60-69): WARN
-- D/F (< 60): FAIL
-
-**Example:**
+| Option                     | Description                                                |
+| -------------------------- | ---------------------------------------------------------- |
+| `--threshold=<n>`          | Minimum line coverage percentage (default: 80)             |
+| `--strict`                 | Enable strict mode requiring all thresholds to pass        |
+| `--new-code-only`          | Validate only changed/new files                            |
+| `--report-format=<format>` | Output: `summary`, `detailed`, `json` (default: `summary`) |
+| `--fail-on-decrease`       | Fail if coverage decreased from baseline                   |
 
 ```bash
 # Quick validation
@@ -674,58 +583,72 @@ valora validate-coverage --strict --fail-on-decrease
 valora validate-coverage --report-format=json
 ```
 
-**Agent:** @qa
-**Model:** Claude Haiku 4.5
+<details>
+<summary><strong>Coverage thresholds and quality score grades</strong></summary>
+
+| Metric            | Default | Strict mode |
+| ----------------- | ------- | ----------- |
+| Line coverage     | ≥ 80%   | ≥ 85%       |
+| Branch coverage   | ≥ 70%   | ≥ 75%       |
+| Function coverage | ≥ 85%   | ≥ 90%       |
+| New code coverage | ≥ 85%   | ≥ 95%       |
+
+**Quality score grades:**
+
+- A (≥ 80): PASS
+- B (70–79): PASS with recommendations
+- C (60–69): WARN
+- D/F (< 60): FAIL
+
+**Agent:** @qa | **Model:** Claude Haiku 4.5
+
+</details>
 
 ---
 
 ### pre-check
 
-Run automated code quality pre-checks (linting, type validation, security audit) before manual review. Reduces review time by 50% by allowing reviewers to focus on architectural concerns.
+Run automated code quality pre-checks (linting, type validation, security audit) before manual review. Reduces review time by ~50% by allowing reviewers to focus on architectural concerns. Total duration: ~1.5 minutes with parallel execution.
 
 ```bash
 valora pre-check [options]
 ```
 
-**Options:**
-
 | Option                     | Description                                                |
 | -------------------------- | ---------------------------------------------------------- |
 | `--fix`                    | Automatically fix issues where possible (ESLint, Prettier) |
-| `--strict`                 | Enable strict mode (warnings treated as errors)            |
+| `--strict`                 | Treat warnings as errors                                   |
 | `--ci`                     | CI/CD mode with JSON output, fails fast                    |
-| `--report-format=<format>` | Output: summary, detailed, json (default: summary)         |
-
-**Automated Checks:**
-
-| Check       | Command               | Duration |
-| ----------- | --------------------- | -------- |
-| TypeScript  | `pnpm tsc:check`      | ~12s     |
-| ESLint      | `pnpm lint`           | ~8s      |
-| Prettier    | `pnpm format --check` | ~3s      |
-| Security    | `pnpm audit`          | ~5s      |
-| Quick Tests | `pnpm test:quick`     | ~20s     |
-
-**Total Duration:** ~1.5 minutes (parallel execution)
-
-**Example:**
+| `--report-format=<format>` | Output: `summary`, `detailed`, `json` (default: `summary`) |
 
 ```bash
 # Standard pre-check
 valora pre-check
 
-# Auto-fix issues and re-check
+# Auto-fix and re-check
 valora pre-check --fix
 
-# CI/CD mode with JSON output
+# CI/CD mode
 valora pre-check --ci --report-format=json
 
-# Recommended workflow (reduces review time by 50%)
+# Recommended pre-review workflow
 valora pre-check && valora review-code --focus=architecture
 ```
 
-**Agent:** @qa
-**Model:** Claude Haiku 4.5
+<details>
+<summary><strong>Checks performed and durations</strong></summary>
+
+| Check       | Command                     | Duration |
+| ----------- | --------------------------- | -------- |
+| TypeScript  | `npm run tsc:check`         | ~12 s    |
+| ESLint      | `npm run lint`              | ~8 s     |
+| Prettier    | `npm run format -- --check` | ~3 s     |
+| Security    | `npm audit`                 | ~5 s     |
+| Quick tests | `npm run test:quick`        | ~20 s    |
+
+**Agent:** @qa | **Model:** Claude Haiku 4.5
+
+</details>
 
 ---
 
@@ -737,36 +660,30 @@ Validate implementation plan quality, completeness, and feasibility.
 valora review-plan '<plan-document>' [options]
 ```
 
-**Options:**
-
-| Option           | Description                                 |
-| ---------------- | ------------------------------------------- |
-| `--strict-mode`  | Enable strict validation                    |
-| `--focus=<area>` | Focus: completeness, risks, feasibility     |
-| `--checklist`    | Quick binary validation (~3 min vs ~14 min) |
-
-**Quick Mode (`--checklist`):**
-Uses PLAN_QUALITY_CHECKLIST.md template for fast validation:
-
-- 35 items across 7 sections (Y/N answers)
-- 80% pass threshold (28/35 items)
-- 3 critical items that must pass
-- Target: ~3 minutes
-
-**Example:**
+| Option           | Description                                   |
+| ---------------- | --------------------------------------------- |
+| `--strict-mode`  | Enable strict validation                      |
+| `--focus=<area>` | Focus: `completeness`, `risks`, `feasibility` |
+| `--checklist`    | Quick binary validation (~3 min vs ~14 min)   |
 
 ```bash
-# Full review
+# Full review with focus on risks
 valora review-plan --strict-mode --focus=risks
 
 # Quick checklist validation
 valora review-plan --checklist
 ```
 
-**Batch-eligible stages:** `completeness`, `risks`, `steps`, `tests`, `synthesis` (5 of 7 stages — the `context` load stage and the `feasibility` stage, which uses `codebase_search`, always run in real time)
+<details>
+<summary><strong>Quick mode details and batch-eligible stages</strong></summary>
 
-**Agent:** @lead
-**Model:** GPT-5 Thinking High
+**`--checklist` mode** uses `PLAN_QUALITY_CHECKLIST.md`: 35 items across 7 sections (Y/N answers), 80% pass threshold (28/35 items), 3 critical items that must pass. Target: ~3 minutes.
+
+**Batch-eligible stages:** `completeness`, `risks`, `steps`, `tests`, `synthesis` (5 of 7 stages). The `context` load stage and the `feasibility` stage (which uses `codebase_search`) always run in real time.
+
+**Agent:** @lead | **Model:** GPT-5 Thinking High
+
+</details>
 
 ---
 
@@ -774,35 +691,30 @@ valora review-plan --checklist
 
 ### implement
 
-Execute code changes following approved implementation plan.
+Execute code changes following an approved implementation plan.
 
 ```bash
 valora implement '<implementation-plan>' [options]
 ```
 
-**Options:**
-
-| Option           | Description                  |
-| ---------------- | ---------------------------- |
-| `--agent=<type>` | Specific engineer type       |
-| `--mode=<mode>`  | Mode: standard, step-by-step |
-| `--step=<n>`     | Specific step number         |
-
-**Example:**
+| Option           | Description                      |
+| ---------------- | -------------------------------- |
+| `--agent=<type>` | Specific engineer type           |
+| `--mode=<mode>`  | Mode: `standard`, `step-by-step` |
+| `--step=<n>`     | Specific step number             |
 
 ```bash
 valora implement --mode=step-by-step --step=1
 ```
 
-**Agent:** Dynamic (based on task analysis)
-**Model:** Claude Sonnet 4.5
+<details>
+<summary><strong>Dynamic agent selection</strong></summary>
 
-**Dynamic Agent Selection:**
-The implement command automatically selects the appropriate agent based on:
+The `implement` command automatically selects the appropriate agent based on task description analysis, affected file patterns, and dependencies and context. This is controlled by the `dynamic_agent_selection_implement_only` feature flag (enabled by default in Phase 1). See [Feature Flags](./configuration.md#feature-flags) in the configuration guide.
 
-- Task description analysis
-- Affected file patterns
-- Dependencies and context
+**Agent:** Dynamic | **Model:** Claude Sonnet 4.5
+
+</details>
 
 ---
 
@@ -816,23 +728,11 @@ Validate implementation completeness, correctness, and compliance.
 valora assert [options]
 ```
 
-**Options:**
-
 | Option                     | Description                                    |
 | -------------------------- | ---------------------------------------------- |
-| `--severity=<level>`       | Level: critical, high, all                     |
-| `--report-format=<format>` | Format: structured, summary, detailed          |
-| `--quick=<template>`       | Quick template validation (~2-5 min vs ~9 min) |
-
-**Quick Mode (`--quick`):**
-Uses assertion templates for fast validation:
-
-- `completeness` - Acceptance criteria, features, tests (~2 min)
-- `security` - OWASP, secrets, input validation (~2 min)
-- `typescript` - Type safety, conventions, patterns (~2 min)
-- `all` - All templates sequentially (~5 min)
-
-**Example:**
+| `--severity=<level>`       | Level: `critical`, `high`, `all`               |
+| `--report-format=<format>` | Format: `structured`, `summary`, `detailed`    |
+| `--quick=<template>`       | Quick template validation (~2–5 min vs ~9 min) |
 
 ```bash
 # Full assertion
@@ -843,8 +743,19 @@ valora assert --quick=typescript
 valora assert --quick=all
 ```
 
-**Agent:** @asserter
-**Model:** Claude Haiku 4.5
+<details>
+<summary><strong>Quick mode templates</strong></summary>
+
+| Template       | What it checks                       | Duration |
+| -------------- | ------------------------------------ | -------- |
+| `completeness` | Acceptance criteria, features, tests | ~2 min   |
+| `security`     | OWASP, secrets, input validation     | ~2 min   |
+| `typescript`   | Type safety, conventions, patterns   | ~2 min   |
+| `all`          | All templates sequentially           | ~5 min   |
+
+**Agent:** @asserter | **Model:** Claude Haiku 4.5
+
+</details>
 
 ---
 
@@ -856,47 +767,52 @@ Execute comprehensive test suites.
 valora test '<test-scope>' [options]
 ```
 
-**Options:**
-
 | Option                     | Description                               |
 | -------------------------- | ----------------------------------------- |
-| `--type=<type>`            | Type: unit, integration, e2e, all         |
+| `--type=<type>`            | Type: `unit`, `integration`, `e2e`, `all` |
 | `--coverage-threshold=<n>` | Minimum coverage percentage (default: 80) |
-
-**Example:**
 
 ```bash
 valora test --type=all --coverage-threshold=90
 ```
 
-**Agent:** @qa
-**Model:** Claude Haiku 4.5
+**Agent:** @qa | **Model:** Claude Haiku 4.5
 
 ---
 
 ### validate-parallel
 
-Run assert and review-code commands in parallel to reduce validation time by ~50%.
+Run `assert` and `review-code` in parallel to reduce validation time by ~50%.
 
 ```bash
 valora validate-parallel [options]
 ```
 
-**Options:**
+| Option               | Description                                                |
+| -------------------- | ---------------------------------------------------------- |
+| `--quick`            | Use quick validation modes (~5 min vs ~10 min)             |
+| `--severity=<level>` | Filter by severity: `critical`, `high`, `all`              |
+| `--focus=<area>`     | Focus: `security`, `performance`, `maintainability`, `all` |
 
-| Option               | Description                                             |
-| -------------------- | ------------------------------------------------------- |
-| `--quick`            | Use quick validation modes (~5 min vs ~10 min)          |
-| `--severity=<level>` | Filter by severity: critical, high, all                 |
-| `--focus=<area>`     | Focus area: security, performance, maintainability, all |
+```bash
+# Standard parallel validation (~10 min)
+valora validate-parallel
 
-**Time Savings:**
+# Quick parallel validation (~5 min)
+valora validate-parallel --quick
+
+# Security-focused validation
+valora validate-parallel --focus=security --severity=critical
+```
+
+<details>
+<summary><strong>Timing and combined verdict logic</strong></summary>
 
 - Sequential: `assert` (~9 min) + `review-code` (~10 min) = ~19 min
-- Parallel: Both run concurrently = ~10 min
-- Quick parallel: Both quick modes = ~5 min
+- Parallel: both run concurrently = ~10 min
+- Quick parallel: both quick modes = ~5 min
 
-**Verdict Logic:**
+**Combined verdict:**
 
 | Assert | Review          | Combined |
 | ------ | --------------- | -------- |
@@ -905,21 +821,9 @@ valora validate-parallel [options]
 | FAIL   | Any             | **FAIL** |
 | Any    | BLOCK           | **FAIL** |
 
-**Example:**
+**Agent:** @lead | **Model:** Claude Sonnet 4.5
 
-```bash
-# Standard parallel validation
-valora validate-parallel
-
-# Quick parallel validation
-valora validate-parallel --quick
-
-# Security-focused validation
-valora validate-parallel --focus=security --severity=critical
-```
-
-**Agent:** @lead
-**Model:** Claude Sonnet 4.5
+</details>
 
 ---
 
@@ -927,38 +831,21 @@ valora validate-parallel --focus=security --severity=critical
 
 ### review-code
 
-Perform comprehensive code quality review.
+Perform a comprehensive code quality review.
 
 ```bash
 valora review-code '<scope>' [options]
 ```
 
-**Options:**
-
-| Option               | Description                                       |
-| -------------------- | ------------------------------------------------- |
-| `--severity=<level>` | Level: critical, high, medium, low                |
-| `--focus=<area>`     | Area: security, performance, maintainability, all |
-| `--checklist`        | Quick binary validation (~3 min vs ~10 min)       |
-| `--auto-only`        | Run automated checks only (~1 min)                |
-
-**Quick Modes:**
-
-`--auto-only` (~1 min):
-
-- TypeScript check, linting, formatting, tests, security audit
-- No manual review, just tooling
-
-`--checklist` (~3 min):
-
-- 40-item binary checklist (Y/N answers)
-- 8 sections: automated, security, architecture, code quality, etc.
-- 80% pass threshold
-
-**Example:**
+| Option               | Description                                               |
+| -------------------- | --------------------------------------------------------- |
+| `--severity=<level>` | Level: `critical`, `high`, `medium`, `low`                |
+| `--focus=<area>`     | Area: `security`, `performance`, `maintainability`, `all` |
+| `--checklist`        | Quick binary validation (~3 min vs ~10 min)               |
+| `--auto-only`        | Run automated checks only (~1 min)                        |
 
 ```bash
-# Full review
+# Full review focused on security
 valora review-code --severity=high --focus=security
 
 # Automated checks only
@@ -968,10 +855,18 @@ valora review-code --auto-only
 valora review-code --checklist
 ```
 
-**Batch-eligible stage:** `documentation` — the review report generation receives pre-scored outputs (`quality_score`, `issues_found`, `review_decision`) and produces a markdown report with no further file access needed. The `context` and `review` stages always run in real time.
+<details>
+<summary><strong>Quick mode details and batch behaviour</strong></summary>
 
-**Agent:** @lead
-**Model:** Claude Sonnet 4.5
+**`--auto-only` (~1 min):** TypeScript check, linting, formatting, tests, security audit. No manual review.
+
+**`--checklist` (~3 min):** 40-item binary checklist (Y/N answers) across 8 sections: automated, security, architecture, code quality, and more. 80% pass threshold.
+
+**Batch-eligible stage:** `documentation` — the review report generation receives pre-scored outputs (`quality_score`, `issues_found`, `review_decision`) and produces a markdown report with no further file access. The `context` and `review` stages always run in real time.
+
+**Agent:** @lead | **Model:** Claude Sonnet 4.5
+
+</details>
 
 ---
 
@@ -983,23 +878,23 @@ Validate feature completeness, acceptance criteria, and user experience.
 valora review-functional '<scope>' [options]
 ```
 
-**Options:**
-
-| Option                | Description                        |
-| --------------------- | ---------------------------------- |
-| `--severity=<level>`  | Level: critical, high, medium, low |
-| `--check-a11y=<bool>` | Check accessibility: true, false   |
-
-**Example:**
+| Option                | Description                                |
+| --------------------- | ------------------------------------------ |
+| `--severity=<level>`  | Level: `critical`, `high`, `medium`, `low` |
+| `--check-a11y=<bool>` | Check accessibility: `true`, `false`       |
 
 ```bash
 valora review-functional --check-a11y=true
 ```
 
+<details>
+<summary><strong>Batch behaviour</strong></summary>
+
 **Batch-eligible stage:** `documentation` — functional review report generation from pre-scored outputs. The `context` stage (which may use browser/Figma tools) and the `review` stage always run in real time.
 
-**Agent:** @lead
-**Model:** Claude Sonnet 4.5
+**Agent:** @lead | **Model:** Claude Sonnet 4.5
+
+</details>
 
 ---
 
@@ -1013,32 +908,27 @@ Analyse changes and create atomic, conventional commits.
 valora commit [options]
 ```
 
-**Options:**
-
-| Option                  | Description                     |
-| ----------------------- | ------------------------------- |
-| `--scope=<area>`        | Commit scope                    |
-| `--breaking`            | Mark as breaking change         |
-| `--message=<msg>`       | Custom commit message           |
-| `--amend`               | Amend previous commit           |
-| `--no-verify`           | Skip pre-commit hooks           |
-| `--version-bump=<type>` | Bump: auto, major, minor, patch |
-| `--tag`                 | Create version tag              |
-| `--update-changelog`    | Update CHANGELOG                |
-| `--interactive`         | Interactive mode                |
-| `--insights`            | Include quality insights        |
-| `--sign`                | Sign commit                     |
-| `--auto-ticket`         | Auto-link tickets               |
-| `--template=<name>`     | Use commit template             |
-
-**Example:**
+| Option                  | Description                             |
+| ----------------------- | --------------------------------------- |
+| `--scope=<area>`        | Commit scope                            |
+| `--breaking`            | Mark as breaking change                 |
+| `--message=<msg>`       | Custom commit message                   |
+| `--amend`               | Amend previous commit                   |
+| `--no-verify`           | Skip pre-commit hooks                   |
+| `--version-bump=<type>` | Bump: `auto`, `major`, `minor`, `patch` |
+| `--tag`                 | Create version tag                      |
+| `--update-changelog`    | Update CHANGELOG                        |
+| `--interactive`         | Interactive mode                        |
+| `--insights`            | Include quality insights                |
+| `--sign`                | Sign commit                             |
+| `--auto-ticket`         | Auto-link tickets                       |
+| `--template=<name>`     | Use commit template                     |
 
 ```bash
 valora commit --scope=auth --update-changelog --insights
 ```
 
-**Agent:** @lead
-**Model:** Claude Sonnet 4.5
+**Agent:** @lead | **Model:** Claude Sonnet 4.5
 
 ---
 
@@ -1049,8 +939,6 @@ Generate and submit pull requests with intelligent description generation.
 ```bash
 valora create-pr [options]
 ```
-
-**Options:**
 
 | Option               | Description               |
 | -------------------- | ------------------------- |
@@ -1067,14 +955,11 @@ valora create-pr [options]
 | `--squash`           | Squash commits            |
 | `--no-push`          | Skip push                 |
 
-**Example:**
-
 ```bash
 valora create-pr --draft --auto-assign --link-issues
 ```
 
-**Agent:** @lead
-**Model:** Claude Sonnet 4.5
+**Agent:** @lead | **Model:** Claude Sonnet 4.5
 
 ---
 
@@ -1088,37 +973,21 @@ Capture outcomes and user feedback for continuous improvement.
 valora feedback [options]
 ```
 
-**Options:**
-
 | Option                   | Description                |
 | ------------------------ | -------------------------- |
 | `--command=<name>`       | Specific command to review |
 | `--pr=<number>`          | PR number for feedback     |
-| `--satisfaction=<n>`     | Satisfaction score (1-10)  |
+| `--satisfaction=<n>`     | Satisfaction score (1–10)  |
 | `--interactive`          | Interactive mode           |
 | `--metrics`              | Include metrics            |
 | `--suggest-improvements` | Generate suggestions       |
 | `--export=<format>`      | Export format              |
 
-**Example:**
-
 ```bash
 valora feedback --command=implement --satisfaction=8 --suggest-improvements
 ```
 
-**Agent:** @product-manager
-**Model:** Claude Haiku 4.5
-
----
-
-## Model Tier Summary
-
-| Tier          | Model               | Commands                                                                       | Use Case                               |
-| ------------- | ------------------- | ------------------------------------------------------------------------------ | -------------------------------------- |
-| **Strategic** | GPT-5 Thinking High | refine-specs, create-prd, gather-knowledge, plan, review-plan                  | Deep analysis, planning                |
-| **Execution** | Claude Sonnet 4.5   | implement, review-code, review-functional, commit, create-pr                   | Code generation, reviews               |
-| **Execution** | Claude Sonnet 4.5   | generate-all-documentation                                                     | Parallel documentation (optimised)     |
-| **Fast**      | Claude Haiku 4.5    | create-backlog, generate-docs, fetch-task, refine-task, assert, test, feedback | Quick tasks, validation, documentation |
+**Agent:** @product-manager | **Model:** Claude Haiku 4.5
 
 ---
 
@@ -1131,8 +1000,6 @@ Launch the real-time TUI dashboard for monitoring sessions, system health, and g
 ```bash
 valora dash
 ```
-
-**Dashboard Layout:**
 
 ```plaintext
 ┌─────────────────────────────────────────────────────────────────┐
@@ -1158,66 +1025,7 @@ valora dash
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-**Panels:**
-
-| Panel             | Location    | Description                                        |
-| ----------------- | ----------- | -------------------------------------------------- |
-| Recent Sessions   | Left (65%)  | Top 10 sessions with status, age, commands, tokens |
-| Background Tasks  | Left (65%)  | Currently running sessions with progress bars      |
-| System Health     | Right (35%) | API status, session count, disk usage, uptime      |
-| **Git Worktrees** | Right (35%) | Live tree diagram of git worktrees (new)           |
-| Recent Commands   | Right (35%) | Last 5 commands with success/failure indicators    |
-
-**Worktree Diagram Panel:**
-
-The Git Worktrees panel displays a live tree structure of all git worktrees in the repository:
-
-- **Main worktree**: Shown with `●` prefix in cyan
-- **Child worktrees**: Connected with `├──` / `└──` tree-drawing characters
-- **Exploration branches**: Highlighted in yellow with status icons
-- **Prunable worktrees**: Shown in red
-- **Status icons**: `▶` running, `✓` completed, `✗` failed, `⏱` timed out, `○` pending
-- **Overflow**: Maximum 4 worktrees displayed, with `...and N more` for additional
-
-The panel fetches data from `WorktreeManager.listWorktrees()` and enriches exploration worktrees with active exploration metadata from `ExplorationStateManager.getActiveExplorations()`.
-
-**Session Details View:**
-
-Press `Enter` on a session to view details. The details view has five sub-tabs (switch with `[` / `]`):
-
-| Sub-tab          | Contents                                                               |
-| ---------------- | ---------------------------------------------------------------------- |
-| **Overview**     | Session info, running task, exploration panel, command history         |
-| **Optimisation** | Agent selection analytics and model selection metrics                  |
-| **Quality**      | Quality gate scores and thresholds                                     |
-| **Tokens**       | Per-command token usage bar chart and context-window utilisation       |
-| **Spending**     | Session cost totals, per-command cost bars, top 5 most expensive calls |
-
-If the session is linked to an exploration (via `explore parallel` or `explore sequential`), an **Exploration** panel appears showing the exploration task, status, branch completion, and per-worktree details:
-
-```plaintext
-┌─ Exploration ────────────────────────┐
-│ Exploration ID: exp-u7PXOCjNYh       │
-│ Task: Implement user authentication  │
-│ Status: COMPLETED                    │
-│ Branches: 3/3                        │
-│ Duration: 12m 34s                    │
-│                                      │
-│ Worktrees:                           │
-│  1. [completed] jwt                  │
-│  2. [completed] session              │
-│  3. [failed] oauth                   │
-└──────────────────────────────────────┘
-```
-
-If the session also has aggregate worktree stats (from the `WorktreeStatsTracker`), a **Worktree Usage** panel shows:
-
-- Total worktrees created during the session
-- Maximum concurrent worktrees running at any point
-- Aggregate duration across all worktrees
-- Per-worktree history with status and duration
-
-**Keyboard Controls:**
+**Keyboard controls:**
 
 | Key       | Action                   |
 | --------- | ------------------------ |
@@ -1228,81 +1036,76 @@ If the session also has aggregate worktree stats (from the `WorktreeStatsTracker
 | `Esc`     | Back (from details view) |
 | `Ctrl+C`  | Force quit               |
 
-**Edge Cases:**
+<details>
+<summary><strong>Panel layout, session detail sub-tabs, worktree diagram, and edge cases</strong></summary>
 
-- **No git repository**: Worktree panel shows "No git repository detected"
-- **No worktrees**: Shows "No additional worktrees" under the main entry
-- **No exploration data**: Worktrees render without status icons
-- **Session without worktrees**: Worktree Usage panel is hidden in session details
-- **Session without exploration**: Exploration panel is hidden in session details
-- **Session without spending records**: Spending panel shows "No spending recorded this session"
+**Panels:**
+
+| Panel            | Location    | Description                                        |
+| ---------------- | ----------- | -------------------------------------------------- |
+| Recent Sessions  | Left (65%)  | Top 10 sessions with status, age, commands, tokens |
+| Background Tasks | Left (65%)  | Currently running sessions with progress bars      |
+| System Health    | Right (35%) | API status, session count, disk usage, uptime      |
+| Git Worktrees    | Right (35%) | Live tree diagram of git worktrees                 |
+| Recent Commands  | Right (35%) | Last 5 commands with success/failure indicators    |
+
+**Session details sub-tabs** (switch with `[` / `]`):
+
+| Sub-tab          | Contents                                                               |
+| ---------------- | ---------------------------------------------------------------------- |
+| **Overview**     | Session info, running task, exploration panel, command history         |
+| **Optimisation** | Agent selection analytics and model selection metrics                  |
+| **Quality**      | Quality gate scores and thresholds                                     |
+| **Tokens**       | Per-command token usage bar chart and context-window utilisation       |
+| **Spending**     | Session cost totals, per-command cost bars, top 5 most expensive calls |
+
+**Worktree diagram panel** icons: `●` main worktree (cyan), `├──` / `└──` tree structure, yellow for exploration branches, red for prunable worktrees. Status icons: `▶` running, `✓` completed, `✗` failed, `⏱` timed out, `○` pending. Maximum 4 worktrees displayed with `...and N more` for overflow.
+
+If a session is linked to an exploration, an **Exploration** panel appears showing the exploration task, status, branch completion, and per-worktree details.
+
+**Edge cases:**
+
+- No git repository → worktree panel shows "No git repository detected"
+- No worktrees → shows "No additional worktrees" under the main entry
+- No exploration data → worktrees render without status icons
+- Session without worktrees → Worktree Usage panel is hidden
+- Session without exploration → Exploration panel is hidden
+- Session without spending records → Spending panel shows "No spending recorded this session"
+
+</details>
 
 ---
 
 ### monitoring
 
-VALORA exposes runtime performance metrics, resource usage, and LLM cost data through the `monitoring` sub-commands.
-
-#### monitoring metrics
-
-Show the current in-process metrics snapshot (counters, gauges, histograms).
+Runtime performance metrics, resource usage, and LLM cost data.
 
 ```bash
+# Current metrics snapshot
 valora monitoring metrics
 valora monitoring metrics --format prometheus
-```
 
-| Flag                 | Description            | Default |
-| -------------------- | ---------------------- | ------- |
-| `-f, --format <fmt>` | `json` or `prometheus` | `json`  |
-
-#### monitoring performance
-
-Show the performance profiling report with slowest operations and memory/CPU statistics.
-
-```bash
+# Performance profiling report
 valora monitoring performance
 valora monitoring performance --detailed
-```
 
-#### monitoring resources
-
-Display current system resource usage (CPU, memory, disk, network, process).
-
-```bash
+# Current system resource usage
 valora monitoring resources
-```
 
-#### monitoring status
-
-Show the overall monitoring status (active intervals, uptime, session count).
-
-```bash
+# Overall monitoring status
 valora monitoring status
-```
 
-#### monitoring spending
-
-Show LLM cost history from `.valora/spending.jsonl`. Spending records are written after every command execution.
-
-```bash
-# Summary grouped by command (endpoint)
+# LLM cost history
 valora monitoring spending
-
-# Top 10 most expensive individual requests
 valora monitoring spending --top 10
-
-# Group by model instead of command
 valora monitoring spending --by-model
-
-# Filter to records since a specific date
 valora monitoring spending --since 2026-03-01
 
-# Output raw JSON
-valora monitoring spending --format json
+# Reset all in-process metrics
+valora monitoring reset
 ```
 
-**Options:**
+**`monitoring spending` flags:**
 
 | Flag                 | Description                               | Default |
 | -------------------- | ----------------------------------------- | ------- |
@@ -1311,7 +1114,12 @@ valora monitoring spending --format json
 | `--since <date>`     | Filter records on or after this date      | —       |
 | `-f, --format <fmt>` | `table` or `json`                         | `table` |
 
-**Example output — endpoint summary:**
+<details>
+<summary><strong>Spending ledger format and example output</strong></summary>
+
+The ledger is stored as append-only JSONL at `.valora/spending.jsonl`. Each record captures command, stage, model, token breakdown, cost, cache savings, duration, and a timestamp.
+
+**Endpoint summary example:**
 
 ```
 💸 Spending by Endpoint
@@ -1323,24 +1131,15 @@ valora monitoring spending --format json
   Total:          25 req  $0.2835  saved $0.0363
 ```
 
-**Example output — top requests:**
+**Top requests example:**
 
 ```
 🔴 Top 5 Most Expensive Requests:
   1. review    10/03/2026, 14:23:01  $0.0214  claude-3-5-sonnet  82k tok
   2. review    10/03/2026, 09:11:44  $0.0198  claude-3-5-sonnet  76k tok
-  ...
 ```
 
-The ledger is stored as append-only JSONL at `.valora/spending.jsonl` (one record per line). Each record captures command, stage, model, token breakdown, cost, cache savings, duration, and a timestamp.
-
-#### monitoring reset
-
-Reset all in-process metrics and performance profiles.
-
-```bash
-valora monitoring reset
-```
+</details>
 
 ---
 
@@ -1351,8 +1150,6 @@ Start multiple parallel explorations with different strategies using Docker cont
 ```bash
 valora explore parallel <task> [options]
 ```
-
-**Options:**
 
 | Flag                      | Description                     | Default                                              |
 | ------------------------- | ------------------------------- | ---------------------------------------------------- |
@@ -1366,10 +1163,6 @@ valora explore parallel <task> [options]
 | `--no-cleanup`            | Keep explorations for debugging | `false`                                              |
 | `--skip-safety`           | Skip pre-flight safety checks   | `false`                                              |
 
-**Safety checks** verify sufficient memory (1GB per branch), disk space (5GB), Docker availability, and clean git state before starting. Use `--skip-safety` to bypass these checks in constrained environments.
-
-**Example:**
-
 ```bash
 # Explore 3 authentication approaches
 valora explore parallel "Implement user authentication" \
@@ -1377,9 +1170,18 @@ valora explore parallel "Implement user authentication" \
   --strategies "jwt,session,oauth" \
   --timeout 30
 
-# Skip safety checks in dev environment
+# Skip safety checks in constrained dev environment
 valora explore parallel "Add caching" --skip-safety
 ```
+
+<details>
+<summary><strong>Safety checks performed</strong></summary>
+
+Pre-flight checks verify: sufficient memory (1 GB per branch), disk space (5 GB), Docker availability, and a clean git state. Use `--skip-safety` to bypass these in constrained environments.
+
+</details>
+
+---
 
 ### explore cleanup
 
@@ -1389,14 +1191,12 @@ Clean up exploration resources (containers, worktrees, branches).
 valora explore cleanup [exploration-id] [options]
 ```
 
-**Options:**
-
 | Flag               | Description                               |
 | ------------------ | ----------------------------------------- |
 | `--all`            | Clean up all explorations                 |
 | `--failed-only`    | Clean up only failed explorations         |
 | `--older-than <h>` | Clean up explorations older than N hours  |
-| `--dry-run`        | Preview cleanup without actually removing |
+| `--dry-run`        | Preview cleanup without removing anything |
 
 If the exploration state has already been removed (e.g., from a previous partial cleanup), the command falls back to pattern-based cleanup of leftover git branches and worktrees.
 
@@ -1404,68 +1204,13 @@ If the exploration state has already been removed (e.g., from a previous partial
 
 ## Batch Processing
 
-The `--batch` global flag submits eligible pipeline stages to the provider's batch API instead of executing them in real time. This reduces token costs by approximately 50% in exchange for asynchronous processing (results available within 24 hours).
+The `--batch` global flag submits eligible pipeline stages to the provider's batch API instead of executing them in real time, reducing token costs by ~50% in exchange for asynchronous processing (results available within 24 hours).
 
 **Eligibility requirements** (all three must be met):
 
 1. The pipeline stage has `batch: true` in its definition.
 2. The `--batch` CLI flag is set.
-3. The resolved provider supports batching (Anthropic and OpenAI only; Google/Cursor/others fall back to real-time).
-
-When a stage is submitted as a batch job, the command returns immediately with a local batch ID. Use the `valora batch` sub-commands to check status and retrieve results.
-
-### batch list
-
-List all known batch jobs.
-
-```bash
-valora batch list
-```
-
-### batch status
-
-Show the current status of a batch job.
-
-```bash
-valora batch status <localId>
-```
-
-**Status values**: `queued`, `processing`, `completed`, `failed`, `cancelled`, `expired`
-
-### batch results
-
-Retrieve the results of a completed batch job. Use `--wait` to poll until the job completes.
-
-```bash
-valora batch results <localId> [--wait]
-```
-
-| Flag     | Description                                                     |
-| -------- | --------------------------------------------------------------- |
-| `--wait` | Poll the provider until the batch completes, then print results |
-
-### batch cancel
-
-Cancel a pending or processing batch job.
-
-```bash
-valora batch cancel <localId>
-```
-
-**Example workflow:**
-
-```bash
-# Submit a command with batch processing enabled
-valora review-code --batch
-# → Batch submitted: batch_local_abc123
-
-# Check status
-valora batch status batch_local_abc123
-# → status: processing (3/5 completed)
-
-# Wait for results
-valora batch results batch_local_abc123 --wait
-```
+3. The resolved provider supports batching (Anthropic and OpenAI only; others fall back to real time).
 
 **Provider support:**
 
@@ -1476,11 +1221,31 @@ valora batch results batch_local_abc123 --wait
 | **Google**    | Not yet supported (falls back) | —        |
 | **Cursor**    | Not supported (falls back)     | —        |
 
-### Batch-eligible stages by command
+```bash
+# Submit with batch processing
+valora review-code --batch
+# → Batch submitted: batch_local_abc123
 
-The following stages have `batch: true` in their pipeline definition. All other stages in these commands — and all stages in commands not listed — always run in real time regardless of the `--batch` flag.
+# Check status
+valora batch status batch_local_abc123
 
-**Selection logic**: only stages where every input comes from a prior stage's output (no direct file reads, no tool loops, no interactive prompts, no file writes) are eligible.
+# Wait for and retrieve results
+valora batch results batch_local_abc123 --wait
+```
+
+**`batch` sub-commands:**
+
+| Sub-command                               | Description                                                                        |
+| ----------------------------------------- | ---------------------------------------------------------------------------------- |
+| `valora batch list`                       | List all known batch jobs                                                          |
+| `valora batch status <localId>`           | Show status: `queued`, `processing`, `completed`, `failed`, `cancelled`, `expired` |
+| `valora batch results <localId> [--wait]` | Retrieve results; `--wait` polls until complete                                    |
+| `valora batch cancel <localId>`           | Cancel a pending or processing job                                                 |
+
+<details>
+<summary><strong>Batch-eligible stages by command</strong></summary>
+
+Only stages where every input comes from a prior stage's output — no direct file reads, no tool loops, no interactive prompts, no file writes — are eligible.
 
 | Command               | Batch-eligible stages                                            | What they do                                    |
 | --------------------- | ---------------------------------------------------------------- | ----------------------------------------------- |
@@ -1495,22 +1260,22 @@ The following stages have `batch: true` in their pipeline definition. All other 
 | `plan-architecture`   | `architecture`                                                   | Architecture definition from analysed context   |
 | `plan-implementation` | `risks`, `breakdown`                                             | Risk assessment and step decomposition          |
 
-**Stages never batch-eligible** (by design): any `context`/`load`/`execute`/`persist`/`apply` stage (reads files or runs commands), `user_answers` stages (interactive), and stages whose prompts are documented to use `codebase_search` during execution.
+**Stages never batch-eligible** (by design): any `context`/`load`/`execute`/`persist`/`apply` stage (reads files or runs commands), `user_answers` stages (interactive), and stages whose prompts use `codebase_search` during execution.
+
+</details>
 
 ---
 
 ## Allowed Tools by Command
 
-Each command has access to specific tools:
-
-| Command                      | Tools                                                                                                              |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `plan`                       | codebase_search, read_file, grep, list_dir, glob_file_search                                                       |
-| `plan-architecture`          | codebase_search, read_file, grep, list_dir, glob_file_search                                                       |
-| `plan-implementation`        | codebase_search, read_file, grep, list_dir, glob_file_search                                                       |
-| `implement`                  | codebase_search, read_file, write, search_replace, grep, list_dir, glob_file_search, run_terminal_cmd, delete_file |
-| `test`                       | codebase_search, read_file, grep, list_dir, glob_file_search, run_terminal_cmd                                     |
-| `commit`                     | codebase_search, read_file, grep, list_dir, glob_file_search, run_terminal_cmd, web_search                         |
-| `create-pr`                  | codebase_search, read_file, grep, list_dir, glob_file_search, run_terminal_cmd, GitHub MCP tools                   |
-| `generate-docs`              | read_file, write, list_dir, glob_file_search, codebase_search, grep                                                |
-| `generate-all-documentation` | read_file, write, list_dir, glob_file_search, codebase_search, grep, run_terminal_cmd                              |
+| Command                      | Tools                                                                                                                                |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `plan`                       | `codebase_search`, `read_file`, `grep`, `list_dir`, `glob_file_search`                                                               |
+| `plan-architecture`          | `codebase_search`, `read_file`, `grep`, `list_dir`, `glob_file_search`                                                               |
+| `plan-implementation`        | `codebase_search`, `read_file`, `grep`, `list_dir`, `glob_file_search`                                                               |
+| `implement`                  | `codebase_search`, `read_file`, `write`, `search_replace`, `grep`, `list_dir`, `glob_file_search`, `run_terminal_cmd`, `delete_file` |
+| `test`                       | `codebase_search`, `read_file`, `grep`, `list_dir`, `glob_file_search`, `run_terminal_cmd`                                           |
+| `commit`                     | `codebase_search`, `read_file`, `grep`, `list_dir`, `glob_file_search`, `run_terminal_cmd`, `web_search`                             |
+| `create-pr`                  | `codebase_search`, `read_file`, `grep`, `list_dir`, `glob_file_search`, `run_terminal_cmd`, GitHub MCP tools                         |
+| `generate-docs`              | `read_file`, `write`, `list_dir`, `glob_file_search`, `codebase_search`, `grep`                                                      |
+| `generate-all-documentation` | `read_file`, `write`, `list_dir`, `glob_file_search`, `codebase_search`, `grep`, `run_terminal_cmd`                                  |

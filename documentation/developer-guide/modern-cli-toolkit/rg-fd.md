@@ -1,5 +1,20 @@
 # ripgrep (rg) and fd reference
 
+## Quick Reference
+
+| Command                     | Purpose                             | Example                                                                 |
+| --------------------------- | ----------------------------------- | ----------------------------------------------------------------------- |
+| `rg 'pattern' src/`         | Search file contents recursively    | `rg 'TODO' src/`                                                        |
+| `rg -t ts 'interface'`      | Search TypeScript files only        | `rg -t ts 'export interface'`                                           |
+| `rg -l 'pattern'`           | List files with matches             | `rg -l 'console.log'`                                                   |
+| `rg --json 'pattern' \| jq` | Structured JSON output for piping   | `rg --json 'TODO' \| jq -r 'select(.type=="match") \| .data.path.text'` |
+| `fd -e ts`                  | Find all `.ts` files                | `fd -e ts src/`                                                         |
+| `fd 'component' src/`       | Find files matching a name pattern  | `fd 'Button' src/components/`                                           |
+| `fd -t d 'tests'`           | Find directories matching a pattern | `fd -t d 'tests'`                                                       |
+| `fd -e ts --exec wc -l {}`  | Execute command per file            | `fd -e ts --exec wc -l {}`                                              |
+
+---
+
 ## rg — ripgrep
 
 ### Why rg over grep for agents
@@ -78,29 +93,6 @@ rg 'import .* from' src/ --json | jq '
 '
 ```
 
-### Multi-line patterns
-
-```bash
-# Multi-line search (e.g., find function definitions with body)
-rg -U 'function \w+\([^)]*\)\s*\{[^}]*\}' src/
-
-# Find empty catch blocks
-rg -U 'catch\s*\([^)]*\)\s*\{\s*\}' src/
-
-# Find multi-line imports
-rg -U 'import \{[^}]+\} from' src/
-```
-
-### Replace mode
-
-```bash
-# Preview replacements (dry run — prints to stdout)
-rg 'old_function' src/ -r 'new_function'
-
-# Actual replacement requires piping or using sed
-rg -l 'old_function' src/ | xargs sed -i 's/old_function/new_function/g'
-```
-
 ### Flags reference
 
 | Flag          | Purpose                      | Example                    |
@@ -125,6 +117,34 @@ rg -l 'old_function' src/ | xargs sed -i 's/old_function/new_function/g'
 | `-e PATTERN`  | Multiple patterns            | `rg -e 'foo' -e 'bar'`     |
 | `--stats`     | Show match statistics        | `rg --stats 'pattern'`     |
 
+<details>
+<summary><strong>Advanced rg Patterns</strong></summary>
+
+### Multi-line patterns
+
+```bash
+# Multi-line search (e.g., find function definitions with body)
+rg -U 'function \w+\([^)]*\)\s*\{[^}]*\}' src/
+
+# Find empty catch blocks
+rg -U 'catch\s*\([^)]*\)\s*\{\s*\}' src/
+
+# Find multi-line imports
+rg -U 'import \{[^}]+\} from' src/
+```
+
+### Replace mode
+
+```bash
+# Preview replacements (dry run — prints to stdout)
+rg 'old_function' src/ -r 'new_function'
+
+# Actual replacement requires piping or using sed
+rg -l 'old_function' src/ | xargs sed -i 's/old_function/new_function/g'
+```
+
+</details>
+
 ---
 
 ## fd — file finder
@@ -145,7 +165,7 @@ fd '^index\.ts$' src/            # Exact filename match
 
 # Find by extension
 fd -e ts                         # All .ts files
-fd -e ts -e tsx . src/             # TypeScript + TSX
+fd -e ts -e tsx . src/           # TypeScript + TSX
 fd -e yaml -e yml                # YAML files
 
 # Find by type
@@ -171,8 +191,8 @@ fd -HI                           # Include everything
 fd -p 'src/components/.*\.tsx$'
 
 # Size filter
-fd -e log --size +10m            # Files larger than 10MB
-fd -t f --size -1k               # Files smaller than 1KB
+fd -e log --size +10m            # Files larger than 10 MB
+fd -t f --size -1k               # Files smaller than 1 KB
 
 # Modified time
 fd -t f --changed-within 1d      # Modified in last day
@@ -198,15 +218,6 @@ fd -e ts -X wc -l                # Single wc invocation with all files
 fd -e yaml k8s/ --exec yq '.kind' {}          # Extract kind from all YAML
 fd -g 'package.json' --exec jq '.name' {}     # All package names
 fd -e ts --exec rg 'TODO' {}                   # TODOs in TypeScript files
-
-# Delete matching files (careful!)
-fd -e log --changed-before 30d --exec rm {}
-
-# Complex exec with shell
-fd -e json --exec sh -c '
-  name=$(jq -r ".name" "$1" 2>/dev/null)
-  [ -n "$name" ] && echo "$1: $name"
-' _ {}
 ```
 
 ### Flags reference

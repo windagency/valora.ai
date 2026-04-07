@@ -2,97 +2,83 @@
 
 Common issues and solutions when using VALORA.
 
-## Quick Diagnostics
-
-Run this command to check system health:
+## Quick diagnostics
 
 ```bash
-# Check installation
 valora --version
-
-# Check configuration
 valora config validate
-
-# Check logs
 tail -f .valora/logs/ai-$(date +%Y-%m-%d).log
 ```
 
-## Common Issues
+## Common problems — quick reference
 
-### Installation & Setup
+| Problem                     | Likely cause                | Fix                                                                              |
+| --------------------------- | --------------------------- | -------------------------------------------------------------------------------- |
+| "Unsupported Node version"  | Node < 20                   | `nvm install 20 && nvm use 20`                                                   |
+| "pnpm: command not found"   | pnpm not installed          | `npm install -g pnpm`                                                            |
+| "API key not found"         | `ANTHROPIC_API_KEY` not set | `export ANTHROPIC_API_KEY="sk-ant-..."`                                          |
+| "Invalid configuration"     | Malformed JSON              | `jq '.' .valora/config.json`                                                     |
+| "valora: command not found" | CLI not built               | `pnpm build`                                                                     |
+| Command hangs               | Timeout too short           | Raise `timeout_ms` in config                                                     |
+| "EACCES: permission denied" | Wrong file permissions      | `chmod -R 755 .valora/sessions/`                                                 |
+| "Rate limit exceeded"       | API quota hit               | Wait 60s or switch provider                                                      |
+| "Model not found"           | Wrong model name            | `valora config list-models`                                                      |
+| "Request timeout"           | Slow or complex task        | Raise `timeout_ms` to 900000                                                     |
+| Tool loop warning           | Too few tool iterations     | Raise `max_tool_iterations` in pipeline YAML                                     |
+| Stage hard-stopped          | Too many tool failures      | See [Stage hard-stopped](#stage-hard-stopped-n-tool-failures-exceeded-threshold) |
+| Dashboard shows 0 workflows | No session data             | Run a workflow, then re-generate                                                 |
 
-#### Node.js Version Mismatch
+---
 
-**Symptoms**:
+## 1. Installation and setup
 
-- Error: "Unsupported Node version"
-- Commands fail to execute
+### Node.js version mismatch
 
-**Solution**:
+**Symptom**: "Unsupported Node version" or commands fail to execute.
 
 ```bash
-# Check Node version
-node --version  # Should be >= 20.0.0
-
-# Install correct version
+node --version   # must be >= 20.0.0
 nvm install 20
 nvm use 20
-
-# Or use .nvmrc
-nvm use
 ```
 
-#### pnpm Not Found
+**Verify**: `node --version` returns `v20.x.x` or higher.
 
-**Symptoms**:
+### pnpm not found
 
-- Error: "pnpm: command not found"
-
-**Solution**:
+**Symptom**: "pnpm: command not found"
 
 ```bash
-# Install pnpm globally
 npm install -g pnpm
-
-# Or via corepack (Node 16.13+)
-corepack enable
-corepack prepare pnpm@latest --activate
+# or via corepack (Node 16.13+):
+corepack enable && corepack prepare pnpm@latest --activate
 ```
 
-#### Dependencies Not Installing
+**Verify**: `pnpm --version` returns a version number.
 
-**Symptoms**:
+### Dependencies not installing
 
-- Error during `pnpm install`
-- Missing modules when running commands
-
-**Solution**:
+**Symptom**: Errors during `pnpm install`, or missing modules at runtime.
 
 ```bash
-# Clean reinstall from the frozen lockfile
 rm -rf node_modules
 pnpm install
-
-# If the lockfile is out of sync with package.json
-# (e.g., after manually editing package.json):
-pnpm install --config.frozen-lockfile=false
-
-# If still failing, check network
-ping registry.npmjs.org
 ```
 
-> **Note**: The project enforces `frozen-lockfile=true` in `.npmrc`. Never delete `pnpm-lock.yaml` — it is the source of truth for reproducible installs. If you need to regenerate it, use `pnpm install --config.frozen-lockfile=false`.
+If the lockfile is out of sync with `package.json` (e.g., after manually editing it):
 
-#### Dependency Install Script Errors
+```bash
+pnpm install --config.frozen-lockfile=false
+```
 
-**Symptoms**:
+**Verify**: `ls node_modules/.bin/tsx` returns a path.
 
-- A new dependency requires native compilation but fails silently
-- Missing native bindings at runtime
+<details>
+<summary><strong>Why the frozen lockfile matters</strong></summary>
 
-**Solution**:
+The project enforces `frozen-lockfile=true` in `.npmrc`. Never delete `pnpm-lock.yaml` — it is the source of truth for reproducible installs. Use `--config.frozen-lockfile=false` only when intentionally regenerating it.
 
-The project blocks all dependency install scripts via `ignore-scripts=true` in `.npmrc`. If a package legitimately needs to run build scripts (e.g., `sharp`, `esbuild`), add it to the allowlist in `package.json`:
+If a new dependency requires native compilation but fails silently (missing native bindings at runtime), the project blocks all install scripts via `ignore-scripts=true`. Add the package to the allowlist:
 
 ```json
 {
@@ -108,166 +94,122 @@ Then reinstall:
 pnpm install --config.frozen-lockfile=false
 ```
 
-### Configuration Issues
+</details>
 
-#### API Keys Not Working
+---
 
-**Symptoms**:
+## 2. Configuration issues
 
-- Error: "API key not found"
-- Error: "Invalid API key"
+### API keys not working
 
-**Solution**:
+**Symptom**: "API key not found" or "Invalid API key"
 
 ```bash
-# Check environment variable
-echo $ANTHROPIC_API_KEY
-
-# Set temporarily
+echo $ANTHROPIC_API_KEY       # check it is set
 export ANTHROPIC_API_KEY="sk-ant-..."
-
-# Set permanently (add to ~/.bashrc or ~/.zshrc)
-echo 'export ANTHROPIC_API_KEY="sk-ant-..."' >> ~/.bashrc
-source ~/.bashrc
-
-# Verify configuration
-valora config validate
+valora config validate        # verify
 ```
 
-#### Configuration File Invalid
+For a permanent fix, add the export to `~/.bashrc` or `~/.zshrc`.
 
-**Symptoms**:
+### Configuration file invalid
 
-- Error: "Invalid configuration"
-- Commands fail immediately
-
-**Solution**:
+**Symptom**: "Invalid configuration" or commands fail immediately.
 
 ```bash
-# Validate JSON syntax
-jq '.' .valora/config.json
+jq '.' .valora/config.json          # will error on invalid JSON
+```
 
-# Check for common errors
-cat .valora/config.json | grep -E '(,\s*}|,\s*])'  # Trailing commas
+To reset to defaults:
 
-# Reset to default
+```bash
 cp data/config.default.json .valora/config.json
 ```
 
-### Execution Issues
+---
 
-#### Command Not Found
+## 3. Execution issues
 
-**Symptoms**:
+### Command not found
 
-- Error: "ai: command not found"
-
-**Solution**:
+**Symptom**: "valora: command not found"
 
 ```bash
-# Check if CLI is built
-ls dist/cli.js
-
-# If not, build it
-pnpm build
-
-# Run directly
-node dist/cli.js plan "test"
-
-# Or add to PATH
-export PATH="$PATH:$(pwd)/dist"
+ls dist/cli.js   # check if CLI is built
+pnpm build       # build if missing
+node dist/cli.js plan "test"   # run directly to verify
 ```
 
-#### Command Hangs
+### Command hangs
 
-**Symptoms**:
-
-- Command starts but never completes
-- No output or progress
-
-**Solution**:
+**Symptom**: Command starts but never completes; no output.
 
 ```bash
-# Check logs
 tail -f .valora/logs/ai-$(date +%Y-%m-%d).log
-
-# Check for timeout
-# Increase timeout in .valora/config.json:
-{
-  "llm": {
-    "providers": {
-      "anthropic": {
-        "timeout_ms": 600000  // 10 minutes
-      }
-    }
-  }
-}
-
-# Kill and restart
-pkill -f "valora "
-valora plan "test"
 ```
 
-#### Permission Denied
+Increase the timeout in `.valora/config.json`:
 
-**Symptoms**:
+```json
+{
+	"llm": {
+		"providers": {
+			"anthropic": {
+				"timeout_ms": 600000
+			}
+		}
+	}
+}
+```
 
-- Error: "EACCES: permission denied"
-
-**Solution**:
+To kill a hung command:
 
 ```bash
-# Fix session directory permissions
+pkill -f "valora "
+```
+
+### Permission denied
+
+**Symptom**: "EACCES: permission denied"
+
+```bash
 chmod -R 755 .valora/sessions/
 chmod -R 644 .valora/sessions/**/*.json
-
-# Fix log directory permissions
 chmod -R 755 .valora/logs/
 chmod -R 644 .valora/logs/**/*.log
-
-# Fix script permissions
 chmod +x scripts/*
 ```
 
-### Pipeline Stage Issues
+---
 
-#### Tool Loop Exceeded Maximum Iterations
+## 4. Pipeline stage issues
 
-**Symptoms**:
+### Tool loop exceeded maximum iterations
+
+**Symptom**:
 
 ```
 ⚠ Tool loop exceeded maximum iterations (stage: test.code.implement-tests)
-⚠ Requesting final structured output (tool loop exhausted) (stage: test.code.implement-tests)
-⚠ Received final output after tool loop exhaustion (stage: test.code.implement-tests)
+⚠ Requesting final structured output (tool loop exhausted)
 ```
 
-**Cause**: The stage needed more than 20 tool calls (the default limit) to complete its
-work. Common in stages that write many files (test generation, documentation, large
-refactors).
+**Cause**: The stage needed more than 20 tool calls (the default limit). Common in stages that write many files.
 
-**Solution**:
-
-Raise `max_tool_iterations` for the affected stage in the command's pipeline YAML:
+**Fix**: Raise `max_tool_iterations` in the command's pipeline YAML:
 
 ```yaml
-# data/commands/implement.md  (or .valora/commands/implement.md for project overrides)
 pipeline:
   - stage: test
     prompt: code.implement-tests
     required: true
-    max_tool_iterations: 40 # was 20
+    max_tool_iterations: 40
 ```
 
-**Check whether the stage actually completed correctly** by inspecting
-`StageOutput.metadata.executionQuality.verifiedModifiedFiles`. If it matches the
-expected outputs, the forced final output was accurate and you may just need the higher
-limit to avoid the warning in future runs.
+**Verify**: Check `StageOutput.metadata.executionQuality.verifiedModifiedFiles` — if it matches expected outputs, the forced final output was accurate and the higher limit will prevent the warning in future runs.
 
----
+### Stage hard-stopped: N tool failures exceeded threshold
 
-#### Stage Hard-Stopped: N Tool Failures Exceeded Threshold
-
-**Symptoms**:
+**Symptom**:
 
 ```
 ✗ Stage hard-stopped: 7 tool failures exceeded the threshold of 5
@@ -275,368 +217,287 @@ limit to avoid the warning in future runs.
 ✗ Pipeline execution failed — Required stage failed
 ```
 
-**Cause**: The stage accumulated too many tool results starting with `"Error:"`. This
-is often caused by a combination of:
+**Cause**: The stage accumulated too many tool results starting with `"Error:"`. Caused by a tight iteration limit forcing rapid tool calls, or genuine tool failures (bad paths, network errors).
 
-1. A tight iteration limit pushing the LLM to make rapid tool calls without waiting for
-   guidance feedback.
-2. Genuine tool failures (bad shell commands, wrong paths, network errors).
+> "File too large", "No matches found", and "File not found" do **not** count as failures. Only results starting with `"Error:"` count.
 
-**Note**: "File too large", "No matches found", "File not found" and similar guidance
-messages do **not** count as failures. Only results starting with `"Error:"` do.
-
-**Solution A — Raise the failure threshold** (if the stage navigates many large files):
+**Fix A** — Raise the failure threshold (if the stage navigates many large files):
 
 ```yaml
 - stage: documentation
   prompt: documentation.update-inline-docs
   required: true
-  max_tool_failures: 10 # was 5
+  max_tool_failures: 10
 ```
 
-**Solution B — Raise the iteration limit** (if failures are accumulating because the
-LLM is rushing):
+**Fix B** — Raise the iteration limit (if failures accumulate because the LLM is rushing):
 
 ```yaml
 - stage: documentation
   prompt: documentation.update-inline-docs
   required: true
-  max_tool_iterations: 30 # give the LLM more room before it hits the ceiling
+  max_tool_iterations: 30
 ```
 
-**Solution C — Make the stage optional** (if failures should not block the pipeline):
+**Fix C** — Make the stage optional (if failures should not block the pipeline):
 
 ```yaml
 - stage: documentation
   prompt: documentation.update-inline-docs
-  required: false # pipeline continues even if documentation stage fails
+  required: false
 ```
 
-**Solution D — Set a tolerant failure policy** (if the stage is exploratory / read-only):
+**Fix D** — Set a tolerant failure policy (for exploratory or read-only stages):
 
 ```yaml
 - stage: review
   prompt: code.validate-prerequisites
   required: true
-  failure_policy: tolerant # only fatal (mutating) failures count toward hard-stop
+  failure_policy: tolerant
 ```
 
-The `failure_policy` controls which failures count: `strict` (all — default for
-`code`/`test`), `tolerant` (only `write`/`search_replace`/`delete_file` failures —
-default for `context`/`review`/`plan`), or `lenient` (never hard-stops). See
-[Pipeline Resilience](../operations/pipeline-resilience.md#failure-policy) for details.
+<details>
+<summary><strong>Failure policy details and root-cause diagnosis</strong></summary>
 
-**Diagnose root cause** by checking the `tool:execution:failed` pipeline events in the
-session log — they include `toolName` and `errorMessage` for each counted failure:
+`failure_policy` controls which failures count:
+
+- `strict` — all failures count (default for `code`/`test` stages)
+- `tolerant` — only `write`, `search_replace`, and `delete_file` failures count (default for `context`/`review`/`plan` stages)
+- `lenient` — never hard-stops
+
+To diagnose root cause, inspect the `tool:execution:failed` events in the session log:
 
 ```bash
 jq '.commands[-1].stages[] | select(.metadata.executionQuality.hardStopped == true)' \
   .valora/sessions/<session-id>/session.json
 ```
 
-See [Pipeline Resilience](../operations/pipeline-resilience.md) for a full
-troubleshooting walkthrough.
+See [Pipeline Resilience](../operations/pipeline-resilience.md) for a full troubleshooting walkthrough.
 
-### Session Issues
+</details>
 
-#### Sessions Not Saving
+---
 
-**Symptoms**:
+## 5. Session issues
 
-- Session data lost between runs
-- Empty session files
+### Sessions not saving
 
-**Solution**:
+**Symptom**: Session data lost between runs; empty session files.
 
 ```bash
-# Check auto-save enabled
-jq '.session.auto_save' .valora/config.json  # Should be true
-
-# Check disk space
-df -h .valora/sessions/
-
-# Check permissions
-ls -la .valora/sessions/
-
-# Verify encryption key
-# If encrypted, check ENCRYPTION_KEY environment variable
-echo $ENCRYPTION_KEY
+jq '.session.auto_save' .valora/config.json   # should be true
+df -h .valora/sessions/                        # check disk space
+ls -la .valora/sessions/                       # check permissions
+echo $ENCRYPTION_KEY                           # if encrypted
 ```
 
-#### Session Corrupted
+### Session corrupted
 
-**Symptoms**:
-
-- Error: "Invalid session data"
-- Cannot resume session
-
-**Solution**:
+**Symptom**: "Invalid session data" or cannot resume session.
 
 ```bash
-# Validate session JSON
 jq '.' .valora/sessions/<session-id>/session.json
-
-# Try snapshot
 jq '.' .valora/sessions/<session-id>/session.snapshot.json
+```
 
-# If corrupted, start new session
+If both are corrupted, start a new session:
+
+```bash
 valora --new-session plan "test"
 ```
 
-#### Old Sessions Not Cleaned Up
+> Do not delete sessions that contain errors — they hold diagnostic context useful for debugging.
 
-**Symptoms**:
+### Old sessions not cleaned up
 
-- `.valora/sessions/` directory very large
-- Many old session files
-
-**Solution**:
+**Symptom**: `.valora/sessions/` directory is very large.
 
 ```bash
-# Enable cleanup
-# In .valora/config.json:
-{
-  "session": {
-    "cleanup_days": 30,
-    "cleanup_enabled": true
-  }
-}
-
-# Manual cleanup
-find .valora/sessions -name "*.json" -mtime +30 -delete
-
-# Or use cleanup command
 valora session cleanup --days 30
 ```
 
-### Exploration Issues
+Or enable automatic cleanup in `.valora/config.json`:
 
-#### Exploration Fails Safety Checks
-
-**Symptoms**:
-
-- Error: "Insufficient memory: X.XGB available, Y.YGB required"
-
-**Solution**:
-
-```bash
-# Skip safety checks (for constrained environments)
-valora explore parallel "task" --skip-safety
-
-# Or reduce branch count
-valora explore parallel "task" --branches 2
+```json
+{
+	"session": {
+		"cleanup_days": 30,
+		"cleanup_enabled": true
+	}
+}
 ```
 
-The safety validator requires 1GB of available memory per branch. In environments where the OS reports low free memory (e.g., devcontainers), use `--skip-safety` to bypass the check. Docker enforces per-container memory limits via cgroups independently.
+---
 
-#### Exploration Cleanup Fails
+## 6. Exploration issues
 
-**Symptoms**:
+### Exploration fails safety checks
 
-- Error: "Exploration exp-XXX not found" during cleanup
-- Branches not deleted: "Branch refs/heads/exploration/... does not exist"
-
-**Solution**:
+**Symptom**: "Insufficient memory: X.XGB available, Y.YGB required"
 
 ```bash
-# Re-run cleanup — it now handles missing state gracefully
-valora explore cleanup exp-XXX
+valora explore parallel "task" --skip-safety    # for constrained environments
+valora explore parallel "task" --branches 2     # reduce branch count
+```
 
-# Or clean up all explorations
-valora explore cleanup --all
+<details>
+<summary><strong>Why this happens in devcontainers</strong></summary>
 
-# Manual cleanup of leftover branches
+The safety validator requires 1GB of available memory per branch. In environments where the OS reports low free memory (e.g., devcontainers), the check can fail even when Docker enforces per-container limits via cgroups. Use `--skip-safety` to bypass the OS-level check.
+
+</details>
+
+### Exploration cleanup fails
+
+**Symptom**: "Exploration exp-XXX not found" during cleanup; branches not deleted.
+
+```bash
+valora explore cleanup exp-XXX          # re-run — now handles missing state gracefully
+valora explore cleanup --all            # or clean up all explorations
+
+# Manual branch cleanup
 git branch --list "exploration/*" | xargs -r git branch -D
 ```
 
-If a previous cleanup removed the exploration state but failed to delete branches (e.g., due to the `refs/heads/` prefix issue), re-running cleanup will detect the missing state and fall back to pattern-based branch cleanup.
+<details>
+<summary><strong>Root cause</strong></summary>
 
-#### Exploration Worktrees Show as Timed Out
+If a previous cleanup removed the exploration state but failed to delete branches (e.g., due to a `refs/heads/` prefix issue), re-running cleanup detects the missing state and falls back to pattern-based branch cleanup.
 
-**Symptoms**:
+</details>
 
-- Worktree status shows `timed_out` (⏱) instead of `completed`
-- Exploration finishes but some branches didn't complete in time
+### Exploration worktrees show as timed out
 
-**Solution**:
+**Symptom**: Worktree status shows `timed_out` (⏱) instead of `completed`.
 
 ```bash
-# Check which worktrees timed out
 valora explore status exp-XXX
-
-# Increase the timeout for future explorations
 valora explore parallel "task" --timeout 120
-
-# Timed-out worktrees cannot be merged — retry with a longer timeout
-# or fewer branches to give each more time
 valora explore parallel "task" --timeout 120 --branches 2
 ```
 
-Worktrees that exceed the `--timeout` duration are marked as `timed_out` and cannot be merged. They score slightly above `failed` in comparisons (5/40 vs 0/40 for the status component) since partial progress may have been made. To resolve, either increase the timeout or simplify the task.
+<details>
+<summary><strong>Scoring note</strong></summary>
 
-### LLM Provider Issues
+Timed-out worktrees cannot be merged. They score slightly above `failed` in comparisons (5/40 vs 0/40 for the status component) since partial progress may have been made.
 
-#### Rate Limiting
+</details>
 
-**Symptoms**:
+---
 
-- Error: "Rate limit exceeded"
-- Error: "429 Too Many Requests"
+## 7. LLM provider issues
 
-**Solution**:
+### Rate limiting
+
+**Symptom**: "Rate limit exceeded" or "429 Too Many Requests"
 
 ```bash
 # Wait and retry
-sleep 60
 valora plan "test"
 
 # Use different provider
 valora plan --provider openai "test"
+```
 
-# Configure retry policy
-# In .valora/config.json:
+Configure retry policy in `.valora/config.json`:
+
+```json
 {
-  "pipeline": {
-    "retry": {
-      "max_attempts": 5,
-      "backoff_ms": 2000
-    }
-  }
+	"pipeline": {
+		"retry": {
+			"max_attempts": 5,
+			"backoff_ms": 2000
+		}
+	}
 }
 ```
 
-#### Model Not Available
+### Model not available
 
-**Symptoms**:
-
-- Error: "Model not found"
-- Error: "Model access denied"
-
-**Solution**:
+**Symptom**: "Model not found" or "Model access denied"
 
 ```bash
-# Check model name spelling
 valora config list-models
-
-# Use alternative model
 valora plan --model claude-sonnet-3.5 "test"
 
-# Check API access
-curl -H "x-api-key: $ANTHROPIC_API_KEY" \
-  https://api.anthropic.com/v1/models
+# Verify API access
+curl -H "x-api-key: $ANTHROPIC_API_KEY" https://api.anthropic.com/v1/models
 ```
 
-#### Timeout Errors
+### Timeout errors
 
-**Symptoms**:
+**Symptom**: "Request timeout" on long-running commands.
 
-- Error: "Request timeout"
-- Long-running commands fail
+Increase the timeout in `.valora/config.json`:
 
-**Solution**:
+```json
+{
+	"llm": {
+		"providers": {
+			"anthropic": {
+				"timeout_ms": 900000
+			}
+		}
+	}
+}
+```
+
+For simple tasks, use a faster model:
 
 ```bash
-# Increase timeout
-# In .valora/config.json:
-{
-  "llm": {
-    "providers": {
-      "anthropic": {
-        "timeout_ms": 900000  // 15 minutes
-      }
-    }
-  }
-}
-
-# Use faster model for simple tasks
 valora plan --model claude-haiku "simple task"
 ```
 
-### Metrics Issues
+---
 
-#### No Metrics Data
+## 8. Metrics issues
 
-**Symptoms**:
+### No metrics data
 
-- Dashboard shows 0 workflows
-- Empty metrics report
-
-**Solution**:
+**Symptom**: Dashboard shows 0 workflows.
 
 ```bash
-# Check sessions exist
 find .valora/sessions -name "*.json" -type f
-
-# Check session format
-jq '.commands[0].optimization_metrics' \
-  .valora/sessions/<id>/session.json
-
-# Verify date range
+jq '.commands[0].optimization_metrics' .valora/sessions/<id>/session.json
 ./scripts/metrics 7d | jq '.totalWorkflows'
-
-# Create test session (see Quick Start)
 ```
 
-#### Metrics Extraction Fails
+If no sessions exist, run a complete workflow then re-generate the report.
 
-**Symptoms**:
+### Metrics extraction fails
 
-- Error when running metrics script
-- Invalid JSON output
-
-**Solution**:
+**Symptom**: Error when running metrics script; invalid JSON output.
 
 ```bash
-# Check tsx installed
-ls node_modules/.bin/tsx
+ls node_modules/.bin/tsx     # check tsx is installed
+pnpm install                 # install if missing
 
-# Install if missing
-pnpm install
-
-# Check session files valid
+# Validate session files
 for f in .valora/sessions/*/*.json; do
   jq '.' "$f" || echo "Invalid: $f"
 done
 
-# Run with debug
 DEBUG=* ./scripts/metrics 30d
 ```
 
-#### Dashboard Not Generating
+### Dashboard not generating
 
-**Symptoms**:
-
-- Metrics extract OK but dashboard fails
-- Empty METRICS_REPORT.md
-
-**Solution**:
+**Symptom**: Metrics extract OK but dashboard fails; empty `METRICS_REPORT.md`.
 
 ```bash
-# Test metrics extraction
 ./scripts/metrics 30d > /tmp/metrics.json
-
-# Validate metrics JSON
 jq '.' /tmp/metrics.json
-
-# Generate dashboard manually
 ./scripts/dashboard < /tmp/metrics.json
-
-# Check for errors
 tail -f .valora/logs/ai-$(date +%Y-%m-%d).log
 ```
 
-### Performance Issues
+---
 
-#### Slow Command Execution
+## 9. Performance issues
 
-**Symptoms**:
+### Slow command execution
 
-- Commands take too long
-- Frequent timeouts
-
-**Solutions**:
-
-1. **Enable parallel execution**:
+Enable parallel execution in `.valora/config.json`:
 
 ```json
 {
@@ -647,20 +508,14 @@ tail -f .valora/logs/ai-$(date +%Y-%m-%d).log
 }
 ```
 
-1. **Use faster models**:
+Other options:
 
 ```bash
-valora plan --model claude-haiku "simple task"
+valora plan --model claude-haiku "simple task"   # faster model
+valora session cleanup --days 7                  # reduce context size
 ```
 
-1. **Reduce context size**:
-
-```bash
-# Clear old sessions
-valora session cleanup --days 7
-```
-
-1. **Enable stage caching**:
+Enable stage caching:
 
 ```json
 {
@@ -671,83 +526,53 @@ valora session cleanup --days 7
 }
 ```
 
-#### High Memory Usage
-
-**Symptoms**:
-
-- Process uses too much RAM
-- System becomes slow
-
-**Solutions**:
+### High memory usage
 
 ```bash
-# Check memory usage
 ps aux | grep "valora "
-
-# Reduce concurrent stages
-# In .valora/config.json:
-{
-  "execution": {
-    "max_concurrent_stages": 2
-  }
-}
-
-# Clear session cache
 rm -rf .valora/sessions/*/cache/
-
-# Restart with memory limit
 node --max-old-space-size=2048 dist/cli.js plan "test"
 ```
 
-### GitHub Actions Issues
+Reduce concurrent stages in `.valora/config.json`:
 
-#### Workflow Not Running
+```json
+{
+	"execution": {
+		"max_concurrent_stages": 2
+	}
+}
+```
 
-**Symptoms**:
+---
 
-- Scheduled workflow doesn't execute
-- Manual trigger doesn't work
+## 10. GitHub Actions issues
 
-**Solution**:
+### Workflow not running
 
 ```bash
-# Check workflow file
 gh workflow view "Weekly Metrics Dashboard"
-
-# Check recent runs
 gh run list --workflow="Weekly Metrics Dashboard"
-
-# Manual trigger
 gh workflow run "Weekly Metrics Dashboard"
-
-# Check Actions enabled
-# Go to Settings → Actions → General
-# Ensure "Allow all actions" is selected
 ```
 
-#### Workflow Fails
+Check that Actions are enabled: Settings → Actions → General → "Allow all actions".
 
-**Symptoms**:
-
-- Workflow runs but fails
-- Error in workflow logs
-
-**Solution**:
+### Workflow fails
 
 ```bash
-# View workflow logs
 gh run view <run-id> --log
-
-# Common fixes:
-# 1. Check dependencies installed
-# 2. Verify API keys in Secrets
-# 3. Check permissions in workflow file
-# 4. Validate YAML syntax
 ```
 
-## Debugging Tips
+Common causes: missing dependencies, API keys not configured in Secrets, incorrect permissions in workflow file, or invalid YAML syntax.
 
-### Enable Debug Logging
+---
+
+## Debugging tools
+
+### Enable debug logging
+
+Add to `.valora/config.json`:
 
 ```json
 {
@@ -758,110 +583,54 @@ gh run view <run-id> --log
 }
 ```
 
-### Check System Status
+### Capture full debug output
 
 ```bash
-# Node version
-node --version
-
-# pnpm version
-pnpm --version
-
-# Disk space
-df -h .valora/
-
-# Permissions
-ls -la .valora/sessions/ .valora/logs/
-
-# Environment variables
-env | grep -E '(ANTHROPIC|OPENAI|GOOGLE)'
-```
-
-### Capture Debug Output
-
-```bash
-# Run with debug output
 DEBUG=* valora plan "test" 2>&1 | tee debug.log
-
-# Check logs
 tail -100 .valora/logs/ai-$(date +%Y-%m-%d).log
-
-# Analyze session
 jq '.' .valora/sessions/<session-id>/session.json | less
 ```
 
-### Test Components Individually
+### Test components individually
 
 ```bash
-# Test LLM connection
-valora test llm
-
-# Test session management
-valora session list
-
-# Test metrics extraction
-./scripts/metrics 7d | jq '.'
-
-# Test configuration
-valora config validate
+valora test llm               # test LLM connection
+valora session list           # test session management
+./scripts/metrics 7d | jq '.'  # test metrics extraction
+valora config validate        # test configuration
 ```
 
-## Getting Additional Help
-
-### Check Documentation
-
-- [User Guide](./README.md)
-- [Configuration](./configuration.md)
-- [Commands Reference](./commands.md)
-- [Architecture Documentation](../architecture/README.md)
-
-### Check Logs
+### System status check
 
 ```bash
-# Today's logs
-cat .valora/logs/ai-$(date +%Y-%m-%d).log
-
-# Last 100 lines
-tail -100 .valora/logs/ai-$(date +%Y-%m-%d).log
-
-# Follow logs in real-time
-tail -f .valora/logs/ai-$(date +%Y-%m-%d).log
+node --version
+pnpm --version
+df -h .valora/
+ls -la .valora/sessions/ .valora/logs/
+env | grep -E '(ANTHROPIC|OPENAI|GOOGLE)'
 ```
-
-### Report Issues
-
-When reporting issues, include:
-
-1. **System information**:
-
-```bash
-echo "Node: $(node --version)"
-echo "pnpm: $(pnpm --version)"
-echo "OS: $(uname -a)"
-```
-
-1. **Error message**:
-
-```bash
-# Copy full error output
-```
-
-1. **Configuration** (sanitized):
-
-```bash
-# Remove API keys first
-jq 'del(.llm.providers[].api_key_env)' .valora/config.json
-```
-
-1. **Relevant logs**:
-
-```bash
-# Last 50 lines
-tail -50 .valora/logs/ai-$(date +%Y-%m-%d).log
-```
-
-1. **Steps to reproduce**
 
 ---
 
-_For development-related issues, see the [Developer Guide](../developer-guide/README.md)._
+## Reporting an issue
+
+Include the following when filing a bug report:
+
+```bash
+# System info
+echo "Node: $(node --version)"
+echo "pnpm: $(pnpm --version)"
+echo "OS: $(uname -a)"
+
+# Sanitised config (remove API keys)
+jq 'del(.llm.providers[].api_key_env)' .valora/config.json
+
+# Recent logs
+tail -50 .valora/logs/ai-$(date +%Y-%m-%d).log
+```
+
+Also include the full error message and steps to reproduce.
+
+---
+
+See also: [Configuration](./configuration.md) · [Commands Reference](./commands.md) · [Developer Guide](../developer-guide/README.md)

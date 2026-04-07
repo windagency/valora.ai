@@ -1,5 +1,7 @@
 # ADR-004: Pipeline Execution Model
 
+> **Decision**: Commands are executed as configurable pipelines of sequential, parallel, conditional, and interactive stages, enabling composition, parallel execution, and centralised error handling.
+
 ## Status
 
 Accepted

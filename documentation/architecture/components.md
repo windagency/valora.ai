@@ -1,10 +1,25 @@
 # Component Architecture
 
-> Detailed component-level architecture of VALORA.
+> Component-level design details for each major module in VALORA.
 
-## Overview
+## Component Overview
 
-This document provides component-level design details for each major module in the engine.
+| Layer            | Key Components                                                                         | Source Files                                                              |
+| ---------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| CLI              | Command Parser, Resolver, Executor, Wizard, Result Presenter, Error Handler            | `index.ts`, `command-resolver.ts`, `command-executor.ts`                  |
+| Orchestration    | Pipeline, Stage Executor, Execution Context, Stage Scheduler, Variable Resolver        | `pipeline.ts`, `stage-executor.ts`, `variable-resolution.service.ts`      |
+| Agent            | Agent Registry, Loader, Selector, Command Discovery, Prompt Loader                     | `agent-loader.ts`, `command-loader.ts`, `prompt-loader.ts`                |
+| LLM              | Provider Registry, Anthropic/OpenAI/Google/Cursor Providers, Token Estimator           | `providers/`, `utils/token-estimator.ts`, `utils/spending-tracker.ts`     |
+| Exploration      | Orchestrator, Collaboration Coordinator, Worktree Manager, Merge Orchestrator          | `orchestrator.ts`, `worktree-manager.ts`, `merge-orchestrator.ts`         |
+| Session          | Session Service, Repository, Worktree Stats Tracker                                    | `lifecycle.ts`, `store.ts`, `worktree-stats-tracker.ts`                   |
+| MCP              | Server, Tool Handler, Prompt Handler, Discovery Service, Health Service                | `mcp/server.ts`, `tool-handler.ts`, `discovery.ts`                        |
+| Configuration    | Config Loader, Schema Validator (Zod), Provider Config                                 | `config-loader.ts`, `providers.ts`                                        |
+| Context Mgmt     | Flush Manager, Threshold Monitor, Summarisation Service, Checkpoint Service            | `context-flush-manager.ts`, `context-summarization.service.ts`            |
+| Security         | Credential Guard, Command Guard, Injection Detector, Tool Validator, Integrity Monitor | `credential-guard.ts`, `command-guard.ts`, `prompt-injection-detector.ts` |
+| AST Intelligence | AST Parser, Index Service, Query Service, Context Service, AST Tools                   | `ast-parser.service.ts`, `ast-index.service.ts`, `ast-tools.service.ts`   |
+| LSP Integration  | LSP Client, Client Manager, LSP Tools, Result Cache, Context Enricher                  | `lsp-client.ts`, `lsp-client-manager.service.ts`, `lsp-tools.service.ts`  |
+
+---
 
 ## CLI Components
 
@@ -30,8 +45,6 @@ C4Component
     Rel(parser, adapter, "Uses")
 ```
 
-### Component Descriptions
-
 | Component         | File                       | Responsibility                            |
 | ----------------- | -------------------------- | ----------------------------------------- |
 | Command Parser    | `index.ts`                 | Entry point, sets up Commander.js         |
@@ -44,7 +57,7 @@ C4Component
 
 ---
 
-## Executor Components
+## Orchestration Components
 
 ```mermaid
 C4Component
@@ -70,8 +83,6 @@ C4Component
     Rel(pipeline, strategy, "Uses")
 ```
 
-### Pipeline Execution Flow
-
 ```mermaid
 stateDiagram-v2
     [*] --> Initialising
@@ -87,8 +98,6 @@ stateDiagram-v2
     Executing --> Failed: Error
     Failed --> [*]
 ```
-
-### Component Descriptions
 
 | Component          | File                             | Responsibility                  |
 | ------------------ | -------------------------------- | ------------------------------- |
@@ -139,8 +148,6 @@ flowchart TD
     G --> I[Return Selected Agent]
 ```
 
-### Component Descriptions
-
 | Component         | File                    | Responsibility              |
 | ----------------- | ----------------------- | --------------------------- |
 | Agent Registry    | Part of config          | Agent capability storage    |
@@ -182,7 +189,6 @@ interface LLMProvider {
 	readonly displayName: string;
 
 	sendPrompt(prompt: string, options?: LLMOptions): Promise<LLMResponse>;
-
 	sendStreamingPrompt(prompt: string, options?: LLMOptions): AsyncGenerator<string>;
 
 	isConfigured(): boolean;
@@ -205,7 +211,7 @@ All providers extract cache metrics into the normalised `LLMUsage` type (`cache_
 
 Cost information flows through three layers:
 
-1. **Live display** — `ProcessingFeedback` (`src/output/processing-feedback.ts`) calls `calculateActualCost()` on each `LLM_RESPONSE` event and accumulates an `estimatedCostUsd` total. This total is appended to the context-insights status bar (`~$0.xxxx`) and to each stage-completion line.
+1. **Live display** — `ProcessingFeedback` (`src/output/processing-feedback.ts`) calls `calculateActualCost()` on each `LLM_RESPONSE` event and accumulates an `estimatedCostUsd` total, appended to the context-insights status bar (`~$0.xxxx`) and to each stage-completion line.
 
 2. **Final summary** — `ResultPresenter` (`src/cli/result-presenter.ts`) receives `costUsd` and `cacheSavingsUsd` from the executor and appends them to the "Token Usage" block printed at the end of every command:
 
@@ -215,14 +221,15 @@ Cost information flows through three layers:
         └─ Cache read: 12,000 tokens (25% hit rate, saved $0.0036)
    ```
 
-3. **Persistent ledger** — `SpendingTracker` (`src/utils/spending-tracker.ts`) appends one `SpendingRecord` to `.valora/spending.jsonl` after each command. The ledger is queried by `valora monitoring spending` and by the dashboard Spending panel.
+3. **Persistent ledger** — `SpendingTracker` (`src/utils/spending-tracker.ts`) appends one `SpendingRecord` to `.valora/spending.jsonl` after each command, queried by `valora monitoring spending` and by the dashboard Spending panel.
 
 | Component       | File                        | Responsibility                                      |
 | --------------- | --------------------------- | --------------------------------------------------- |
 | SpendingTracker | `utils/spending-tracker.ts` | Append-only JSONL ledger; query by endpoint or date |
 | TokenEstimator  | `utils/token-estimator.ts`  | `calculateActualCost()` — pricing for all providers |
 
-### Provider Selection Flow
+<details>
+<summary><strong>Provider Selection Flow</strong></summary>
 
 ```mermaid
 flowchart TD
@@ -237,6 +244,8 @@ flowchart TD
     G -->|No| I[Throw Error]
     H --> F
 ```
+
+</details>
 
 ---
 
@@ -266,41 +275,6 @@ C4Component
     Rel(orchestrator, state, "Tracks")
 ```
 
-### Exploration Component Descriptions
-
-| Component                 | File                           | Responsibility                                    |
-| ------------------------- | ------------------------------ | ------------------------------------------------- |
-| Orchestrator              | `orchestrator.ts`              | Main exploration coordination                     |
-| Collaboration Coordinator | `collaboration-coordinator.ts` | Agent collaboration management                    |
-| Container Manager         | `container-manager.ts`         | Docker container isolation                        |
-| Worktree Manager          | `worktree-manager.ts`          | Git worktree CRUD operations                      |
-| Merge Orchestrator        | `merge-orchestrator.ts`        | Result merging strategies                         |
-| Result Comparator         | `result-comparator.ts`         | Compare outputs across branches                   |
-| Safety Validator          | `safety-validator.ts`          | Pre-exploration safety checks (1GB/branch memory) |
-| Exploration State         | `exploration-state.ts`         | State persistence, recovery, and session linking  |
-| Exploration Events        | `exploration-events.ts`        | Real-time event emitter for dashboard monitoring  |
-
-### Dashboard Integration
-
-The exploration layer integrates with the main dashboard (`valora dash`) through three mechanisms:
-
-1. **Worktree Diagram Panel**: The dashboard fetches `WorktreeManager.listWorktrees()` and `ExplorationStateManager.getActiveExplorations()` in parallel, transforming them into a live tree-diagram showing all git worktrees with exploration status indicators.
-
-2. **Exploration Info Panel**: When viewing a session that is linked to an exploration, the `ExplorationInfoPanel` component loads the exploration data (via `ExplorationStateManager.findBySessionId()`) and displays the task, status, branch completion, and per-worktree details. This works even while the exploration is still running, since the `session_id` is stored on the `Exploration` object immediately after creation.
-
-3. **Worktree Stats Tracking**: The `WorktreeStatsTracker` (in `src/session/`) subscribes to `ExplorationEventEmitter` events and accumulates per-session statistics, which are displayed in the session details view.
-
-4. **Spending Panel**: The session details view has a **Spending** sub-tab (`SpendingPanel` in `src/ui/dashboard/detail-panels/spending-panel.tsx`) that queries `SpendingTracker` filtered to `session.created_at`. It displays session-scoped total cost, cache savings, a per-command cost bar chart, and the top 5 most expensive requests.
-
-### Session-Exploration Linking
-
-Explorations and sessions are bidirectionally linked:
-
-- The `Exploration` type has a `session_id` field, set by the orchestrator immediately after the exploration is created
-- Each `WorktreeExploration` also stores the `session_id`
-- The session context stores `exploration_id` after the exploration completes
-- `ExplorationStateManager.findBySessionId()` enables reverse lookup from session to exploration
-
 ### Parallel Exploration Flow
 
 ```mermaid
@@ -320,6 +294,38 @@ sequenceDiagram
     Merger-->>Orchestrator: mergedResult
     Orchestrator-->>User: finalResult
 ```
+
+| Component                 | File                           | Responsibility                                    |
+| ------------------------- | ------------------------------ | ------------------------------------------------- |
+| Orchestrator              | `orchestrator.ts`              | Main exploration coordination                     |
+| Collaboration Coordinator | `collaboration-coordinator.ts` | Agent collaboration management                    |
+| Container Manager         | `container-manager.ts`         | Docker container isolation                        |
+| Worktree Manager          | `worktree-manager.ts`          | Git worktree CRUD operations                      |
+| Merge Orchestrator        | `merge-orchestrator.ts`        | Result merging strategies                         |
+| Result Comparator         | `result-comparator.ts`         | Compare outputs across branches                   |
+| Safety Validator          | `safety-validator.ts`          | Pre-exploration safety checks (1GB/branch memory) |
+| Exploration State         | `exploration-state.ts`         | State persistence, recovery, and session linking  |
+| Exploration Events        | `exploration-events.ts`        | Real-time event emitter for dashboard monitoring  |
+
+<details>
+<summary><strong>Dashboard Integration and Session-Exploration Linking</strong></summary>
+
+The exploration layer integrates with the main dashboard (`valora dash`) through three mechanisms:
+
+1. **Worktree Diagram Panel**: The dashboard fetches `WorktreeManager.listWorktrees()` and `ExplorationStateManager.getActiveExplorations()` in parallel, transforming them into a live tree-diagram showing all git worktrees with exploration status indicators.
+
+2. **Exploration Info Panel**: When viewing a session linked to an exploration, the `ExplorationInfoPanel` component loads the exploration data via `ExplorationStateManager.findBySessionId()` and displays task, status, branch completion, and per-worktree details — even while the exploration is still running.
+
+3. **Worktree Stats Tracking**: `WorktreeStatsTracker` (in `src/session/`) subscribes to `ExplorationEventEmitter` events and accumulates per-session statistics displayed in the session details view.
+
+Explorations and sessions are bidirectionally linked:
+
+- The `Exploration` type has a `session_id` field set immediately after the exploration is created
+- Each `WorktreeExploration` also stores the `session_id`
+- The session context stores `exploration_id` after the exploration completes
+- `ExplorationStateManager.findBySessionId()` enables reverse lookup
+
+</details>
 
 ---
 
@@ -349,30 +355,6 @@ C4Component
     Rel(service, worktree_tracker, "Collects stats from")
 ```
 
-### Component Descriptions
-
-| Component              | File                         | Responsibility                                           |
-| ---------------------- | ---------------------------- | -------------------------------------------------------- |
-| Session Service        | `lifecycle.ts`, `context.ts` | Session creation, resumption, and state management       |
-| Session Repository     | `store.ts`                   | File-based persistence of session data                   |
-| Session Types          | `types/session.types.ts`     | Type definitions (`Session`, `WorktreeUsageStats`, etc.) |
-| Worktree Stats Tracker | `worktree-stats-tracker.ts`  | Event-driven worktree usage statistics accumulation      |
-
-### Worktree Stats Tracking
-
-The `WorktreeStatsTracker` subscribes to `ExplorationEventEmitter` and accumulates worktree usage statistics during a session:
-
-| Event                | Action                                                        |
-| -------------------- | ------------------------------------------------------------- |
-| `worktree:created`   | Increment `total_created`, add to `worktree_summaries`        |
-| `worktree:started`   | Track in active map, update `max_concurrent`                  |
-| `worktree:completed` | Calculate duration, update `total_duration_ms`, mark complete |
-| `worktree:failed`    | Same as completed but with `failed` status                    |
-
-Worktrees that exceed the exploration timeout are marked with `timed_out` status. Timed-out worktrees are not eligible for merging and score 5/40 (status component) in result comparisons.
-
-On session completion, stats are stored into `session.context['worktree_stats']` (only if `total_created > 0`).
-
 ### Session Lifecycle
 
 ```mermaid
@@ -387,6 +369,31 @@ stateDiagram-v2
     Completed --> Archived: cleanup()
     Archived --> [*]
 ```
+
+| Component              | File                         | Responsibility                                           |
+| ---------------------- | ---------------------------- | -------------------------------------------------------- |
+| Session Service        | `lifecycle.ts`, `context.ts` | Session creation, resumption, and state management       |
+| Session Repository     | `store.ts`                   | File-based persistence of session data                   |
+| Session Types          | `types/session.types.ts`     | Type definitions (`Session`, `WorktreeUsageStats`, etc.) |
+| Worktree Stats Tracker | `worktree-stats-tracker.ts`  | Event-driven worktree usage statistics accumulation      |
+
+<details>
+<summary><strong>Worktree Stats Tracking Detail</strong></summary>
+
+`WorktreeStatsTracker` subscribes to `ExplorationEventEmitter` and accumulates worktree usage statistics during a session:
+
+| Event                | Action                                                        |
+| -------------------- | ------------------------------------------------------------- |
+| `worktree:created`   | Increment `total_created`, add to `worktree_summaries`        |
+| `worktree:started`   | Track in active map, update `max_concurrent`                  |
+| `worktree:completed` | Calculate duration, update `total_duration_ms`, mark complete |
+| `worktree:failed`    | Same as completed but with `failed` status                    |
+
+Worktrees that exceed the exploration timeout are marked `timed_out` and are not eligible for merging. They score 5/40 (status component) in result comparisons.
+
+On session completion, stats are stored into `session.context['worktree_stats']` (only when `total_created > 0`).
+
+</details>
 
 ---
 
@@ -417,32 +424,6 @@ C4Component
 
 ---
 
-## Configuration Components
-
-```mermaid
-C4Component
-    title Component Diagram - Configuration Layer
-
-    Container_Boundary(config, "Configuration Layer") {
-        Component(loader, "Config Loader", "TypeScript", "Load config files")
-        Component(schema, "Schema Validator", "Zod", "Validate structure")
-        Component(wizard, "Interactive Wizard", "Inquirer.js", "Config wizard")
-        Component(providers, "Provider Config", "TypeScript", "Provider settings")
-        Component(constants, "Constants", "TypeScript", "Application constants")
-        Component(helpers, "Validation Helpers", "TypeScript", "Helper functions")
-    }
-
-    ContainerDb(files, "Config Files", "JSON/YAML", "Configuration storage")
-
-    Rel(loader, schema, "Validates")
-    Rel(loader, files, "Reads")
-    Rel(wizard, loader, "Writes via")
-    Rel(loader, providers, "Loads")
-    Rel(schema, helpers, "Uses")
-```
-
----
-
 ## Context Management Components
 
 ```mermaid
@@ -462,7 +443,40 @@ C4Component
     Rel(summariser, checkpoint, "Provides summary to")
 ```
 
-### Context Flush Flow
+### Threshold State Machine
+
+```mermaid
+stateDiagram-v2
+    [*] --> Normal: usage < 50%
+    Normal --> Warning: usage >= 50%
+    Warning --> Normal: usage < 50%
+    Warning --> FlushRequired: usage >= 80%
+    FlushRequired --> Flushing: trigger flush
+    Flushing --> Normal: flush complete
+    FlushRequired --> Critical: usage >= 90%
+    Critical --> Flushing: mandatory flush
+```
+
+| Component             | File                               | Responsibility                          |
+| --------------------- | ---------------------------------- | --------------------------------------- |
+| Flush Manager         | `context-flush-manager.ts`         | Orchestrates flush operations           |
+| Threshold Monitor     | `context-threshold-monitor.ts`     | Monitors token usage against thresholds |
+| Summarisation Service | `context-summarization.service.ts` | Summarises conversation history         |
+| Checkpoint Service    | `context-checkpoint.service.ts`    | Creates and restores execution state    |
+
+### Configuration
+
+| Constant                           | Default          | Description                       |
+| ---------------------------------- | ---------------- | --------------------------------- |
+| `CONTEXT_FLUSH_THRESHOLD`          | 80%              | Trigger automatic flush           |
+| `CONTEXT_FLUSH_CRITICAL_THRESHOLD` | 90%              | Mandatory flush                   |
+| `CONTEXT_FLUSH_WARNING_THRESHOLD`  | 50%              | Log warning                       |
+| `CONTEXT_PRESERVE_TOOL_RESULTS`    | 3                | Tool results to preserve verbatim |
+| `CONTEXT_SUMMARIZATION_MODEL`      | claude-haiku-4-5 | Model for summarisation           |
+| `CONTEXT_MIN_TOKENS_AFTER_FLUSH`   | 10,000           | Minimum headroom after flush      |
+
+<details>
+<summary><strong>Context Flush Flow</strong></summary>
 
 ```mermaid
 sequenceDiagram
@@ -484,39 +498,7 @@ sequenceDiagram
     Manager-->>Executor: {flushed: true, messages: newMessages, tokensSaved: 50000}
 ```
 
-### Threshold State Machine
-
-```mermaid
-stateDiagram-v2
-    [*] --> Normal: usage < 50%
-    Normal --> Warning: usage >= 50%
-    Warning --> Normal: usage < 50%
-    Warning --> FlushRequired: usage >= 80%
-    FlushRequired --> Flushing: trigger flush
-    Flushing --> Normal: flush complete
-    FlushRequired --> Critical: usage >= 90%
-    Critical --> Flushing: mandatory flush
-```
-
-### Component Descriptions
-
-| Component             | File                               | Responsibility                          |
-| --------------------- | ---------------------------------- | --------------------------------------- |
-| Flush Manager         | `context-flush-manager.ts`         | Orchestrates flush operations           |
-| Threshold Monitor     | `context-threshold-monitor.ts`     | Monitors token usage against thresholds |
-| Summarisation Service | `context-summarization.service.ts` | Summarises conversation history         |
-| Checkpoint Service    | `context-checkpoint.service.ts`    | Creates and restores execution state    |
-
-### Configuration
-
-| Constant                           | Default          | Description                       |
-| ---------------------------------- | ---------------- | --------------------------------- |
-| `CONTEXT_FLUSH_THRESHOLD`          | 80%              | Trigger automatic flush           |
-| `CONTEXT_FLUSH_CRITICAL_THRESHOLD` | 90%              | Mandatory flush                   |
-| `CONTEXT_FLUSH_WARNING_THRESHOLD`  | 50%              | Log warning                       |
-| `CONTEXT_PRESERVE_TOOL_RESULTS`    | 3                | Tool results to preserve verbatim |
-| `CONTEXT_SUMMARIZATION_MODEL`      | claude-haiku-4-5 | Model for summarisation           |
-| `CONTEXT_MIN_TOKENS_AFTER_FLUSH`   | 10,000           | Minimum headroom after flush      |
+</details>
 
 ---
 
@@ -554,18 +536,6 @@ C4Component
     Rel(mcp_client, integrity, "Checks fingerprints")
     Rel(variables, cred_guard, "Filters sensitive vars")
 ```
-
-### Vulnerability Coverage
-
-| Component          | Vulnerability Class                        | Severity |
-| ------------------ | ------------------------------------------ | -------- |
-| Credential Guard   | Credential leakage via env/output/files    | Critical |
-| Command Guard      | Command injection and data exfiltration    | Critical |
-| Injection Detector | Indirect prompt injection via tool results | High     |
-| Tool Validator     | MCP tool poisoning via descriptions        | High     |
-| Integrity Monitor  | Rug pull attacks via tool-set drift        | High     |
-
-### Component Descriptions
 
 | Component          | File                           | Responsibility                                                 |
 | ------------------ | ------------------------------ | -------------------------------------------------------------- |
@@ -606,7 +576,14 @@ C4Component
     Rel(tools, context, "Extracts context")
 ```
 
-### Component Descriptions
+### Smart Context Levels
+
+| Level             | What Is Sent                             | When Used                          |
+| ----------------- | ---------------------------------------- | ---------------------------------- |
+| 0 — Codebase Map  | Compact file/symbol listing              | Always in system message           |
+| 1 — Signatures    | Function signatures, type definitions    | Referenced-but-not-focal files     |
+| 2 — Focal symbols | Full body of directly relevant functions | Files in task inputs               |
+| 3 — Full file     | Complete content                         | Only on explicit `request_context` |
 
 | Component       | File                           | Responsibility                                                                    |
 | --------------- | ------------------------------ | --------------------------------------------------------------------------------- |
@@ -617,15 +594,6 @@ C4Component
 | Context Service | `ast-context.service.ts`       | Budget-aware context extraction at multiple detail levels                         |
 | AST Tools       | `ast-tools.service.ts`         | LLM tool handlers for symbol_search, file_outline, find_references, smart_context |
 | Grammar Loader  | `grammars/grammar-loader.ts`   | Lazy WASM grammar loading with concurrency-safe initialisation                    |
-
-### Smart Context Levels
-
-| Level             | What Is Sent                             | When Used                          |
-| ----------------- | ---------------------------------------- | ---------------------------------- |
-| 0 — Codebase Map  | Compact file/symbol listing              | Always in system message           |
-| 1 — Signatures    | Function signatures, type definitions    | Referenced-but-not-focal files     |
-| 2 — Focal symbols | Full body of directly relevant functions | Files in task inputs               |
-| 3 — Full file     | Complete content                         | Only on explicit `request_context` |
 
 ---
 
@@ -660,8 +628,6 @@ C4Component
     Rel(client, gopls, "stdio")
 ```
 
-### Component Descriptions
-
 | Component         | File                            | Responsibility                                                                    |
 | ----------------- | ------------------------------- | --------------------------------------------------------------------------------- |
 | LSP Client        | `lsp-client.ts`                 | JSON-RPC stdio wrapper for a single language server process                       |
@@ -675,6 +641,9 @@ C4Component
 ---
 
 ## Cross-Cutting Concerns
+
+<details>
+<summary><strong>Logging, Error Handling, and Dependency Injection</strong></summary>
 
 ### Logging
 
@@ -738,3 +707,5 @@ classDiagram
     Container --> ConfigLoader
     Container --> LLMRegistry
 ```
+
+</details>

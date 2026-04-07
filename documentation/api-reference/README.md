@@ -1,85 +1,19 @@
 # API Reference
 
-Complete API reference for VALORA.
+> VALORA exposes two specialised APIs beyond the CLI: an MCP server for IDE integration and a TypeScript API for programmatic use. CLI flags and configuration schema are documented separately.
 
-## Overview
+## APIs at a Glance
 
-VALORA provides three main APIs:
+| API        | Audience            | Entry Point                                         |
+| ---------- | ------------------- | --------------------------------------------------- |
+| CLI        | Interactive use     | See [Commands Reference](../user-guide/commands.md) |
+| MCP Server | Cursor / IDE agents | `pnpm dev:mcp` or `valora-mcp start`                |
+| TypeScript | Programmatic access | `import { Orchestrator } from 'valora'`             |
 
-1. **CLI API** - Command-line interface for interactive use
-2. **MCP Server API** - Model Context Protocol server for Cursor integration
-3. **TypeScript API** - Programmatic access for custom integrations
+For global CLI flags, see [Commands Reference](../user-guide/commands.md).  
+For configuration schema, see [Configuration Reference](../user-guide/configuration.md).
 
-## CLI API
-
-### Command Structure
-
-```bash
-valora <command> [arguments] [flags]
-```
-
-### Global Flags
-
-| Flag                | Description               | Example                                 |
-| ------------------- | ------------------------- | --------------------------------------- |
-| `--help, -h`        | Show help                 | `valora plan --help`                    |
-| `--version, -v`     | Show version              | `valora --version`                      |
-| `--verbose`         | Verbose output            | `valora plan --verbose`                 |
-| `--dry-run`         | Preview without executing | `valora implement --dry-run`            |
-| `--session <id>`    | Use specific session      | `valora --session abc123 plan`          |
-| `--new-session`     | Start new session         | `valora --new-session plan`             |
-| `--resume`          | Resume last session       | `valora --resume implement`             |
-| `--model <name>`    | Override LLM model        | `valora plan --model claude-sonnet-4.6` |
-| `--provider <name>` | Override LLM provider     | `valora plan --provider openai`         |
-| `--mode <mode>`     | Execution mode            | `valora plan --mode api`                |
-
-### Configuration Commands
-
-```bash
-# Setup configuration
-valora config setup
-
-# Validate configuration
-valora config validate
-
-# List available models
-valora config list-models
-
-# Show current config
-valora config show
-
-# Set configuration value
-valora config set <key> <value>
-
-# Get configuration value
-valora config get <key>
-```
-
-### Session Commands
-
-```bash
-# List sessions
-valora session list
-
-# Show session details
-valora session show <session-id>
-
-# Resume session
-valora session resume <session-id>
-
-# Clear session context
-valora session clear-context [session-id]
-
-# Delete session
-valora session delete <session-id>
-
-# Cleanup old sessions
-valora session cleanup --days <number>
-```
-
-### Development Lifecycle Commands
-
-See [Commands Reference](../user-guide/commands.md) for detailed documentation.
+---
 
 ## MCP Server API
 
@@ -90,12 +24,16 @@ See [Commands Reference](../user-guide/commands.md) for detailed documentation.
 pnpm dev:mcp
 
 # Production mode
-ai-mcp start
+valora-mcp start
 ```
 
 ### MCP Tools
 
-The server exposes tools via Model Context Protocol:
+| Tool               | Purpose                             |
+| ------------------ | ----------------------------------- |
+| `execute_workflow` | Execute a named workflow end-to-end |
+| `run_command`      | Run a single VALORA command         |
+| `query_session`    | Query session context by ID         |
 
 #### `execute_workflow`
 
@@ -164,14 +102,16 @@ Query session context.
 }
 ```
 
+---
+
 ## TypeScript API
 
 ### Installation
 
 ```bash
-pnpm add @windagency/valora             # pnpm
-yarn add @windagency/valora             # yarn
-npm install @windagency/valora          # npm
+pnpm add @windagency/valora
+npm install @windagency/valora
+yarn add @windagency/valora
 ```
 
 ### Basic Usage
@@ -186,12 +126,9 @@ const orchestrator = new Orchestrator({
 	}
 });
 
-// Execute command
 const result = await orchestrator.execute('plan', {
 	args: ['Add user authentication'],
-	flags: {
-		pattern: 'rest-api'
-	}
+	flags: { pattern: 'rest-api' }
 });
 
 console.log(result.outputs);
@@ -199,55 +136,35 @@ console.log(result.outputs);
 
 ### Core Classes
 
-#### Orchestrator
-
-Main orchestrator class.
+#### `Orchestrator`
 
 ```typescript
 class Orchestrator {
 	constructor(config?: Partial<OrchestratorConfig>);
 
 	async execute(command: string, options: CommandExecutionOptions): Promise<CommandResult>;
-
 	async executePipeline(pipeline: Pipeline, context: SessionContext): Promise<PipelineResult>;
 
 	getSession(sessionId?: string): Promise<Session>;
-
 	listCommands(): CommandDefinition[];
-
 	listAgents(): AgentDefinition[];
 }
 ```
 
-#### Session Lifecycle
-
-Manage sessions programmatically.
+#### `SessionLifecycle`
 
 ```typescript
 import { SessionLifecycle } from 'valora/session';
 
 const lifecycle = new SessionLifecycle(config);
 
-// Create session
-const session = await lifecycle.create({
-	initialContext: { task: 'Add feature' }
-});
-
-// Resume session
-const resumed = await lifecycle.resume({
-	sessionId: 'abc123'
-});
-
-// Complete session
+const session = await lifecycle.create({ initialContext: { task: 'Add feature' } });
+const resumed = await lifecycle.resume({ sessionId: 'abc123' });
 await lifecycle.complete();
-
-// Fail session
 await lifecycle.fail(error);
 ```
 
-#### Pipeline Executor
-
-Execute pipelines directly.
+#### `PipelineExecutor`
 
 ```typescript
 import { PipelineExecutor } from 'valora/executor';
@@ -256,21 +173,13 @@ const executor = new PipelineExecutor(config);
 
 const result = await executor.execute(
 	{
-		stages: [
-			{
-				name: 'analyze',
-				prompt: 'context.analyze-task-context',
-				required: true
-			}
-		]
+		stages: [{ name: 'analyze', prompt: 'context.analyze-task-context', required: true }]
 	},
 	context
 );
 ```
 
 ### Type Definitions
-
-#### CommandExecutionOptions
 
 ```typescript
 interface CommandExecutionOptions {
@@ -279,11 +188,7 @@ interface CommandExecutionOptions {
 	sessionId?: string;
 	dryRun?: boolean;
 }
-```
 
-#### CommandResult
-
-```typescript
 interface CommandResult {
 	success: boolean;
 	outputs: Record<string, unknown>;
@@ -291,19 +196,11 @@ interface CommandResult {
 	duration_ms: number;
 	tokens_used?: number;
 }
-```
 
-#### SessionContext
-
-```typescript
 interface SessionContext {
 	[key: string]: unknown;
 }
-```
 
-#### OptimizationMetrics
-
-```typescript
 interface OptimizationMetrics {
 	complexity_score?: number;
 	early_exit_triggered?: boolean;
@@ -314,11 +211,7 @@ interface OptimizationMetrics {
 	template_used?: string;
 	time_saved_minutes?: number;
 }
-```
 
-#### QualityMetrics
-
-```typescript
 interface QualityMetrics {
 	auto_fixes_applied?: number;
 	files_generated?: number;
@@ -332,148 +225,7 @@ interface QualityMetrics {
 }
 ```
 
-### Advanced Usage
-
-#### Custom Agents
-
-```typescript
-import { AgentRegistry } from 'valora/agents';
-
-const registry = new AgentRegistry();
-
-// Register custom agent
-registry.register({
-	name: 'custom-agent',
-	role: 'Custom Specialist',
-	expertise: ['Custom domain'],
-	model: 'claude-sonnet-4.6',
-	systemPrompt: 'You are a custom agent...'
-});
-
-// Use custom agent
-const result = await orchestrator.execute('plan', {
-	args: ['Task'],
-	flags: { agent: 'custom-agent' }
-});
-```
-
-#### Custom Commands
-
-```typescript
-import { CommandRegistry } from 'valora/commands';
-
-const registry = new CommandRegistry();
-
-// Register custom command
-registry.register({
-	name: 'custom-command',
-	description: 'Custom workflow',
-	agent: 'lead',
-	pipeline: {
-		stages: [
-			/* ... */
-		]
-	}
-});
-```
-
-#### Event Listeners
-
-```typescript
-import { PipelineEvents } from 'valora/executor';
-
-const events = new PipelineEvents();
-
-events.on('stage:start', (stage) => {
-	console.log(`Starting stage: ${stage.name}`);
-});
-
-events.on('stage:complete', (stage, result) => {
-	console.log(`Completed stage: ${stage.name}`);
-});
-
-events.on('pipeline:error', (error) => {
-	console.error('Pipeline failed:', error);
-});
-```
-
-## Configuration File Reference
-
-### Structure
-
-```typescript
-interface Config {
-	llm: LLMConfig;
-	execution: ExecutionConfig;
-	session: SessionConfig;
-	logging: LoggingConfig;
-	agents?: AgentsConfig;
-	commands?: CommandsConfig;
-	metrics?: MetricsConfig;
-}
-```
-
-### LLM Configuration
-
-```typescript
-interface LLMConfig {
-	default_provider: 'anthropic' | 'openai' | 'google';
-	providers: {
-		[provider: string]: {
-			api_key_env: string;
-			default_model: string;
-			timeout_ms: number;
-			models?: {
-				[model: string]: {
-					max_tokens?: number;
-					temperature?: number;
-					top_p?: number;
-				};
-			};
-		};
-	};
-}
-```
-
-### Execution Configuration
-
-```typescript
-interface ExecutionConfig {
-	default_mode: 'guided' | 'api' | 'mcp';
-	enable_parallel_execution: boolean;
-	max_concurrent_stages: number;
-	timeout_ms?: number;
-}
-```
-
-### Session Configuration
-
-```typescript
-interface SessionConfig {
-	auto_save: boolean;
-	auto_save_interval_ms: number;
-	cleanup_days: number;
-	cleanup_enabled: boolean;
-	encryption: boolean;
-	encryption_key_env?: string;
-}
-```
-
-### Logging Configuration
-
-```typescript
-interface LoggingConfig {
-	level: 'debug' | 'info' | 'warn' | 'error';
-	file_enabled: boolean;
-	console_enabled: boolean;
-	daily_file_max_size_mb: number;
-	log_directory: string;
-}
-```
-
-## Error Handling
-
-### Error Types
+### Error Handling
 
 ```typescript
 class OrchestratorError extends Error {
@@ -487,8 +239,6 @@ class PipelineError extends OrchestratorError {}
 class LLMError extends OrchestratorError {}
 ```
 
-### Error Codes
-
 | Code                | Description                          |
 | ------------------- | ------------------------------------ |
 | `COMMAND_NOT_FOUND` | Command does not exist               |
@@ -499,8 +249,6 @@ class LLMError extends OrchestratorError {}
 | `LLM_RATE_LIMIT`    | Rate limit exceeded                  |
 | `CONFIG_INVALID`    | Configuration is invalid             |
 | `VALIDATION_FAILED` | Validation check failed              |
-
-### Error Handling Example
 
 ```typescript
 try {
@@ -516,7 +264,9 @@ try {
 }
 ```
 
-## Examples
+---
+
+## Programmatic Usage Examples
 
 ### Complete Workflow
 
@@ -548,7 +298,7 @@ if (reviewResult.outputs.go_no_go_decision === 'GO') {
 }
 ```
 
-### Custom Integration
+### Custom Integration with Session Management
 
 ```typescript
 import { Orchestrator, SessionLifecycle } from 'valora';
@@ -563,13 +313,11 @@ class CustomWorkflow {
 	}
 
 	async executeFeatureDevelopment(feature: string) {
-		// Create session
 		const session = await this.lifecycle.create({
 			initialContext: { feature }
 		});
 
 		try {
-			// Execute workflow
 			await this.orchestrator.execute('plan', {
 				args: [feature],
 				flags: {},
@@ -582,9 +330,7 @@ class CustomWorkflow {
 				sessionId: session.session_id
 			});
 
-			// Complete session
 			await this.lifecycle.complete();
-
 			return { success: true };
 		} catch (error) {
 			await this.lifecycle.fail(error);
@@ -594,12 +340,76 @@ class CustomWorkflow {
 }
 ```
 
-## Related Documentation
+<details>
+<summary><strong>Extension Points: Custom Agents and Commands</strong></summary>
 
-- [User Guide](../user-guide/README.md) - Getting started
-- [Developer Guide](../developer-guide/README.md) - Implementation details
-- [Architecture](../architecture/README.md) - System design
+### Custom Agents
+
+```typescript
+import { AgentRegistry } from 'valora/agents';
+
+const registry = new AgentRegistry();
+
+registry.register({
+	name: 'custom-agent',
+	role: 'Custom Specialist',
+	expertise: ['Custom domain'],
+	model: 'claude-sonnet-4.6',
+	systemPrompt: 'You are a custom agent...'
+});
+
+const result = await orchestrator.execute('plan', {
+	args: ['Task'],
+	flags: { agent: 'custom-agent' }
+});
+```
+
+### Custom Commands
+
+```typescript
+import { CommandRegistry } from 'valora/commands';
+
+const registry = new CommandRegistry();
+
+registry.register({
+	name: 'custom-command',
+	description: 'Custom workflow',
+	agent: 'lead',
+	pipeline: {
+		stages: [
+			/* ... */
+		]
+	}
+});
+```
+
+### Event Listeners
+
+```typescript
+import { PipelineEvents } from 'valora/executor';
+
+const events = new PipelineEvents();
+
+events.on('stage:start', (stage) => {
+	console.log(`Starting stage: ${stage.name}`);
+});
+
+events.on('stage:complete', (stage, result) => {
+	console.log(`Completed stage: ${stage.name}`);
+});
+
+events.on('pipeline:error', (error) => {
+	console.error('Pipeline failed:', error);
+});
+```
+
+</details>
 
 ---
 
-_For the latest API updates, see the [TypeScript source code](../../src/)._
+## Related Documentation
+
+- [Commands Reference](../user-guide/commands.md) — CLI flags and all 24 commands
+- [Configuration Reference](../user-guide/configuration.md) — Full configuration schema
+- [Architecture](../architecture/README.md) — System design
+- [TypeScript source](../../src/) — Source code

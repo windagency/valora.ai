@@ -1,5 +1,7 @@
 # ADR-009: Supply Chain Hardening
 
+> **Decision**: Valora hardens its supply chain via four measures: a frozen lockfile, blocking dependency install scripts, patching known transitive vulnerabilities via `pnpm.overrides`, and automated Dependabot updates.
+
 ## Status
 
 Accepted

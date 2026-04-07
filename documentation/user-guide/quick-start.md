@@ -1,94 +1,58 @@
-# Quick Start Guide
+# Quick Start
 
-> Get up and running with VALORA in 5 minutes.
+Get Valora installed and running your first command in 5 minutes.
 
 ## Prerequisites
 
-Ensure you have the following installed:
+- Node.js >=18.0.0
+- Cursor IDE (recommended)
 
-- **Node.js** 18.0.0 or higher
-- **Cursor IDE** (recommended for best experience)
-
-## Installation
-
-### Step 1: Install VALORA
+## Install
 
 ```bash
-pnpm add -g @windagency/valora          # pnpm
-yarn global add @windagency/valora      # yarn
-npm install -g @windagency/valora       # npm
+npm install -g @windagency/valora
+# pnpm add -g @windagency/valora
+# yarn global add @windagency/valora
+valora --version  # 2.3.4
 ```
 
-### Step 2: Verify Installation
-
-```bash
-valora --version
-# Should output: 2.3.4
-```
-
-### Step 3: Initialise Your Project (Optional)
+## Initialise your project
 
 ```bash
 cd your-project
-valora init          # Minimal: creates .valora/config.json
-valora init --full   # Full: creates override directories for agents, commands, prompts, templates
+valora init         # minimal: creates .valora/config.json
+valora init --full  # full: creates override directories
 ```
 
-## First Command
+## Configuration
 
-Try running a simple command to verify everything works:
+### Default (no API key needed)
 
-```bash
-valora help
-```
+Works immediately with **Guided Completion Mode** using your Cursor subscription. No setup required.
 
-This displays all available commands and their descriptions.
-
-## Configuration (Optional)
-
-### Zero-Config Mode (Default)
-
-The engine works immediately without any configuration using **Guided Completion Mode**. This mode:
-
-- Uses your Cursor IDE subscription
-- Generates structured prompts for you to execute
-- Requires no API keys
-
-### API Key Configuration
-
-For autonomous execution with cloud providers, configure API keys:
+### API keys (for autonomous execution)
 
 ```bash
 valora config setup --quick
-```
 
-Or set environment variables:
-
-```bash
+# Or set directly
 export ANTHROPIC_API_KEY=sk-ant-your-key
 export OPENAI_API_KEY=sk-your-key
 export GOOGLE_API_KEY=your-key
 ```
 
-### Local Models (No API Key)
-
-Run fully offline with a local model server. No API key required:
+### Local models (fully offline)
 
 ```bash
-# Ollama (recommended)
 ollama pull llama3.1 && ollama serve
 
-# Configure VALORA to use it
-valora config setup   # select "Local" from the provider list
-# or
 export LOCAL_BASE_URL=http://localhost:11434/v1
 export LOCAL_DEFAULT_MODEL=llama3.1
 
-# Use it
 valora plan "Add feature" --provider local --model llama3.1
 ```
 
-Other compatible servers: LM Studio (`http://localhost:1234/v1`), vLLM, llama.cpp, LocalAI.
+Compatible with LM Studio (`http://localhost:1234/v1`), vLLM, llama.cpp, LocalAI.
 
 Verify your configuration:
 
@@ -96,186 +60,52 @@ Verify your configuration:
 valora config show
 ```
 
-## Your First Workflow
+## First workflow
 
-Let's walk through a simple planning workflow:
-
-### 1. Create an Implementation Plan
+### 1. Create a plan
 
 ```bash
 valora plan "Add a user profile page with avatar upload"
 ```
 
-The engine will:
+Valora selects the `@lead` agent, analyses your request, and generates an implementation plan.
 
-1. Select the `@lead` agent
-2. Analyse your request
-3. Generate a detailed implementation plan
-
-### 2. Review the Plan
+### 2. Review the plan
 
 ```bash
 valora review-plan
 ```
 
-This validates the plan for:
-
-- Completeness
-- Technical feasibility
-- Risk assessment
-
-### 3. Start Implementation
-
-Based on the approved plan, implement the changes:
+### 3. Implement
 
 ```bash
 valora implement
 ```
 
-The engine will:
+Valora selects the appropriate engineer agent and guides the implementation.
 
-1. Dynamically select the appropriate engineer agent
-2. Guide you through the implementation
-3. Provide code suggestions
+## Common commands
 
-## Understanding the Output
-
-When you run a command, you'll see:
-
-```plaintext
-╭──────────────────────────────────────────────────────────────╮
-│  VALORA v2.3.4                      │
-├──────────────────────────────────────────────────────────────┤
-│  Command: plan                                               │
-│  Agent: @lead                                                │
-│  Model: gpt-5-thinking-high                                  │
-╰──────────────────────────────────────────────────────────────╯
-
-[Planning Phase]
-Analysing task requirements...
-```
-
-## Common First Commands
-
-| Goal               | Command                                    |
-| ------------------ | ------------------------------------------ |
-| Get help           | `valora help`                              |
-| View configuration | `valora config show`                       |
-| Plan a feature     | `valora plan "<description>"`              |
-| Plan (complex)     | `valora plan --mode=tiered`                |
-| Plan (API pattern) | `valora plan "Add API" --pattern=rest-api` |
-| Get next task      | `valora fetch-task`                        |
-| Run tests          | `valora test`                              |
-| Review code        | `valora review-code`                       |
-| Quick review       | `valora review-code --checklist`           |
-| Preview changes    | `valora implement -n`                      |
-
-## Pattern Templates
-
-Use pre-built templates for common architectural patterns:
-
-| Pattern        | Command                                | Use When                             |
-| -------------- | -------------------------------------- | ------------------------------------ |
-| REST API       | `valora plan --pattern=rest-api`       | Adding API endpoints, CRUD resources |
-| React Feature  | `valora plan --pattern=react-feature`  | Adding React features, pages         |
-| Database       | `valora plan --pattern=database`       | Adding tables, migrations            |
-| Auth           | `valora plan --pattern=auth`           | Adding login, JWT, OAuth             |
-| Background Job | `valora plan --pattern=background-job` | Adding queues, workers               |
-
-## Quick Validation Modes
-
-For faster feedback during development, use quick validation modes:
-
-| Command             | Quick Mode    | Time Savings                                  |
-| ------------------- | ------------- | --------------------------------------------- |
-| `validate-plan`     | (default)     | Pre-review ~2 min (saves ~9 min in review)    |
-| `validate-coverage` | (default)     | Coverage validation gate with quality scoring |
-| `review-plan`       | `--checklist` | ~14 min → ~3 min                              |
-| `assert`            | `--quick=all` | ~9 min → ~5 min                               |
-| `review-code`       | `--checklist` | ~10 min → ~3 min                              |
-| `review-code`       | `--auto-only` | ~10 min → ~1 min                              |
-| `validate-parallel` | (default)     | ~19 min → ~10 min                             |
-| `validate-parallel` | `--quick`     | ~19 min → ~5 min                              |
-
-## Dry Run Mode
-
-Before running any command that makes changes, you can preview what it would do:
-
-```bash
-# Preview implementation without making changes
-valora implement "Add user authentication" --dry-run
-
-# Short form
-valora implement "Add user authentication" -n
-```
-
-This shows:
-
-- Files that would be created, modified, or deleted
-- Diff previews of all changes
-- Terminal commands that would be executed
-- Estimated token usage and costs
-
-See [Dry Run Mode](./dry-run-mode.md) for full documentation.
-
-## Session Management
-
-The engine maintains session state between commands:
-
-```bash
-# View active sessions
-valora session list
-
-# Resume a session
-valora session resume <session-id>
-
-# Clear session
-valora session clean
-```
+| Goal               | Command                       |
+| ------------------ | ----------------------------- |
+| Get help           | `valora help`                 |
+| View configuration | `valora config show`          |
+| Plan a feature     | `valora plan "<description>"` |
+| Get next task      | `valora fetch-task`           |
+| Run tests          | `valora test`                 |
+| Review code        | `valora review-code`          |
+| Preview changes    | `valora implement --dry-run`  |
 
 ## Troubleshooting
 
-### Command Not Found
+**Command not found**: ensure the global install completed — `npm install -g @windagency/valora`
 
-Ensure VALORA is installed globally:
+**No output**: check logs at `.valora/logs/` or run `valora doctor`
 
-```bash
-pnpm add -g @windagency/valora          # pnpm
-yarn global add @windagency/valora      # yarn
-npm install -g @windagency/valora       # npm
-```
+**API errors**: verify keys with `valora doctor`
 
-### No Output
+## Next steps
 
-Check logs for details:
-
-```bash
-# Logs are stored in .valora/logs/ (project) or ~/.valora/logs/ (global)
-valora doctor
-```
-
-### API Errors
-
-Verify API keys are set:
-
-```bash
-valora doctor
-```
-
-## Next Steps
-
-Now that you're set up:
-
-1. **Learn workflows**: Read [Workflows](./workflows.md) for common patterns
-2. **Explore commands**: See [Commands](./commands.md) for the full reference
-3. **Understand agents**: Review agent capabilities in the [Architecture](../architecture/README.md)
-
-## Summary
-
-| Step | Action                                                                                                                     |
-| ---- | -------------------------------------------------------------------------------------------------------------------------- |
-| 1    | Install with `pnpm add -g @windagency/valora` / `yarn global add @windagency/valora` / `npm install -g @windagency/valora` |
-| 2    | Verify with `valora --version`                                                                                             |
-| 3    | Initialise project with `valora init` (optional)                                                                           |
-| 4    | Configure (optional) with `valora config setup`                                                                            |
-| 5    | Start using with `valora plan "<task>"`                                                                                    |
+- [Workflows](./workflows.md) — common development patterns
+- [Commands](./commands.md) — full command reference
+- [Configuration](./configuration.md) — providers, agents, external MCP

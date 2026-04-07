@@ -1,5 +1,9 @@
 # Claude CLI–Inspired UI/UX Design Specification
 
+> **Summary**: Valora's UI/UX is inspired by the Claude CLI — calm, minimal, text-first, and cognitively efficient. The design prioritises readability and conversational flow over decoration.
+
+---
+
 ## Overview
 
 This design is inspired by the **Claude CLI** experience: calm, minimal, text-first, and cognitively efficient. The interface emphasizes clarity, low visual noise, and a sense of conversational flow, prioritizing productivity and trust over decoration.
@@ -25,8 +29,8 @@ This design favours _quiet confidence_ over visual flair.
 ### 1. Overall Canvas
 
 - Single-column layout
-- Max width: ~720–800px
-- Centered horizontally
+- Max width: ~720–800 px
+- Centred horizontally
 - Full-height viewport
 - Generous vertical spacing between elements
 
@@ -38,7 +42,7 @@ No sidebars by default. Secondary controls are hidden or context-driven.
 
 - Very minimal
 - Left-aligned product name or logo (monochrome)
-- Optional subtle status indicator (e.g., “Connected”, “Ready”)
+- Optional subtle status indicator (e.g., "Connected", "Ready")
 - No heavy navigation bars
 
 Typography-only header, no background colour block.
@@ -50,7 +54,7 @@ Typography-only header, no background colour block.
 - Appears like a **structured transcript**, not chat bubbles
 - Messages are stacked vertically
 - Each message block has:
-  - Role label (e.g., “You”, “Assistant”) in small, muted text
+  - Role label (e.g., "You", "Assistant") in small, muted text
   - Message content below, full-width
 - No avatars or speech bubbles
 
@@ -67,7 +71,7 @@ The conversation should feel like reading a clean document.
 
 Example:
 
-> “Type your prompt and press Enter…”
+> "Type your prompt and press Enter…"
 
 Primary action is **Enter**. Secondary actions are hidden behind keyboard shortcuts.
 
@@ -101,4 +105,40 @@ Primary action is **Enter**. Secondary actions are hidden behind keyboard shortc
   - Charcoal background
   - Soft off-white text
 
-Accent colors are
+Accent colours are used sparingly — only to draw attention to interactive elements or state changes. They never compete with content.
+
+---
+
+## Interaction Principles
+
+- **Keyboard-first**: all primary actions accessible without a mouse
+- **Progressive disclosure**: complexity is hidden until needed
+- **Immediate feedback**: every action has a visible response within 100 ms
+- **Graceful loading**: streaming responses render incrementally, never block
+
+---
+
+## Component Notes
+
+### Code Blocks
+
+- Monospace font at slightly reduced size
+- Subtle background tint to distinguish from prose
+- Syntax highlighting optional — readability over colour
+- Copy button appears on hover only
+
+### System Messages
+
+- Italicised, muted colour
+- Used for status updates, errors, and confirmations
+- Never compete visually with user or assistant messages
+
+### Tool Call Display
+
+- Collapsible by default
+- Shows tool name and summary when collapsed
+- Expands to show full input/output on demand
+
+---
+
+_This specification applies to both the terminal dashboard and any future web interface extensions._

@@ -1,25 +1,103 @@
 # Automated Metrics Reporting
 
-This document describes the automated weekly metrics reporting system for tracking workflow optimisation effectiveness.
+Weekly workflow metrics are collected automatically and compiled into a dashboard report. This document explains how to run reports, what they contain, and how they are scheduled.
 
-## Overview
+## How to Run Reports
 
-The system automatically collects, analyses, and reports on workflow optimisation metrics every week, providing insights into:
+### Automated (recommended)
 
-- Template usage and time savings
-- Early exit review effectiveness
-- Express planning adoption
-- Real-time linting impact
-- Overall workflow efficiency
+The GitHub Actions workflow runs every Monday at 09:00 UTC with no manual intervention required.
 
-## Architecture
+```bash
+# Check the latest automated run
+gh run view --workflow="Weekly Metrics Dashboard"
+
+# View generated issues
+gh issue list --label metrics,weekly-report
+
+# Download artifacts
+gh run download --name metrics-report-30d
+```
+
+### Manual (on demand)
+
+```bash
+# Generate a report for the last 30 days
+./scripts/generate-weekly-report.sh 30d
+
+# Generate a report for the last 7 days
+./scripts/generate-weekly-report.sh 7d
+
+# Generate and create a GitHub issue
+./scripts/generate-weekly-report.sh 30d --issue
+
+# View the generated report
+cat .valora/METRICS_REPORT.md
+```
+
+### Custom Analysis
+
+```bash
+# Extract raw metrics JSON
+./scripts/metrics 30d > metrics.json
+
+# Query specific data
+jq '.templateUsage.byPattern' metrics.json
+jq '.earlyExit.confidenceDistribution' metrics.json
+jq '.qualityScores' metrics.json
+```
+
+## What Reports Are Generated
+
+The report file is written to `.valora/METRICS_REPORT.md` and contains:
+
+1. **Executive Summary** — key metrics at a glance
+2. **Optimisation Performance** — detailed breakdown by optimisation type
+3. **Phase Breakdown** — time spent per workflow phase
+4. **Quality Metrics** — code, test, and review quality scores
+5. **Time Savings Distribution** — where time is being saved
+6. **Recommendations** — actionable improvement suggestions
+
+### Example Terminal Summary
+
+```plaintext
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+METRICS SUMMARY (30d)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Workflows:        12
+  Time Saved:       8h
+
+  OPTIMIZATION ADOPTION
+  ├─ Templates:     42% (target: 40%)
+  ├─ Early Exit:    33% (target: 30%)
+  └─ Express:       17% (target: 15%)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+## Commands That Emit Metrics
+
+| Command       | Metrics Type                               | Key Fields                                                                 |
+| ------------- | ------------------------------------------ | -------------------------------------------------------------------------- |
+| `plan`        | `optimization_metrics`                     | `template_used`, `planning_mode`, `time_saved_minutes`, `complexity_score` |
+| `review-plan` | `optimization_metrics` + `quality_metrics` | `early_exit_triggered`, `plan_approved`, `review_score`, `iterations`      |
+| `implement`   | `quality_metrics`                          | `lint_errors_realtime`, `auto_fixes_applied`, `files_generated`            |
+| `assert`      | `quality_metrics`                          | `lint_errors_assert`, `test_failures`, `test_passes`                       |
+
+---
+
+<details>
+<summary><strong>Architecture and Implementation</strong></summary>
+
+## System Architecture
 
 ```plaintext
 ┌─────────────────────────────────────────────────────────────┐
 │                    METRICS COLLECTION                        │
 ├─────────────────────────────────────────────────────────────┤
 │                                                              │
-│  Workflow Commands (/plan, /review-plan, /implement, etc.)  │
+│  Workflow Commands (plan, review-plan, implement, etc.)      │
 │         │                                                    │
 │         ├─> optimization_metrics                            │
 │         │   ├─ template_used                                │
@@ -35,7 +113,7 @@ The system automatically collects, analyses, and reports on workflow optimisatio
 │                                                              │
 │                         ↓                                    │
 │                                                              │
-│  Session Logs (.valora/sessions/<workflow-id>/session.json)     │
+│  Session Logs (.valora/sessions/<workflow-id>/session.json)  │
 │                                                              │
 └─────────────────────────────────────────────────────────────┘
 
@@ -45,9 +123,9 @@ The system automatically collects, analyses, and reports on workflow optimisatio
 │                                                              │
 │  extract-metrics.ts                                          │
 │         │                                                    │
-│         ├─> Scans .valora/sessions/*/*.json                     │
+│         ├─> Scans .valora/sessions/*/*.json                 │
 │         ├─> Filters by date range (7d or 30d)               │
-│         ├─> Aggregates metrics by optimization type         │
+│         ├─> Aggregates metrics by optimisation type         │
 │         ├─> Calculates averages and percentages             │
 │         └─> Outputs JSON metrics summary                    │
 │                                                              │
@@ -60,53 +138,69 @@ The system automatically collects, analyses, and reports on workflow optimisatio
 │  generate-dashboard.ts                                       │
 │         │                                                    │
 │         ├─> Reads metrics JSON                              │
-│         ├─> Generates ASCII visualizations                  │
+│         ├─> Generates ASCII visualisations                  │
 │         ├─> Creates markdown report                         │
-│         └─> Writes .valora/METRICS_REPORT.md                    │
-│                                                              │
-└─────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────┐
-│                  AUTOMATED REPORTING                         │
-├─────────────────────────────────────────────────────────────┤
-│                                                              │
-│  GitHub Actions (Weekly - Every Monday 9am UTC)              │
-│         │                                                    │
-│         ├─> Runs extract-metrics.ts                         │
-│         ├─> Runs generate-dashboard.ts                      │
-│         ├─> Commits .valora/METRICS_REPORT.md                   │
-│         ├─> Creates GitHub Issue with summary               │
-│         └─> Uploads artifacts (90-day retention)            │
-│                                                              │
-│  Local Script (Manual)                                       │
-│         │                                                    │
-│         └─> generate-weekly-report.sh                       │
-│             ├─> Runs metrics extraction                     │
-│             ├─> Generates dashboard                         │
-│             ├─> Displays terminal summary                   │
-│             └─> Optionally creates GitHub issue             │
+│         └─> Writes .valora/METRICS_REPORT.md                │
 │                                                              │
 └─────────────────────────────────────────────────────────────┘
 ```
 
 ## Components
 
-### 1. Metrics Collection (Automatic)
+### Metrics Extraction Script
 
-**Location**: Session command outputs
+**Script**: `scripts/extract-metrics.ts`
+**Wrapper**: `scripts/metrics`
+**Input**: Session logs from `.valora/sessions/*/*.json`
 
-**Triggers**: When workflow commands execute
+```bash
+./scripts/metrics 30d          # Extract last 30 days
+./scripts/metrics 7d           # Extract last 7 days
+./scripts/metrics 30d > metrics.json   # Save to file
+```
 
-**Commands that emit metrics**:
+### Dashboard Generation Script
 
-| Command        | Metrics Type                           | Fields                                                             |
-| -------------- | -------------------------------------- | ------------------------------------------------------------------ |
-| `/plan`        | optimization_metrics                   | template_used, planning_mode, time_saved_minutes, complexity_score |
-| `/review-plan` | optimization_metrics + quality_metrics | early_exit_triggered, plan_approved, review_score, iterations      |
-| `/implement`   | quality_metrics                        | lint_errors_realtime, auto_fixes_applied, files_generated          |
-| `/assert`      | quality_metrics                        | lint_errors_assert, test_failures, test_passes                     |
+**Script**: `scripts/generate-dashboard.ts`
+**Wrapper**: `scripts/dashboard`
+**Output**: `.valora/METRICS_REPORT.md`
 
-**Session Log Format**:
+```bash
+./scripts/metrics 30d | ./scripts/dashboard   # From pipe
+./scripts/dashboard < metrics.json             # From file
+```
+
+### GitHub Actions Workflow
+
+**File**: `.github/workflows/metrics-dashboard.yml`
+**Schedule**: Every Monday at 09:00 UTC (`cron: '0 9 * * 1'`)
+
+**Workflow steps:**
+
+1. Checkout repository
+2. Install Node.js and pnpm
+3. Install dependencies
+4. Extract metrics (30-day period)
+5. Generate dashboard report
+6. Commit `.valora/METRICS_REPORT.md`
+7. Create GitHub issue with summary
+8. Upload artifacts (90-day retention)
+
+**Required permissions:**
+
+```yaml
+permissions:
+  contents: write # for committing the report
+  issues: write # for creating issues
+  pull-requests: read # for PR context
+```
+
+**Manual trigger inputs:**
+
+- `period`: `7d` or `30d` (default: `30d`)
+- `create_issue`: `true` or `false` (default: `true`)
+
+### Session Log Format
 
 ```json
 {
@@ -126,235 +220,9 @@ The system automatically collects, analyses, and reports on workflow optimisatio
 }
 ```
 
-### 2. Metrics Extraction (Manual/Automated)
+## Adding New Metrics
 
-**Script**: `scripts/extract-metrics.ts`
-
-**Wrapper**: `scripts/metrics`
-
-**Input**: Session logs from `.valora/sessions/*/*.json`
-
-**Output**: JSON metrics summary
-
-**Usage**:
-
-```bash
-# Extract last 30 days
-./scripts/metrics 30d
-
-# Extract last 7 days
-./scripts/metrics 7d
-
-# Save to file
-./scripts/metrics 30d > metrics.json
-```
-
-**Metrics Calculated**:
-
-- Template usage rate and time savings
-- Early exit trigger rate and average confidence
-- Express planning adoption
-- Real-time linting effectiveness
-- Decision criteria iteration reduction
-- Overall workflow time savings
-
-### 3. Dashboard Generation (Manual/Automated)
-
-**Script**: `scripts/generate-dashboard.ts`
-
-**Wrapper**: `scripts/dashboard`
-
-**Input**: Metrics JSON (from extract-metrics or piped)
-
-**Output**: `.valora/METRICS_REPORT.md`
-
-**Usage**:
-
-```bash
-# From pipe
-./scripts/metrics 30d | ./scripts/dashboard
-
-# From file
-./scripts/dashboard < metrics.json
-```
-
-**Report Sections**:
-
-1. Executive Summary - Key metrics at a glance
-2. Optimisation Performance - Detailed breakdown by optimisation
-3. Phase Breakdown - Time spent per workflow phase
-4. Quality Metrics - Code/test/review quality scores
-5. Time Savings Distribution - Where time is being saved
-6. Recommendations - Actionable improvement suggestions
-
-### 4. GitHub Actions Workflow (Automated)
-
-**File**: `.github/workflows/metrics-dashboard.yml`
-
-**Schedule**: Every Monday at 9:00 AM UTC (cron: `0 9 * * 1`)
-
-**Manual Trigger**: Via GitHub UI or `gh workflow run`
-
-**Workflow Steps**:
-
-1. **Checkout** - Get repository code
-2. **Setup** - Install Node.js and pnpm
-3. **Install** - Install dependencies
-4. **Extract** - Run metrics extraction (30d period)
-5. **Generate** - Create dashboard report
-6. **Commit** - Push `.valora/METRICS_REPORT.md` to repository
-7. **Issue** - Create GitHub issue with summary
-8. **Artifact** - Upload metrics for 90 days
-
-**Permissions Required**:
-
-```yaml
-permissions:
-  contents: write # For committing report
-  issues: write # For creating issues
-  pull-requests: read # For PR context
-```
-
-**Workflow Inputs** (manual trigger):
-
-- `period`: Metrics period (`7d` or `30d`, default: `30d`)
-- `create_issue`: Create GitHub issue (`true` or `false`, default: `true`)
-
-### 5. Local Report Script (Manual)
-
-**Script**: `scripts/generate-weekly-report.sh`
-
-**Usage**:
-
-```bash
-# Generate report for last 30 days
-./scripts/generate-weekly-report.sh 30d
-
-# Generate report for last 7 days
-./scripts/generate-weekly-report.sh 7d
-
-# Generate report and create GitHub issue
-./scripts/generate-weekly-report.sh 30d --issue
-```
-
-**Features**:
-
-- Extracts metrics for specified period
-- Generates dashboard report
-- Displays colourful terminal summary
-- Optionally creates GitHub issue (requires `gh` CLI)
-- Provides next steps for committing
-
-**Output Example**:
-
-```plaintext
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📊 METRICS SUMMARY (30d)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-  Workflows:        12
-  Time Saved:       8h
-
-  OPTIMIZATION ADOPTION
-  ├─ Templates:     42% (target: 40%)
-  ├─ Early Exit:    33% (target: 30%)
-  └─ Express:       17% (target: 15%)
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-```
-
-## Usage Scenarios
-
-### Scenario 1: Weekly Automated Reports (Recommended)
-
-**Goal**: Automatic weekly metrics without manual intervention
-
-**Setup**:
-
-1. Workflow is already configured (`.github/workflows/metrics-dashboard.yml`)
-2. Runs every Monday at 9am UTC
-3. Commits report and creates issue automatically
-
-**View Results**:
-
-```bash
-# View latest workflow run
-gh run view --workflow="Weekly Metrics Dashboard"
-
-# View metrics issues
-gh issue list --label metrics,weekly-report
-
-# Download artifacts
-gh run download --name metrics-report-30d
-```
-
-**No action required** - Just review the weekly issue when created.
-
-### Scenario 2: Manual Local Reports
-
-**Goal**: Generate metrics on-demand for analysis
-
-**Steps**:
-
-```bash
-# 1. Generate report
-./scripts/generate-weekly-report.sh 30d
-
-# 2. Review report
-cat .valora/METRICS_REPORT.md
-
-# 3. Optional: Create issue
-./scripts/generate-weekly-report.sh 30d --issue
-
-# 4. Commit if satisfied
-git add .valora/METRICS_REPORT.md
-git commit -m "chore: update metrics report"
-git push
-```
-
-### Scenario 3: Custom Analysis
-
-**Goal**: Extract specific metrics for custom analysis
-
-**Steps**:
-
-```bash
-# Extract raw metrics
-./scripts/metrics 30d > metrics.json
-
-# Query specific data
-jq '.templateUsage.byPattern' metrics.json
-jq '.earlyExit.confidenceDistribution' metrics.json
-jq '.qualityScores' metrics.json
-
-# Custom visualization
-cat metrics.json | python custom_analysis.py
-```
-
-### Scenario 4: CI/CD Integration
-
-**Goal**: Include metrics in deployment pipeline
-
-**Steps**:
-
-```yaml
-# .github/workflows/deploy.yml
-- name: Generate metrics
-  run: ./scripts/metrics 7d > metrics.json
-
-- name: Check optimization targets
-  run: |
-    TEMPLATE_RATE=$(jq -r '.templateUsage.rate' metrics.json)
-    if (( $(echo "$TEMPLATE_RATE < 40" | bc -l) )); then
-      echo "⚠️ Template usage below target: ${TEMPLATE_RATE}%"
-    fi
-```
-
-## Maintenance
-
-### Adding New Metrics
-
-1. **Update Session Types** (`src/types/session.types.ts`):
+1. **Update session types** (`src/types/session.types.ts`):
 
 ```typescript
 export interface OptimizationMetrics {
@@ -363,7 +231,7 @@ export interface OptimizationMetrics {
 }
 ```
 
-1. **Update Command** (`data/commands/<command>.md`):
+2. **Update command** (`data/commands/<command>.md`):
 
 ```typescript
 optimization_metrics: {
@@ -371,7 +239,7 @@ optimization_metrics: {
 }
 ```
 
-1. **Update Extraction** (`scripts/extract-metrics.ts`):
+3. **Update extraction** (`scripts/extract-metrics.ts`):
 
 ```typescript
 if (opt.new_metric !== undefined) {
@@ -379,7 +247,7 @@ if (opt.new_metric !== undefined) {
 }
 ```
 
-1. **Update Dashboard** (`scripts/generate-dashboard.ts`):
+4. **Update dashboard** (`scripts/generate-dashboard.ts`):
 
 ```typescript
 ### New Metric
@@ -387,18 +255,14 @@ if (opt.new_metric !== undefined) {
 - **Value**: ${metrics.newMetric.total}
 ```
 
-### Troubleshooting
-
-See `scripts/README.md` for comprehensive troubleshooting guide.
-
-**Quick Checks**:
+## Troubleshooting
 
 ```bash
 # Verify wrapper scripts exist
 ls -la scripts/metrics scripts/dashboard
 
 # Check session logs
-find .valora/sessions -name "*.json" -type f
+fd -t f -e json .valora/sessions/
 
 # Test extraction
 ./scripts/metrics 30d | jq '.'
@@ -410,27 +274,33 @@ find .valora/sessions -name "*.json" -type f
 gh workflow view "Weekly Metrics Dashboard"
 ```
 
-## Security
+See `scripts/README.md` for a comprehensive troubleshooting guide.
 
-- Session logs may contain sensitive data - **encrypted at rest**
-- Metrics extraction **sanitizes** sensitive information
-- GitHub issues contain only **aggregated metrics** (no sensitive data)
-- Workflow runs with **least privilege** permissions
+## Security and Performance
 
-## Performance
+- Session logs may contain sensitive data — **encrypted at rest**
+- Metrics extraction **sanitises** sensitive information before outputting
+- GitHub issues contain only **aggregated metrics** (no raw session data)
+- Workflow runs with **least-privilege** permissions
 
-- **Metrics extraction**: ~2-5 seconds for 100 workflows
-- **Dashboard generation**: ~1 second
-- **Total workflow time**: ~2 minutes (including setup)
-- **Artifact storage**: ~100KB per report
+**Performance benchmarks:**
+
+| Operation                          | Duration     |
+| ---------------------------------- | ------------ |
+| Metrics extraction (100 workflows) | ~2–5 seconds |
+| Dashboard generation               | ~1 second    |
+| Total GitHub Actions workflow      | ~2 minutes   |
+| Artifact storage per report        | ~100 KB      |
+
+</details>
 
 ## References
 
-- Full Documentation: `documentation/architecture/metrics-dashboard.md`
-- Scripts Documentation: `scripts/README.md`
-- Optimisation Details: `documentation/user-guide/workflow-optimisations.md`
-- Workflow Configuration: `.github/workflows/metrics-dashboard.yml`
+- Full documentation: `documentation/architecture/metrics-dashboard.md`
+- Scripts documentation: `scripts/README.md`
+- Optimisation details: `documentation/user-guide/workflow-optimisations.md`
+- Workflow configuration: `.github/workflows/metrics-dashboard.yml`
 
 ---
 
-**Last Updated**: 2026-02-02
+_Last updated: 2026-02-02_

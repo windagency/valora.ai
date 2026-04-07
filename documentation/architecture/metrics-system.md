@@ -1,117 +1,138 @@
 # Metrics System Architecture
 
-This document describes the architecture of the workflow metrics collection, extraction, and reporting system.
+> Architecture of the workflow metrics collection, extraction, and reporting system in VALORA.
 
-## Overview
+## What Metrics Are Collected
 
-The metrics system provides data-driven insights into workflow optimization effectiveness through automated collection, aggregation, and visualization of optimization and quality metrics.
+### Optimisation Metrics (per command)
 
-## Architecture Diagram
+| Field                  | Type                                    | Description                                |
+| ---------------------- | --------------------------------------- | ------------------------------------------ |
+| `complexity_score`     | `number`                                | Task complexity (0–10 scale)               |
+| `early_exit_triggered` | `boolean`                               | Whether review confidence skipped stages   |
+| `initial_confidence`   | `number`                                | Confidence score that triggered early exit |
+| `pattern_detected`     | `string`                                | Detected planning pattern (e.g. REST_API)  |
+| `pattern_confidence`   | `number`                                | Confidence in pattern detection            |
+| `planning_mode`        | `'express' \| 'template' \| 'standard'` | Which planning path was taken              |
+| `template_used`        | `string`                                | Template identifier if mode is `template`  |
+| `time_saved_minutes`   | `number`                                | Estimated minutes saved vs baseline        |
+
+### Quality Metrics (per command)
+
+| Field                   | Type      | Description                                        |
+| ----------------------- | --------- | -------------------------------------------------- |
+| `auto_fixes_applied`    | `number`  | Linter errors fixed automatically                  |
+| `files_generated`       | `number`  | Files created or modified                          |
+| `iterations`            | `number`  | Review/implementation iteration count              |
+| `lint_errors_assert`    | `number`  | Linter errors found at assert phase                |
+| `lint_errors_realtime`  | `number`  | Linter errors caught in real-time during implement |
+| `plan_approved`         | `boolean` | Whether the plan passed review                     |
+| `review_score`          | `number`  | Numeric review quality score                       |
+| `test_failures`         | `number`  | Test failures in assert phase                      |
+| `test_passes`           | `number`  | Tests passing in assert phase                      |
+| `tool_failures`         | `number`  | Total tool call failures across all stages         |
+| `tool_loop_exhaustions` | `number`  | Stages that hit the 20-iteration tool loop ceiling |
+
+### Pipeline Resilience Metrics (per stage)
+
+| Counter/Event           | Labels      | Emitted When                                                 |
+| ----------------------- | ----------- | ------------------------------------------------------------ |
+| `tool_execution_failed` | `{ tool }`  | A tool call exception is caught in `executeToolWithSpan`     |
+| `tool_loop_exhausted`   | `{ stage }` | The 20-iteration ceiling is reached in `callLLMWithToolLoop` |
+
+The dashboard **Metrics Summary** panel shows:
+
+```plaintext
+Loop Exhausted: N   ← yellow if > 0, green if 0
+Tool Failures:  N   ← red if > 0, green if 0
+```
+
+For detailed per-stage and per-tool breakdown, switch to the **Performance** tab.
+
+---
+
+## How to Access Metrics
+
+```bash
+# View spending summary
+valora monitoring spending
+
+# Extract metrics JSON (last 30 days)
+pnpm tsx scripts/extract-metrics.ts 30d
+
+# Extract metrics JSON (last 7 days)
+pnpm tsx scripts/extract-metrics.ts 7d
+
+# Generate markdown dashboard report
+pnpm tsx scripts/extract-metrics.ts 30d | pnpm tsx scripts/generate-dashboard.ts
+```
+
+The `SpendingTracker` (`src/utils/spending-tracker.ts`) provides four query methods:
+
+| Method              | Returns                                                                    |
+| ------------------- | -------------------------------------------------------------------------- |
+| `getRecords(opts?)` | Raw records, optionally filtered by command or date                        |
+| `getByEndpoint()`   | Per-command summaries, sorted by total cost descending                     |
+| `getExpensive(n)`   | Top N records sorted by `costUsd` descending                               |
+| `getTotals()`       | Aggregate `totalCostUsd`, `cacheSavingsUsd`, `requestCount`, `totalTokens` |
+
+These methods back both `valora monitoring spending` and the dashboard **Spending** sub-tab.
+
+---
+
+## System Architecture
 
 ```plaintext
 ┌─────────────────────────────────────────────────────────────┐
 │                    COLLECTION LAYER                          │
 ├─────────────────────────────────────────────────────────────┤
-│                                                              │
-│  Workflow Commands                                           │
-│  (/plan, /review-plan, /implement, /assert)                 │
-│                    │                                         │
-│                    ↓                                         │
+│  Workflow Commands (/plan, /review-plan, /implement, /assert)│
+│          │                                                   │
+│          ↓                                                   │
 │  Command Executor (command-executor.ts)                      │
-│         ├─ Extract optimization_metrics from outputs         │
-│         ├─ Extract quality_metrics from outputs              │
-│         └─ Pass to Session Context Manager                   │
-│                    │                                         │
-│                    ↓                                         │
+│     ├─ Extract optimization_metrics from outputs             │
+│     ├─ Extract quality_metrics from outputs                  │
+│     └─ Pass to Session Context Manager                       │
+│          │                                                   │
+│          ↓                                                   │
 │  Session Context Manager (context.ts)                        │
-│         └─ addCommand(..., optimization_metrics,             │
-│                          quality_metrics)                    │
-│                    │                                         │
-│                    ↓                                         │
-│  Session Lifecycle (lifecycle.ts)                            │
-│         └─ persist() → Debounced write to disk               │
-│                    │                                         │
-│                    ↓                                         │
-│  Session Store (store.ts)                                    │
-│         ├─ Encrypt session data                              │
-│         ├─ Write .valora/sessions/<id>/session.json              │
-│         └─ Create snapshot for fast resume                   │
-│                                                              │
+│     └─ addCommand(..., optimization_metrics, quality_metrics)│
+│          │                                                   │
+│          ↓                                                   │
+│  Session Lifecycle (lifecycle.ts) → debounced disk write     │
+│          │                                                   │
+│          ↓                                                   │
+│  Session Store → .valora/sessions/<id>/session.json          │
 └─────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────┐
 │                   EXTRACTION LAYER                           │
 ├─────────────────────────────────────────────────────────────┤
-│                                                              │
 │  extract-metrics.ts                                          │
-│         ├─ Scan .valora/sessions/*/*.json                        │
-│         ├─ Filter by date range (7d/30d)                     │
-│         ├─ Parse Session or SessionLog format                │
-│         ├─ Aggregate metrics by type                         │
-│         ├─ Calculate averages and percentages                │
-│         └─ Output JSON summary                               │
-│                    │                                         │
-│                    ↓                                         │
-│  Metrics JSON                                                │
-│  {                                                           │
-│    totalWorkflows: number,                                   │
-│    templateUsage: {...},                                     │
-│    earlyExit: {...},                                         │
-│    expressPlanning: {...},                                   │
-│    realTimeLinting: {...},                                   │
-│    ...                                                       │
-│  }                                                           │
-│                                                              │
+│     ├─ Scan .valora/sessions/*/*.json                        │
+│     ├─ Filter by date range (7d/30d)                         │
+│     ├─ Parse Session or SessionLog format                    │
+│     ├─ Aggregate metrics by type                             │
+│     ├─ Calculate averages and percentages                    │
+│     └─ Output JSON summary                                   │
 └─────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────┐
 │                  PRESENTATION LAYER                          │
 ├─────────────────────────────────────────────────────────────┤
-│                                                              │
 │  generate-dashboard.ts                                       │
-│         ├─ Read metrics JSON                                 │
-│         ├─ Generate ASCII visualizations                     │
-│         ├─ Create markdown report                            │
-│         ├─ Add recommendations based on targets              │
-│         └─ Write .valora/METRICS_REPORT.md                       │
-│                    │                                         │
-│                    ↓                                         │
-│  Dashboard Report                                            │
-│  - Executive Summary                                         │
-│  - Optimization Performance                                  │
-│  - Phase Breakdown                                           │
-│  - Quality Metrics                                           │
-│  - Recommendations                                           │
-│                                                              │
-└─────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────┐
-│                  AUTOMATION LAYER                            │
-├─────────────────────────────────────────────────────────────┤
-│                                                              │
-│  GitHub Actions Workflow                                     │
-│  (metrics-dashboard.yml)                                     │
-│         ├─ Scheduled: Every Monday 9am UTC                   │
-│         ├─ Manual: workflow_dispatch                         │
-│         ├─ Extract metrics (30d)                             │
-│         ├─ Generate dashboard                                │
-│         ├─ Commit report                                     │
-│         ├─ Create GitHub issue                               │
-│         └─ Upload artifacts (90-day retention)               │
-│                    │                                         │
-│                    ↓                                         │
-│  Local Script (generate-weekly-report.sh)                    │
-│         ├─ Extract metrics                                   │
-│         ├─ Generate dashboard                                │
-│         ├─ Display terminal summary                          │
-│         └─ Optional: Create GitHub issue (gh CLI)            │
-│                                                              │
+│     ├─ Read metrics JSON                                     │
+│     ├─ Generate ASCII visualisations                         │
+│     ├─ Create markdown report                                │
+│     ├─ Add recommendations based on targets                  │
+│     └─ Write .valora/METRICS_REPORT.md                       │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-## Data Model
+---
 
-### Session Types
+<details>
+<summary><strong>Data Model: TypeScript Type Definitions</strong></summary>
 
 Defined in `src/types/session.types.ts`:
 
@@ -169,87 +190,21 @@ export interface Session {
 }
 ```
 
-### Metrics Summary
+</details>
 
-Output format from `extract-metrics.ts`:
+<details>
+<summary><strong>Collection Flow: How Metrics Are Emitted</strong></summary>
 
-```typescript
-interface WorkflowMetrics {
-	period: '7d' | '30d';
-	startDate: string;
-	endDate: string;
-	totalWorkflows: number;
+### Command Execution
 
-	templateUsage: {
-		total: number;
-		rate: number;
-		byPattern: Record<
-			string,
-			{
-				count: number;
-				avgTime: number;
-				timeSaved: number;
-			}
-		>;
-		avgTimeSaved: number;
-		totalTimeSaved: number;
-	};
-
-	earlyExit: {
-		triggered: number;
-		rate: number;
-		avgTimeSaved: number;
-		totalTimeSaved: number;
-		confidenceDistribution: Record<string, number>;
-	};
-
-	expressPlanning: {
-		used: number;
-		rate: number;
-		avgComplexity: number;
-		avgTime: number;
-		avgTimeSaved: number;
-		totalTimeSaved: number;
-	};
-
-	// ... other optimization metrics
-
-	avgWorkflowTime: number;
-	baselineTime: number;
-	totalTimeSaved: number;
-	timeEfficiency: number;
-
-	phaseBreakdown: Record<
-		string,
-		{
-			avg: number;
-			count: number;
-			baseline: number;
-			savings: number;
-		}
-	>;
-
-	qualityScores: {
-		codeQuality: number;
-		testQuality: number;
-		reviewQuality: number;
-	};
-}
-```
-
-## Collection Flow
-
-### 1. Command Execution
-
-When a workflow command executes:
+After each command, `command-executor.ts` aggregates metrics and records them:
 
 ```typescript
 private updateSessionState(...): void {
   const optimizationMetrics = result.outputs['optimization_metrics'] as OptimizationMetrics | undefined;
   const baseQualityMetrics  = result.outputs['quality_metrics']      as QualityMetrics      | undefined;
 
-  // Aggregate tool failure and loop exhaustion counts from per-stage execution quality
-  // metadata and merge them into quality_metrics for persistent cross-session tracking.
+  // Aggregate tool failure and loop exhaustion counts from per-stage metadata
   const toolFailures = result.stages.reduce((sum, s) => {
     const eq = s.metadata?.['executionQuality'] as Record<string, unknown> | undefined;
     return sum + (typeof eq?.['toolFailureCount'] === 'number' ? eq['toolFailureCount'] : 0);
@@ -258,6 +213,7 @@ private updateSessionState(...): void {
     const eq = s.metadata?.['executionQuality'] as Record<string, unknown> | undefined;
     return sum + (eq?.['wasLoopExhausted'] === true ? 1 : 0);
   }, 0);
+
   const qualityMetrics = toolFailures > 0 || toolLoopExhaustions > 0
     ? { ...baseQualityMetrics, tool_failures: toolFailures || undefined, tool_loop_exhaustions: toolLoopExhaustions || undefined }
     : baseQualityMetrics;
@@ -272,14 +228,12 @@ private updateSessionState(...): void {
 }
 ```
 
-### 2. Metrics Emission
+### Metrics Emitted by Each Command
 
-Commands emit metrics in their outputs:
-
-**Plan command** (`data/commands/plan.md`):
+**Plan command** — emits in `optimization_metrics`:
 
 ```typescript
-optimization_metrics: {
+{
   complexity_score: 4.2,
   pattern_detected: "REST_API",
   pattern_confidence: 0.85,
@@ -289,51 +243,31 @@ optimization_metrics: {
 }
 ```
 
-**Review-plan command** (`data/commands/review-plan.md`):
+**Review-plan command** — emits in both:
 
 ```typescript
-optimization_metrics: {
-  early_exit_triggered: true,
-  initial_confidence: 9.2,
-  time_saved_minutes: 12.0
-}
-
-quality_metrics: {
-  plan_approved: true,
-  review_score: 92,
-  iterations: 1
-}
+optimization_metrics: { early_exit_triggered: true, initial_confidence: 9.2, time_saved_minutes: 12.0 }
+quality_metrics: { plan_approved: true, review_score: 92, iterations: 1 }
 ```
 
-**Implement command** (`data/commands/implement.md`):
+**Implement command** — emits in `quality_metrics`:
 
 ```typescript
-quality_metrics: {
-  lint_errors_realtime: 5,
-  auto_fixes_applied: 4,
-  files_generated: 2
-}
+{ lint_errors_realtime: 5, auto_fixes_applied: 4, files_generated: 2 }
 ```
 
-**Assert command** (`data/commands/assert.md`):
+**Assert command** — emits in `quality_metrics`:
 
 ```typescript
-quality_metrics: {
-  lint_errors_assert: 1,
-  test_failures: 0,
-  test_passes: 12
-}
+{ lint_errors_assert: 1, test_failures: 0, test_passes: 12 }
 ```
 
-### 3. Session Persistence
-
-Session data is written to `.valora/sessions/<session-id>/session.json`:
+### Session Persistence Example
 
 ```json
 {
 	"session_id": "wf-001",
 	"created_at": "2026-02-02T10:00:00.000Z",
-	"updated_at": "2026-02-02T11:00:00.000Z",
 	"status": "completed",
 	"commands": [
 		{
@@ -356,13 +290,14 @@ Session data is written to `.valora/sessions/<session-id>/session.json`:
 }
 ```
 
-## Spending Ledger
+</details>
 
-In addition to the in-process counters and session-level metrics above, VALORA maintains a per-request cost ledger at `.valora/spending.jsonl`.
+<details>
+<summary><strong>Spending Ledger Collection</strong></summary>
 
-### Collection
+In addition to in-process counters and session-level metrics, VALORA maintains a per-request cost ledger at `.valora/spending.jsonl`.
 
-`CommandExecutor.execute()` calls `calculateActualCost()` (from `src/utils/token-estimator.ts`) immediately after `calculateTokenUsage()`, then calls `getSpendingTracker().record()`:
+`CommandExecutor.execute()` calls `calculateActualCost()` immediately after `calculateTokenUsage()`, then records a spending entry:
 
 ```typescript
 const costResult = calculateActualCost(
@@ -394,27 +329,12 @@ getSpendingTracker().record({
 });
 ```
 
-### Querying
+`ProcessingFeedback` also calls `calculateActualCost()` on every `LLM_RESPONSE` pipeline event, displaying the accumulating cost in the status bar (`~$0.0124`) and on each stage-completion line.
 
-`SpendingTracker` (`src/utils/spending-tracker.ts`) provides four query methods:
+</details>
 
-| Method              | Returns                                                                    |
-| ------------------- | -------------------------------------------------------------------------- |
-| `getRecords(opts?)` | Raw records, optionally filtered by command / date                         |
-| `getByEndpoint()`   | Per-command summaries, sorted by total cost desc                           |
-| `getExpensive(n)`   | Top N records sorted by `costUsd` desc                                     |
-| `getTotals()`       | Aggregate `totalCostUsd`, `cacheSavingsUsd`, `requestCount`, `totalTokens` |
-
-These methods back both `valora monitoring spending` and the dashboard **Spending** sub-tab.
-
-### Live Feedback
-
-`ProcessingFeedback` also calls `calculateActualCost()` on every `LLM_RESPONSE` pipeline event, accumulating an `estimatedCostUsd` field. This value is displayed:
-
-- Appended to the context-insights status bar: `~$0.0124`
-- Appended to each stage-completion line: `Done (review, 3.2s, 48,880 tokens, ~$0.0124)`
-
-## Extraction Algorithm
+<details>
+<summary><strong>Extraction and Aggregation Algorithm</strong></summary>
 
 ### Scanning Sessions
 
@@ -431,13 +351,11 @@ for (const workflowId of workflows) {
 	for (const file of files) {
 		if (!file.endsWith('.json')) continue;
 
-		const filePath = join(workflowDir, file);
-		const content = await readFile(filePath, 'utf-8');
+		const content = await readFile(join(workflowDir, file), 'utf-8');
 		const data = JSON.parse(content);
 
-		// Handle both Session format and SessionLog format
+		// Handles both Session format and SessionLog format
 		const sessionLogs = extractSessionLogs(data);
-
 		for (const session of sessionLogs) {
 			processSession(session, metrics);
 		}
@@ -445,315 +363,49 @@ for (const workflowId of workflows) {
 }
 ```
 
-### Aggregating Metrics
-
-For each session, extract and aggregate optimization metrics:
+### Aggregation Logic
 
 ```typescript
-if (session.optimization_metrics) {
-	const opt = session.optimization_metrics;
-
-	// Template usage
-	if (opt.template_used && opt.planning_mode === 'template') {
-		metrics.templateUsage.total++;
-		metrics.templateUsage.totalTimeSaved += opt.time_saved_minutes || 0;
-
-		if (!metrics.templateUsage.byPattern[opt.template_used]) {
-			metrics.templateUsage.byPattern[opt.template_used] = {
-				count: 0,
-				avgTime: 0,
-				timeSaved: 0
-			};
-		}
-
-		const pattern = metrics.templateUsage.byPattern[opt.template_used];
-		pattern.count++;
-		pattern.timeSaved += opt.time_saved_minutes || 0;
-	}
-
-	// Early exit
-	if (opt.early_exit_triggered) {
-		metrics.earlyExit.triggered++;
-		metrics.earlyExit.totalTimeSaved += opt.time_saved_minutes || 0;
-
-		const confidence = opt.initial_confidence || 0;
-		const range = confidence >= 9.5 ? '9.5-10' : confidence >= 9.0 ? '9.0-9.4' : '8.5-8.9';
-		metrics.earlyExit.confidenceDistribution[range] = (metrics.earlyExit.confidenceDistribution[range] || 0) + 1;
-	}
-
-	// Express planning
-	if (opt.planning_mode === 'express') {
-		metrics.expressPlanning.used++;
-		metrics.expressPlanning.avgComplexity += opt.complexity_score || 0;
-		metrics.expressPlanning.totalTimeSaved += opt.time_saved_minutes || 0;
-	}
-}
-```
-
-### Calculating Rates and Averages
-
-After aggregation, calculate rates and averages:
-
-```typescript
-if (metrics.totalWorkflows > 0) {
-	// Template usage rate
-	metrics.templateUsage.rate = (metrics.templateUsage.total / metrics.totalWorkflows) * 100;
-
-	if (metrics.templateUsage.total > 0) {
-		metrics.templateUsage.avgTimeSaved = metrics.templateUsage.totalTimeSaved / metrics.templateUsage.total;
-	}
-
-	// Early exit rate
-	metrics.earlyExit.rate = (metrics.earlyExit.triggered / metrics.totalWorkflows) * 100;
-
-	if (metrics.earlyExit.triggered > 0) {
-		metrics.earlyExit.avgTimeSaved = metrics.earlyExit.totalTimeSaved / metrics.earlyExit.triggered;
-	}
-
-	// Overall workflow time and efficiency
-	metrics.avgWorkflowTime /= metrics.totalWorkflows;
-	metrics.totalTimeSaved = (BASELINE_TIMES.avgWorkflowTime - metrics.avgWorkflowTime) * metrics.totalWorkflows;
-	metrics.timeEfficiency = Math.round((1 - metrics.avgWorkflowTime / BASELINE_TIMES.avgWorkflowTime) * 100);
-}
-```
-
-## Dashboard Generation
-
-### ASCII Visualization
-
-Generate progress bars for visual feedback:
-
-```typescript
-function generateBar(percentage: number, width: number = 20, symbol: string = '█'): string {
-	const filled = Math.round((percentage / 100) * width);
-	const empty = width - filled;
-	return symbol.repeat(Math.max(0, filled)) + '░'.repeat(Math.max(0, empty));
+if (opt.template_used && opt.planning_mode === 'template') {
+	metrics.templateUsage.total++;
+	metrics.templateUsage.totalTimeSaved += opt.time_saved_minutes || 0;
+	// ... per-pattern breakdown
 }
 
-// Usage
-const templateBar = generateBar(metrics.templateUsage.rate, 15);
-// Output: "████░░░░░░░░░░░  25%"
+if (opt.early_exit_triggered) {
+	metrics.earlyExit.triggered++;
+	metrics.earlyExit.totalTimeSaved += opt.time_saved_minutes || 0;
+	// ... confidence distribution bucketing
+}
 ```
-
-### Report Sections
-
-The dashboard is structured into sections:
-
-1. **Executive Summary** - Overview with ASCII visualizations
-2. **Optimization Performance** - Detailed breakdown per optimization
-3. **Phase Breakdown** - Table of time spent per phase
-4. **Quality Metrics** - Code/test/review quality scores
-5. **Time Savings Distribution** - Bar chart of time saved by optimization
-6. **Recommendations** - Actionable suggestions based on targets
 
 ### Recommendations Engine
 
-Generate recommendations based on targets:
+The dashboard generates recommendations based on configurable targets:
 
 ```typescript
 // Template usage below target (40%)
 if (metrics.templateUsage.rate < 40) {
-	recommendations.push(
-		'⚠️ **Template usage below target** - ' + 'Consider creating more templates for common patterns'
-	);
+	recommendations.push('⚠️ **Template usage below target** - Consider creating more templates for common patterns');
 }
 
 // Early exit rate below target (30%)
 if (metrics.earlyExit.rate < 30) {
-	recommendations.push('⚠️ **Early exit rate below target** - ' + 'Review confidence thresholds');
+	recommendations.push('⚠️ **Early exit rate below target** - Review confidence thresholds');
 }
 
-// Express planning underutilized (15%)
+// Express planning underutilised (15%)
 if (metrics.expressPlanning.rate < 15) {
-	recommendations.push('⚠️ **Express planning underutilized** - ' + 'Ensure trivial tasks are routed correctly');
-}
-
-// All targets met
-if (allTargetsMet) {
-	recommendations.push('✅ **All optimization targets met!** - ' + 'Continue monitoring and refining');
+	recommendations.push('⚠️ **Express planning underutilised** - Ensure trivial tasks are routed correctly');
 }
 ```
 
-## Automation
+</details>
 
-### GitHub Actions Workflow
+<details>
+<summary><strong>Per-Stage Execution Quality Metadata</strong></summary>
 
-Workflow steps:
-
-1. **Checkout** - Clone repository
-2. **Setup Node.js** - Install Node 20
-3. **Install pnpm** - Install package manager
-4. **Install dependencies** - Run `pnpm install`
-5. **Generate metrics** - Run `extract-metrics.ts` and capture outputs
-6. **Generate dashboard** - Create markdown report
-7. **Commit report** - Push `.valora/METRICS_REPORT.md` to repository
-8. **Create issue** - Generate GitHub issue with summary
-9. **Upload artifact** - Save metrics JSON for 90 days
-10. **Post summary** - Display results in workflow summary
-
-### Wrapper Scripts
-
-Simplify execution with wrapper scripts:
-
-```bash
-#!/usr/bin/env bash
-# scripts/metrics
-
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-cd "$PROJECT_ROOT"
-
-exec "$PROJECT_ROOT/node_modules/.bin/tsx" \
-  "$SCRIPT_DIR/extract-metrics.ts" "$@"
-```
-
-These avoid the need for `pnpm exec tsx` and handle path resolution.
-
-## Performance Considerations
-
-### Session Scanning
-
-- **Time**: ~2-5 seconds for 100 workflows
-- **Optimization**: Skip non-JSON files early
-- **Caching**: Consider caching parsed sessions
-
-### Dashboard Generation
-
-- **Time**: ~1 second
-- **Optimization**: Pre-compute common calculations
-- **Memory**: Process sessions iteratively, not all at once
-
-### Workflow Execution
-
-- **Time**: ~2 minutes total (including setup)
-- **Optimization**: Use debounced session persistence
-- **Artifacts**: Compress JSON before upload
-
-## Security
-
-### Session Data
-
-- Sessions encrypted at rest (via `encryptSessionData()`)
-- Sensitive data sanitized before logging
-- Metrics extraction only reads encrypted files
-
-### GitHub Issues
-
-- Only aggregated metrics included (no sensitive data)
-- No raw session contents in issues
-- Labels for easy filtering
-
-### Workflow Permissions
-
-Minimum required permissions:
-
-```yaml
-permissions:
-  contents: write # For committing report
-  issues: write # For creating issues
-  pull-requests: read # For PR context
-```
-
-## Extension Points
-
-### Adding New Metrics
-
-1. **Update Session Types**:
-
-```typescript
-// session.types.ts
-export interface OptimizationMetrics {
-	// ...existing fields
-	new_metric?: number;
-}
-```
-
-1. **Emit from Command**:
-
-```typescript
-// command.md
-optimization_metrics: {
-	new_metric: calculated_value;
-}
-```
-
-1. **Extract in Metrics Script**:
-
-```typescript
-// extract-metrics.ts
-if (opt.new_metric !== undefined) {
-	metrics.newMetric.total += opt.new_metric;
-}
-```
-
-1. **Display in Dashboard**:
-
-```typescript
-// generate-dashboard.ts
-### New Metric
-- **Value**: ${metrics.newMetric.total}
-```
-
-### Custom Visualizations
-
-Create custom dashboard sections:
-
-```typescript
-function generateCustomSection(metrics: Metrics): string {
-	return `
-## Custom Analysis
-
-${customAnalysis(metrics)}
-
-${generateChart(metrics.customData)}
-  `;
-}
-```
-
-### Integration with External Tools
-
-Export metrics to external systems:
-
-```typescript
-// Export to Prometheus
-const promMetrics = convertToPrometheus(metrics);
-await fetch('http://pushgateway:9091/metrics/job/workflow', {
-	method: 'POST',
-	body: promMetrics
-});
-
-// Export to Datadog
-await datadogClient.gauge('workflow.time_saved', metrics.totalTimeSaved);
-```
-
-## Pipeline Resilience Metrics
-
-In addition to optimization and quality metrics emitted by commands, the pipeline executor
-itself emits runtime health signals that feed the same collection pipeline.
-
-### In-memory counters (current session)
-
-| Counter                 | Labels      | Incremented when                                             |
-| ----------------------- | ----------- | ------------------------------------------------------------ |
-| `tool_execution_failed` | `{ tool }`  | A tool call exception is caught in `executeToolWithSpan`     |
-| `tool_loop_exhausted`   | `{ stage }` | The 20-iteration ceiling is reached in `callLLMWithToolLoop` |
-
-These counters are visible in the dashboard **Performance** tab and in `MetricsSummary`
-(read via `getMetricsCollector().getSnapshot().counters`).
-
-### Typed pipeline events
-
-| Event                   | Payload                                                     |
-| ----------------------- | ----------------------------------------------------------- |
-| `tool:execution:failed` | `{ toolName, errorMessage }`                                |
-| `tool:loop:exhausted`   | `{ stage, iterationsUsed, lastToolsInvoked, messageDepth }` |
-
-Subscribers receive these via `getPipelineEmitter().on(PipelineEventType.TOOL_LOOP_EXHAUSTED, ...)`.
-
-### Per-stage execution quality metadata
-
-`StageOutput.metadata.executionQuality` is set on every stage that ran through the tool
-loop:
+`StageOutput.metadata.executionQuality` is set on every stage that ran through the tool loop:
 
 ```typescript
 {
@@ -765,44 +417,56 @@ loop:
 }
 ```
 
-`verifiedModifiedFiles` is computed mechanically from the conversation history: only files
-whose `write`/`search_replace`/`delete_file` tool call produced a non-error result are
-included. It is injected into the forced final prompt when the loop exhausts.
+`verifiedModifiedFiles` is computed from the conversation history: only files whose `write`/`search_replace`/`delete_file` tool call produced a non-error result are included. It is injected into the forced final prompt when the loop exhausts.
 
-### Persistent storage
+After each command, `command-executor.ts` aggregates `toolFailureCount` and `wasLoopExhausted` from all stage metadata entries and writes the totals into `SessionCommand.quality_metrics.tool_failures` and `SessionCommand.quality_metrics.tool_loop_exhaustions`.
 
-After each command, `command-executor.ts` aggregates `toolFailureCount` and
-`wasLoopExhausted` from all stage metadata entries and writes the totals into
-`SessionCommand.quality_metrics.tool_failures` and
-`SessionCommand.quality_metrics.tool_loop_exhaustions`.
+The dashboard `buildMetricsSummary` combines in-memory counters (current process) with these persisted values (historical sessions) so the Overview panel always reflects the full history.
 
-The dashboard `buildMetricsSummary` combines in-memory counters (current process) with
-these persisted values (historical sessions) so the Overview panel always reflects the
-full history.
+</details>
 
-### Dashboard display
+<details>
+<summary><strong>Adding New Metrics</strong></summary>
 
-The **Metrics Summary** panel in the Overview tab shows:
+1. **Update Session Types** (`src/types/session.types.ts`):
 
-```
-Loop Exhausted: N   ← yellow if > 0, green if 0
-Tool Failures:  N   ← red if > 0, green if 0
+```typescript
+export interface OptimizationMetrics {
+	// ...existing fields
+	new_metric?: number;
+}
 ```
 
-For detailed per-stage and per-tool breakdown, switch to the **Performance** tab.
+2. **Emit from Command** (in the command's `.md` definition):
 
-### Related
+```typescript
+optimization_metrics: {
+	new_metric: calculated_value;
+}
+```
 
-- [Pipeline Resilience Operations Guide](../operations/pipeline-resilience.md)
-- [ADR-010: Pipeline Resilience and Tool-Failure Observability](../adr/010-pipeline-resilience-and-tool-failure-observability.md)
+3. **Extract in Metrics Script** (`scripts/extract-metrics.ts`):
 
-## Related Documentation
+```typescript
+if (opt.new_metric !== undefined) {
+	metrics.newMetric.total += opt.new_metric;
+}
+```
 
-- [User Guide: Metrics](../user-guide/metrics.md) - User-facing documentation
-- [Automated Reporting](../../AUTOMATED_REPORTING.md) - Complete automation guide
-- [Workflow Optimizations](../../WORKFLOW_OPTIMIZATIONS.md) - Optimization details
-- [Session Types](../../src/types/session.types.ts) - TypeScript definitions
+4. **Display in Dashboard** (`scripts/generate-dashboard.ts`):
+
+```typescript
+### New Metric
+- **Value**: ${metrics.newMetric.total}
+```
+
+</details>
 
 ---
 
-_For implementation details, see the source code in `scripts/` and `src/`._
+## Related Documentation
+
+- [Metrics Dashboard](./metrics-dashboard.md) — Dashboard views and query commands
+- [Pipeline Resilience Operations Guide](../operations/pipeline-resilience.md)
+- [ADR-010: Pipeline Resilience and Tool-Failure Observability](../adr/010-pipeline-resilience-and-tool-failure-observability.md)
+- [Session Types](../../src/types/session.types.ts) — TypeScript definitions

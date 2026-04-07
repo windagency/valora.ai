@@ -1,5 +1,18 @@
 # fzf, eza, and zoxide reference
 
+## Quick Reference
+
+| Command                | Purpose                                            | Example                                        |
+| ---------------------- | -------------------------------------------------- | ---------------------------------------------- |
+| `fzf --filter 'query'` | Non-interactive fuzzy match (agent-friendly)       | `fd -e ts \| fzf --filter 'component'`         |
+| `eza -la`              | Long listing with hidden files (replaces `ls -la`) | `eza -la --sort=modified`                      |
+| `eza --tree --level=2` | Directory tree (replaces `tree`)                   | `eza --tree --level=2 -I 'node_modules\|.git'` |
+| `eza -la --git`        | Listing with Git status per file                   | `eza -la --git --only-files`                   |
+| `zoxide query name`    | Get path for a known directory                     | `PROJECT=$(zoxide query my-app)`               |
+| `z name`               | Navigate to best-matching directory                | `z valora`                                     |
+
+---
+
 ## fzf — fuzzy finder
 
 ### Why fzf for agents
@@ -16,9 +29,6 @@ echo -e "foo\nbar\nbaz\nfoobar" | fzf --filter 'foo'
 
 # Fuzzy match with scoring (returns best match first)
 fd -e ts | fzf --filter 'compnnt'  # Fuzzy matches 'component'
-
-# With preview (only useful in interactive contexts)
-fd -e ts | fzf --preview 'head -20 {}'
 
 # Select top N results
 fd -e ts | fzf --filter 'hook' | head -5
@@ -83,35 +93,17 @@ eza --tree --level=2 --git         # Tree with git status
 # Sort options
 eza -la --sort=modified            # Most recently modified last
 eza -la --sort=size                # By size
-eza -la --sort=name                # Alphabetical (default)
 eza -la -r --sort=modified         # Most recently modified first
 
 # Filter by type
 eza -la --only-dirs                # Directories only
 eza -la --only-files               # Files only
 
-# Long format with specific columns
-eza -l --no-user --no-permissions --sort=modified  # Compact listing
-
-# File size details
-eza -la --total-size               # Show directory sizes
-
-# Combine with grep for filtering
-eza -la | grep '\.ts$'            # TypeScript files only
-eza --tree --level=2 -I 'node_modules|.git' --only-dirs  # Directory structure
-```
-
-### Agent-optimised patterns
-
-```bash
 # Quick project structure overview (great for context gathering)
 eza --tree --level=2 -I 'node_modules|.git|dist|coverage|.next|build|__pycache__' --only-dirs
 
 # Find recently modified files
 eza -la --sort=modified -r | head -20
-
-# Git status overview
-eza -la --git --git-ignore | grep -E '^\s*(M|N|I)'
 
 # One file per line, names only (for piping)
 eza -1                              # Filenames only, one per line
@@ -153,14 +145,9 @@ zoxide tracks directory visit frequency and recency. For agents, its value is ju
 ### Essential patterns
 
 ```bash
-# Initialise (add to shell profile for persistent use)
-eval "$(zoxide init bash)"        # Bash
-eval "$(zoxide init zsh)"         # Zsh
-
 # Navigate (replaces cd)
 z project-name                     # Jump to best match
 z src components                   # Multiple keywords narrow the match
-z ~/repos/my-app                   # Exact paths still work
 
 # Query without navigating (agent-friendly — just get the path)
 zoxide query project-name          # Print the best matching path
@@ -169,9 +156,6 @@ zoxide query -ls project           # List matches sorted by score
 
 # Add a directory to the database manually
 zoxide add /home/user/repos/my-app
-
-# Remove a directory from the database
-zoxide remove /home/user/repos/old-project
 
 # Interactive selection (requires fzf)
 zi project                         # Opens fzf to pick from matches
@@ -203,3 +187,14 @@ zoxide query -l --all
 | `zoxide add PATH`       | Add directory to database    | `zoxide add /path/to/dir` |
 | `zoxide remove PATH`    | Remove from database         | `zoxide remove /path`     |
 | `zoxide query --all`    | List entire database         | `zoxide query -l --all`   |
+
+<details>
+<summary><strong>Initialisation</strong></summary>
+
+```bash
+# Add to shell profile for persistent use
+eval "$(zoxide init bash)"        # Bash
+eval "$(zoxide init zsh)"         # Zsh
+```
+
+</details>

@@ -1,67 +1,187 @@
 # Codebase Overview
 
-> Detailed walkthrough of the VALORA source code structure.
+> Walkthrough of the VALORA source structure.
 
-## Directory Structure
+## Directory Tree
 
 ```plaintext
 src/
-├── ast/               # AST-based code intelligence (parsing, indexing, queries)
-│   └── grammars/      # Tree-sitter WASM grammar loading and language mapping
-├── batch/             # Async batch processing (LLM batch APIs)
+├── ast/               # AST-based code intelligence (tree-sitter)
+│   └── grammars/      # WASM grammar loading and language mapping
+├── batch/             # Async LLM batch processing
 │   └── providers/     # Provider-specific batch implementations
 ├── cleanup/           # Resource cleanup coordination
-├── cli/               # Command-line interface
-│   ├── commands/      # Individual CLI commands
+├── cli/               # Command-line interface and command dispatch
+│   ├── commands/      # Individual CLI command handlers
 │   └── types/         # CLI-specific types
-├── config/            # Configuration management
+├── config/            # Configuration loading and validation
 ├── di/                # Dependency injection container
-├── executor/          # Pipeline execution
-├── exploration/       # Parallel exploration system
+├── executor/          # Pipeline orchestration and stage execution
+├── exploration/       # Parallel agent exploration (git worktrees)
 ├── llm/               # LLM provider integrations
-│   └── providers/     # Individual provider implementations
-├── lsp/               # LSP integration (language server client, tools)
-├── mcp/               # MCP server implementation
+│   └── providers/     # Anthropic, OpenAI, Google, Cursor
+├── lsp/               # Language server client pool
+├── mcp/               # Model Context Protocol server
 ├── output/            # Output formatting and rendering
-├── security/          # Agentic AI security (credential guard, command guard, injection detection)
+├── security/          # Agentic AI security (credential, injection, tool guards)
 ├── services/          # Shared services
-├── session/           # Session management
+├── session/           # Session lifecycle and persistence
 ├── types/             # Global type definitions
-├── ui/                # Terminal UI components
-└── utils/             # Utility functions
+├── ui/                # Terminal UI components (Ink/React)
+└── utils/             # Shared utilities
 ```
 
-## Core Modules
+Non-source directories:
+
+```plaintext
+data/                     # Built-in resources (shipped with the package)
+│   ├── agents/           # Agent definition files (Markdown + frontmatter)
+│   ├── commands/         # Command specification files
+│   ├── prompts/          # Prompt templates
+│   ├── templates/        # Document templates
+│   ├── hooks/            # Hook scripts
+│   ├── config.default.json
+│   ├── hooks.default.json
+│   └── external-mcp.default.json
+tests/
+│   ├── integration/
+│   ├── e2e/
+│   ├── security/
+│   ├── performance/
+│   ├── error-scenarios/
+│   └── architecture/     # arch-unit-ts architectural rules
+```
+
+Unit tests are co-located with source files (`*.test.ts`).
+
+---
+
+## Key Files Quick Reference
+
+| File                               | Purpose                                                    |
+| ---------------------------------- | ---------------------------------------------------------- |
+| `src/cli/index.ts`                 | CLI entry point — registers all commands with Commander.js |
+| `src/executor/pipeline.ts`         | Orchestrates the command pipeline stage by stage           |
+| `src/executor/stage-executor.ts`   | Executes a single pipeline stage against an LLM provider   |
+| `src/llm/provider.interface.ts`    | `LLMProvider` interface implemented by all providers       |
+| `src/llm/registry.ts`              | Provider registry — register and resolve providers by name |
+| `src/session/lifecycle.ts`         | Session create / resume / complete transitions             |
+| `src/session/store.ts`             | File-based session persistence under `.valora/sessions/`   |
+| `src/config/loader.ts`             | Multi-level config cascade (defaults → project → flags)    |
+| `src/di/container.ts`              | DI container — all services registered here                |
+| `src/security/credential-guard.ts` | Env sanitisation and output secret scanning                |
+| `src/batch/batch-orchestrator.ts`  | Submit → poll → retrieve orchestration for async batches   |
+| `src/exploration/orchestrator.ts`  | Parallel worktree exploration coordination                 |
+
+---
+
+## Module Reference
+
+### CLI Layer (`src/cli/`)
+
+Handles user input, flag parsing, and command dispatch.
+
+| Component                  | Responsibility                                       |
+| -------------------------- | ---------------------------------------------------- |
+| `command-executor.ts`      | Executes a parsed command after validation           |
+| `command-resolver.ts`      | Resolves a command name to its specification         |
+| `command-wizard.ts`        | Interactive prompts for missing required inputs      |
+| `execution-coordinator.ts` | Coordinates multi-step execution (wizard → pipeline) |
+| `provider-resolver.ts`     | Resolves LLM provider from flags and config          |
+| `flags.ts`                 | Shared flag definitions for Commander.js             |
+
+---
+
+### Executor Layer (`src/executor/`)
+
+Owns pipeline orchestration and stage execution.
+
+| Component                        | Responsibility                                    |
+| -------------------------------- | ------------------------------------------------- |
+| `pipeline.ts`                    | Iterates stages, manages dependencies and results |
+| `stage-executor.ts`              | Sends a single stage prompt to the LLM provider   |
+| `stage-scheduler.ts`             | Determines execution order for parallel stages    |
+| `variable-resolution.service.ts` | Resolves `$VAR` and `$ENV_*` template variables   |
+| `agent-loader.ts`                | Loads and validates agent definition files        |
+| `command-loader.ts`              | Loads command specification files                 |
+| `execution-context.ts`           | Immutable container for execution state           |
+
+<details>
+<summary><strong>Pipeline flow detail</strong></summary>
+
+```mermaid
+sequenceDiagram
+    participant CLI
+    participant Pipeline
+    participant StageExecutor
+    participant LLM
+    participant Session
+
+    CLI->>Pipeline: execute(command)
+    Pipeline->>Session: loadContext()
+    Pipeline->>StageExecutor: executeStage(stage1)
+    StageExecutor->>LLM: sendPrompt()
+    LLM-->>StageExecutor: response
+    StageExecutor-->>Pipeline: stageResult
+    Pipeline->>Session: saveOutput()
+    Pipeline-->>CLI: result
+```
+
+The pipeline reads each stage's `depends_on` field to build a dependency graph. Independent stages can run in parallel via `stage-scheduler.ts`. The `stage-executor.ts` checks `isBatchableProvider()` before routing eligible stages to the batch path (see Batch layer below).
+
+</details>
+
+---
+
+### LLM Layer (`src/llm/`)
+
+Multi-provider AI integration with a single unified interface.
+
+```typescript
+interface LLMProvider {
+	name: string;
+	sendPrompt(prompt: string, options?: LLMOptions): Promise<LLMResponse>;
+	isConfigured(): boolean;
+	getModel(): string;
+}
+```
+
+Providers: `anthropic.provider.ts`, `openai.provider.ts`, `google.provider.ts`, `cursor.provider.ts`.
+
+<details>
+<summary><strong>Prompt caching per provider</strong></summary>
+
+Each provider surfaces cache metrics through the normalised `LLMUsage` type:
+
+- **Anthropic**: Injects `cache_control` breakpoints when `prompt_caching: true` in provider config. Caches system prompt, tools, and conversation history across tool-loop iterations.
+- **OpenAI**: Extracts `cached_tokens` from `prompt_tokens_details` (automatic, no configuration required).
+- **Google**: Extracts `cachedContentTokenCount` from `usageMetadata` (automatic, no configuration required).
+
+`src/utils/token-estimator.ts` includes per-model `cache_write` and `cache_read` rates for accurate cost calculation via `calculateActualCost()`.
+
+</details>
+
+---
 
 ### Batch Layer (`src/batch/`)
 
-The batch layer provides asynchronous LLM processing via provider batch APIs, reducing token costs by ~50%.
+Asynchronous LLM processing via provider batch APIs, reducing token costs by ~50%.
 
 ```plaintext
 src/batch/
 ├── batch.types.ts                   # BatchRequest, BatchSubmission, BatchResult, PersistedBatch
-├── batch-provider.interface.ts      # BatchableProvider interface + isBatchableProvider() type guard
-├── batch-eligibility.ts             # isEligible(stage, context, provider) helper
-├── batch-orchestrator.ts            # Submit → poll → retrieve orchestration; singleton getBatchOrchestrator()
-├── batch-session.ts                 # JSON file persistence under .valora/batches/<localId>.json
+├── batch-provider.interface.ts      # BatchableProvider extends LLMProvider; isBatchableProvider() guard
+├── batch-eligibility.ts             # isEligible(stage, context, provider)
+├── batch-orchestrator.ts            # submit → poll → retrieve; singleton getBatchOrchestrator()
+├── batch-session.ts                 # JSON persistence under .valora/batches/<localId>.json
 └── providers/
-    ├── anthropic.batch-provider.ts  # Anthropic Message Batches implementation
+    ├── anthropic.batch-provider.ts  # Anthropic Message Batches
     ├── openai.batch-provider.ts     # OpenAI Batch API (JSONL file upload)
     └── google.batch-provider.ts     # Vertex AI stub (supportsBatch() returns false)
 ```
 
-Key components:
-
-| Component                     | Responsibility                                                    |
-| ----------------------------- | ----------------------------------------------------------------- |
-| `batch-provider.interface.ts` | `BatchableProvider` extends `LLMProvider`; runtime type guard     |
-| `batch-eligibility.ts`        | Checks stage opt-in, `--batch` flag, and provider capability      |
-| `batch-orchestrator.ts`       | Coordinates submit/poll/retrieve; persists state via BatchSession |
-| `batch-session.ts`            | File-based batch state persistence (one JSON file per job)        |
-
-The `AnthropicProvider` and `OpenAIProvider` implement `BatchableProvider` directly. The `isBatchableProvider()` type guard is used in `StageExecutor` to route eligible stages through the batch path.
-
-#### Batch Flow
+<details>
+<summary><strong>Batch flow detail</strong></summary>
 
 ```mermaid
 sequenceDiagram
@@ -86,310 +206,100 @@ sequenceDiagram
     BatchOrchestrator-->>CLI: BatchResult[]
 ```
 
+`AnthropicProvider` and `OpenAIProvider` implement `BatchableProvider` directly. The `isBatchableProvider()` type guard in `stage-executor.ts` routes eligible stages through the batch path automatically when `--batch` is passed.
+
+</details>
+
 ---
 
 ### AST Layer (`src/ast/`)
 
-The AST layer provides code intelligence via tree-sitter parsing — symbol extraction, codebase indexing, semantic search, and smart context selection for token reduction.
+Code intelligence via tree-sitter: symbol extraction, codebase indexing, semantic search, and smart context selection for token reduction.
 
-```plaintext
-src/ast/
-├── ast.types.ts                  # Type definitions (IndexedSymbol, IndexedFile, CodebaseIndex)
-├── ast-parser.service.ts         # tree-sitter wrapper: parse files, extract symbols/imports
-├── ast-index.service.ts          # Build, persist, load, and query the symbol index
-├── ast-index-watcher.service.ts  # File watching + incremental updates
-├── ast-query.service.ts          # High-level queries (symbol search, file outline, references)
-├── ast-tools.service.ts          # LLM tool handlers (symbol_search, file_outline, etc.)
-├── ast-context.service.ts        # Smart context extraction for token reduction
-└── grammars/
-    ├── grammar-loader.ts         # Lazy WASM grammar loading
-    └── language-map.ts           # Extension → language + tree-sitter query patterns
-```
-
-Key components:
-
-| Component                | Responsibility                                                                            |
-| ------------------------ | ----------------------------------------------------------------------------------------- |
-| `ast-parser.service.ts`  | Parses files via tree-sitter WASM, extracts symbols and imports                           |
-| `ast-index.service.ts`   | Builds and persists sharded symbol index under `.valora/index/`                           |
-| `ast-query.service.ts`   | Symbol search, file outline, and cross-file reference finding                             |
-| `ast-context.service.ts` | Budget-aware context extraction at multiple detail levels                                 |
-| `ast-tools.service.ts`   | LLM tool handlers for `symbol_search`, `file_outline`, `find_references`, `smart_context` |
+| Component                | Responsibility                                                                         |
+| ------------------------ | -------------------------------------------------------------------------------------- |
+| `ast-parser.service.ts`  | Parses files via tree-sitter WASM; extracts symbols and imports                        |
+| `ast-index.service.ts`   | Builds and persists sharded symbol index under `.valora/index/`                        |
+| `ast-query.service.ts`   | Symbol search, file outline, and cross-file reference finding                          |
+| `ast-context.service.ts` | Budget-aware context extraction at multiple detail levels                              |
+| `ast-tools.service.ts`   | LLM tool handlers: `symbol_search`, `file_outline`, `find_references`, `smart_context` |
 
 ---
 
 ### LSP Layer (`src/lsp/`)
 
-The LSP layer integrates with language servers to provide compiler-level intelligence — go-to-definition, hover information, diagnostics, and type info.
+Language server client pool providing compiler-level intelligence to the LLM: definitions, hover info, diagnostics, and type information.
 
-```plaintext
-src/lsp/
-├── lsp.types.ts                      # Type definitions
-├── lsp-client.ts                     # JSON-RPC stdio wrapper for a single language server
-├── lsp-client-manager.service.ts     # Multi-language client pool (spawn-on-demand, idle timeout)
-├── lsp-language-registry.ts          # Extension → server command mapping
-├── lsp-lifecycle.service.ts          # Session-scoped lifecycle (spawn, timeout, shutdown)
-├── lsp-tools.service.ts              # LLM tool handlers (goto_definition, hover_info, etc.)
-├── lsp-result-cache.ts               # LRU cache (500 entries, 30s TTL)
-└── lsp-context-enricher.ts           # Inject diagnostics/type info into message context
-```
-
-Key components:
-
-| Component                       | Responsibility                                                                            |
-| ------------------------------- | ----------------------------------------------------------------------------------------- |
-| `lsp-client.ts`                 | JSON-RPC stdio wrapper for communicating with language servers                            |
-| `lsp-client-manager.service.ts` | Manages a pool of language server clients with idle timeout                               |
-| `lsp-tools.service.ts`          | LLM tool handlers for `goto_definition`, `get_type_info`, `get_diagnostics`, `hover_info` |
-| `lsp-context-enricher.ts`       | Injects compiler diagnostics into LLM message context                                     |
-
----
-
-### CLI Layer (`src/cli/`)
-
-The CLI layer handles user interaction and command parsing.
-
-#### Entry Point (`index.ts`)
-
-```typescript
-// Main entry point for the CLI application
-// Sets up Commander.js and registers all commands
-```
-
-#### Command Structure
-
-Each command follows a consistent pattern:
-
-```plaintext
-src/cli/
-├── commands/
-│   ├── config.ts        # Configuration commands
-│   ├── dashboard.ts     # Dashboard display
-│   ├── doctor.ts        # Diagnostics
-│   ├── dynamic.ts       # Dynamic command loading
-│   ├── explore.ts       # Exploration mode
-│   ├── help.ts          # Help display
-│   ├── monitoring.ts    # Monitoring commands
-│   └── session.ts       # Session management
-├── command-adapter.interface.ts
-├── commander-adapter.ts
-├── command-error-handler.ts
-├── command-executor.ts
-├── command-palette.ts
-├── command-resolver.ts
-├── command-suggestions.ts
-├── command-templates.ts
-├── command-validator.ts
-├── command-wizard.ts
-├── config-builder.ts
-├── execution-coordinator.ts
-├── flags.ts
-├── provider-fallback-service.ts
-├── provider-resolver.ts
-├── result-presenter.ts
-├── session-browser.ts
-├── session-cleanup-adapter.ts
-├── session-formatter.ts
-├── session-manager.ts
-└── session-resume.ts
-```
-
-Key components:
-
-| Component                  | Responsibility                      |
-| -------------------------- | ----------------------------------- |
-| `command-executor.ts`      | Executes parsed commands            |
-| `command-resolver.ts`      | Resolves command specifications     |
-| `command-wizard.ts`        | Interactive command configuration   |
-| `execution-coordinator.ts` | Coordinates multi-step execution    |
-| `provider-resolver.ts`     | Resolves LLM provider configuration |
-
----
-
-### Executor Layer (`src/executor/`)
-
-The executor layer handles pipeline orchestration and stage execution.
-
-```plaintext
-src/executor/
-├── agent-loader.ts              # Load agent definitions
-├── command-discovery.ts         # Discover available commands
-├── command-isolation.executor.ts # Isolated command execution
-├── command-loader.ts            # Load command specifications
-├── command-validation.ts        # Validate command inputs
-├── execution-context.ts         # Execution state container
-├── execution-strategy.ts        # Execution strategy patterns
-├── pipeline.ts                  # Pipeline orchestration
-├── pipeline-events.ts           # Pipeline event definitions
-├── pipeline-validator.ts        # Pipeline validation
-├── prompt-loader.ts             # Load prompt templates
-├── stage-executor.ts            # Execute individual stages
-├── stage-scheduler.ts           # Schedule stage execution
-├── variable-resolution.service.ts # Resolve template variables
-└── variables.ts                 # Variable definitions
-```
-
-Key components:
-
-| Component              | Responsibility                          |
-| ---------------------- | --------------------------------------- |
-| `pipeline.ts`          | Orchestrates command pipeline execution |
-| `stage-executor.ts`    | Executes individual pipeline stages     |
-| `execution-context.ts` | Maintains execution state               |
-| `agent-loader.ts`      | Loads and validates agent definitions   |
-
-#### Pipeline Flow
-
-```mermaid
-sequenceDiagram
-    participant CLI
-    participant Pipeline
-    participant StageExecutor
-    participant LLM
-    participant Session
-
-    CLI->>Pipeline: execute(command)
-    Pipeline->>Session: loadContext()
-    Pipeline->>StageExecutor: executeStage(stage1)
-    StageExecutor->>LLM: sendPrompt()
-    LLM-->>StageExecutor: response
-    StageExecutor-->>Pipeline: stageResult
-    Pipeline->>Session: saveOutput()
-    Pipeline-->>CLI: result
-```
-
----
-
-### LLM Layer (`src/llm/`)
-
-The LLM layer provides multi-provider AI integration.
-
-```plaintext
-src/llm/
-├── index.ts              # Module exports
-├── provider.interface.ts # Provider interface definition
-├── registry.ts           # Provider registry
-└── providers/
-    ├── anthropic.provider.ts  # Anthropic/Claude
-    ├── cursor.provider.ts     # Cursor integration
-    ├── google.provider.ts     # Google AI
-    ├── index.ts
-    └── openai.provider.ts     # OpenAI
-```
-
-#### Provider Interface
-
-```typescript
-interface LLMProvider {
-	name: string;
-	sendPrompt(prompt: string, options?: LLMOptions): Promise<LLMResponse>;
-	isConfigured(): boolean;
-	getModel(): string;
-}
-```
-
-#### Provider Registration
-
-```typescript
-// registry.ts
-class LLMRegistry {
-	register(provider: LLMProvider): void;
-	getProvider(name: string): LLMProvider;
-	listProviders(): string[];
-}
-```
-
-#### Prompt Caching
-
-Each provider extracts cache metrics into the normalised `LLMUsage` type:
-
-- **Anthropic**: Injects `cache_control` breakpoints when `prompt_caching: true` in provider config. Caches system prompt, tools, and conversation history across tool-loop iterations.
-- **OpenAI**: Extracts `cached_tokens` from `prompt_tokens_details` (automatic, no config needed).
-- **Google**: Extracts `cachedContentTokenCount` from `usageMetadata` (automatic, no config needed).
-
-The token estimator (`src/utils/token-estimator.ts`) includes `cache_write` and `cache_read` rates per model for accurate cost calculation via `calculateActualCost()`.
+| Component                       | Responsibility                                                                         |
+| ------------------------------- | -------------------------------------------------------------------------------------- |
+| `lsp-client.ts`                 | JSON-RPC stdio wrapper for a single language server process                            |
+| `lsp-client-manager.service.ts` | Pool of language server clients with spawn-on-demand and idle timeout                  |
+| `lsp-tools.service.ts`          | LLM tool handlers: `goto_definition`, `get_type_info`, `get_diagnostics`, `hover_info` |
+| `lsp-context-enricher.ts`       | Injects compiler diagnostics into LLM message context                                  |
+| `lsp-result-cache.ts`           | LRU cache (500 entries, 30s TTL) for LSP query results                                 |
 
 ---
 
 ### Exploration Layer (`src/exploration/`)
 
-The exploration layer enables parallel agent collaboration using git worktrees.
+Parallel agent collaboration using git worktrees — multiple agents explore different approaches simultaneously, then results are merged.
 
-```plaintext
-src/exploration/
-├── collaboration-coordinator.ts  # Coordinate agent collaboration
-├── container-manager.ts          # Manage exploration containers
-├── execution-modes.ts            # Execution mode definitions
-├── exploration-events.ts         # Event emitter for real-time updates
-├── exploration-state.ts          # State persistence and recovery
-├── merge-orchestrator.ts         # Merge exploration results
-├── orchestrator.ts               # Main orchestration logic
-├── resource-allocator.ts         # Resource management
-├── result-comparator.ts          # Compare agent results
-├── safety-validator.ts           # Safety validation
-├── shared-volume-manager.ts      # Volume management
-├── worktree-manager.ts           # Git worktree CRUD operations
-└── worktree-manager-secure.ts    # Secure worktree manager
-```
-
-This module supports:
-
-- Parallel exploration of implementation approaches using git worktrees
-- Multi-agent collaboration with shared insights and decisions
-- Safe result merging with backup branches
-- Real-time event emission for dashboard monitoring (via `ExplorationEventEmitter`)
-- Worktree usage statistics tracked per session (via `WorktreeStatsTracker` in session layer)
+| Component                      | Responsibility                                      |
+| ------------------------------ | --------------------------------------------------- |
+| `orchestrator.ts`              | Main orchestration entry point                      |
+| `worktree-manager.ts`          | Git worktree CRUD operations                        |
+| `collaboration-coordinator.ts` | Coordinates shared insights between parallel agents |
+| `merge-orchestrator.ts`        | Safe result merging with backup branches            |
+| `exploration-events.ts`        | Event emitter for real-time dashboard updates       |
+| `safety-validator.ts`          | Pre-merge safety validation                         |
 
 ---
 
 ### Session Layer (`src/session/`)
 
-The session layer manages persistent state and worktree usage tracking.
-
-```plaintext
-src/session/
-├── archive-adapter.interface.ts  # Archive adapter interface
-├── archive-adapter.ts            # Archive implementation
-├── cleanup-scheduler.ts          # Session cleanup scheduling
-├── context.ts                    # Session context management
-├── lifecycle.ts                  # Session lifecycle (create, resume, complete)
-├── retention-manager.ts          # Retention management
-├── retention-policy-runner.ts    # Retention policy execution
-├── session-cleanup-ui.ts         # Cleanup UI
-├── session-exporter.ts           # Session export
-├── store.ts                      # Session file persistence
-├── types.ts                      # Internal types
-└── worktree-stats-tracker.ts     # Worktree usage statistics (event-driven)
-```
-
-Key components:
+Persistent state management and worktree usage tracking.
 
 | Component                   | Responsibility                                                     |
 | --------------------------- | ------------------------------------------------------------------ |
-| `lifecycle.ts`              | Session creation, resumption, completion, and state transitions    |
+| `lifecycle.ts`              | Session create / resume / complete state transitions               |
 | `context.ts`                | Session context management and updates                             |
 | `store.ts`                  | File-based session persistence and listing                         |
 | `worktree-stats-tracker.ts` | Event-driven worktree usage tracking via `ExplorationEventEmitter` |
 
 ---
 
+### Security Layer (`src/security/`)
+
+Agentic AI attack detection and prevention across five threat surfaces.
+
+| Component                      | Responsibility                                                                   |
+| ------------------------------ | -------------------------------------------------------------------------------- |
+| `credential-guard.ts`          | Redacts sensitive env vars in subprocess env; scans output for secrets           |
+| `command-guard.ts`             | Blocks network, remote access, eval, and exfiltration command patterns           |
+| `prompt-injection-detector.ts` | Scores tool results for injection markers; quarantines or redacts                |
+| `tool-definition-validator.ts` | Validates MCP tool names, descriptions, and schemas against poisoning            |
+| `tool-integrity-monitor.ts`    | SHA-256 fingerprints MCP tool sets; detects rug pull attacks between connections |
+
+<details>
+<summary><strong>Security integration points</strong></summary>
+
+- **`tool-execution.service.ts`** — command guard before exec, env sanitisation, output scanning, sensitive file blocking
+- **`stage-executor.ts`** — prompt injection scanning of all tool results before LLM context
+- **`mcp-tool-handler.ts`** — credential and injection scanning of MCP tool output
+- **`mcp-client-manager.service.ts`** — tool definition validation and integrity checking on connection
+- **`variables.ts`** — sensitive env var filtering in `$ENV_*` resolution
+
+All services are registered in `src/di/container.ts` and use singleton patterns.
+
+</details>
+
+---
+
 ### Configuration Layer (`src/config/`)
 
-```plaintext
-src/config/
-├── constants.ts           # Application constants
-├── index.ts
-├── interactive-wizard.ts  # Configuration wizard
-├── loader.ts              # Config file loading
-├── providers.config.ts    # Provider configuration
-├── schema.ts              # Zod schemas
-├── validation-helpers.ts  # Validation utilities
-└── wizard.ts              # Wizard utilities
-```
+Multi-level cascade: package defaults (`data/config.default.json`) → project level (`.valora/config.json`) → CLI flags.
 
-#### Configuration Schema
-
-Configuration is validated using Zod:
+Schemas are validated with Zod:
 
 ```typescript
 const ConfigSchema = z.object({
@@ -401,7 +311,6 @@ const ConfigSchema = z.object({
 		session_mode: z.boolean()
 	}),
 	providers: z.record(ProviderSchema)
-	// ...
 });
 ```
 
@@ -409,169 +318,21 @@ const ConfigSchema = z.object({
 
 ### MCP Layer (`src/mcp/`)
 
-The MCP layer implements the Model Context Protocol server.
+Implements the [Model Context Protocol](https://modelcontextprotocol.io) server, exposing VALORA commands as MCP tools and prompts for use in Cursor and other MCP-capable hosts.
 
-```plaintext
-src/mcp/
-├── command-discovery.service.ts  # Discover commands
-├── context.ts                    # Request context
-├── health.service.ts             # Health checks
-├── index.ts
-├── mcp-logger.ts                 # MCP-specific logging
-├── prompt-handler.ts             # Handle prompt requests
-├── prompt.service.ts             # Prompt operations
-├── server.ts                     # MCP server entry
-├── session.service.ts            # Session handling
-├── tool-handler.ts               # Tool execution
-└── types.ts                      # Type definitions
-```
+Entry point: `src/mcp/server.ts` → binary at `bin/mcp.js`.
 
 ---
 
-### Security Layer (`src/security/`)
+## Key Architectural Patterns
 
-The security layer provides agentic AI attack detection and prevention.
+### Dependency injection
 
-```plaintext
-src/security/
-├── index.ts                          # Barrel exports
-├── security-event.types.ts           # Shared event types (SecurityEvent, SecurityEventType)
-├── credential-guard.ts               # Env sanitisation, output scanning, sensitive file blocking
-├── command-guard.ts                  # Command validation (network, eval, exfiltration patterns)
-├── prompt-injection-detector.ts      # 0–1 risk scoring for injection in tool results
-├── tool-definition-validator.ts      # MCP tool name/description/schema validation
-└── tool-integrity-monitor.ts         # SHA-256 fingerprinting for tool-set drift detection
-```
+All services are registered in `src/di/container.ts` and resolved by name at runtime. This pattern makes unit testing straightforward — inject mock implementations.
 
-Key components:
+### Event-driven pipeline
 
-| Component                      | Responsibility                                                           |
-| ------------------------------ | ------------------------------------------------------------------------ |
-| `credential-guard.ts`          | Redacts sensitive env vars in subprocess env; scans output for secrets   |
-| `command-guard.ts`             | Blocks network, remote access, eval, and exfiltration command patterns   |
-| `prompt-injection-detector.ts` | Scores tool results for injection markers; quarantines or redacts        |
-| `tool-definition-validator.ts` | Validates MCP tool names, descriptions, and schemas against poisoning    |
-| `tool-integrity-monitor.ts`    | Fingerprints MCP tool sets; detects rug pull attacks between connections |
-
-Integration points:
-
-- **`tool-execution.service.ts`** — command guard before exec, env sanitisation, output scanning, sensitive file blocking
-- **`stage-executor.ts`** — prompt injection scanning of all tool results before LLM context
-- **`mcp-tool-handler.ts`** — credential and injection scanning of MCP tool output
-- **`mcp-client-manager.service.ts`** — tool definition validation and integrity checking on connection
-- **`variables.ts`** — sensitive env var filtering in `$ENV_*` resolution
-
-All services are registered in the DI container (`src/di/container.ts`) and use singleton patterns.
-
----
-
-### Types Layer (`src/types/`)
-
-Global type definitions used across the codebase.
-
-```plaintext
-src/types/
-├── agent.types.ts          # Agent definitions
-├── command-validation.types.ts
-├── command.types.ts        # Command definitions
-├── config.types.ts         # Configuration types
-├── context.types.ts        # Context types
-├── events.types.ts         # Event definitions
-├── execution.types.ts      # Execution types
-├── exploration.types.ts    # Exploration types
-├── index.ts
-├── llm.types.ts            # LLM types (incl. LLMUsage with cache fields)
-├── output.types.ts         # Output types
-├── pipeline.types.ts       # Pipeline types
-├── prompt.types.ts         # Prompt types
-├── provider.types.ts       # Provider types
-├── registry.types.ts       # Registry types
-├── result.types.ts         # Result types
-├── session.types.ts        # Session types (incl. WorktreeUsageStats)
-└── stage.types.ts          # Stage types
-```
-
----
-
-### Utilities (`src/utils/`)
-
-Shared utility functions.
-
-```plaintext
-src/utils/
-├── arrays.ts               # Array utilities
-├── async-helpers.ts        # Async utilities
-├── cli-helpers.ts          # CLI utilities
-├── concurrent-executor.ts  # Concurrent execution
-├── date.ts                 # Date utilities
-├── file.ts                 # File operations
-├── formatting.ts           # Text formatting
-├── git.ts                  # Git operations
-├── index.ts
-├── logger.ts               # Logging
-├── markdown-parser.ts      # Markdown parsing
-├── paths.ts                # Path utilities
-├── process-manager.ts      # Process management
-├── registry-utils.ts       # Registry utilities
-├── script-runner.ts        # Script execution
-├── string.ts               # String utilities
-├── timeout-promise.ts      # Timeout handling
-├── time.ts                 # Time utilities
-├── token-estimator.ts      # Token counting, cost estimation, cache pricing
-└── validation.ts           # Validation utilities
-```
-
----
-
-## Data Flow
-
-### Command Execution Flow
-
-```mermaid
-flowchart TD
-    A[User Input] --> B[CLI Parser]
-    B --> C[Command Resolver]
-    C --> D[Execution Coordinator]
-    D --> E[Pipeline]
-    E --> F[Stage Executor]
-    F --> G[LLM Provider]
-    G --> H[Response]
-    H --> I[Output Formatter]
-    I --> J[Session Storage]
-    J --> K[User Display]
-```
-
-### Session Management Flow
-
-```mermaid
-flowchart TD
-    A[Command Start] --> B{Session Exists?}
-    B -->|Yes| C[Load Session]
-    B -->|No| D[Create Session]
-    C --> E[Execute Command]
-    D --> E
-    E --> F[Capture Output]
-    F --> G[Update Session]
-    G --> H[Save to Disk]
-```
-
----
-
-## Key Patterns
-
-### Dependency Injection
-
-The codebase uses a simple DI container (`src/di/container.ts`):
-
-```typescript
-const container = new Container();
-container.register('logger', Logger);
-container.register('sessionService', SessionService);
-```
-
-### Event-Driven Architecture
-
-Pipeline execution uses events for loose coupling:
+Pipeline execution emits typed events for loose coupling:
 
 ```typescript
 pipeline.on('stageStart', (stage) => { ... });
@@ -579,36 +340,14 @@ pipeline.on('stageComplete', (stage, result) => { ... });
 pipeline.on('error', (error) => { ... });
 ```
 
-### Strategy Pattern
+### Adapter pattern for LLM providers
 
-Execution strategies are pluggable:
-
-```typescript
-interface ExecutionStrategy {
-	execute(context: ExecutionContext): Promise<Result>;
-}
-```
-
----
-
-## Testing Structure
-
-```plaintext
-tests/
-├── integration/    # Integration tests
-├── e2e/            # End-to-end tests
-├── security/       # Security tests
-├── performance/    # Performance tests
-├── error-scenarios/ # Error handling tests
-└── architecture/   # Architecture tests
-```
-
-Unit tests are co-located with source files using `.test.ts` extension.
+Each provider (`AnthropicProvider`, `OpenAIProvider`, etc.) implements the `LLMProvider` interface. The CLI layer never imports a concrete provider directly — always via the registry.
 
 ---
 
 ## Next Steps
 
-1. Explore individual modules in detail
-2. Read [Contributing Guidelines](./contributing.md)
-3. Review [Architecture Documentation](../architecture/README.md)
+1. Read the [Contributing Guidelines](./contributing.md)
+2. Review the [Architecture Documentation](../architecture/README.md)
+3. Explore individual modules starting from `src/cli/index.ts`

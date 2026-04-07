@@ -1,51 +1,140 @@
-# Session Optimisation Architecture
+# Session Optimisation
 
-This document describes how VALORA uses sessions to optimise requests, reduce token consumption, and speed up execution.
+> How VALORA uses sessions to reduce token consumption, avoid redundant LLM calls, and speed up execution.
 
-## Overview
+## What Session Optimisation Does
 
-Sessions provide persistent state across command executions, enabling multiple optimisation strategies:
+Sessions persist state across command executions, enabling several optimisation strategies that activate automatically:
 
-- **Loader Cache Reuse**: Avoid re-parsing agent and prompt files
-- **Stage Output Caching**: Reference previous command outputs without re-execution
-- **Context Filtering**: Pass only referenced context to LLM calls
-- **Snapshot Resume**: Fast context restoration on session resume
-- **Debounced Persistence**: Reduce disk I/O during intensive operations
-- **Token Tracking**: Session-wide visibility for cost management
+| Optimisation                 | Impact                                | When Active                              |
+| ---------------------------- | ------------------------------------- | ---------------------------------------- |
+| **Persistent stage caching** | **2–3 min saved per context load**    | **Unchanged source documents**           |
+| **Prompt caching**           | **Up to 90% input token savings**     | **Tool-loop iterations (all providers)** |
+| Loader cache reuse           | 90%+ faster agent loading             | Session resume with fresh cache          |
+| Stage output reference       | Eliminates redundant execution        | Multi-command workflows                  |
+| Context filtering            | ~40% token reduction                  | Pipelines with `$CONTEXT_*` refs         |
+| Snapshot resume              | 2–5× faster startup                   | Session resume with `--session-id`       |
+| Debounced persistence        | 80% fewer disk writes                 | Rapid command sequences                  |
+| Token tracking               | Full visibility (incl. cache metrics) | All sessions                             |
 
-## Architecture Components
+---
+
+## How to Use It
+
+### Resuming a Session
+
+```bash
+# Resume a specific session for optimised execution
+valora implement plan.md --session-id my-feature
+
+# Session caches and context are automatically restored
+```
+
+### Multi-Command Workflow Example
+
+```bash
+# Command 1: Plan (creates session context)
+valora plan "Add user authentication" --session-id auth-feature
+
+# Command 2: Implement (uses cached agents, references plan output)
+valora implement plan.md --session-id auth-feature
+
+# Command 3: Test (references implementation output)
+valora test --session-id auth-feature
+```
+
+Each subsequent command benefits from:
+
+- Cached agent definitions (no re-parsing)
+- Previous stage outputs (no re-analysis)
+- Accumulated context (progressive understanding)
+
+### Session Mode Indicator
+
+The status bar shows whether running from a resumed session:
+
+```plaintext
+⟳ Session ⠴ Processing | claude-3-5-sonnet | analyze | 5s | 1200 tokens
+● Live ⠴ Processing | claude-3-5-sonnet | analyze | 5s | 1200 tokens
+```
+
+---
+
+## Prompt Caching
+
+Prompt caching is a provider-side optimisation that avoids re-processing identical prefixes across API calls within a tool loop. Each provider handles this differently:
+
+| Provider      | Mechanism                                                            | Config Flag            | Discount |
+| ------------- | -------------------------------------------------------------------- | ---------------------- | -------- |
+| **Anthropic** | Explicit `cache_control` breakpoints on system, tools, last user msg | `prompt_caching: true` | 90% off  |
+| **OpenAI**    | Automatic — reads `prompt_tokens_details.cached_tokens`              | None needed            | 50% off  |
+| **Google**    | Automatic — reads `usageMetadata.cachedContentTokenCount`            | None needed            | 75% off  |
+
+Cache metrics (`cache_creation_input_tokens`, `cache_read_input_tokens`) are extracted from all provider responses and displayed in the CLI token usage summary.
+
+---
+
+## Integration Flow
 
 ```plaintext
 ┌─────────────────────────────────────────────────────────────────┐
-│                     Session Management                          │
+│ Command Execution with Session Optimisation                     │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
-│  ┌─────────────────┐    ┌─────────────────┐                    │
-│  │  SessionStore   │    │ SessionLifecycle│                    │
-│  │  (Persistence)  │◄───│  (Operations)   │                    │
-│  └────────┬────────┘    └────────┬────────┘                    │
-│           │                      │                              │
-│           ▼                      ▼                              │
-│  ┌─────────────────┐    ┌─────────────────┐                    │
-│  │ Session Files   │    │ SessionContext  │                    │
-│  │ + Snapshots     │    │    Manager      │                    │
-│  └─────────────────┘    └────────┬────────┘                    │
-│                                  │                              │
-│                                  ▼                              │
-│                         ┌─────────────────┐                    │
-│                         │ CLISessionMgr   │                    │
-│                         │ (Coordination)  │                    │
-│                         └─────────────────┘                    │
+│  1. Session Acquisition                                         │
+│     ├─ --session-id provided? → Resume existing session         │
+│     ├─ Load snapshot (fast, essential context)                  │
+│     └─ Load full session (complete history)                     │
+│                                                                 │
+│  2. Cache Restoration (if fresh, <5 min)                        │
+│     ├─ Inject cached agents → skip file parsing                 │
+│     └─ Import stage outputs → enable $STAGE_* resolution        │
+│                                                                 │
+│  3. Context Preparation                                         │
+│     ├─ Scan pipeline for $CONTEXT_* references                  │
+│     └─ Filter context to only referenced keys                   │
+│                                                                 │
+│  4. Pipeline Execution                                          │
+│     ├─ Variable resolution uses session data                    │
+│     ├─ Session mode indicator shown (Live/Session)              │
+│     └─ LLM calls with minimal context payload                   │
+│                                                                 │
+│  5. Post-Execution Persistence                                  │
+│     ├─ Merge outputs → session.context                          │
+│     ├─ Save stage outputs → session._stageOutputs               │
+│     ├─ Export loader caches → session._loaderCache              │
+│     ├─ Accumulate tokens → session.total_tokens_used            │
+│     └─ Persist (debounced, 1–5s delay)                          │
+│                                                                 │
+│  Next Command: All optimisations transparently applied          │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-## Optimisation Mechanisms
+---
 
-### 1. Persistent Stage Output Caching
+## Configuration
+
+Session optimisation settings in `src/config/constants.ts`:
+
+```typescript
+// Persistence timing
+export const SESSION_PERSIST_DEBOUNCE_MS = 1000;
+export const SESSION_PERSIST_EXTENDED_DEBOUNCE_MS = 5000;
+export const SESSION_RAPID_COMMAND_THRESHOLD_MS = 10000;
+
+// Session lifecycle
+export const SESSION_ARCHIVE_DAYS = 30;
+export const SESSION_CLEANUP_DAYS = 90;
+```
+
+---
+
+<details>
+<summary><strong>Implementation Details: Persistent Stage Output Caching</strong></summary>
 
 **File:** `src/executor/stage-output-cache.ts`
 
-Context loading stages (like `context.load-specifications`) are expensive LLM operations that parse and analyse documents. The persistent stage output cache eliminates redundant execution when source files haven't changed.
+Context loading stages (such as `context.load-specifications`) are expensive LLM operations that parse and analyse documents. The persistent stage output cache eliminates redundant execution when source files have not changed.
 
 **Cache configuration in pipeline stages:**
 
@@ -85,7 +174,7 @@ generateCacheKey(stageId, inputs, config): string {
 | Input change        | Different inputs produce different cache key          |
 | Manual invalidation | `stageOutputCache.invalidate()` or `clear()`          |
 
-**Cache storage location:**
+**Cache storage:**
 
 ```plaintext
 .valora/cache/stages/
@@ -112,7 +201,6 @@ interface StageCacheEntry {
 ```typescript
 // In stage-executor.ts
 async executeStage(stage, context, stageIndex, options) {
-  // Check cache first
   if (stage.cache?.enabled) {
     const cachedResult = await this.checkStageCache(stage, executionContext);
     if (cachedResult) {
@@ -120,10 +208,8 @@ async executeStage(stage, context, stageIndex, options) {
     }
   }
 
-  // Execute stage normally
   const result = await this.performStageExecution(stage, ...);
 
-  // Cache successful results
   if (stage.cache?.enabled && result.success) {
     await this.storeInCache(stage, executionContext, result);
   }
@@ -136,20 +222,20 @@ async executeStage(stage, context, stageIndex, options) {
 
 | Command          | Stage                                | File Dependencies                 | Estimated Savings |
 | ---------------- | ------------------------------------ | --------------------------------- | ----------------- |
-| `create-prd`     | `context.load-specifications`        | FUNCTIONAL.md, PRD.md             | 2-3 minutes       |
-| `create-backlog` | `context.load-prd`                   | PRD.md                            | 1-2 minutes       |
-| `generate-docs`  | `context.load-documentation-context` | PRD.md, FUNCTIONAL.md, BACKLOG.md | 2-3 minutes       |
+| `create-prd`     | `context.load-specifications`        | FUNCTIONAL.md, PRD.md             | 2–3 minutes       |
+| `create-backlog` | `context.load-prd`                   | PRD.md                            | 1–2 minutes       |
+| `generate-docs`  | `context.load-documentation-context` | PRD.md, FUNCTIONAL.md, BACKLOG.md | 2–3 minutes       |
 
-**Impact:** 2-3 minutes saved per command execution when source documents haven't changed.
+</details>
 
-### 2. Loader Cache Storage & Restoration
+<details>
+<summary><strong>Implementation Details: Loader Cache Storage and Restoration</strong></summary>
 
 **Files:** `src/cli/command-executor.ts`, `src/executor/agent-loader.ts`
 
 When a command executes successfully, loaded agents and prompts are cached in the session:
 
 ```typescript
-// Export cache after command execution
 saveLoaderCachesToSession(sessionManager) {
   const cachedAgents = this.agentLoader.exportCache();
   sessionManager.updateContext('_loaderCache', {
@@ -162,7 +248,6 @@ saveLoaderCachesToSession(sessionManager) {
 On session resume, caches are restored if still fresh (5-minute TTL):
 
 ```typescript
-// Restore cache on resume
 restoreLoaderCachesFromSession(sessionContext) {
   const loaderCache = sessionContext['_loaderCache'];
   const cacheAge = Date.now() - loaderCache.savedAt;
@@ -177,7 +262,10 @@ restoreLoaderCachesFromSession(sessionContext) {
 
 **Impact:** 90%+ faster agent loading by eliminating file I/O and markdown parsing.
 
-### 2. Stage Output Caching Between Commands
+</details>
+
+<details>
+<summary><strong>Implementation Details: Stage Output Caching Between Commands</strong></summary>
 
 **File:** `src/cli/command-executor.ts:470-494`
 
@@ -188,18 +276,16 @@ saveStageOutputsToSession(sessionManager, result) {
   const stageOutputs = {};
   for (const stage of result.stages) {
     if (stage.success && stage.outputs) {
-      const stageKey = stage.stage;
-      stageOutputs[stageKey] = stage.outputs;
+      stageOutputs[stage.stage] = stage.outputs;
     }
   }
 
-  // Merge with existing outputs
   const existing = sessionManager.getContext('_stageOutputs') ?? {};
   sessionManager.updateContext('_stageOutputs', { ...existing, ...stageOutputs });
 }
 ```
 
-Stage outputs are keyed by `stage.stage` (the stage name) only. Subsequent commands can reference previous outputs via variable resolution using `$STAGE_<stageName>`:
+Stage outputs are keyed by `stage.stage`. Subsequent commands can reference previous outputs via `$STAGE_<stageName>`:
 
 ```yaml
 # In pipeline stage definition
@@ -210,7 +296,10 @@ inputs:
 
 **Impact:** Eliminates redundant LLM calls by referencing cached analysis.
 
-### 3. Context Filtering for Token Reduction
+</details>
+
+<details>
+<summary><strong>Implementation Details: Context Filtering for Token Reduction</strong></summary>
 
 **Files:** `src/cli/execution-coordinator.ts:603-620`, `src/session/context.ts:246-297`
 
@@ -219,14 +308,12 @@ Before execution, the system scans pipeline stages for `$CONTEXT_*` references:
 ```typescript
 extractPipelineContextReferences(prompts): Set<string> {
   const references = new Set<string>();
-
   for (const stage of prompts.pipeline) {
     if (stage.inputs) {
       const refs = SessionContextManager.extractContextReferences(stage.inputs);
       refs.forEach(ref => references.add(ref));
     }
   }
-
   return references;
 }
 ```
@@ -234,14 +321,16 @@ extractPipelineContextReferences(prompts): Set<string> {
 Only referenced context is passed to the execution:
 
 ```typescript
-// Filter context to only what's needed
 const referencedKeys = extractPipelineContextReferences(command.prompts);
 const filteredContext = sessionManager.getFilteredContext([...referencedKeys]);
 ```
 
 **Impact:** ~40% token reduction by avoiding full session history in prompts.
 
-### 4. Variable Resolution with Session Data
+</details>
+
+<details>
+<summary><strong>Implementation Details: Variable Resolution</strong></summary>
 
 **File:** `src/executor/variable-resolution.service.ts`
 
@@ -265,9 +354,10 @@ resolve(template: string): string {
 }
 ```
 
-**Impact:** Seamless cross-command data sharing without re-fetching.
+</details>
 
-### 5. Session Snapshot for Fast Resume
+<details>
+<summary><strong>Implementation Details: Session Snapshot for Fast Resume</strong></summary>
 
 **File:** `src/session/store.ts:23-40, 427-495`
 
@@ -289,7 +379,7 @@ Dual-file storage strategy:
 
 | File Type            | Content                             | Purpose        |
 | -------------------- | ----------------------------------- | -------------- |
-| `{id}.json`          | Full session, encrypted             | Complete state |
+| `{id}.json`          | Full session                        | Complete state |
 | `{id}.snapshot.json` | Recent commands + essential context | Fast resume    |
 
 Resume flow:
@@ -301,21 +391,21 @@ async resume(options: SessionResumeOptions) {
 
   // 2. Load full session (complete history)
   const session = await this.store.loadSession(options.sessionId);
-
-  // Snapshot provides early context while full session loads
 }
 ```
 
-**Impact:** 2-5x faster context restoration on session resume.
+**Impact:** 2–5× faster context restoration on session resume.
 
-### 6. Debounced Persistence
+</details>
+
+<details>
+<summary><strong>Implementation Details: Debounced Persistence</strong></summary>
 
 **File:** `src/session/lifecycle.ts:40-194`
 
 Adaptive debouncing reduces disk I/O:
 
 ```typescript
-// Configuration (from config/constants.ts)
 SESSION_PERSIST_DEBOUNCE_MS = 1000; // Standard: 1 second
 SESSION_PERSIST_EXTENDED_DEBOUNCE_MS = 5000; // Extended: 5 seconds
 SESSION_RAPID_COMMAND_THRESHOLD_MS = 10000; // Detection window: 10 seconds
@@ -328,7 +418,6 @@ shouldUseExtendedDebounce(): boolean {
   const currentSessionId = this.currentSession.getSession().session_id;
   const timeSinceLastPersist = Date.now() - this.lastPersistTime;
 
-  // Use extended debounce if same session and recent persist
   return this.lastPersistSessionId === currentSessionId
       && timeSinceLastPersist < RAPID_COMMAND_THRESHOLD_MS;
 }
@@ -338,130 +427,17 @@ Persistence modes:
 
 | Mode      | Delay | Use Case                        |
 | --------- | ----- | ------------------------------- |
-| Debounced | 1-5s  | Normal command execution        |
+| Debounced | 1–5s  | Normal command execution        |
 | Immediate | 0ms   | Critical: complete, fail, pause |
 
 **Impact:** 80%+ reduction in disk writes during intensive batches.
 
-### 7. Session Mode Indicator
+</details>
 
-**File:** `src/output/processing-feedback.ts`
-
-The status bar indicates whether running from a resumed session:
-
-```plaintext
-⟳ Session ⠴ Processing | claude-3-5-sonnet | analyze | 5s | 1200 tokens
-● Live ⠴ Processing | claude-3-5-sonnet | analyze | 5s | 1200 tokens
-```
-
-This helps users understand when session optimisations are active.
-
-## Integration Flow
-
-```plaintext
-┌─────────────────────────────────────────────────────────────────┐
-│ Command Execution with Session Optimisation                     │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  1. Session Acquisition                                         │
-│     ├─ --session-id provided? → Resume existing session         │
-│     ├─ Load snapshot (fast, essential context)                  │
-│     └─ Load full session (complete history)                     │
-│                                                                 │
-│  2. Cache Restoration (if fresh, <5 min)                        │
-│     ├─ Inject cached agents → skip file parsing                 │
-│     └─ Import stage outputs → enable $STAGE_* resolution        │
-│                                                                 │
-│  3. Context Preparation                                         │
-│     ├─ Scan pipeline for $CONTEXT_* references                  │
-│     └─ Filter context to only referenced keys                   │
-│                                                                 │
-│  4. Pipeline Execution                                          │
-│     ├─ Variable resolution uses session data                    │
-│     ├─ Session mode indicator shown (Live/Session)              │
-│     └─ LLM calls with minimal context payload                   │
-│                                                                 │
-│  5. Post-Execution Persistence                                  │
-│     ├─ Merge outputs → session.context                          │
-│     ├─ Save stage outputs → session._stageOutputs               │
-│     ├─ Export loader caches → session._loaderCache              │
-│     ├─ Accumulate tokens → session.total_tokens_used            │
-│     └─ Persist (debounced, 1-5s delay)                          │
-│                                                                 │
-│  Next Command: All optimisations transparently applied          │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-## Performance Summary
-
-| Optimisation                 | Impact                                | When Active                              |
-| ---------------------------- | ------------------------------------- | ---------------------------------------- |
-| **Persistent stage caching** | **2-3 min saved per context load**    | **Unchanged source documents**           |
-| **Prompt caching**           | **Up to 90% input token savings**     | **Tool-loop iterations (all providers)** |
-| Loader cache reuse           | 90%+ faster agent loading             | Session resume with fresh cache          |
-| Stage output reference       | Eliminates redundant execution        | Multi-command workflows                  |
-| Context filtering            | ~40% token reduction                  | Pipelines with `$CONTEXT_*` refs         |
-| Snapshot resume              | 2-5x faster startup                   | Session resume with `--session-id`       |
-| Debounced persistence        | 80% fewer disk writes                 | Rapid command sequences                  |
-| Token tracking               | Full visibility (incl. cache metrics) | All sessions                             |
-
-### Prompt Caching
-
-Prompt caching is a provider-side optimisation that avoids re-processing identical prefixes across API calls within a tool loop. Each provider handles this differently:
-
-- **Anthropic** (`prompt_caching: true` in config): Explicit `cache_control` breakpoints on system prompt, tools, and last user message. Cached reads cost 0.1× the standard input rate (90% discount).
-- **OpenAI**: Automatic caching with no configuration. Cached reads cost 0.5× input (50% discount).
-- **Google**: Automatic context caching. Cached reads cost 0.25× input (75% discount).
-
-Cache metrics (`cache_creation_input_tokens`, `cache_read_input_tokens`) are extracted from all provider responses and displayed in the CLI token usage summary alongside context and generation breakdowns.
-
-## Usage
-
-### Resuming a Session
-
-```bash
-# Resume specific session for optimized execution
-valora implement plan.md --session-id my-feature
-
-# Session caches and context automatically restored
-```
-
-### Workflow Example
-
-```bash
-# Command 1: Plan (creates session context)
-valora plan "Add user authentication" --session-id auth-feature
-
-# Command 2: Implement (uses cached agents, references plan output)
-valora implement plan.md --session-id auth-feature
-
-# Command 3: Test (references implementation output)
-valora test --session-id auth-feature
-```
-
-Each subsequent command benefits from:
-
-- Cached agent definitions (no re-parsing)
-- Previous stage outputs (no re-analysis)
-- Accumulated context (progressive understanding)
-
-## Configuration
-
-Session optimisation settings in `src/config/constants.ts`:
-
-```typescript
-// Persistence timing
-export const SESSION_PERSIST_DEBOUNCE_MS = 1000;
-export const SESSION_PERSIST_EXTENDED_DEBOUNCE_MS = 5000;
-export const SESSION_RAPID_COMMAND_THRESHOLD_MS = 10000;
-
-// Session lifecycle
-export const SESSION_ARCHIVE_DAYS = 30;
-export const SESSION_CLEANUP_DAYS = 90;
-```
+---
 
 ## Related Documentation
 
-- [System Architecture](./system-architecture.md) - Overall system design
-- [Data Flow](./data-flow.md) - How data moves through the system
-- [Components](./components.md) - Component responsibilities
+- [System Architecture](./system-architecture.md) — Overall system design
+- [Data Flow](./data-flow.md) — How data moves through the system
+- [Components](./components.md) — Component responsibilities

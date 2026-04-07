@@ -4,25 +4,15 @@
 
 ## Prerequisites
 
-### Required Software
+| Software | Version  | Purpose            |
+| -------- | -------- | ------------------ |
+| Node.js  | >=18.0.0 | JavaScript runtime |
+| pnpm     | 10.x     | Package manager    |
+| Git      | 2.x+     | Version control    |
 
-| Software | Version | Purpose            |
-| -------- | ------- | ------------------ |
-| Node.js  | 18.0.0+ | JavaScript runtime |
-| pnpm     | 10.x    | Package manager    |
-| Git      | 2.x+    | Version control    |
+## Installation
 
-### Optional Software
-
-| Software   | Purpose                     |
-| ---------- | --------------------------- |
-| Docker     | Container testing           |
-| Cursor IDE | Best development experience |
-| VS Code    | Alternative IDE             |
-
-## Installation Steps
-
-### 1. Clone the Repository
+### 1. Clone the repository
 
 ```bash
 git clone <repository-url>
@@ -31,21 +21,18 @@ cd valora
 
 ### 2. Install Node.js
 
-We recommend using Volta for Node.js version management:
+Use [Volta](https://volta.sh/) (recommended) — it pins the exact version from `package.json` automatically:
 
 ```bash
-# Install Volta
 curl https://get.volta.sh | bash
-
-# Volta will automatically use the correct Node.js version
-# (specified in package.json volta config)
+# Volta reads .volta in package.json and uses the pinned version
 ```
 
-Or use nvm:
+Or use [nvm](https://github.com/nvm-sh/nvm):
 
 ```bash
-nvm install 22
-nvm use 22
+nvm install 18
+nvm use 18
 ```
 
 ### 3. Install pnpm
@@ -60,40 +47,86 @@ Or with Volta:
 volta install pnpm@10
 ```
 
-### 4. Install Dependencies
-
-From the repository root:
+### 4. Install dependencies
 
 ```bash
 pnpm install
 ```
 
-This will:
+This installs all dependencies from the frozen lockfile, sets up Husky git hooks, and runs the build.
 
-- Install all dependencies from the frozen lockfile (no lockfile mutations)
-- Set up Husky git hooks
-- Build the project
+> The project enforces `frozen-lockfile=true` in `.npmrc`. See [Supply Chain Security](#supply-chain-security) for details.
 
-> **Note**: The project enforces `frozen-lockfile=true` and `ignore-scripts=true` in `.npmrc`. See [Supply Chain Security](#supply-chain-security) below for details.
-
-### 5. Verify Installation
+### 5. Verify installation
 
 ```bash
-# Check the CLI works
+# Confirm the CLI responds
 pnpm dev --version
 
-# Run the test suite
+# Run the smoke test suite
 pnpm test:smoke
 ```
 
-## Environment Configuration
+---
 
-### Configuration File
+## Development Commands
 
-The engine uses a multi-level configuration cascade. The default configuration is at `data/config.default.json`. For development, you can create a project-level override:
+### Essential
+
+| Command          | Description                          |
+| ---------------- | ------------------------------------ |
+| `pnpm dev`       | Run in development mode (tsx)        |
+| `pnpm dev:watch` | Run with auto-reload on file changes |
+| `pnpm build`     | Compile TypeScript to `dist/`        |
+| `pnpm format`    | Format and lint code                 |
+| `pnpm tsc:check` | Type-check without building          |
+
+### Testing
+
+| Command                       | Description         |
+| ----------------------------- | ------------------- |
+| `pnpm test:smoke`             | Fast sanity check   |
+| `pnpm test:suite:unit`        | Unit tests only     |
+| `pnpm test:suite:integration` | Integration tests   |
+| `pnpm test:suite:e2e`         | End-to-end tests    |
+| `pnpm test:coverage`          | Tests with coverage |
+| `pnpm test:quick`             | Unit + integration  |
+
+### Build
+
+| Command            | Description           |
+| ------------------ | --------------------- |
+| `pnpm clean:build` | Clean build artefacts |
+| `pnpm build`       | Full build            |
+| `pnpm build:watch` | Watch mode build      |
+
+### Code quality
+
+| Command             | Description        |
+| ------------------- | ------------------ |
+| `pnpm lint`         | Check linting      |
+| `pnpm lint:fix`     | Fix linting issues |
+| `pnpm beautify`     | Check formatting   |
+| `pnpm beautify:fix` | Fix formatting     |
+
+### Security
+
+| Command           | Description                              |
+| ----------------- | ---------------------------------------- |
+| `pnpm audit`      | Audit all dependencies for known CVEs    |
+| `pnpm audit:prod` | Audit production dependencies only       |
+| `pnpm audit:fix`  | Attempt automated vulnerability patching |
+
+---
+
+## Configuration
+
+### Project configuration
+
+VALORA uses a multi-level configuration cascade. The defaults live in `data/config.default.json`. Initialise a project-level override with:
 
 ```bash
-valora init  # Creates .valora/config.json
+valora init  # creates .valora/config.json
 ```
 
 ```json
@@ -109,22 +142,9 @@ valora init  # Creates .valora/config.json
 }
 ```
 
-### Environment Variables
+### API keys
 
-For API-based execution, set these environment variables:
-
-```bash
-# Anthropic (Claude)
-export ANTHROPIC_API_KEY=sk-ant-...
-
-# OpenAI
-export OPENAI_API_KEY=sk-...
-
-# Google AI
-export GOOGLE_API_KEY=...
-```
-
-Create a `.env` file in the repository root:
+Create a `.env` file in the repository root (gitignored):
 
 ```plaintext
 ANTHROPIC_API_KEY=sk-ant-...
@@ -132,126 +152,15 @@ OPENAI_API_KEY=sk-...
 GOOGLE_API_KEY=...
 ```
 
-### IDE Configuration
-
-#### VS Code / Cursor
-
-The project includes VS Code settings in `.vscode/`:
-
-Recommended extensions:
-
-- ESLint
-- Prettier
-- TypeScript and JavaScript Language Features
-- Error Lens
-
-Settings are pre-configured for:
-
-- Format on save
-- ESLint auto-fix
-- TypeScript strict mode
-
-## Project Structure
-
-After cloning and installing, your directory structure should be:
-
-```plaintext
-valora/                      # Repository root = npm package root
-├── bin/                     # CLI entry points
-│   ├── valora.js            # Main CLI entry
-│   └── mcp.js               # MCP server entry
-├── src/                     # TypeScript source code
-│   ├── cli/                 # Command-line interface
-│   ├── config/              # Configuration management
-│   ├── di/                  # Dependency injection
-│   ├── executor/            # Pipeline execution
-│   ├── exploration/         # Parallel exploration
-│   ├── llm/                 # LLM provider integrations
-│   ├── mcp/                 # MCP server implementation
-│   ├── output/              # Output formatting
-│   ├── services/            # Shared services
-│   ├── session/             # Session management
-│   ├── types/               # Global type definitions
-│   ├── ui/                  # Terminal UI components
-│   └── utils/               # Utilities & path resolution
-├── data/                    # Built-in resources (shipped with package)
-│   ├── agents/              # Agent definitions
-│   ├── commands/            # Command specifications
-│   ├── prompts/             # Prompt templates
-│   ├── templates/           # Document templates
-│   ├── hooks/               # Hook scripts
-│   ├── config.default.json  # Default configuration
-│   ├── hooks.default.json   # Default hooks configuration
-│   └── external-mcp.default.json # External MCP server registry
-├── dist/                    # Compiled output (gitignored)
-├── tests/                   # Test suites
-├── scripts/                 # Development scripts
-├── documentation/           # Comprehensive documentation
-├── node_modules/            # Dependencies
-├── package.json             # Package configuration
-├── tsconfig.json            # TypeScript config
-├── eslint.config.js         # ESLint config
-└── vitest.config.ts         # Test config
-```
-
-## Development Commands
-
-### Essential Commands
-
-| Command          | Description                          |
-| ---------------- | ------------------------------------ |
-| `pnpm dev`       | Run in development mode              |
-| `pnpm dev:watch` | Run with auto-reload on file changes |
-| `pnpm build`     | Build the project                    |
-| `pnpm test`      | Run all tests                        |
-| `pnpm lint`      | Run ESLint                           |
-| `pnpm format`    | Format code                          |
-
-### Build Commands
-
-| Command            | Description           |
-| ------------------ | --------------------- |
-| `pnpm clean:build` | Clean build artefacts |
-| `pnpm build`       | Full build            |
-| `pnpm build:watch` | Watch mode build      |
-
-### Test Commands
-
-| Command                       | Description         |
-| ----------------------------- | ------------------- |
-| `pnpm test:suite:unit`        | Unit tests only     |
-| `pnpm test:suite:integration` | Integration tests   |
-| `pnpm test:suite:e2e`         | End-to-end tests    |
-| `pnpm test:coverage`          | Tests with coverage |
-| `pnpm test:quick`             | Fast test subset    |
-
-### Quality Commands
-
-| Command             | Description        |
-| ------------------- | ------------------ |
-| `pnpm lint`         | Check linting      |
-| `pnpm lint:fix`     | Fix linting issues |
-| `pnpm beautify`     | Check formatting   |
-| `pnpm beautify:fix` | Fix formatting     |
-| `pnpm tsc:check`    | Type checking      |
-
-### Security Commands
-
-| Command           | Description                                |
-| ----------------- | ------------------------------------------ |
-| `pnpm audit`      | Audit all dependencies for vulnerabilities |
-| `pnpm audit:prod` | Audit production dependencies only         |
-| `pnpm audit:fix`  | Attempt to auto-fix vulnerabilities        |
+---
 
 ## Supply Chain Security
 
-The project enforces several supply chain hardening measures via `.npmrc` and `package.json`. These are documented in [ADR-009](../adr/009-supply-chain-hardening.md).
+The project applies several hardening measures via `.npmrc` and `package.json`, documented in [ADR-009](../adr/009-supply-chain-hardening.md).
 
-### Frozen Lockfile
+### Frozen lockfile
 
-`.npmrc` sets `frozen-lockfile=true`, which prevents `pnpm install` from silently modifying `pnpm-lock.yaml`. This catches lockfile drift and ensures reproducible installs.
-
-To update dependencies intentionally:
+`frozen-lockfile=true` prevents `pnpm install` from silently modifying `pnpm-lock.yaml`. To update dependencies intentionally:
 
 ```bash
 # Update a specific package
@@ -261,13 +170,11 @@ pnpm update <package-name> --config.frozen-lockfile=false
 pnpm update --config.frozen-lockfile=false
 ```
 
-### Dependency Install Scripts Blocked
+### Blocked install scripts
 
-`.npmrc` sets `ignore-scripts=true`, which blocks lifecycle scripts (`postinstall`, `install`, `preinstall`) from all dependencies. This is the primary defence against supply chain attacks via malicious install scripts.
+`ignore-scripts=true` prevents lifecycle scripts (`postinstall`, `preinstall`) from all third-party dependencies. Root scripts (`prepare`, `prebuild`, `postbuild`) are unaffected.
 
-Root project scripts (`prepare`, `prebuild`, `postbuild`) are unaffected.
-
-If a new dependency legitimately requires a build step (e.g., native compilation), add it to `pnpm.onlyBuiltDependencies` in `package.json`:
+If a new dependency legitimately requires a build step (e.g., native compilation), allowlist it:
 
 ```json
 {
@@ -277,64 +184,107 @@ If a new dependency legitimately requires a build step (e.g., native compilation
 }
 ```
 
-### Vulnerability Overrides
+### Vulnerability overrides
 
-Transitive vulnerabilities that cannot be fixed by updating direct dependencies are patched via `pnpm.overrides` in `package.json`. When adding or reviewing overrides, run:
+Transitive vulnerabilities patched via `pnpm.overrides` in `package.json`. After any dependency change, run:
 
 ```bash
-pnpm audit:prod                          # Check production vulnerabilities
-pnpm audit --prod --audit-level=high     # Check high/critical only
+pnpm audit:prod
+pnpm audit --prod --audit-level=high
 ```
 
 ### Dependabot
 
-Automated dependency updates are configured in `.github/dependabot.yml`. Dependabot groups minor/patch updates into two weekly PRs (production and dev dependencies). Major version bumps get individual PRs for careful review.
+Automated updates are configured in `.github/dependabot.yml`. Minor/patch updates are grouped into two weekly PRs. Major bumps get individual PRs for manual review.
+
+---
 
 ## Troubleshooting
 
-### Common Issues
-
-#### pnpm Install Fails
+**`pnpm install` fails**
 
 ```bash
-# Clear pnpm cache
 pnpm store prune
-
-# Remove node_modules and reinstall
 rm -rf node_modules
 pnpm install
 ```
 
-#### Build Errors
+**Build errors**
 
 ```bash
-# Clean and rebuild
-pnpm clean:build
-pnpm build
+pnpm clean:build && pnpm build
 ```
 
-#### Type Errors
+**Type errors**
 
 ```bash
-# Check types without build
 pnpm tsc:check
 ```
 
-#### Test Failures
+**Test failures**
 
 ```bash
-# Run with verbose output
 pnpm test:suite:unit -- --reporter=verbose
 ```
 
-### Getting Help
+**Getting help**
 
-1. Check logs: `valora doctor` shows log locations
-2. Run diagnostics: `pnpm dev doctor`
-3. Review the [Architecture Documentation](../architecture/README.md)
+1. Run `valora doctor` — shows log file locations and environment info
+2. Run `pnpm dev doctor` — equivalent in development mode
+3. See the [Architecture Documentation](../architecture/README.md)
+
+---
+
+<details>
+<summary><strong>IDE configuration</strong></summary>
+
+The repository ships with `.vscode/` settings pre-configured for:
+
+- Format on save (Prettier)
+- ESLint auto-fix on save
+- TypeScript strict mode
+
+Recommended VS Code / Cursor extensions:
+
+- ESLint (`dbaeumer.vscode-eslint`)
+- Prettier (`esbenp.prettier-vscode`)
+- TypeScript and JavaScript Language Features (built-in)
+- Error Lens (`usernamehw.errorlens`)
+
+</details>
+
+<details>
+<summary><strong>Optional tooling</strong></summary>
+
+| Tool       | Purpose                                 | Install                          |
+| ---------- | --------------------------------------- | -------------------------------- |
+| Docker     | Container-based testing                 | [docker.com](https://docker.com) |
+| Cursor IDE | Best Valora development UX              | [cursor.com](https://cursor.com) |
+| Stryker    | Mutation testing (`pnpm test:mutation`) | already a dev dependency         |
+
+The project's CLI enforcement hook (see [ADR-008](../adr/008-pretooluse-cli-enforcement.md)) blocks legacy commands like `grep`, `find`, and `ls` in favour of `rg`, `fd`, and `eza`. Install the modern CLI toolkit described in [modern-cli-toolkit/README.md](./modern-cli-toolkit/README.md).
+
+</details>
+
+<details>
+<summary><strong>Environment variables reference</strong></summary>
+
+| Variable            | Required | Description                       |
+| ------------------- | -------- | --------------------------------- |
+| `ANTHROPIC_API_KEY` | Optional | Enables Anthropic/Claude provider |
+| `OPENAI_API_KEY`    | Optional | Enables OpenAI provider           |
+| `GOOGLE_API_KEY`    | Optional | Enables Google AI provider        |
+| `VALORA_LOG_LEVEL`  | Optional | Overrides `log_level` in config   |
+| `VALORA_DATA_DIR`   | Optional | Overrides default data directory  |
+
+At least one provider API key is required for execution. The `cursor` provider requires no key — it uses the active Cursor IDE session.
+
+</details>
+
+---
 
 ## Next Steps
 
 1. Read the [Codebase Overview](./codebase.md)
 2. Review [Contributing Guidelines](./contributing.md)
-3. Start with a small fix or improvement
+3. Pick an open issue tagged `good first issue`

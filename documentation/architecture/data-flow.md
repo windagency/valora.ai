@@ -2,10 +2,6 @@
 
 > Data flow, state management, and integration patterns in VALORA.
 
-## Overview
-
-This document describes how data flows through the system, how state is managed, and how different components integrate.
-
 ## Primary Data Flows
 
 ### 1. Command Execution Flow
@@ -45,31 +41,84 @@ flowchart TD
     E --> P
 ```
 
-### 2. Session Data Flow
+### 2. Pipeline Execution Flow
 
 ```mermaid
-flowchart LR
-    subgraph Command
-        A[Command Start] --> B[Load Session]
-        B --> C[Execute]
-        C --> D[Capture Output]
-        D --> E[Update Session]
-        E --> F[Persist]
-    end
+sequenceDiagram
+    participant User
+    participant CLI
+    participant Resolver
+    participant Pipeline
+    participant Agent
+    participant LLM
+    participant Session
 
-    subgraph Storage
-        G[(Session File)] --> B
-        F --> G
-    end
-
-    subgraph Context
-        H[Previous Outputs] --> C
-        D --> I[Context Aggregation]
-        I --> H
-    end
+    User->>CLI: valora plan "feature"
+    CLI->>Resolver: resolveCommand("plan")
+    Resolver-->>CLI: CommandSpec
+    CLI->>Pipeline: execute(spec, args)
+    Pipeline->>Session: loadContext()
+    Session-->>Pipeline: context
+    Pipeline->>Agent: selectAgent(task)
+    Agent-->>Pipeline: @lead
+    Pipeline->>LLM: sendPrompt(prompt)
+    LLM-->>Pipeline: response
+    Pipeline->>Session: saveOutput()
+    Pipeline-->>CLI: result
+    CLI-->>User: formatted output
 ```
 
-### 3. Interactive Clarification Flow
+### 3. LLM Request Flow
+
+```mermaid
+sequenceDiagram
+    participant Executor
+    participant Registry
+    participant Provider
+    participant API
+
+    Executor->>Registry: getProvider(name)
+    Registry-->>Executor: provider
+    Executor->>Provider: sendPrompt(prompt, options)
+    Provider->>Provider: applyCacheBreakpoints(params)
+    Provider->>API: HTTP POST (with cache_control markers)
+    API-->>Provider: response (incl. cache metrics)
+    Provider->>Provider: extractUsage(response)
+    Provider-->>Executor: LLMResponse {usage: {cache_read, cache_write, ...}}
+```
+
+Prompt caching reduces input token costs across tool-loop iterations. Each provider applies its own caching strategy:
+
+- **Anthropic**: Injects `cache_control: { type: "ephemeral" }` breakpoints on system prompt, tools, and last user message (when `prompt_caching: true`)
+- **OpenAI**: Automatic caching — extracts `cached_tokens` from `prompt_tokens_details`
+- **Google**: Automatic caching — extracts `cachedContentTokenCount` from `usageMetadata`
+
+Cache metrics are normalised into `LLMUsage.cache_creation_input_tokens` and `LLMUsage.cache_read_input_tokens`. For caching implementation detail, see [Session Optimisation](./session-optimization.md).
+
+### 4. MCP Integration Flow
+
+```mermaid
+sequenceDiagram
+    participant Cursor
+    participant MCPServer
+    participant ToolHandler
+    participant Engine
+    participant LLM
+
+    Cursor->>MCPServer: ListTools
+    MCPServer-->>Cursor: [ai_plan, ai_implement, ...]
+
+    Cursor->>MCPServer: CallTool(ai_plan, args)
+    MCPServer->>ToolHandler: handle(ai_plan, args)
+    ToolHandler->>Engine: execute(plan, args)
+    Engine->>LLM: sendPrompt()
+    LLM-->>Engine: response
+    Engine-->>ToolHandler: result
+    ToolHandler-->>MCPServer: ToolResult
+    MCPServer-->>Cursor: response
+```
+
+### 5. Interactive Clarification Flow
 
 When commands require user input to resolve ambiguities, the pipeline pauses for interactive clarification:
 
@@ -96,7 +145,8 @@ sequenceDiagram
     end
 ```
 
-**Key Data Structures:**
+<details>
+<summary><strong>Clarification Data Structures</strong></summary>
 
 ```typescript
 interface ClarifyingQuestion {
@@ -126,38 +176,13 @@ interface ClarificationOutput {
 }
 ```
 
-### 4. LLM Request Flow
+</details>
 
-```mermaid
-sequenceDiagram
-    participant Executor
-    participant Registry
-    participant Provider
-    participant API
-
-    Executor->>Registry: getProvider(name)
-    Registry-->>Executor: provider
-    Executor->>Provider: sendPrompt(prompt, options)
-    Provider->>Provider: applyCacheBreakpoints(params)
-    Provider->>API: HTTP POST (with cache_control markers)
-    API-->>Provider: response (incl. cache metrics)
-    Provider->>Provider: extractUsage(response)
-    Provider-->>Executor: LLMResponse {usage: {cache_read, cache_write, ...}}
-```
-
-**Prompt caching** reduces input token costs across tool-loop iterations. Each provider applies its own caching strategy:
-
-- **Anthropic**: Injects `cache_control: { type: "ephemeral" }` breakpoints on system prompt, tools, and last user message (when `prompt_caching: true`)
-- **OpenAI**: Automatic caching — extracts `cached_tokens` from `prompt_tokens_details`
-- **Google**: Automatic caching — extracts `cachedContentTokenCount` from `usageMetadata`
-
-Cache metrics are normalised into `LLMUsage.cache_creation_input_tokens` and `LLMUsage.cache_read_input_tokens`, enabling the CLI to display cache hit rates and cost savings across all providers.
+---
 
 ## State Management
 
 ### Session State
-
-Sessions maintain the following state:
 
 ```typescript
 interface SessionState {
@@ -186,24 +211,28 @@ interface SessionState {
 }
 ```
 
-### State Transitions
+### Session Data Flow
 
 ```mermaid
-stateDiagram-v2
-    [*] --> Idle: Session Created
+flowchart LR
+    subgraph Command
+        A[Command Start] --> B[Load Session]
+        B --> C[Execute]
+        C --> D[Capture Output]
+        D --> E[Update Session]
+        E --> F[Persist]
+    end
 
-    state Active {
-        Idle --> Loading: Command Received
-        Loading --> Executing: Context Loaded
-        Executing --> Processing: LLM Response
-        Processing --> Updating: Output Processed
-        Updating --> Idle: Session Updated
-    }
+    subgraph Storage
+        G[(Session File)] --> B
+        F --> G
+    end
 
-    Active --> Suspended: Timeout
-    Active --> Completed: User Ends
-    Suspended --> Active: Resume
-    Completed --> [*]
+    subgraph Context
+        H[Previous Outputs] --> C
+        D --> I[Context Aggregation]
+        I --> H
+    end
 ```
 
 ### Context Propagation
@@ -241,9 +270,130 @@ flowchart TD
     E -.->|Available to| F
 ```
 
+---
+
+## Data Persistence
+
+### File Structure
+
+```plaintext
+.valora/
+├── sessions/
+│   ├── session-abc123.json
+│   └── session-def456.json
+├── logs/
+│   ├── <date>.log
+│   └── latest.log -> <date>.log
+├── batches/
+│   └── <localId>.json
+├── index/               ← AST symbol index (sharded JSON)
+│   ├── manifest.json
+│   ├── files.json
+│   └── symbols-*.json
+└── spending.jsonl        ← append-only per-request cost ledger
+```
+
+### spending.jsonl Record Format
+
+```json
+{
+	"id": "1741609384000-review",
+	"command": "review",
+	"stage": "context+analysis+synthesis",
+	"model": "claude-3-5-sonnet-latest",
+	"promptTokens": 29817,
+	"completionTokens": 19063,
+	"cacheReadTokens": 12000,
+	"cacheWriteTokens": 0,
+	"totalTokens": 48880,
+	"costUsd": 0.0124,
+	"cacheSavingsUsd": 0.0036,
+	"durationMs": 3200,
+	"timestamp": "2026-03-10T14:23:01.000Z",
+	"batchDiscounted": false
+}
+```
+
+### Session File Format
+
+```json
+{
+	"id": "session-abc123",
+	"createdAt": "...",
+	"updatedAt": "...",
+	"context": {
+		"currentTask": {},
+		"history": []
+	},
+	"outputs": {
+		"plan": {},
+		"implement": {}
+	},
+	"metadata": {
+		"commandCount": 5,
+		"lastCommand": "review-code",
+		"totalTokens": 15000
+	}
+}
+```
+
+---
+
+## What's Cached
+
+| Data Type         | Cache Location        | TTL                |
+| ----------------- | --------------------- | ------------------ |
+| Agent definitions | Memory                | Session lifetime   |
+| Command specs     | Memory                | Session lifetime   |
+| Prompt templates  | Memory                | Session lifetime   |
+| Configuration     | Memory                | Until reload       |
+| Session data      | File                  | Configurable       |
+| LLM prompt tokens | Provider-side (API)   | ~5 minutes         |
+| LLM responses     | None                  | Not cached         |
+| AST symbol index  | File (.valora/index/) | Until file changes |
+
+LLM prompt token caching is handled server-side by the provider APIs — the provider injects cache markers in the request and extracts cache metrics from the response. For the full caching implementation, see [Session Optimisation](./session-optimization.md).
+
+---
+
+## Metrics and Observability
+
+| Metric               | Type      | Description                                |
+| -------------------- | --------- | ------------------------------------------ |
+| command_duration     | Histogram | Command execution time                     |
+| llm_request_duration | Histogram | LLM API latency                            |
+| session_count        | Gauge     | Active sessions                            |
+| error_count          | Counter   | Errors by type                             |
+| token_usage          | Counter   | Tokens consumed                            |
+| cache_read_tokens    | Counter   | Tokens read from prompt cache              |
+| cache_write_tokens   | Counter   | Tokens written to prompt cache             |
+| cost_usd             | Ledger    | Per-request USD cost (spending.jsonl)      |
+| cache_savings_usd    | Ledger    | Per-request cache savings (spending.jsonl) |
+
+### Log Structure
+
+```json
+{
+	"timestamp": "...",
+	"level": "info",
+	"component": "executor",
+	"message": "Pipeline execution started",
+	"context": {
+		"command": "plan",
+		"sessionId": "abc123",
+		"agent": "lead"
+	}
+}
+```
+
+---
+
 ## Integration Patterns
 
-### 1. Provider Integration
+<details>
+<summary><strong>Provider Integration, GitHub Integration, and Concurrency Patterns</strong></summary>
+
+### Provider Integration
 
 ```mermaid
 flowchart TD
@@ -279,30 +429,7 @@ flowchart TD
     G --> K
 ```
 
-### 2. MCP Integration
-
-```mermaid
-sequenceDiagram
-    participant Cursor
-    participant MCPServer
-    participant ToolHandler
-    participant Engine
-    participant LLM
-
-    Cursor->>MCPServer: ListTools
-    MCPServer-->>Cursor: [ai_plan, ai_implement, ...]
-
-    Cursor->>MCPServer: CallTool(ai_plan, args)
-    MCPServer->>ToolHandler: handle(ai_plan, args)
-    ToolHandler->>Engine: execute(plan, args)
-    Engine->>LLM: sendPrompt()
-    LLM-->>Engine: response
-    Engine-->>ToolHandler: result
-    ToolHandler-->>MCPServer: ToolResult
-    MCPServer-->>Cursor: response
-```
-
-### 3. GitHub Integration
+### GitHub Integration
 
 ```mermaid
 sequenceDiagram
@@ -319,154 +446,6 @@ sequenceDiagram
     GitHub-->>GitHelper: Reviewers assigned
     GitHelper-->>Engine: PRResult
 ```
-
-## Data Transformation
-
-### Prompt Assembly
-
-```mermaid
-flowchart TD
-    subgraph Inputs
-        A[Agent Definition]
-        B[Command Spec]
-        C[User Input]
-        D[Session Context]
-        E[Knowledge Base]
-    end
-
-    subgraph Assembly
-        F[Template Engine]
-        G[Variable Resolution]
-        H[Context Injection]
-    end
-
-    subgraph Output
-        I[Final Prompt]
-    end
-
-    A --> F
-    B --> F
-    C --> F
-    D --> G
-    E --> H
-    F --> G
-    G --> H
-    H --> I
-```
-
-### Response Processing
-
-```mermaid
-flowchart TD
-    subgraph Input
-        A[LLM Response]
-    end
-
-    subgraph Processing
-        B[Parse Response]
-        C[Extract Structured Data]
-        D[Validate Output]
-        E[Transform Format]
-    end
-
-    subgraph Storage
-        F[Update Session]
-        G[Update Context]
-    end
-
-    subgraph Display
-        H[Format for CLI]
-        I[User Output]
-    end
-
-    A --> B
-    B --> C
-    C --> D
-    D --> E
-    E --> F
-    E --> G
-    E --> H
-    H --> I
-```
-
-## Caching Strategy
-
-### Cache Layers
-
-```mermaid
-flowchart TD
-    subgraph Request
-        A[Incoming Request]
-    end
-
-    subgraph Caching
-        B{Memory Cache}
-        C{File Cache}
-        D{No Cache}
-    end
-
-    subgraph Execution
-        E[Execute Request]
-    end
-
-    A --> B
-    B -->|Hit| F[Return Cached]
-    B -->|Miss| C
-    C -->|Hit| G[Load & Return]
-    C -->|Miss| D
-    D --> E
-    E --> H[Cache Result]
-    H --> F
-```
-
-### What's Cached
-
-| Data Type         | Cache Location        | TTL                |
-| ----------------- | --------------------- | ------------------ |
-| Agent definitions | Memory                | Session lifetime   |
-| Command specs     | Memory                | Session lifetime   |
-| Prompt templates  | Memory                | Session lifetime   |
-| Configuration     | Memory                | Until reload       |
-| Session data      | File                  | Configurable       |
-| LLM prompt tokens | Provider-side (API)   | ~5 minutes         |
-| LLM responses     | None                  | Not cached         |
-| AST symbol index  | File (.valora/index/) | Until file changes |
-
-**LLM prompt token caching** is handled server-side by the provider APIs. When prompt caching is active, the system prompt, tool definitions, and conversation history are cached by the API and reused across tool-loop iterations. This is transparent to the application — the provider injects cache markers in the request and extracts cache metrics from the response.
-
-## Error Propagation
-
-```mermaid
-flowchart TD
-    subgraph Source
-        A[LLM API Error]
-        B[Validation Error]
-        C[File System Error]
-        D[Configuration Error]
-    end
-
-    subgraph Handler
-        E[Error Wrapper]
-        F[Error Classification]
-    end
-
-    subgraph Response
-        G[User Message]
-        H[Log Entry]
-        I[Recovery Action]
-    end
-
-    A --> E
-    B --> E
-    C --> E
-    D --> E
-    E --> F
-    F --> G
-    F --> H
-    F --> I
-```
-
-## Concurrency Patterns
 
 ### Parallel Stage Execution
 
@@ -517,100 +496,39 @@ sequenceDiagram
     Pipeline2->>Lock: release()
 ```
 
-## Data Persistence
+</details>
 
-### File Structure
+<details>
+<summary><strong>Error Propagation</strong></summary>
 
-```plaintext
-.valora/
-├── sessions/
-│   ├── session-abc123.json
-│   └── session-def456.json
-├── logs/
-│   ├── 2024-01-15.log
-│   └── latest.log -> 2024-01-15.log
-├── batches/
-│   └── <localId>.json
-├── index/               ← AST symbol index (sharded JSON)
-│   ├── manifest.json
-│   ├── files.json
-│   └── symbols-*.json
-├── spending.jsonl        ← append-only per-request cost ledger
-└── config.json
+```mermaid
+flowchart TD
+    subgraph Source
+        A[LLM API Error]
+        B[Validation Error]
+        C[File System Error]
+        D[Configuration Error]
+    end
+
+    subgraph Handler
+        E[Error Wrapper]
+        F[Error Classification]
+    end
+
+    subgraph Response
+        G[User Message]
+        H[Log Entry]
+        I[Recovery Action]
+    end
+
+    A --> E
+    B --> E
+    C --> E
+    D --> E
+    E --> F
+    F --> G
+    F --> H
+    F --> I
 ```
 
-Each line of `spending.jsonl` is a JSON object with the following fields:
-
-```json
-{
-	"id": "1741609384000-review",
-	"command": "review",
-	"stage": "context+analysis+synthesis",
-	"model": "claude-3-5-sonnet-latest",
-	"promptTokens": 29817,
-	"completionTokens": 19063,
-	"cacheReadTokens": 12000,
-	"cacheWriteTokens": 0,
-	"totalTokens": 48880,
-	"costUsd": 0.0124,
-	"cacheSavingsUsd": 0.0036,
-	"durationMs": 3200,
-	"timestamp": "2026-03-10T14:23:01.000Z",
-	"batchDiscounted": false
-}
-```
-
-### Session File Format
-
-```json
-{
-  "id": "session-abc123",
-  "createdAt": "2024-01-15T10:00:00Z",
-  "updatedAt": "2024-01-15T11:30:00Z",
-  "context": {
-    "currentTask": { ... },
-    "history": [ ... ]
-  },
-  "outputs": {
-    "plan": { ... },
-    "implement": { ... }
-  },
-  "metadata": {
-    "commandCount": 5,
-    "lastCommand": "review-code",
-    "totalTokens": 15000
-  }
-}
-```
-
-## Metrics and Observability
-
-### Collected Metrics
-
-| Metric               | Type      | Description                                |
-| -------------------- | --------- | ------------------------------------------ |
-| command_duration     | Histogram | Command execution time                     |
-| llm_request_duration | Histogram | LLM API latency                            |
-| session_count        | Gauge     | Active sessions                            |
-| error_count          | Counter   | Errors by type                             |
-| token_usage          | Counter   | Tokens consumed                            |
-| cache_read_tokens    | Counter   | Tokens read from prompt cache              |
-| cache_write_tokens   | Counter   | Tokens written to prompt cache             |
-| cost_usd             | Ledger    | Per-request USD cost (spending.jsonl)      |
-| cache_savings_usd    | Ledger    | Per-request cache savings (spending.jsonl) |
-
-### Log Structure
-
-```json
-{
-	"timestamp": "2024-01-15T10:00:00Z",
-	"level": "info",
-	"component": "executor",
-	"message": "Pipeline execution started",
-	"context": {
-		"command": "plan",
-		"sessionId": "abc123",
-		"agent": "lead"
-	}
-}
-```
+</details>
