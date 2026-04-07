@@ -100,9 +100,22 @@ Use the **@lead** agent profile for orchestration, spawning parallel subprocesse
 - **@software-engineer-typescript-backend** subprocess for backend documentation
 - **@software-engineer-typescript-frontend** subprocess for frontend documentation
 
+## Documentation Philosophy — MANDATORY
+
+Every document has two audiences. Confusing them makes documentation useless to both.
+
+1. **Consumers** scan like a menu: find the thing, see what it takes, copy the example, move on. They will not read a wall of text. Too much information and no information accomplish the same goal — both get skipped.
+2. **Maintainers** need the full picture: why there are two calls, why a field is nullable, the historical context. They debug at 2AM.
+
+**Structure rule**: Lead with WHAT it does. Follow with HOW to use it. Bury the WHY behind `<details>` collapsible sections. The goal is not completeness. The goal is transferring the right information to the right person at the right moment.
+
+**Collapsible sections are mandatory for maintainer context.** Use HTML `<details><summary>` tags. Consumers skim past them. Maintainers expand them.
+
+**If a section has no meaningful project-specific content, omit it.** An empty "Best Practices" section with generic advice is worse than no section.
+
 ## Goal
 
-Generate **comprehensive technical documentation** (15 files) across all domains through an **optimised 3-stage parallel pipeline** that saves **5-7 minutes per workflow** compared to sequential execution.
+Generate **comprehensive audience-layered technical documentation** (15 files) across all domains through an **optimised 3-stage parallel pipeline** that saves **5-7 minutes per workflow** compared to sequential execution.
 
 ### Time Savings Breakdown
 
@@ -475,9 +488,10 @@ Writes to custom directory.
 
 1. ✅ All 3 subprocesses complete without error
 2. ✅ 15 files written to target directories
-3. ✅ Completeness score >= 85% (if review not skipped)
+3. ✅ Quality score >= 85% (consumer surface 50% + information density 30% + structure 20%), if review not skipped
 4. ✅ Total duration < 10 minutes
 5. ✅ Time saved >= 5 minutes vs sequential baseline
+6. ✅ Consumer surface scannable, maintainer depth in `<details>` tags, no empty boilerplate sections
 
 ---
 

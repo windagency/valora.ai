@@ -6,6 +6,7 @@
 | **Version**        | 1.0.0                         |
 | **Last Updated**   | [YYYY-MM-DD]                  |
 | **Authentication** | Bearer Token / API Key / None |
+| **Audience**       | Consumers + Maintainers       |
 
 ---
 
@@ -196,49 +197,6 @@ All errors follow this format:
 
 ---
 
-## Rate Limiting
-
-| Tier       | Requests/min | Burst |
-| ---------- | ------------ | ----- |
-| Free       | 60           | 10    |
-| Pro        | 600          | 100   |
-| Enterprise | 6000         | 1000  |
-
-**Rate limit headers:**
-
-```
-X-RateLimit-Limit: 60
-X-RateLimit-Remaining: 45
-X-RateLimit-Reset: 1640995200
-```
-
----
-
-## Webhooks (if applicable)
-
-### Events
-
-| Event              | Trigger              |
-| ------------------ | -------------------- |
-| `resource.created` | New resource created |
-| `resource.updated` | Resource updated     |
-| `resource.deleted` | Resource deleted     |
-
-### Payload
-
-```json
-{
-	"event": "resource.created",
-	"timestamp": "2025-01-01T00:00:00Z",
-	"data": {
-		"id": "abc-123",
-		"name": "Resource 1"
-	}
-}
-```
-
----
-
 ## SDKs & Examples
 
 ### cURL
@@ -266,8 +224,47 @@ const { data } = await response.json();
 
 ---
 
-## Changelog
+<details>
+<summary><strong>Rate Limiting Details</strong></summary>
 
-| Version | Date         | Changes             |
-| ------- | ------------ | ------------------- |
-| 1.0.0   | [YYYY-MM-DD] | Initial API release |
+| Tier       | Requests/min | Burst |
+| ---------- | ------------ | ----- |
+| Free       | 60           | 10    |
+| Pro        | 600          | 100   |
+| Enterprise | 6000         | 1000  |
+
+**Rate limit headers:**
+
+```
+X-RateLimit-Limit: 60
+X-RateLimit-Remaining: 45
+X-RateLimit-Reset: 1640995200
+```
+
+</details>
+
+<details>
+<summary><strong>Webhooks (if applicable)</strong></summary>
+
+### Events
+
+| Event              | Trigger              |
+| ------------------ | -------------------- |
+| `resource.created` | New resource created |
+| `resource.updated` | Resource updated     |
+| `resource.deleted` | Resource deleted     |
+
+### Payload
+
+```json
+{
+	"event": "resource.created",
+	"timestamp": "2025-01-01T00:00:00Z",
+	"data": {
+		"id": "abc-123",
+		"name": "Resource 1"
+	}
+}
+```
+
+</details>

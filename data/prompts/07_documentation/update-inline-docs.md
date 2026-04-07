@@ -50,11 +50,23 @@ Add clear, maintainable inline documentation including function docs, inline com
 
 ## Documentation Principles
 
-1. **Explain WHY, not WHAT** - Code shows what, comments explain why
-2. **Keep docs close to code** - Inline documentation stays up-to-date
-3. **Be concise** - Clear and brief, avoid essay-length comments
-4. **Be specific** - Concrete examples over abstract descriptions
-5. **Update docs with code** - Outdated docs are worse than no docs
+Every function has two audiences — write for both, in the right place:
+
+1. **Consumers of your function** read the JSDoc/docstring: what the function does, its parameters, return value, and a usage example. This is their "menu" — keep it scannable and precise.
+2. **Maintainers** read the inline comments inside the function body: why the code works this way, non-obvious decisions, historical context. This is where the "why" belongs.
+
+Concretely:
+
+- **JSDoc/docstrings** = consumer audience: WHAT it does, HOW to use it
+- **Inline comments** = maintainer audience: WHY it does it this way
+
+Additional principles:
+
+- **Explain WHY, not WHAT** — code shows what, comments explain why
+- **Keep docs close to code** — inline documentation stays up-to-date
+- **Be concise** — clear and brief, avoid essay-length comments
+- **Be specific** — concrete examples over abstract descriptions
+- **Update docs with code** — outdated docs are worse than no docs
 
 ## Instructions
 

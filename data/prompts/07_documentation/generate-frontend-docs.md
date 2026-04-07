@@ -57,9 +57,31 @@ tokens:
 
 # Generate Frontend Documentation
 
+## Documentation Philosophy — MANDATORY
+
+Every document has two audiences. Confusing them makes documentation useless to both.
+
+1. **Consumers** scan like a menu: find the component, see its props, copy the example, move on. They will not read a wall of text.
+2. **Maintainers** need the full picture: why state is structured this way, why this design pattern, the trade-offs. They refactor at risk.
+
+**Structure rule**: Lead with WHAT it does. Follow with HOW to use it. Bury the WHY behind `<details>` collapsible sections.
+
+**Use this exact HTML syntax for all maintainer-depth sections:**
+
+```markdown
+<details>
+<summary><strong>Section Title</strong></summary>
+
+Content here — design rationale, historical context, edge cases.
+
+</details>
+```
+
+**If a section has no meaningful project-specific content, omit it entirely.** An empty section is worse than no section.
+
 ## Objective
 
-Generate 4 comprehensive frontend documentation files by **writing them directly to disk** using the `write` tool. Apply British English for prose and include Mermaid diagrams as specified.
+Generate 4 comprehensive audience-layered frontend documentation files by **writing them directly to disk** using the `write` tool. Apply British English for prose and include Mermaid diagrams as specified.
 
 ## CRITICAL: Write Files Directly
 
@@ -114,88 +136,91 @@ Use `list_dir` to check if `knowledge-base/frontend/` exists. If not, it will be
 
 Use the `write` tool to create `knowledge-base/frontend/ARCHITECTURE.md` with:
 
-**Required sections**:
+**Consumer Surface (always present — leads the document)**:
 
-1. **Purpose** - Document scope and intended audience
-2. **Architecture Overview** - High-level frontend design
-3. **Component Hierarchy Diagram** (Mermaid flowchart)
-4. **Application Structure** - Folder and file organisation
-5. **State Management** - State architecture and patterns
-6. **Routing Structure** - Route definitions (with Mermaid diagram)
-7. **Data Fetching** - API integration patterns
-8. **Error Boundaries** - Error handling strategy
-9. **Performance Optimisation** - Performance patterns
-10. **Troubleshooting** - Common issues and resolutions
-11. **Best Practices** - Architecture best practices
-12. **Related Documentation** - Cross-references
-13. **Changelog** - Version history table
+1. **Purpose** — one sentence
+2. **Architecture Overview** — 2-3 sentences + Component Hierarchy Diagram (Mermaid flowchart)
+3. **Application Structure** — directory tree with one-line descriptions
+4. **Routing Structure** — route definitions table: `Route | Component | Auth Required | Notes`
+
+**Maintainer Depth (use `<details>` tags)**:
+
+5. `<details>` **State Management Architecture** — why state is structured this way, alternatives rejected, data flow diagram
+6. `<details>` **Data Fetching Strategy** — API integration pattern rationale, caching decisions, error handling approach
+7. `<details>` **Error Boundaries** — where they're placed and why, recovery behaviour
+8. `<details>` **Performance Optimisation Decisions** — code splitting, lazy loading rationale, bundle size trade-offs
+
+**Conditional (only if project-specific content exists)**:
+
+9. **Related Documentation** — cross-references
 
 ### Step 3: Generate and Write DESIGN.md
 
 Use the `write` tool to create `knowledge-base/frontend/DESIGN.md` with:
 
-**Required sections**:
+**Consumer Surface (always present — leads the document)**:
 
-1. **Purpose** - Design system overview
-2. **Design Principles** - Core design philosophy
-3. **Design Tokens** - Colours, typography, spacing
-4. **Colour Palette** - Colour definitions table
-5. **Typography** - Font styles table
-6. **Spacing System** - Spacing scale table
-7. **Component Library** - UI component catalogue
-8. **Icons** - Icon system
-9. **Layout Patterns** - Common layouts
-10. **Responsive Design** - Breakpoints
-11. **Accessibility** - A11y guidelines
-12. **Troubleshooting** - Design issues
-13. **Best Practices** - Design best practices
-14. **Related Documentation** - Cross-references
-15. **Changelog** - Version history table
+1. **Design Principles** — 3-5 core principles, one sentence each
+2. **Design Tokens** — three tables: Colour Palette (`Name | Hex | Usage`), Typography (`Token | Size | Weight | Usage`), Spacing Scale (`Token | Value | Usage`)
+3. **Component Library** — catalogue of UI components with props tables and usage examples
+4. **Icons** — icon system reference: how to import and use
+
+**Maintainer Depth (use `<details>` tags)**:
+
+5. `<details>` **Design Decision Rationale** — why specific design choices were made, brand constraints, trade-offs
+6. `<details>` **Accessibility Implementation** — ARIA patterns, keyboard navigation, focus management strategy, and why
+7. `<details>` **Responsive Design** — breakpoint rationale, layout strategy at each breakpoint, known limitations
+
+**Conditional (only if project-specific content exists)**:
+
+8. **Related Documentation** — cross-references
 
 ### Step 4: Generate and Write TESTING.md
 
 Use the `write` tool to create `knowledge-base/frontend/TESTING.md` with:
 
-**Required sections**:
+**Consumer Surface (always present — leads the document)**:
 
-1. **Purpose** - Testing strategy overview
-2. **Testing Approach** - Overall philosophy
-3. **Test Pyramid** (Mermaid diagram)
-4. **Unit Testing** - Component unit tests
-5. **Integration Testing** - Component integration
-6. **E2E Testing** - End-to-end scenarios
-7. **Visual Regression** - Visual testing
-8. **Accessibility Testing** - A11y automation
-9. **Test Data Management** - Mocks and fixtures
-10. **Coverage Requirements** - Thresholds
-11. **CI Integration** - Automation
-12. **Troubleshooting** - Test issues
-13. **Best Practices** - Testing best practices
-14. **Related Documentation** - Cross-references
-15. **Changelog** - Version history table
+1. **Testing Approach** — philosophy in 2-3 sentences + Test Pyramid diagram (Mermaid)
+2. **How to Run Tests** — copy-paste commands for each test type
+3. **Coverage Requirements** — table of thresholds: `Layer | Minimum Coverage | Tool`
+
+**Maintainer Depth (use `<details>` tags)**:
+
+4. `<details>` **Component Testing Patterns** — what to test, what to mock, testing library choices and why
+5. `<details>` **Integration Testing Architecture** — how components are tested with real API calls, MSW setup
+6. `<details>` **E2E Testing Infrastructure** — Playwright/Cypress setup, test data, known flakiness
+7. `<details>` **Visual Regression Strategy** — tooling, snapshot management, review process
+8. `<details>` **Accessibility Testing Automation** — axe-core integration, what's automated vs. manual
+9. `<details>` **CI Integration** — pipeline configuration, parallelisation, test splitting strategy
+
+**Conditional (only if project-specific content exists)**:
+
+10. **Related Documentation** — cross-references
 
 ### Step 5: Generate and Write CODING-ASSERTIONS.md
 
 Use the `write` tool to create `knowledge-base/frontend/CODING-ASSERTIONS.md` with:
 
-**Required sections**:
+**Consumer Surface (always present — leads the document)**:
 
-1. **Purpose** - Standards overview
-2. **Naming Conventions** - Naming rules
-3. **File Organisation** - Structure standards
-4. **Component Patterns** - Component structure
-5. **State Management Rules** - State patterns
-6. **Styling Standards** - CSS conventions
-7. **Accessibility Requirements** - A11y requirements table
-8. **Performance Standards** - Performance requirements
-9. **Type Safety** - TypeScript standards
-10. **Error Handling** - Error patterns
-11. **Documentation Standards** - Component docs
-12. **Linting Configuration** - ESLint/Prettier
-13. **Troubleshooting** - Standards enforcement
-14. **Best Practices** - Coding best practices
-15. **Related Documentation** - Cross-references
-16. **Changelog** - Version history table
+1. **Quick Reference** — scannable rules table: `Category | Rule | Enforcement`
+2. **Naming Conventions** — table by construct (components, hooks, files, CSS modules, etc.)
+3. **File Organisation** — directory tree with brief descriptions
+4. **Type Safety** — key TypeScript rules as a table
+
+**Maintainer Depth (use `<details>` tags)**:
+
+5. `<details>` **Component Patterns Rationale** — why composition over inheritance, when to lift state, what to avoid
+6. `<details>` **State Management Rules** — what goes in global vs. local state, and why
+7. `<details>` **Styling Standards Rationale** — CSS Modules vs. Tailwind choice, naming strategy, why
+8. `<details>` **Accessibility Requirements** — WCAG level, specific requirements table with threat context
+9. `<details>` **Performance Standards** — Core Web Vitals targets, bundle size limits, and benchmark rationale
+10. `<details>` **Linting Configuration** — ESLint/Prettier rules with justifications for non-obvious choices
+
+**Conditional (only if project-specific content exists)**:
+
+11. **Related Documentation** — cross-references
 
 ### Step 6: Return Metadata
 
@@ -275,12 +300,13 @@ Include in each document:
 ## Success Criteria
 
 - ✅ All 4 files written using `write` tool
-- ✅ Each document includes standardised header
-- ✅ All required sections present
+- ✅ Each document includes standardised header with Audience field
+- ✅ Consumer surface leads each document and is scannable without expanding anything
+- ✅ Maintainer depth sections use `<details><summary>` tags
+- ✅ No empty or generic boilerplate sections — omit rather than pad
 - ✅ Mermaid diagrams render correctly
 - ✅ British English used consistently
 - ✅ Cross-references use correct relative paths
-- ✅ Completeness score >= 85% for each document
 
 ## Error Handling
 

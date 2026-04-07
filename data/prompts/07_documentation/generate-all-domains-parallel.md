@@ -81,6 +81,15 @@ This prompt orchestrates **three parallel subprocesses**, each running with a do
 **Sequential equivalent**: ~540s
 **Time saved**: ~340s (~5.7 minutes)
 
+## Documentation Philosophy — MANDATORY
+
+Pass this philosophy to all subprocesses. Every document has two audiences:
+
+1. **Consumers** scan like a menu — find the endpoint/command/component, copy the example, move on. Too much information and no information accomplish the same goal: both get skipped.
+2. **Maintainers** need the full picture — why decisions were made, historical context, security rationale.
+
+**Structure rule**: Consumer surface (WHAT + HOW) leads every document. Maintainer depth (WHY) goes inside `<details><summary>` collapsible tags. No empty or generic boilerplate sections — omit rather than pad.
+
 ## Instructions
 
 ### Step 1: Prepare Subprocess Inputs

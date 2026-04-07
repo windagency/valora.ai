@@ -1,118 +1,90 @@
 # [Document Title]
 
-| Attribute        | Value                       |
-| ---------------- | --------------------------- |
-| **Purpose**      | [Brief purpose description] |
-| **Version**      | 1.0.0                       |
-| **Author**       | AI Documentation Generator  |
-| **Created**      | [YYYY-MM-DD]                |
-| **Last Updated** | [YYYY-MM-DD]                |
-| **Status**       | Draft                       |
+| Attribute        | Value                   |
+| ---------------- | ----------------------- |
+| **Purpose**      | [One-sentence purpose]  |
+| **Audience**     | Consumers + Maintainers |
+| **Version**      | 1.0.0                   |
+| **Last Updated** | [YYYY-MM-DD]            |
+| **Status**       | Draft                   |
 
 ---
 
-## Overview
+## Quick Reference
 
-[High-level overview of the document scope and content. Use British English for prose.]
+[Scannable table — the "menu" a consumer reads to decide if this document has what they need]
 
----
-
-## Architecture
-
-[Architecture description with component diagram]
-
-```mermaid
-flowchart TB
-    subgraph API["API Layer"]
-        routes[Routes]
-        middleware[Middleware]
-        controllers[Controllers]
-    end
-
-    subgraph Business["Business Layer"]
-        services[Services]
-        validators[Validators]
-    end
-
-    subgraph Data["Data Layer"]
-        repositories[Repositories]
-        models[Models]
-    end
-
-    routes --> middleware
-    middleware --> controllers
-    controllers --> services
-    services --> validators
-    services --> repositories
-    repositories --> models
-```
+| Item             | Description                  | Location / Details   |
+| ---------------- | ---------------------------- | -------------------- |
+| [Endpoint/Class] | [What it does, one sentence] | [Path or link]       |
+| [Key concept]    | [Brief description]          | [Where to find more] |
 
 ---
 
-## [Main Section 1]
+## [Primary Content Section]
 
-[Content for main section]
-
-### [Subsection 1.1]
-
-[Detailed content with code examples using American English for code]
+[What it does. How to use it. Examples first. Keep scannable.]
 
 ```typescript
-// Example service implementation
+// Copy-paste ready example
 export class ExampleService {
 	constructor(private readonly repository: ExampleRepository) {}
 
 	async findAll(): Promise<Example[]> {
 		return this.repository.findAll();
 	}
-
-	async create(data: CreateExampleDto): Promise<Example> {
-		// Validate input
-		this.validate(data);
-
-		// Create entity
-		return this.repository.create(data);
-	}
 }
 ```
 
-### [Subsection 1.2]
-
-[Detailed content]
-
 ---
 
-## [Main Section 2]
+## [Second Content Section]
 
-[Content for section 2]
+[Tables, diagrams, practical reference material]
 
-| Column 1 | Column 2 | Column 3 | Column 4 |
-| -------- | -------- | -------- | -------- |
-| Value 1  | Value 2  | Value 3  | Value 4  |
+```mermaid
+flowchart TB
+    subgraph API["API Layer"]
+        routes[Routes]
+        controllers[Controllers]
+    end
+
+    subgraph Business["Business Layer"]
+        services[Services]
+    end
+
+    subgraph Data["Data Layer"]
+        repositories[Repositories]
+    end
+
+    routes --> controllers
+    controllers --> services
+    services --> repositories
+```
+
+| Column 1 | Column 2 | Column 3 |
+| -------- | -------- | -------- |
+| Value 1  | Value 2  | Value 3  |
 
 ---
 
 ## API Reference
 
-### Endpoint: `[METHOD] /api/v1/[resource]`
+### `[METHOD] /api/v1/[resource]`
 
-**Description**: [Brief description]
-
-**Authentication**: Required / Optional
+**Description**: [One sentence]
 
 **Request**:
 
-| Parameter | Location | Type    | Required | Description                 |
-| --------- | -------- | ------- | -------- | --------------------------- |
-| `id`      | path     | string  | Yes      | Resource identifier         |
-| `limit`   | query    | integer | No       | Maximum items (default: 20) |
+| Parameter | Location | Type   | Required | Description |
+| --------- | -------- | ------ | -------- | ----------- |
+| `id`      | path     | string | Yes      | Resource ID |
 
 **Request Body**:
 
 ```json
 {
-	"field1": "value1",
-	"field2": 123
+	"field1": "value1"
 }
 ```
 
@@ -122,53 +94,44 @@ export class ExampleService {
 {
 	"data": {
 		"id": "abc-123",
-		"field1": "value1",
-		"field2": 123,
-		"createdAt": "2025-01-01T00:00:00Z"
+		"field1": "value1"
 	}
 }
 ```
 
 **Error Responses**:
 
-| Status | Code             | Description              |
-| ------ | ---------------- | ------------------------ |
-| 400    | VALIDATION_ERROR | Invalid request data     |
-| 401    | UNAUTHORIZED     | Authentication required  |
-| 403    | FORBIDDEN        | Insufficient permissions |
-| 404    | NOT_FOUND        | Resource not found       |
-| 500    | INTERNAL_ERROR   | Server error             |
+| Status | Code               | Description             |
+| ------ | ------------------ | ----------------------- |
+| 400    | `VALIDATION_ERROR` | Invalid request data    |
+| 401    | `UNAUTHORIZED`     | Authentication required |
+| 404    | `NOT_FOUND`        | Resource not found      |
 
 ---
 
-## Data Model
+<details>
+<summary><strong>Design Rationale and Architecture Decisions</strong></summary>
 
-```mermaid
-erDiagram
-    ENTITY_A ||--o{ ENTITY_B : has
-    ENTITY_A {
-        uuid id PK
-        string name
-        timestamp created_at
-    }
-    ENTITY_B {
-        uuid id PK
-        uuid entity_a_id FK
-        string value
-    }
-```
+[WHY it works this way. The decisions that shaped this design. What was considered and rejected. Historical context a maintainer debugging at 2AM will need.]
 
----
+### Why [specific decision]
 
-## Troubleshooting
+[Explanation of the decision, what alternative was considered, why this was chosen]
 
-### Common Issues
+### Why [another decision]
 
-| Issue                       | Symptoms                      | Resolution                                   |
-| --------------------------- | ----------------------------- | -------------------------------------------- |
-| Database connection timeout | `ECONNREFUSED` errors in logs | Check database host/port, verify credentials |
-| Authentication failures     | 401 responses on valid tokens | Check token expiration, verify secret key    |
-| Slow response times         | API latency > 2 seconds       | Check database queries, review N+1 issues    |
+[Explanation]
+
+</details>
+
+<details>
+<summary><strong>Troubleshooting</strong></summary>
+
+[Only include this section if there are project-specific known issues. Generic advice belongs nowhere.]
+
+| Issue                  | Symptoms             | Resolution                  |
+| ---------------------- | -------------------- | --------------------------- |
+| [Specific known issue] | [Observable symptom] | [Concrete step-by-step fix] |
 
 ### Diagnostic Commands
 
@@ -176,50 +139,11 @@ erDiagram
 # Check API health
 curl http://localhost:3000/health
 
-# Test database connection
-npm run db:check
-
-# View application logs
+# View logs
 docker logs api-server --tail 100
-
-# Run query analysis
-npm run db:analyze
 ```
 
-### Escalation Path
-
-1. Check application logs for stack traces
-2. Verify database connectivity and queries
-3. Check external service dependencies
-4. Contact backend team if issue persists
-
----
-
-## Best Practices
-
-### Do
-
-- Use dependency injection for testability
-- Implement proper error handling with typed errors
-- Use transactions for multi-step operations
-- Validate all input at API boundaries
-- Write comprehensive unit and integration tests
-
-### Don't
-
-- Expose internal error details to clients
-- Use `any` type in TypeScript
-- Bypass authentication middleware
-- Hardcode configuration values
-- Ignore error handling in async operations
-
-### Checklist
-
-- [ ] All endpoints documented
-- [ ] Error responses standardised
-- [ ] Input validation implemented
-- [ ] Unit tests written (>80% coverage)
-- [ ] Integration tests for critical paths
+</details>
 
 ---
 
@@ -229,13 +153,4 @@ npm run db:analyze
 | ------------------------------------------------------- | ------------ | -------------------------- |
 | [API.md](./API.md)                                      | Related      | Complete API documentation |
 | [DATA.md](./DATA.md)                                    | Related      | Data model definitions     |
-| [TESTING.md](./TESTING.md)                              | Related      | Testing strategy           |
 | [Frontend ARCHITECTURE.md](../frontend/ARCHITECTURE.md) | See Also     | Frontend integration       |
-
----
-
-## Changelog
-
-| Version | Date         | Author                     | Changes               |
-| ------- | ------------ | -------------------------- | --------------------- |
-| 1.0.0   | [YYYY-MM-DD] | AI Documentation Generator | Initial documentation |
