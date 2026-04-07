@@ -16,7 +16,6 @@ import { getColorAdapter } from 'output/color-adapter.interface';
 import { getLogger } from 'output/logger';
 import { getProcessingFeedback } from 'output/processing-feedback';
 import { dirExists, fileExists, readFile } from 'utils/file-utils';
-import { getPackageRoot } from 'utils/paths';
 
 interface GuidanceFile {
 	content: string;
@@ -51,11 +50,11 @@ const GUIDANCE_FILE_PATTERNS = [
 const guidanceCache = new Map<string, null | string>();
 
 /**
- * Get the project root directory
+ * Get the project root directory — the directory from which Valora is being run.
+ * This is always process.cwd(), not the Valora package install directory.
  */
 export function getProjectRoot(): string {
-	// In the new layout, the package root IS the project root
-	return getPackageRoot();
+	return process.cwd();
 }
 
 /**

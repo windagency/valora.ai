@@ -111,15 +111,6 @@ export function validateCommandsDirectory(commandsDir: string): void {
 			resolvedPath
 		});
 	}
-
-	// Check for dangerous path patterns
-	const dangerousPathPatterns = /\.\./;
-	if (dangerousPathPatterns.test(commandsDir)) {
-		throw new ValidationError('Commands directory path contains traversal', {
-			commandsDir,
-			reason: 'Directory traversal (..) not allowed'
-		});
-	}
 }
 
 /**

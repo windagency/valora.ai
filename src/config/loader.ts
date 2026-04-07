@@ -190,12 +190,9 @@ export class ConfigLoader {
 
 		// Load local provider configuration from environment variables
 		const localBaseUrl = process.env['LOCAL_BASE_URL'];
-		const localModel = process.env['LOCAL_DEFAULT_MODEL'];
 		if (localBaseUrl && config.providers) {
-			(config.providers as Record<string, { baseUrl: string; default_model?: string }>)['local'] = {
-				baseUrl: localBaseUrl,
-				default_model: localModel
-			};
+			(config.providers as Record<string, { baseUrl: string; default_model?: string }>)['local'] =
+				this.buildLocalEnvConfig(localBaseUrl, process.env['LOCAL_DEFAULT_MODEL']);
 		}
 
 		// Load Vertex AI configuration for Anthropic provider
@@ -360,7 +357,7 @@ export class ConfigLoader {
 	 */
 	private mergeSingleConfig(result: Config, config: Partial<Config>): Config {
 		if (config.providers) {
-			result.providers = { ...result.providers, ...config.providers };
+			result.providers = this.mergeProviderConfigs(result.providers, config.providers);
 		}
 		if (config.defaults) {
 			result.defaults = { ...result.defaults, ...config.defaults };
@@ -381,6 +378,34 @@ export class ConfigLoader {
 			result.hooks = { ...result.hooks, ...config.hooks };
 		}
 		return result;
+	}
+
+	/**
+	 * Deep-merge individual provider configs so higher-priority layers override
+	 * specific fields without erasing fields absent from the higher-priority layer.
+	 * Undefined values in the incoming config are skipped.
+	 */
+	private mergeProviderConfigs(
+		base: Config['providers'],
+		incoming: NonNullable<Partial<Config>>['providers']
+	): Config['providers'] {
+		const merged = { ...base };
+		for (const [key, value] of Object.entries(incoming!)) {
+			if (value !== undefined) {
+				const existing = merged[key as keyof typeof merged] ?? {};
+				const definedValues = Object.fromEntries(Object.entries(value).filter(([, v]) => v !== undefined));
+				merged[key as keyof typeof merged] = { ...existing, ...definedValues } as typeof existing;
+			}
+		}
+		return merged;
+	}
+
+	/**
+	 * Build local provider config from env vars, omitting default_model when unset
+	 * to avoid overriding a lower-priority config layer's value.
+	 */
+	private buildLocalEnvConfig(baseUrl: string, model: string | undefined): { baseUrl: string; default_model?: string } {
+		return model !== undefined ? { baseUrl, default_model: model } : { baseUrl };
 	}
 
 	/**
