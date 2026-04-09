@@ -1,5 +1,7 @@
 # ADR-007: Persistent Stage Output Caching
 
+> **Decision**: Context-loading pipeline stages can opt in to file-based caching in `.valora/cache/stages/`, keyed on stage inputs and SHA-256 hashes of declared file dependencies, eliminating redundant LLM calls when source documents have not changed.
+
 ## Status
 
 Accepted

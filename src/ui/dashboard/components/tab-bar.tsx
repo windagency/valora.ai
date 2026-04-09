@@ -17,7 +17,8 @@ const TAB_CONFIG: Array<{ key: string; label: string; tab: DashboardTab }> = [
 	{ key: '2', label: 'Performance', tab: 'performance' },
 	{ key: '3', label: 'Agents', tab: 'agents' },
 	{ key: '4', label: 'Cache', tab: 'cache' },
-	{ key: '5', label: 'Audit', tab: 'audit' }
+	{ key: '5', label: 'Audit', tab: 'audit' },
+	{ key: '6', label: 'Usage', tab: 'usage' }
 ];
 
 // eslint-disable-next-line @typescript-eslint/naming-convention -- React components must use PascalCase

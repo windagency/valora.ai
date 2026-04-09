@@ -19,6 +19,8 @@ export type {
 export { useDashboardData } from './hooks/use-dashboard-data';
 export { useMetricsData } from './hooks/use-metrics-data';
 export { useNavigation } from './hooks/use-navigation';
+export { useUsageAnalyticsData } from './hooks/use-usage-analytics-data';
+export type { UsageAnalyticsDashboardData } from './hooks/use-usage-analytics-data';
 
 // Components
 export { Header } from './components/header';
@@ -41,6 +43,7 @@ export { CacheStatsView } from './views/cache-stats-view';
 export { DashboardView } from './views/dashboard-view';
 export { PerformanceView } from './views/performance-view';
 export { SessionDetailsView } from './views/session-details-view';
+export { UsageAnalyticsView } from './views/usage-analytics-view';
 
 // Session Panels
 export { CommandHistoryPanel } from './detail-panels/command-history-panel';

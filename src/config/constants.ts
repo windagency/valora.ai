@@ -246,6 +246,22 @@ export const LSP_DIAGNOSTICS_WAIT_MS = 2 * MS_PER_SECOND;
 export const LSP_MAX_DIAGNOSTICS_DISPLAY = 20;
 
 /**
+ * Memory System Constants
+ */
+export const MEMORY_STORE_VERSION = 1;
+export const DEFAULT_MEMORY_ENABLED = true;
+export const DEFAULT_MEMORY_EPISODIC_HALF_LIFE_DAYS = 7;
+export const DEFAULT_MEMORY_SEMANTIC_HALF_LIFE_DAYS = 30;
+export const DEFAULT_MEMORY_DECISION_HALF_LIFE_DAYS = 21;
+export const DEFAULT_MEMORY_RETRIEVAL_BOOST_DAYS = 2;
+export const DEFAULT_MEMORY_PRUNE_THRESHOLD = 0.05;
+export const DEFAULT_MEMORY_MAX_ENTRIES_PER_STORE = 500;
+export const DEFAULT_MEMORY_ERROR_HALF_LIFE_MULTIPLIER = 2;
+export const DEFAULT_MEMORY_INJECTION_TOKEN_BUDGET = 2000;
+export const DEFAULT_MEMORY_INJECTION_STRENGTH_THRESHOLD = 0.2;
+export const MEMORY_PERSIST_DEBOUNCE_MS = 2000;
+
+/**
  * Documentation URL
  */
 export function getDocsUrl(path?: string): string {

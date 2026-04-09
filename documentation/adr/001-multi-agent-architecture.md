@@ -1,5 +1,7 @@
 # ADR-001: Multi-Agent Architecture
 
+> **Decision**: Valora implements 11 specialised AI agents, each with distinct domains and selection criteria, rather than a single generalist agent.
+
 ## Status
 
 Accepted

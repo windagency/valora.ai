@@ -1,10 +1,6 @@
 # Development Workflows
 
-> Common patterns and workflows for using VALORA effectively.
-
-## Overview
-
-The engine supports various development workflows, from new feature development to bug fixes and refactoring. This guide covers the most common patterns.
+Common patterns for using VALORA effectively.
 
 ## The Complete Development Lifecycle
 
@@ -80,134 +76,80 @@ flowchart TD
     PHASE8 --> END([End])
 ```
 
+## Workflow Summary
+
+| Workflow                                                        | When to Use                       | Key Commands                              |
+| --------------------------------------------------------------- | --------------------------------- | ----------------------------------------- |
+| [New Feature](#workflow-1-new-feature-development)              | Starting fresh                    | Full lifecycle                            |
+| [Bug Fix](#workflow-2-bug-fix)                                  | Fixing issues                     | plan, implement, test, commit             |
+| [Refactoring](#workflow-3-refactoring)                          | Code improvements                 | plan, implement (step-by-step), test      |
+| [Code Review](#workflow-4-code-review)                          | Before merging                    | review-code, review-functional            |
+| [Tiered Planning](#workflow-5-tiered-planning-complex-features) | Complex features (complexity > 5) | plan-architecture, plan-implementation    |
+| [Quick Task](#workflow-6-quick-task)                            | Small, well-defined tasks         | fetch-task, plan, implement, commit       |
+| [Documentation](#workflow-7-documentation-generation)           | Generating technical docs         | generate-docs, generate-all-documentation |
+
+---
+
 ## Workflow 1: New Feature Development
 
 **Use when**: Starting a new feature from scratch.
 
-### Steps
+```bash
+valora refine-specs "User authentication with OAuth providers"
+valora create-prd
+valora create-backlog
+valora generate-docs          # optional — 15 docs across infra/backend/frontend
+valora fetch-task
+valora refine-task
+valora gather-knowledge --scope=task
+valora plan
+valora review-plan
+valora implement
+valora assert
+valora test
+valora review-code && valora review-functional
+valora commit && valora create-pr
+valora feedback
+```
 
-1. **Define Requirements**
+**Expected outcome**: A fully planned, implemented, reviewed, and committed feature with a pull request open.
 
-   ```bash
-   valora refine-specs "User authentication with OAuth providers"
-   ```
+<details>
+<summary><strong>When to use each step — rationale and edge cases</strong></summary>
 
-   This engages the `@product-manager` agent to clarify requirements through structured questioning.
+**refine-specs** engages the `@product-manager` agent, which pauses to ask clarifying questions grouped by priority (P0 → P1 → P2). Your answers are written into a "User Clarifications" section in `FUNCTIONAL.md`. **Do not skip this**: vague specs produce vague plans.
 
-   **Interactive Clarification:** The command will pause to collect your answers to clarifying questions. These answers are automatically incorporated into the final `FUNCTIONAL.md` document with a "User Clarifications" section documenting your decisions.
+**create-prd** may trigger a second round of interactive clarification if the requirements analysis exposes ambiguities. The resulting Product Requirements Document in `PRD.md` feeds directly into backlog decomposition.
 
-2. **Generate PRD**
+**create-backlog** uses `--granularity=fine` by default. For simpler features, `--granularity=coarse` reduces the number of tasks and speeds up the subsequent `fetch-task` / `refine-task` cycle.
 
-   ```bash
-   valora create-prd
-   ```
+**generate-docs** is optional but valuable for projects that lack documentation. It produces 15 documents across infrastructure, backend, and frontend domains. If time is short, use `valora generate-all-documentation` (parallel, ~8 min) or skip until after the first iteration.
 
-   Creates a comprehensive Product Requirements Document based on refined specifications.
+**refine-task** may trigger a third round of interactive clarification when clarity gaps are identified. Your answers are applied to the task document and backlog.
 
-   **Interactive Clarification:** If requirements analysis identifies ambiguities, you'll be prompted to answer clarifying questions before the PRD is generated.
+**gather-knowledge** with `--scope=task` restricts codebase analysis to the current task context. Use `--scope=project` only when the task has broad cross-cutting concerns.
 
-3. **Create Backlog**
+**plan** engages the `@lead` agent. It aggregates questions from complexity assessment, dependency analysis, and risk assessment into a single interactive pause. The resulting plan is written to `knowledge-base/PLAN-[TASK-ID].md`.
 
-   ```bash
-   valora create-backlog
-   ```
+**review-plan** is a lightweight gate (~14 min full, ~3 min with `--checklist`). Use `--checklist` for most cases; reserve the full review for complexity ≥ 7.
 
-   Decomposes the PRD into prioritised, actionable tasks.
+**assert + test** run sequentially by default. Use `valora validate-parallel` to run both concurrently and save ~9 minutes.
 
-4. **Generate Documentation** (Optional)
+**review-code + review-functional** can be preceded by `valora pre-check` (automated, ~1.5 min) to catch TypeScript, ESLint, Prettier, and security issues before the deeper manual review.
 
-   ```bash
-   valora generate-docs
-   ```
+**feedback** records outcomes for continuous improvement. Always run it — it feeds the metrics system.
 
-   Generates comprehensive technical documentation (15 files) across infrastructure, backend, and frontend domains.
+### Decision points during the workflow
 
-5. **Fetch First Task**
+| Decision                | Criteria                     | Action if false           |
+| ----------------------- | ---------------------------- | ------------------------- |
+| Sufficient context?     | Agent has enough information | Run `gather-knowledge`    |
+| Plan quality validated? | `review-plan` passes         | Re-run `plan`             |
+| Feature too large?      | Complexity exceeds threshold | Use `--mode=step-by-step` |
+| Tests passed?           | All tests green              | Re-run `plan` and fix     |
+| Reviews passed?         | Both reviews approved        | Re-implement              |
 
-   ```bash
-   valora fetch-task
-   ```
-
-   Retrieves the highest priority task from the backlog.
-
-6. **Refine Task Details**
-
-   ```bash
-   valora refine-task
-   ```
-
-   Clarifies acceptance criteria and implementation details.
-
-   **Interactive Clarification:** When clarity gaps are identified, you'll be prompted to answer questions. Your answers are applied to the task document and backlog.
-
-7. **Gather Technical Context**
-
-   ```bash
-   valora gather-knowledge --scope=task
-   ```
-
-   Analyses the codebase for relevant patterns and dependencies.
-
-8. **Create Implementation Plan**
-
-   ```bash
-   valora plan
-   ```
-
-   The `@lead` agent creates a detailed technical plan.
-
-   **Interactive Clarification:** Questions from complexity assessment, dependency analysis, and risk assessment are aggregated and presented to you. Your answers inform the implementation breakdown.
-
-9. **Review the Plan**
-
-   ```bash
-   valora review-plan
-   ```
-
-   Validates the plan before implementation begins.
-
-10. **Implement**
-
-    ```bash
-    valora implement
-    ```
-
-    The appropriate engineer agent guides the implementation.
-
-11. **Validate Implementation**
-
-    ```bash
-    valora assert
-    valora test
-    ```
-
-    Checks completeness and runs test suites.
-
-12. **Review**
-
-    ```bash
-    valora review-code
-    valora review-functional
-    ```
-
-    Performs code quality and functional reviews.
-
-13. **Commit and PR**
-
-    ```bash
-    valora commit
-    valora create-pr
-    ```
-
-    Creates conventional commits and a pull request.
-
-14. **Capture Feedback**
-
-    ```bash
-    valora feedback
-    ```
-
-    Records outcomes for continuous improvement.
+</details>
 
 ---
 
@@ -215,55 +157,30 @@ flowchart TD
 
 **Use when**: Fixing a reported bug or issue.
 
-### Steps
+```bash
+valora gather-knowledge --scope=task --domain=<affected-area>
+valora plan "Fix: <bug description>"
+valora implement
+valora assert
+valora test --type=all
+valora review-code --focus=security
+valora review-functional
+valora commit --scope=fix
+valora feedback
+```
 
-1. **Understand the Issue**
+**Expected outcome**: A targeted fix with validated tests and a conventional commit.
 
-   Analyse the bug report and gather context manually or use:
+<details>
+<summary><strong>Bug fix rationale and edge cases</strong></summary>
 
-   ```bash
-   valora gather-knowledge --scope=task --domain=<affected-area>
-   ```
+Start with `gather-knowledge` to understand the affected area before planning. Bug fixes benefit from `--domain=<area>` to restrict knowledge gathering to the relevant subsystem.
 
-2. **Plan the Fix**
+`--focus=security` on `review-code` is appropriate for bugs that may have security implications (e.g., input validation, authentication). For non-security bugs, omit the flag or use `--focus=all`.
 
-   ```bash
-   valora plan "Fix: <bug description>"
-   ```
+If the bug is in a highly tested area, add `--coverage-threshold=80` to `valora test` to verify you haven't regressed coverage.
 
-3. **Implement the Fix**
-
-   Make the code changes directly or with assistance:
-
-   ```bash
-   valora implement
-   ```
-
-4. **Validate**
-
-   ```bash
-   valora assert
-   valora test --type=all
-   ```
-
-5. **Review**
-
-   ```bash
-   valora review-code --focus=security
-   valora review-functional
-   ```
-
-6. **Commit**
-
-   ```bash
-   valora commit --scope=fix
-   ```
-
-7. **Document**
-
-   ```bash
-   valora feedback
-   ```
+</details>
 
 ---
 
@@ -271,53 +188,30 @@ flowchart TD
 
 **Use when**: Improving code structure without changing functionality.
 
-### Steps
+```bash
+valora gather-knowledge --scope=project --depth=deep
+valora plan "Refactor: <refactoring description>"
+valora review-plan --strict-mode
+valora implement --mode=step-by-step
+valora test --type=all --coverage-threshold=80
+valora review-code --focus=maintainability
+valora commit --scope=refactor
+```
 
-1. **Define Refactoring Goals**
+**Expected outcome**: Improved code structure with no regressions and a verified test suite.
 
-   Discuss what you want to achieve:
+<details>
+<summary><strong>Refactoring rationale and edge cases</strong></summary>
 
-   ```bash
-   valora gather-knowledge --scope=project --depth=deep
-   ```
+Use `--scope=project` with `gather-knowledge` when the refactoring spans multiple modules. For localised refactors, `--scope=task` is sufficient.
 
-2. **Plan the Refactoring**
+`--mode=step-by-step` is critical for large refactors. It breaks implementation into discrete, verifiable steps rather than making all changes at once. Each step can be validated individually before proceeding.
 
-   ```bash
-   valora plan "Refactor: <refactoring description>"
-   ```
+`--strict-mode` on `review-plan` enforces stricter validation criteria and is appropriate when refactoring load-bearing code. It adds ~5 minutes but catches architectural regressions early.
 
-3. **Review the Plan**
+`--focus=maintainability` on `review-code` specifically evaluates readability, naming, and structure — the primary goals of a refactor.
 
-   ```bash
-   valora review-plan --strict-mode
-   ```
-
-4. **Implement Incrementally**
-
-   For large refactorings, use step-by-step mode:
-
-   ```bash
-   valora implement --mode=step-by-step
-   ```
-
-5. **Validate No Regressions**
-
-   ```bash
-   valora test --type=all --coverage-threshold=80
-   ```
-
-6. **Review Changes**
-
-   ```bash
-   valora review-code --focus=maintainability
-   ```
-
-7. **Commit**
-
-   ```bash
-   valora commit --scope=refactor
-   ```
+</details>
 
 ---
 
@@ -325,304 +219,28 @@ flowchart TD
 
 **Use when**: Reviewing code before merging.
 
-### Steps
-
-1. **Run Comprehensive Review**
-
-   ```bash
-   valora review-code --severity=high --focus=all
-   ```
-
-2. **Check Functionality**
-
-   ```bash
-   valora review-functional --check-a11y=true
-   ```
-
-3. **Validate Tests**
-
-   ```bash
-   valora test
-   ```
-
-4. **Provide Feedback**
-
-   ```bash
-   valora feedback --command=review-code
-   ```
-
----
-
-## Workflow 5: Tiered Planning (Complex Features)
-
-**Use when**: Working on complex features (complexity > 5) that benefit from architectural review before detailed planning.
-
-### Steps
-
-1. **Fetch the Task**
-
-   ```bash
-   valora fetch-task --task-id=<id>
-   ```
-
-2. **Gather Context**
-
-   ```bash
-   valora gather-knowledge --scope=task
-   ```
-
-3. **Create Architecture Plan (Phase 1, ~5 min)**
-
-   ```bash
-   valora plan-architecture
-   ```
-
-   Produces `knowledge-base/PLAN-ARCH-[TASK-ID].md` with:
-   - Technology choices and rationale
-   - Component boundaries
-   - Integration points
-   - Go/No-Go decision
-
-4. **Quick Architecture Review**
-
-   ```bash
-   valora review-plan --checklist
-   ```
-
-   Fast binary validation (~3 min) before investing in detailed planning.
-
-5. **Create Implementation Plan (Phase 2, ~10 min)**
-
-   ```bash
-   valora plan-implementation --arch-plan=knowledge-base/PLAN-ARCH-[TASK-ID].md
-   ```
-
-   Produces `knowledge-base/PLAN-IMPL-[TASK-ID].md` with:
-   - Step-by-step tasks with file paths
-   - Dependencies and risks
-   - Testing and rollback procedures
-
-6. **Quick Implementation Review**
-
-   ```bash
-   valora review-plan --checklist
-   ```
-
-7. **Implement**
-
-   ```bash
-   valora implement --plan=knowledge-base/PLAN-IMPL-[TASK-ID].md
-   ```
-
-8. **Fast Validation Loop**
-
-   ```bash
-   valora assert --quick=all
-   valora review-code --auto-only
-   ```
-
-### Benefits
-
-- Catches architectural issues in 5 min, not 18 min
-- No detailed planning on rejected architectures
-- Faster feedback loops with `--checklist` and `--quick` modes
-- ~25 min saved per planning cycle
-
----
-
-## Workflow 6: Quick Task
-
-**Use when**: Handling a small, well-defined task.
-
-### Steps
-
-1. **Fetch the Task**
-
-   ```bash
-   valora fetch-task --task-id=<id>
-   ```
-
-2. **Plan**
-
-   ```bash
-   valora plan
-   ```
-
-3. **Implement**
-
-   ```bash
-   valora implement
-   ```
-
-4. **Validate and Commit**
-
-   ```bash
-   valora assert && valora test && valora commit
-   ```
-
----
-
-## Interactive Clarification Stages
-
-Several commands include interactive stages that pause execution to collect user input. This ensures that user decisions are properly captured and incorporated into final documents.
-
-### How It Works
-
-1. **Question Generation**: During analysis phases, the AI identifies ambiguities and generates clarifying questions
-2. **Interactive Pause**: The pipeline pauses and presents questions grouped by priority (P0 → P1 → P2)
-3. **User Response**: You can select predefined options, provide custom answers, or skip non-critical questions
-4. **Document Integration**: Your answers are incorporated into the final document with a "User Clarifications" section
-
-### Commands with Interactive Stages
-
-| Command        | Questions Source                | Document Updated    |
-| -------------- | ------------------------------- | ------------------- |
-| `refine-specs` | Specification refinement        | `FUNCTIONAL.md`     |
-| `create-prd`   | Requirements analysis           | `PRD.md`            |
-| `refine-task`  | Task clarity analysis           | `BACKLOG.md`        |
-| `plan`         | Complexity, dependencies, risks | `PLAN-[TASK-ID].md` |
-
-### Skipping Questions
-
-- **P0 (Critical)** questions should always be answered as they block core functionality
-- **P1 (Important)** questions affect significant features but can be skipped with noted assumptions
-- **P2 (Minor)** questions are optional clarifications
-
-### Example: User Clarifications Section
-
-When you answer questions, they appear in the document like this:
-
-```markdown
-## User Clarifications
-
-The following decisions were made during the refinement process:
-
-| Question           | Decision                       | Impact                      |
-| ------------------ | ------------------------------ | --------------------------- |
-| Optimal cache TTL? | 5 seconds                      | Non-Functional Requirements |
-| Self-health logic? | Any critical service unhealthy | Health Status Logic         |
-
-**Applied on**: 2025-01-28T10:30:00Z
-**Mode**: Interactive
-```
-
----
-
-## Decision Points
-
-During workflows, you may encounter decision points:
-
-| Decision            | Criteria                     | Action if False           |
-| ------------------- | ---------------------------- | ------------------------- |
-| Sufficient context? | Agent has enough information | `gather-knowledge`        |
-| AI confident?       | Plan quality validated       | Re-run `plan`             |
-| Feature too large?  | Complexity exceeds threshold | Use `--mode=step-by-step` |
-| Tests passed?       | All tests green              | Re-run `plan` and fix     |
-| Reviews passed?     | Both reviews approved        | Re-implement              |
-
-## Best Practices
-
-### 1. Always Plan First
-
 ```bash
-# Good
-valora plan "Add authentication" && valora review-plan && valora implement
-
-# Avoid
-valora implement "Add authentication"  # Skipping planning
-```
-
-### 2. Use Appropriate Granularity
-
-```bash
-# For large features
-valora create-backlog --granularity=fine
-
-# For simple features
-valora create-backlog --granularity=coarse
-```
-
-### 3. Validate Early and Often
-
-```bash
-# After each implementation step (full validation)
-valora assert && valora test
-
-# Quick validation for faster feedback
-valora assert --quick=typescript && valora review-code --auto-only
-```
-
-### 4. Use Quick Modes for Faster Feedback
-
-```bash
-# Quick plan review (~3 min vs ~14 min)
-valora review-plan --checklist
-
-# Quick assertion (~5 min vs ~9 min)
-valora assert --quick=all
-
-# Quick code review (~3 min vs ~10 min)
-valora review-code --checklist
-
-# Automated checks only (~1 min)
-valora review-code --auto-only
-
-# Coverage validation gate
-valora validate-coverage --threshold=80
-
-# Parallel validation (~10 min vs ~19 min sequential)
-valora validate-parallel
-
-# Quick parallel validation (~5 min)
-valora validate-parallel --quick
-```
-
-### 5. Enforce Coverage Gates
-
-Use coverage validation to maintain test quality:
-
-```bash
-# Standard validation (80% threshold)
-valora validate-coverage
-
-# Strict mode for critical code
-valora validate-coverage --strict
-
-# Only validate new/changed code
-valora validate-coverage --new-code-only
-
-# CI/CD integration with JSON output
-valora validate-coverage --strict --fail-on-decrease --report-format=json
-```
-
-**Quality Score Thresholds:**
-
-| Score | Grade | Action                        |
-| ----- | ----- | ----------------------------- |
-| >= 80 | A     | PASS                          |
-| 70-79 | B     | PASS with recommendations     |
-| 60-69 | C     | WARN - requires justification |
-| < 60  | F     | FAIL - must improve           |
-
-### 6. Use Two-Phase Code Review
-
-Split code review into automated pre-checks and manual architecture review to reduce time by 50%:
-
-```bash
-# Phase 1: Automated pre-checks (~1.5 min)
 valora pre-check
-
-# If pre-check fails, fix and retry
-valora pre-check --fix
-
-# Phase 2: Manual architecture review (~5 min)
-valora review-code --focus=architecture
-
-# Continue workflow
-valora review-functional
+valora review-code --severity=high --focus=all
+valora review-functional --check-a11y=true
+valora test
+valora feedback --command=review-code
 ```
 
-**Pre-Check Automated Checks:**
+**Expected outcome**: Code quality and functional correctness confirmed, with issues documented.
+
+<details>
+<summary><strong>Code review rationale and time-saving options</strong></summary>
+
+**Two-phase approach saves ~36–56% of review time**:
+
+| Approach                        | Time     | Savings |
+| ------------------------------- | -------- | ------- |
+| Full manual review              | 10.2 min | —       |
+| pre-check + architecture review | 6.5 min  | 36%     |
+| pre-check + checklist review    | 4.5 min  | 56%     |
+
+**pre-check** runs automated checks (~1.5 min total):
 
 | Check       | Purpose            | Duration |
 | ----------- | ------------------ | -------- |
@@ -632,97 +250,64 @@ valora review-functional
 | Security    | Vulnerability scan | ~5s      |
 | Quick Tests | Regression check   | ~20s     |
 
-**Time Savings:**
+If `pre-check` finds issues, use `valora pre-check --fix` to apply auto-fixes before proceeding to the manual review.
 
-| Approach                 | Time     | Savings |
-| ------------------------ | -------- | ------- |
-| Full manual review       | 10.2 min | -       |
-| Pre-check + Architecture | 6.5 min  | 36%     |
-| Pre-check + Checklist    | 4.5 min  | 56%     |
+`--check-a11y=true` on `review-functional` includes accessibility validation. Omit it for backend-only changes.
 
-### 5. Use Parallel Validation
+</details>
 
-Run assert and review-code concurrently to save ~9 minutes:
+---
+
+## Workflow 5: Tiered Planning (Complex Features)
+
+**Use when**: Working on complex features (complexity > 5) that benefit from architectural review before detailed planning.
 
 ```bash
-# Instead of sequential:
-valora implement
-valora assert        # ~9 min
-valora review-code   # ~10 min (after assert)
-valora commit
-
-# Use parallel:
-valora implement
-valora validate-parallel  # ~10 min (both run together)
-valora commit
-
-# Or quick parallel:
-valora implement
-valora validate-parallel --quick  # ~5 min
-valora commit
+valora fetch-task --task-id=<id>
+valora gather-knowledge --scope=task
+valora plan-architecture
+valora review-plan --checklist          # fast gate (~3 min) before detailed planning
+valora plan-implementation --arch-plan=knowledge-base/PLAN-ARCH-<TASK-ID>.md
+valora review-plan --checklist
+valora implement --plan=knowledge-base/PLAN-IMPL-<TASK-ID>.md
+valora assert --quick=all
+valora review-code --auto-only
 ```
 
-### 8. Use Pattern Templates for Common Tasks
+**Expected outcome**: Architectural issues caught in ~5 minutes before committing to detailed planning, saving ~25 minutes per cycle.
 
-For common architectural patterns, use pre-built templates to accelerate planning:
+<details>
+<summary><strong>Tiered planning rationale and outputs</strong></summary>
 
-```bash
-# REST API endpoints
-valora plan "Add users API" --pattern=rest-api
+**Why tiered planning?** Standard `valora plan` runs architecture and implementation planning sequentially in one pass. For complex features this means ~18 minutes of work before you discover an architectural problem. Tiered planning separates the phases:
 
-# React features and components
-valora plan "Add dashboard" --pattern=react-feature
+- **Phase 1 — Architecture** (`plan-architecture`, ~5 min): Produces `knowledge-base/PLAN-ARCH-[TASK-ID].md` with technology choices, component boundaries, integration points, and a Go/No-Go decision.
+- **Phase 2 — Implementation** (`plan-implementation`, ~10 min): Produces `knowledge-base/PLAN-IMPL-[TASK-ID].md` with step-by-step tasks, file paths, dependencies, risks, testing, and rollback procedures.
 
-# Database schema and migrations
-valora plan "Add orders table" --pattern=database
+The `--checklist` flag on `review-plan` runs a fast binary validation (~3 min vs ~14 min full) between phases. Only proceed to Phase 2 if Phase 1 passes the checklist gate.
 
-# Authentication features
-valora plan "Add OAuth login" --pattern=auth
+**Time savings**: ~25 min per planning cycle. Catches architectural issues before detailed planning, eliminates detailed planning on rejected architectures, and provides faster feedback through `--checklist` and `--quick` modes.
 
-# Background jobs and workers
-valora plan "Add email queue" --pattern=background-job
-```
+</details>
 
-**Available Patterns:**
+---
 
-| Pattern          | Template                         | Use When                                 |
-| ---------------- | -------------------------------- | ---------------------------------------- |
-| `rest-api`       | `PLAN_PATTERN_REST_API.md`       | Adding API endpoints, CRUD resources     |
-| `react-feature`  | `PLAN_PATTERN_REACT_FEATURE.md`  | Adding React features, pages, components |
-| `database`       | `PLAN_PATTERN_DATABASE.md`       | Adding tables, migrations, entities      |
-| `auth`           | `PLAN_PATTERN_AUTH.md`           | Adding login, JWT, OAuth, RBAC           |
-| `background-job` | `PLAN_PATTERN_BACKGROUND_JOB.md` | Adding async tasks, queues, workers      |
+## Workflow 6: Quick Task
 
-### 9. Capture Feedback
-
-Always run `valora feedback` after completing a workflow to improve future executions.
-
-### 10. Leverage Session Context
-
-The engine maintains context between commands. Use this to your advantage:
+**Use when**: Handling a small, well-defined task (complexity < 3).
 
 ```bash
-valora plan "Add user profile"
-# Context from plan is available for:
+valora fetch-task --task-id=<id>
+valora plan
 valora implement
+valora assert
 valora test
-valora review-code
+valora commit
 ```
 
-## Workflow Summary
+**Expected outcome**: A small, verified change committed in a single pass.
 
-| Workflow               | When to Use                          | Key Commands                           |
-| ---------------------- | ------------------------------------ | -------------------------------------- |
-| New Feature            | Starting fresh                       | Full lifecycle                         |
-| Bug Fix                | Fixing issues                        | plan, implement, test, commit          |
-| Refactoring            | Code improvements                    | plan, implement (step-by-step), test   |
-| Code Review            | Before merging                       | review-code, review-functional         |
-| Tiered Planning        | Complex features (complexity > 5)    | plan-architecture, plan-implementation |
-| Pattern-Based Planning | Common patterns (API, React, DB)     | plan --pattern=<type>                  |
-| Quick Task             | Small changes                        | fetch-task, plan, implement, commit    |
-| Documentation          | Generating tech docs                 | generate-docs                          |
-| Fast Documentation     | Parallel generation (5-7 min faster) | generate-all-documentation             |
-| Quick Docs             | Template-based documentation         | generate-docs --quick, --extract-only  |
+> **Tip**: For trivial tasks (updating a constant, fixing a typo), use `valora plan --mode=express` to reduce planning time from ~13 min to ~2–3 min.
 
 ---
 
@@ -730,154 +315,44 @@ valora review-code
 
 **Use when**: Creating comprehensive technical documentation for a project.
 
-### Standard Approach (Full Pipeline)
+Prerequisites: `knowledge-base/PRD.md`, `knowledge-base/FUNCTIONAL.md`, and `knowledge-base/BACKLOG.md` must exist.
 
-1. **Ensure Prerequisites Exist**
+### Choose your approach
 
-   Make sure PRD, FUNCTIONAL, and BACKLOG documents exist:
+| Approach               | Command                                      | Duration    | Best for                   |
+| ---------------------- | -------------------------------------------- | ----------- | -------------------------- |
+| Full pipeline          | `generate-docs`                              | ~14 min     | Single domain or templates |
+| Parallel (all domains) | `generate-all-documentation`                 | ~8 min      | Full suite, time-critical  |
+| Parallel with cache    | `generate-all-documentation --cache-context` | ~6.5 min    | Subsequent runs            |
+| Fastest                | `generate-all-documentation --skip-review`   | ~5.5 min    | Speed over validation      |
+| Quick mode             | `generate-docs --quick`                      | ~50% faster | Initial documentation      |
 
-   ```bash
-   ls knowledge-base/PRD.md knowledge-base/FUNCTIONAL.md knowledge-base/BACKLOG.md
-   ```
+### Standard parallel generation
 
-2. **Generate All Documentation**
+```bash
+valora generate-all-documentation
+```
 
-   ```bash
-   valora generate-docs
-   ```
+### Domain-specific generation
 
-   This generates 15 documents across infrastructure, backend, and frontend domains.
+```bash
+valora generate-docs --domain=infrastructure
+valora generate-docs --domain=backend
+valora generate-docs --domain=frontend
+```
 
-3. **Generate Domain-Specific Documentation**
+### Verify output
 
-   For infrastructure only:
+```bash
+ls -la knowledge-base/infrastructure/
+ls -la knowledge-base/backend/
+ls -la knowledge-base/frontend/
+```
 
-   ```bash
-   valora generate-docs --domain=infrastructure
-   ```
+<details>
+<summary><strong>Documentation output structure and quick-mode details</strong></summary>
 
-   For backend only:
-
-   ```bash
-   valora generate-docs --domain=backend
-   ```
-
-   For frontend only:
-
-   ```bash
-   valora generate-docs --domain=frontend
-   ```
-
-4. **Verify Generated Files**
-
-   Check the output in knowledge-base/:
-
-   ```bash
-   ls -la knowledge-base/infrastructure/
-   ls -la knowledge-base/backend/
-   ls -la knowledge-base/frontend/
-   ```
-
-5. **Review Mermaid Diagrams**
-
-   Open documentation files in VS Code with Mermaid preview to verify diagrams render correctly.
-
-### Quick Approach (~50% Faster)
-
-Use when time is constrained or for initial documentation:
-
-1. **Run Extraction First**
-
-   ```bash
-   valora generate-docs --extract-only
-   ```
-
-   Generates `DOC_EXTRACTION_CHECKLIST.md` with automated commands to extract from code.
-
-2. **Fill Extraction Checklist**
-
-   Run the extraction commands and fill in the checklist (~10 min):
-
-   ```bash
-   # Find all route definitions
-   grep -rn "router\.\|app\.\(get\|post\|put\|patch\|delete\)" src/ --include="*.ts"
-
-   # Find all interfaces/types
-   grep -rn "^export interface\|^export type" src/ --include="*.ts"
-
-   # Find all service classes
-   grep -rn "^export class.*Service" src/ --include="*.ts"
-   ```
-
-3. **Generate with Quick Mode**
-
-   ```bash
-   valora generate-docs --quick
-   ```
-
-   Uses pre-built templates for faster generation.
-
-4. **Verify and Customise**
-
-   Review generated docs and add project-specific details.
-
-### Parallel Approach (~6 min Faster)
-
-Use `generate-all-documentation` when time is critical:
-
-1. **Standard Parallel Generation (~8 min)**
-
-   ```bash
-   valora generate-all-documentation
-   ```
-
-   Runs all three domains in parallel subprocesses.
-
-2. **With Cached Context (~6.5 min)**
-
-   ```bash
-   valora generate-all-documentation --cache-context
-   ```
-
-   Reuses cached context from previous runs (2-hour TTL).
-
-3. **Fastest Generation (~5.5 min)**
-
-   ```bash
-   valora generate-all-documentation --skip-review
-   ```
-
-   Skips validation stage. Run `valora validate-parallel` afterwards if needed.
-
-4. **With Security Documentation**
-
-   ```bash
-   valora generate-all-documentation --security-context=.valora/security-requirements.json
-   ```
-
-   Includes comprehensive security sections in all documents.
-
-**Comparison:**
-
-| Approach                                     | Duration | Best For                  |
-| -------------------------------------------- | -------- | ------------------------- |
-| `generate-docs`                              | ~14 min  | Single domain, templates  |
-| `generate-all-documentation`                 | ~8 min   | Full suite, time-critical |
-| `generate-all-documentation --cache-context` | ~6.5 min | Subsequent runs           |
-| `generate-all-documentation --skip-review`   | ~5.5 min | Fastest generation        |
-
-### Quick Templates Available
-
-| Template                      | Purpose                           |
-| ----------------------------- | --------------------------------- |
-| `DOC_EXTRACTION_CHECKLIST.md` | Systematic extraction from code   |
-| `DOC_API_QUICK.md`            | API documentation skeleton        |
-| `DOC_COMPONENT_QUICK.md`      | Component documentation           |
-| `BACKEND_DOC.md`              | Backend document structure        |
-| `FRONTEND_DOC.md`             | Frontend document structure       |
-| `INFRASTRUCTURE_DOC.md`       | Infrastructure document structure |
-
-### Output Structure
+**Output structure**:
 
 ```plaintext
 knowledge-base/
@@ -893,10 +368,120 @@ knowledge-base/
 │   ├── API.md              # API Documentation
 │   ├── DATA.md             # Data Architecture
 │   ├── TESTING.md          # Testing Strategy
-│   └── CODING-ASSERTIONS.md # Coding Standards
+│   └── CODING-ASSERTIONS.md
 └── frontend/
     ├── ARCHITECTURE.md     # Frontend Architecture
     ├── DESIGN.md           # Design System
     ├── TESTING.md          # Testing Strategy
-    └── CODING-ASSERTIONS.md # Coding Standards
+    └── CODING-ASSERTIONS.md
 ```
+
+**Quick mode (--extract-only → --quick)**:
+
+1. Generate the extraction checklist:
+
+   ```bash
+   valora generate-docs --extract-only
+   ```
+
+   Produces `DOC_EXTRACTION_CHECKLIST.md` with automated commands to extract from code.
+
+2. Fill the checklist manually (~10 min), then:
+   ```bash
+   valora generate-docs --quick
+   ```
+   Uses pre-built templates for faster generation.
+
+**Adding security context**:
+
+```bash
+valora generate-all-documentation --security-context=.valora/security-requirements.json
+```
+
+Includes comprehensive security sections across all documents.
+
+**Cache TTL**: `--cache-context` reuses cached context from previous runs with a 2-hour TTL. After `--skip-review`, run `valora validate-parallel` if post-hoc validation is needed.
+
+**Available quick templates**:
+
+| Template                      | Purpose                           |
+| ----------------------------- | --------------------------------- |
+| `DOC_EXTRACTION_CHECKLIST.md` | Systematic extraction from code   |
+| `DOC_API_QUICK.md`            | API documentation skeleton        |
+| `DOC_COMPONENT_QUICK.md`      | Component documentation           |
+| `BACKEND_DOC.md`              | Backend document structure        |
+| `FRONTEND_DOC.md`             | Frontend document structure       |
+| `INFRASTRUCTURE_DOC.md`       | Infrastructure document structure |
+
+</details>
+
+---
+
+## Interactive Clarification
+
+Several commands pause execution to collect your input. Answers are incorporated into the final document under a "User Clarifications" section.
+
+| Command        | Questions source                | Document updated    |
+| -------------- | ------------------------------- | ------------------- |
+| `refine-specs` | Specification refinement        | `FUNCTIONAL.md`     |
+| `create-prd`   | Requirements analysis           | `PRD.md`            |
+| `refine-task`  | Task clarity analysis           | `BACKLOG.md`        |
+| `plan`         | Complexity, dependencies, risks | `PLAN-[TASK-ID].md` |
+
+Questions are grouped by priority:
+
+- **P0 (Critical)** — always answer; blocks core functionality
+- **P1 (Important)** — affects significant features; can be skipped with noted assumptions
+- **P2 (Minor)** — optional clarifications
+
+---
+
+## Speed-Up Options
+
+Use these flags to reduce time across any workflow:
+
+| Goal                  | Command                                   | Time saving        |
+| --------------------- | ----------------------------------------- | ------------------ |
+| Fast plan review      | `valora review-plan --checklist`          | ~3 min vs ~14 min  |
+| Fast assertion        | `valora assert --quick=all`               | ~5 min vs ~9 min   |
+| Fast code review      | `valora review-code --checklist`          | ~3 min vs ~10 min  |
+| Automated checks only | `valora review-code --auto-only`          | ~1 min             |
+| Parallel validation   | `valora validate-parallel`                | ~10 min vs ~19 min |
+| Quick parallel        | `valora validate-parallel --quick`        | ~5 min             |
+| Coverage gate         | `valora validate-coverage --threshold=80` | —                  |
+
+### Pattern templates (planning)
+
+Use `--pattern` to reduce planning time from 13–15 min to 4–6 min:
+
+```bash
+valora plan "Add users API" --pattern=rest-api
+valora plan "Add dashboard" --pattern=react-feature
+valora plan "Add orders table" --pattern=database
+valora plan "Add OAuth login" --pattern=auth
+valora plan "Add email queue" --pattern=background-job
+```
+
+| Pattern          | Template file                    | Use when                          |
+| ---------------- | -------------------------------- | --------------------------------- |
+| `rest-api`       | `PLAN_PATTERN_REST_API.md`       | API endpoints, CRUD resources     |
+| `react-feature`  | `PLAN_PATTERN_REACT_FEATURE.md`  | React features, pages, components |
+| `database`       | `PLAN_PATTERN_DATABASE.md`       | Tables, migrations, entities      |
+| `auth`           | `PLAN_PATTERN_AUTH.md`           | Login, JWT, OAuth, RBAC           |
+| `background-job` | `PLAN_PATTERN_BACKGROUND_JOB.md` | Async tasks, queues, workers      |
+
+### Coverage validation gates
+
+```bash
+valora validate-coverage                         # 80% threshold (default)
+valora validate-coverage --strict                # strict mode
+valora validate-coverage --new-code-only         # only changed code
+valora validate-coverage --strict --fail-on-decrease --report-format=json   # CI/CD
+```
+
+| Score | Grade | Action                        |
+| ----- | ----- | ----------------------------- |
+| ≥ 80  | A     | PASS                          |
+| 70–79 | B     | PASS with recommendations     |
+| 60–69 | C     | WARN — requires justification |
+| < 60  | F     | FAIL — must improve           |

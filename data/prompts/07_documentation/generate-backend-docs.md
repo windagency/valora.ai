@@ -58,9 +58,31 @@ tokens:
 
 # Generate Backend Documentation
 
+## Documentation Philosophy — MANDATORY
+
+Every document has two audiences. Confusing them makes documentation useless to both.
+
+1. **Consumers** scan like a menu: find the endpoint, see what it takes, copy the example, move on. They will not read a wall of text.
+2. **Maintainers** need the full picture: why there are two calls, why a field is nullable, the historical context. They debug at 2AM.
+
+**Structure rule**: Lead with WHAT it does. Follow with HOW to use it. Bury the WHY behind `<details>` collapsible sections.
+
+**Use this exact HTML syntax for all maintainer-depth sections:**
+
+```markdown
+<details>
+<summary><strong>Section Title</strong></summary>
+
+Content here — design rationale, historical context, edge cases.
+
+</details>
+```
+
+**If a section has no meaningful project-specific content, omit it entirely.** An empty section is worse than no section.
+
 ## Objective
 
-Generate 5 comprehensive backend documentation files by **writing them directly to disk** using the `write` tool. Apply British English for prose and include Mermaid diagrams as specified.
+Generate 5 comprehensive audience-layered backend documentation files by **writing them directly to disk** using the `write` tool. Apply British English for prose and include Mermaid diagrams as specified.
 
 ## CRITICAL: Write Files Directly
 
@@ -115,104 +137,114 @@ Use `list_dir` to check if `knowledge-base/backend/` exists.
 
 Use the `write` tool to create `knowledge-base/backend/ARCHITECTURE.md` with:
 
-**Required sections**:
+**Consumer Surface (always present — leads the document)**:
 
-1. **Purpose** - Document scope
-2. **Architecture Overview** - High-level backend design
-3. **Component Diagram** (Mermaid flowchart)
-4. **Service Design** - Service boundaries and responsibilities
-5. **Dependency Graph** - Module dependencies
-6. **Layer Architecture** - Layering patterns
-7. **Design Patterns** - Patterns used
-8. **Error Handling** - Error handling strategy
-9. **Middleware** - Middleware chain
-10. **Troubleshooting** - Common issues
-11. **Best Practices** - Architecture best practices
-12. **Related Documentation** - Cross-references
-13. **Changelog** - Version history
+1. **Purpose** — one sentence
+2. **Architecture Overview** — 2-3 sentences + Component Diagram (Mermaid flowchart)
+3. **Service Boundaries** — table of services and their single responsibilities
+4. **Key Patterns** — table of patterns used and where (`Pattern | Where Applied | Why`)
+
+**Maintainer Depth (use `<details>` tags)**:
+
+5. `<details>` **Layer Architecture Rationale** — why this layering was chosen, alternatives rejected
+6. `<details>` **Dependency Graph Analysis** — why certain dependencies exist, what to avoid
+7. `<details>` **Error Handling Strategy** — how errors propagate and why
+8. `<details>` **Middleware Chain** — ordering rationale and edge cases
+
+**Conditional (only if project-specific content exists)**:
+
+9. **Related Documentation** — cross-references
 
 ### Step 3: Generate and Write API.md
 
 Use the `write` tool to create `knowledge-base/backend/API.md` with:
 
-**Required sections**:
+**Consumer Surface (always present — leads the document)**:
 
-1. **Purpose** - API overview
-2. **API Overview** - REST/GraphQL design
-3. **Authentication** - Auth mechanisms
-4. **Base URL and Versioning** - API versioning
-5. **Endpoints by Resource** - Endpoint documentation
-6. **Request/Response Examples** - Sample payloads
-7. **Error Codes** - Error response formats
-8. **Rate Limiting** - Rate limit policies
-9. **Sequence Diagrams** (Mermaid sequenceDiagram)
-10. **Troubleshooting** - API issues
-11. **Best Practices** - API best practices
-12. **Related Documentation** - Cross-references
-13. **Changelog** - Version history
+1. **Quick Reference Table** — all endpoints: `Method | Path | Description | Auth Required`
+2. **Authentication** — how to authenticate with copy-paste ready examples
+3. **Base URL and Versioning** — base URL and version scheme
+4. **Endpoints by Resource** — for each endpoint: method, path, request params, request body (example), response (example), error codes. Example-first.
+5. **Error Codes** — standard error table: `HTTP Status | Code | Description`
+
+**Maintainer Depth (use `<details>` tags)**:
+
+6. `<details>` **Rate Limiting** — limits, burst rules, headers, and why these limits were chosen
+7. `<details>` **Sequence Diagrams** (Mermaid sequenceDiagram) — internal flows, only when non-obvious
+8. `<details>` **Authentication Architecture** — why this auth mechanism, token lifecycle, edge cases
+
+**Conditional (only if project-specific content exists)**:
+
+9. **Related Documentation** — cross-references
 
 ### Step 4: Generate and Write DATA.md
 
 Use the `write` tool to create `knowledge-base/backend/DATA.md` with:
 
-**Required sections**:
+**Consumer Surface (always present — leads the document)**:
 
-1. **Purpose** - Data architecture overview
-2. **Data Model Overview** - High-level data design
-3. **Entity Relationship Diagram** (Mermaid erDiagram)
-4. **Entity Definitions** - Entity details
-5. **Relationships** - Entity relationships
-6. **Indexing Strategy** - Database indexes
-7. **Migrations** - Migration workflow
-8. **Data Validation** - Validation rules
-9. **Caching Strategy** - Cache layers
-10. **Troubleshooting** - Data issues
-11. **Best Practices** - Data best practices
-12. **Related Documentation** - Cross-references
-13. **Changelog** - Version history
+1. **Purpose** — one sentence
+2. **Data Model Overview** — high-level description + Entity Relationship Diagram (Mermaid erDiagram)
+3. **Entity Definitions** — one table per entity with fields, types, constraints, and nullable rationale
+4. **Relationships** — table of entity relationships: `Entity A | Relationship | Entity B | Notes`
+
+**Maintainer Depth (use `<details>` tags)**:
+
+5. `<details>` **Indexing Strategy** — which indexes exist and why, query patterns they serve
+6. `<details>` **Migration History and Workflow** — how migrations work, notable past migrations, pitfalls
+7. `<details>` **Validation Rules Rationale** — why specific constraints exist (especially non-obvious ones)
+8. `<details>` **Caching Strategy** — what is cached, TTL, invalidation logic, and why
+
+**Conditional (only if project-specific content exists)**:
+
+9. **Related Documentation** — cross-references
 
 ### Step 5: Generate and Write TESTING.md
 
 Use the `write` tool to create `knowledge-base/backend/TESTING.md` with:
 
-**Required sections**:
+**Consumer Surface (always present — leads the document)**:
 
-1. **Purpose** - Testing strategy overview
-2. **Testing Approach** - Overall philosophy
-3. **Test Pyramid** (Mermaid diagram)
-4. **Unit Testing** - Service unit tests
-5. **Integration Testing** - API integration tests
-6. **E2E Testing** - Full flow tests
-7. **Test Data Management** - Fixtures and mocks
-8. **Coverage Requirements** - Thresholds
-9. **CI Integration** - Test automation
-10. **Troubleshooting** - Test issues
-11. **Best Practices** - Testing best practices
-12. **Related Documentation** - Cross-references
-13. **Changelog** - Version history
+1. **Testing Approach** — philosophy in 2-3 sentences + Test Pyramid diagram (Mermaid)
+2. **How to Run Tests** — copy-paste commands for unit, integration, and E2E tests
+3. **Coverage Requirements** — table of thresholds by layer: `Layer | Minimum Coverage | Tool`
+
+**Maintainer Depth (use `<details>` tags)**:
+
+4. `<details>` **Unit Testing Patterns** — what to unit test, what to mock, and why
+5. `<details>` **Integration Testing Architecture** — test database setup, fixtures, why integration tests are structured this way
+6. `<details>` **E2E Testing Infrastructure** — environment setup, data seeding, known flakiness and mitigations
+7. `<details>` **Test Data Management** — fixture strategy, factory patterns, why this approach
+8. `<details>` **CI Integration** — pipeline configuration, parallelisation, test splitting
+
+**Conditional (only if project-specific content exists)**:
+
+9. **Related Documentation** — cross-references
 
 ### Step 6: Generate and Write CODING-ASSERTIONS.md
 
 Use the `write` tool to create `knowledge-base/backend/CODING-ASSERTIONS.md` with:
 
-**Required sections**:
+**Consumer Surface (always present — leads the document)**:
 
-1. **Purpose** - Standards overview
-2. **Naming Conventions** - Naming rules
-3. **File Organisation** - Structure standards
-4. **Service Patterns** - Service structure
-5. **Error Handling Rules** - Error patterns
-6. **Validation Patterns** - Input validation
-7. **Security Assertions** - Security requirements table
-8. **Performance Standards** - Performance requirements
-9. **Type Safety** - TypeScript standards
-10. **Logging Standards** - Logging patterns
-11. **Documentation Standards** - Code docs
-12. **Linting Configuration** - ESLint setup
-13. **Troubleshooting** - Standards enforcement
-14. **Best Practices** - Coding best practices
-15. **Related Documentation** - Cross-references
-16. **Changelog** - Version history
+1. **Quick Reference** — scannable rules table: `Category | Rule | Enforcement`
+2. **Naming Conventions** — table of naming rules by construct (classes, files, variables, etc.)
+3. **File Organisation** — directory tree with brief descriptions
+4. **Type Safety** — key TypeScript rules as a table
+
+**Maintainer Depth (use `<details>` tags)**:
+
+5. `<details>` **Service Patterns Rationale** — why services are structured this way, what to avoid
+6. `<details>` **Error Handling Rationale** — error hierarchy, propagation strategy, and why
+7. `<details>` **Validation Patterns** — where validation occurs, why at these boundaries
+8. `<details>` **Security Assertions** — security requirements table with threat context
+9. `<details>` **Performance Standards** — thresholds with benchmark rationale
+10. `<details>` **Logging Standards** — what to log, log levels, PII rules, and why
+11. `<details>` **Linting Configuration** — ESLint rules with justifications for non-obvious choices
+
+**Conditional (only if project-specific content exists)**:
+
+12. **Related Documentation** — cross-references
 
 ### Step 7: Return Metadata
 
@@ -229,8 +261,10 @@ After writing all files, output JSON with metadata only (no content).
 		"filename": "ARCHITECTURE.md",
 		"target_path": "knowledge-base/backend/ARCHITECTURE.md",
 		"written": true,
-		"sections_count": 13,
-		"diagrams_included": ["Component Diagram", "Dependency Graph"],
+		"consumer_sections": 4,
+		"maintainer_sections": 4,
+		"diagrams_included": ["Component Diagram"],
+		"details_tags_present": true,
 		"completeness_score": 0.95
 	},
 	"api_document": {
@@ -238,8 +272,10 @@ After writing all files, output JSON with metadata only (no content).
 		"filename": "API.md",
 		"target_path": "knowledge-base/backend/API.md",
 		"written": true,
-		"sections_count": 13,
+		"consumer_sections": 5,
+		"maintainer_sections": 3,
 		"diagrams_included": ["Sequence Diagram"],
+		"details_tags_present": true,
 		"completeness_score": 0.93
 	},
 	"data_document": {
@@ -247,8 +283,10 @@ After writing all files, output JSON with metadata only (no content).
 		"filename": "DATA.md",
 		"target_path": "knowledge-base/backend/DATA.md",
 		"written": true,
-		"sections_count": 13,
+		"consumer_sections": 4,
+		"maintainer_sections": 4,
 		"diagrams_included": ["ERD"],
+		"details_tags_present": true,
 		"completeness_score": 0.92
 	},
 	"testing_document": {
@@ -256,8 +294,10 @@ After writing all files, output JSON with metadata only (no content).
 		"filename": "TESTING.md",
 		"target_path": "knowledge-base/backend/TESTING.md",
 		"written": true,
-		"sections_count": 13,
+		"consumer_sections": 3,
+		"maintainer_sections": 5,
 		"diagrams_included": ["Test Pyramid"],
+		"details_tags_present": true,
 		"completeness_score": 0.9
 	},
 	"coding_assertions_document": {
@@ -265,8 +305,10 @@ After writing all files, output JSON with metadata only (no content).
 		"filename": "CODING-ASSERTIONS.md",
 		"target_path": "knowledge-base/backend/CODING-ASSERTIONS.md",
 		"written": true,
-		"sections_count": 16,
+		"consumer_sections": 4,
+		"maintainer_sections": 7,
 		"diagrams_included": [],
+		"details_tags_present": true,
 		"completeness_score": 0.94
 	},
 	"generation_summary": {
@@ -288,12 +330,13 @@ After writing all files, output JSON with metadata only (no content).
 ## Success Criteria
 
 - ✅ All 5 files written using `write` tool
-- ✅ Each document includes standardised header
-- ✅ All required sections present
+- ✅ Each document includes standardised header with Audience field
+- ✅ Consumer surface leads each document and is scannable without expanding anything
+- ✅ Maintainer depth sections use `<details><summary>` tags
+- ✅ No empty or generic boilerplate sections — omit rather than pad
 - ✅ Mermaid diagrams render correctly
 - ✅ British English used consistently
 - ✅ Cross-references use correct relative paths
-- ✅ Completeness score >= 85% for each document
 
 ## Error Handling
 

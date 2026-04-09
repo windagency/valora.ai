@@ -1,103 +1,86 @@
 # Contributing Guidelines
 
-> How to contribute to VALORA.
+> How to contribute to VALORA. Naming conventions and commit format are defined here; `code-quality.md` defers to this file on those topics.
 
-## Welcome
+## Contribution Steps
 
-We welcome contributions to VALORA! This guide will help you get started with contributing code, documentation, or bug reports.
+1. **Fork** the repository to your GitHub account.
 
-## Types of Contributions
+2. **Clone** your fork and install dependencies:
 
-| Type              | Description                                     |
-| ----------------- | ----------------------------------------------- |
-| **Bug Fixes**     | Fix issues in the codebase                      |
-| **Features**      | Add new functionality                           |
-| **Documentation** | Improve or add documentation                    |
-| **Tests**         | Add or improve test coverage                    |
-| **Refactoring**   | Improve code quality without changing behaviour |
+   ```bash
+   git clone https://github.com/YOUR-USERNAME/valora.git
+   cd valora
+   pnpm install
+   ```
 
-## Getting Started
+3. **Create a branch** from `main`:
 
-### 1. Fork the Repository
+   ```bash
+   git checkout -b feat/your-feature-name
+   # or
+   git checkout -b fix/the-bug-description
+   ```
 
-Fork the repository to your GitHub account.
+4. **Make changes** — write code, add tests, update documentation as needed.
 
-### 2. Clone Your Fork
+5. **Run quality checks** before committing:
 
-```bash
-git clone https://github.com/YOUR-USERNAME/valora.git
-cd valora
+   ```bash
+   pnpm format        # format and lint
+   pnpm tsc:check     # type check
+   pnpm test:quick    # unit + integration tests
+   ```
+
+6. **Commit** using [Conventional Commits](#commit-messages).
+
+7. **Push** and open a pull request against `main`.
+
+---
+
+## Pre-commit Checklist
+
+- [ ] `pnpm format` passes without changes
+- [ ] `pnpm tsc:check` reports no errors
+- [ ] `pnpm test:quick` passes
+- [ ] New functionality has unit tests
+- [ ] Bug fixes include a regression test
+- [ ] Public APIs have JSDoc comments
+- [ ] Documentation updated if behaviour changed
+- [ ] No new `any` types without explicit justification
+
+---
+
+## Pull Request Template
+
+```markdown
+## Summary
+
+Brief description of the change and why it was made.
+
+## Changes
+
+- [ ] Feature / fix description
+- [ ] Test additions
+- [ ] Documentation updates
+
+## Testing
+
+How were the changes tested? Which test suites cover this?
+
+## Checklist
+
+- [ ] Code follows naming conventions
+- [ ] Tests pass locally
+- [ ] Documentation updated
+- [ ] Commit messages follow Conventional Commits
 ```
 
-### 3. Set Up Development Environment
+---
 
-```bash
-pnpm install
-pnpm build
-pnpm test
-```
+## Commit Messages
 
-See [Development Setup](./setup.md) for detailed instructions.
-
-### 4. Create a Feature Branch
-
-```bash
-git checkout -b feature/your-feature-name
-# or
-git checkout -b fix/your-bug-fix
-```
-
-## Development Workflow
-
-### Making Changes
-
-1. **Write code** following our coding standards
-2. **Add tests** for new functionality
-3. **Update documentation** if needed
-4. **Run quality checks** before committing
-
-### CLI Tool Enforcement
-
-VALORA enforces the use of modern CLI tools via a PreToolUse hook. Legacy commands like `grep`, `find`, `ls`, and `npm` are automatically blocked when run through `run_terminal_cmd`. Use the modern equivalents instead:
-
-- `rg` instead of `grep` / `egrep` / `fgrep`
-- `fd` instead of `find`
-- `jq` / `yq` instead of `cat` on JSON/YAML files
-- `eza` instead of `ls` or `tree`
-- `pnpm` instead of `npm`
-
-See the [Modern CLI Toolkit](./modern-cli-toolkit/README.md) for full details and the [ADR-008](../adr/008-pretooluse-cli-enforcement.md) for the architectural rationale.
-
-### Dependency Management
-
-The project enforces supply chain security measures. When working with dependencies:
-
-- **Never delete `pnpm-lock.yaml`** — the lockfile is frozen to prevent drift. If `pnpm install` fails, see the [troubleshooting guide](../user-guide/troubleshooting.md).
-- **Adding a dependency**: run `pnpm add <package> --config.frozen-lockfile=false`, then commit the updated `pnpm-lock.yaml`.
-- **Updating a dependency**: run `pnpm update <package> --config.frozen-lockfile=false`.
-- **After any dependency change**: run `pnpm audit:prod` to check for new vulnerabilities.
-- **Native build dependencies**: if a new package requires install scripts (e.g., native compilation), add it to `pnpm.onlyBuiltDependencies` in `package.json`.
-
-See [ADR-009](../adr/009-supply-chain-hardening.md) for the full rationale.
-
-### Quality Checks
-
-Run these before every commit:
-
-```bash
-# Format and lint code
-pnpm format
-
-# Type check
-pnpm tsc:check
-
-# Run tests
-pnpm test
-```
-
-### Commit Messages
-
-We use [Conventional Commits](https://www.conventionalcommits.org/):
+VALORA uses [Conventional Commits](https://www.conventionalcommits.org/):
 
 ```plaintext
 <type>(<scope>): <description>
@@ -107,42 +90,56 @@ We use [Conventional Commits](https://www.conventionalcommits.org/):
 [optional footer]
 ```
 
-#### Types
+### Types
 
-| Type       | Description                |
-| ---------- | -------------------------- |
-| `feat`     | New feature                |
-| `fix`      | Bug fix                    |
-| `docs`     | Documentation only         |
-| `style`    | Formatting, no code change |
-| `refactor` | Code refactoring           |
-| `perf`     | Performance improvement    |
-| `test`     | Adding tests               |
-| `chore`    | Maintenance tasks          |
+| Type       | When to use                           |
+| ---------- | ------------------------------------- |
+| `feat`     | New feature                           |
+| `fix`      | Bug fix                               |
+| `docs`     | Documentation only                    |
+| `style`    | Formatting, no logic change           |
+| `refactor` | Code restructure, no behaviour change |
+| `perf`     | Performance improvement               |
+| `test`     | Adding or updating tests              |
+| `chore`    | Maintenance (deps, build scripts)     |
 
-#### Examples
+### Examples
 
 ```bash
-git commit -m "feat(cli): add verbose flag to plan command"
+git commit -m "feat(cli): add --verbose flag to plan command"
 git commit -m "fix(llm): handle timeout in Anthropic provider"
-git commit -m "docs(readme): update installation instructions"
+git commit -m "docs(setup): clarify Node.js version requirement"
 git commit -m "test(executor): add pipeline integration tests"
 ```
 
-## Coding Standards
+---
 
-### TypeScript Guidelines
+## Naming Conventions
 
-#### Type Safety
+These are authoritative — `code-quality.md` references this section.
 
-- Use strict TypeScript settings
-- Avoid `any` type; use `unknown` when needed
-- Define interfaces for object shapes
-- Use Zod for runtime validation
+| Element                 | Convention                      | Example               |
+| ----------------------- | ------------------------------- | --------------------- |
+| Files                   | kebab-case                      | `command-executor.ts` |
+| Classes                 | PascalCase noun                 | `CommandExecutor`     |
+| Interfaces              | PascalCase noun (no `I` prefix) | `LLMProvider`         |
+| Functions               | camelCase verb                  | `executeCommand()`    |
+| Constants               | UPPER_SNAKE_CASE                | `MAX_RETRIES`         |
+| Types (union/primitive) | PascalCase                      | `LogLevel`            |
+
+---
+
+## TypeScript Standards
+
+### Type safety
+
+- Use strict TypeScript settings (already enforced by `tsconfig.json`)
+- Avoid `any`; use `unknown` when the type is genuinely unknown
+- Use Zod for all runtime validation of external input
 
 ```typescript
 // Good
-interface UserInput {
+interface CommandInput {
 	command: string;
 	options: CommandOptions;
 }
@@ -151,9 +148,9 @@ interface UserInput {
 const input: any = {};
 ```
 
-#### Imports
+### Imports
 
-Use path aliases for internal imports:
+Use path aliases for all internal imports — never relative parent paths:
 
 ```typescript
 // Good
@@ -163,9 +160,9 @@ import { Logger } from 'utils/logger';
 import { Logger } from '../../../utils/logger';
 ```
 
-#### Async/Await
+### Async/await
 
-Prefer async/await over raw promises:
+Prefer `async/await` over raw Promise chains:
 
 ```typescript
 // Good
@@ -180,45 +177,30 @@ function fetchData() {
 }
 ```
 
-### Code Style
+---
 
-#### Naming Conventions
+## Dependency Management
 
-| Element    | Convention                          | Example                               |
-| ---------- | ----------------------------------- | ------------------------------------- |
-| Files      | kebab-case                          | `command-executor.ts`                 |
-| Classes    | PascalCase                          | `CommandExecutor`                     |
-| Functions  | camelCase                           | `executeCommand`                      |
-| Constants  | UPPER_SNAKE_CASE                    | `MAX_RETRIES`                         |
-| Interfaces | PascalCase with I prefix (optional) | `ICommandOptions` or `CommandOptions` |
+The project enforces supply chain security. See [ADR-009](../adr/009-supply-chain-hardening.md) for full rationale.
 
-#### Documentation
+- **Never delete `pnpm-lock.yaml`** — the lockfile is frozen to prevent drift.
+- **Adding a dependency**: `pnpm add <package> --config.frozen-lockfile=false`, then commit the updated lockfile.
+- **Updating a dependency**: `pnpm update <package> --config.frozen-lockfile=false`.
+- **After any dependency change**: run `pnpm audit:prod` to catch new vulnerabilities.
+- **Native build dependencies**: add to `pnpm.onlyBuiltDependencies` in `package.json`.
 
-Document public APIs with JSDoc:
+---
 
-```typescript
-/**
- * Executes a command pipeline.
- *
- * @param command - The command to execute
- * @param options - Execution options
- * @returns The execution result
- * @throws {ValidationError} If command is invalid
- */
-async function execute(command: string, options: ExecutionOptions): Promise<ExecutionResult> {
-	// implementation
-}
-```
+## Testing Requirements
 
-### Testing Requirements
+| Type        | Location             | Minimum requirement           |
+| ----------- | -------------------- | ----------------------------- |
+| Unit        | `src/**/*.test.ts`   | All new functions and classes |
+| Integration | `tests/integration/` | Module interaction paths      |
+| E2E         | `tests/e2e/`         | Complete user-facing flows    |
+| Security    | `tests/security/`    | Any security-relevant change  |
 
-#### Test Coverage
-
-- Aim for 80%+ code coverage
-- All new features must have tests
-- Bug fixes should include regression tests
-
-#### Test Structure
+Aim for 80 % coverage on new code. All bug fixes must include a regression test.
 
 ```typescript
 describe('CommandExecutor', () => {
@@ -235,83 +217,25 @@ describe('CommandExecutor', () => {
 		});
 
 		it('should throw on invalid command', async () => {
-			// Arrange
 			const executor = new CommandExecutor();
-
-			// Act & Assert
 			await expect(executor.execute('invalid')).rejects.toThrow(ValidationError);
 		});
 	});
 });
 ```
 
-#### Test Types
-
-| Type        | Location             | Purpose                   |
-| ----------- | -------------------- | ------------------------- |
-| Unit        | `src/**/*.test.ts`   | Test individual functions |
-| Integration | `tests/integration/` | Test module interactions  |
-| E2E         | `tests/e2e/`         | Test complete flows       |
-| Security    | `tests/security/`    | Security validation       |
-| Performance | `tests/performance/` | Performance benchmarks    |
-
-## Pull Request Process
-
-### 1. Prepare Your PR
-
-- Ensure all tests pass
-- Update documentation
-- Add changelog entry if needed
-- Rebase on latest main
-
-### 2. Create Pull Request
-
-Use this template:
-
-```markdown
-## Summary
-
-Brief description of changes.
-
-## Changes
-
-- [ ] Feature/fix description
-- [ ] Documentation updates
-- [ ] Test additions
-
-## Testing
-
-Describe how you tested the changes.
-
-## Checklist
-
-- [ ] Code follows project style
-- [ ] Tests pass locally
-- [ ] Documentation updated
-- [ ] Commit messages follow convention
-```
-
-### 3. Review Process
-
-1. Automated checks must pass
-2. At least one maintainer review
-3. Address feedback promptly
-4. Squash commits if requested
-
-### 4. Merging
-
-Maintainers will merge approved PRs using squash merge.
+---
 
 ## Adding New Commands
 
-### 1. Create Command Specification
+### 1. Create the command specification
 
-Add a new file in `data/commands/` (built-in) or `.valora/commands/` (project-level override):
+Add a Markdown file with YAML frontmatter in `data/commands/` (built-in) or `.valora/commands/` (project-level override):
 
 ```markdown
 ---
 name: my-command
-description: Description of what it does
+description: What this command does
 agent: lead
 model: claude-sonnet-4.6
 ---
@@ -320,7 +244,7 @@ model: claude-sonnet-4.6
 
 ## Purpose
 
-Explain the command purpose.
+Describe the command purpose.
 
 ## Inputs
 
@@ -336,7 +260,7 @@ Describe expected outputs.
 Define execution stages.
 ```
 
-### 2. Register the Command
+### 2. Register the command
 
 Update `data/commands/registry.json`:
 
@@ -353,9 +277,7 @@ Update `data/commands/registry.json`:
 }
 ```
 
-### 3. Add Tests
-
-Create tests for the new command:
+### 3. Add tests
 
 ```typescript
 describe('my-command', () => {
@@ -365,11 +287,13 @@ describe('my-command', () => {
 });
 ```
 
+---
+
 ## Adding New Agents
 
-### 1. Create Agent Definition
+### 1. Create the agent definition
 
-Add a new file in `data/agents/` (built-in) or `.valora/agents/` (project-level override):
+Add a Markdown file with YAML frontmatter in `data/agents/` (built-in) or `.valora/agents/` (project-level override):
 
 ```markdown
 ---
@@ -379,14 +303,13 @@ expertise:
   - Area 2
 domains:
   - domain1
-  - domain2
 ---
 
 # My Agent
 
 ## Role
 
-Describe the agent's role.
+Describe the agent's role and responsibilities.
 
 ## Expertise
 
@@ -394,48 +317,88 @@ Detail specific expertise areas.
 
 ## Constraints
 
-Define operational constraints.
+Define operational constraints and boundaries.
 ```
 
-### 2. Register the Agent
+### 2. Register the agent
 
-Update `data/agents/registry.json` with the agent's capabilities and selection criteria.
+Update `data/agents/registry.json` with capabilities and selection criteria.
+
+---
+
+## CLI Tool Enforcement
+
+The project enforces modern CLI tools via a PreToolUse hook (see [ADR-008](../adr/008-pretooluse-cli-enforcement.md)). Legacy commands are blocked when run through `run_terminal_cmd`:
+
+| Blocked            | Use instead |
+| ------------------ | ----------- |
+| `grep`             | `rg`        |
+| `find`             | `fd`        |
+| `ls`, `tree`       | `eza`       |
+| `cat` on JSON/YAML | `jq` / `yq` |
+| `npm`              | `pnpm`      |
+
+See the [Modern CLI Toolkit](./modern-cli-toolkit/README.md) for installation and usage.
+
+---
+
+## Review Process
+
+1. Automated CI checks must pass (lint, type check, tests).
+2. At least one maintainer review is required.
+3. Address feedback promptly; maintainers may request changes or a squash.
+4. Maintainers merge approved PRs using squash merge.
+
+---
 
 ## Reporting Issues
 
-### Bug Reports
+**Bug reports** — include:
 
-Include:
-
-- Clear title
-- Steps to reproduce
+- Clear title and steps to reproduce
 - Expected vs actual behaviour
-- Environment details
-- Logs if available
+- Environment details (OS, Node.js version, VALORA version)
+- Relevant log output
 
-### Feature Requests
-
-Include:
+**Feature requests** — include:
 
 - Use case description
 - Proposed solution
 - Alternatives considered
-- Impact assessment
-
-## Getting Help
-
-- Check existing documentation
-- Search existing issues
-- Ask in discussions
-- Contact maintainers
-
-## Code of Conduct
-
-- Be respectful and inclusive
-- Provide constructive feedback
-- Help others learn
-- Follow project guidelines
 
 ---
 
-Thank you for contributing to VALORA!
+<details>
+<summary><strong>Branch strategy rationale</strong></summary>
+
+VALORA uses a trunk-based development model:
+
+- `main` is always deployable.
+- Feature branches are short-lived (ideally less than two days).
+- Branch naming follows `<type>/<short-description>` to mirror Conventional Commits types.
+
+This is intentionally simple — there are no `develop`, `release/*`, or `hotfix/*` branches. Releases are tagged from `main` directly.
+
+</details>
+
+<details>
+<summary><strong>Commit message format rationale</strong></summary>
+
+Conventional Commits enables:
+
+- Automated changelog generation (`feat` and `fix` entries appear automatically)
+- Semantic version bumping (breaking changes → major, `feat` → minor, `fix` → patch)
+- Clear PR titles and git log readability
+
+The scope is optional but recommended for larger codebases. Use the module name or the `src/` subdirectory name (e.g., `cli`, `executor`, `llm`, `batch`).
+
+</details>
+
+<details>
+<summary><strong>Naming convention rationale</strong></summary>
+
+The `I` prefix for interfaces (e.g., `IPaymentGateway`) is common in C# and older TypeScript codebases but adds noise without value in modern TypeScript. TypeScript already distinguishes interfaces structurally. The no-`I`-prefix convention is enforced by ESLint (`@typescript-eslint/naming-convention`).
+
+File naming in `kebab-case` ensures consistency across case-insensitive (macOS) and case-sensitive (Linux) filesystems, avoiding import errors when moving between platforms.
+
+</details>

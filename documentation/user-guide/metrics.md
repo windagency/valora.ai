@@ -1,442 +1,248 @@
 # Workflow Metrics and Optimisation
 
-VALORA includes a comprehensive metrics collection and reporting system that tracks workflow optimisations and provides data-driven insights into development efficiency.
+VALORA automatically collects data about workflow efficiency and surfaces actionable recommendations via a weekly dashboard.
 
-## Overview
+## What is tracked
 
-The metrics system automatically collects data about workflow optimisations, including:
+| Optimisation        | Target adoption | Average time saved | How to trigger                                        |
+| ------------------- | --------------- | ------------------ | ----------------------------------------------------- |
+| Plan templates      | 40% of plans    | 8–10 min           | `valora plan "..." --pattern=<type>`                  |
+| Early exit reviews  | 30% of reviews  | 10–15 min          | Write high-quality plans (confidence ≥ 8.5)           |
+| Express planning    | 15% of plans    | 10–12 min          | `valora plan "..." --mode=express` (complexity < 3)   |
+| Parallel validation | —               | 12–15 min          | `valora review-plan` (runs in parallel by default)    |
+| Real-time linting   | —               | 3–5 min            | Enabled by default during `implement`                 |
+| Decision criteria   | —               | 5–8 min            | Produce clear plans with explicit acceptance criteria |
+| Technical defaults  | —               | 12–15 min          | Document defaults in `TECHNICAL_DEFAULTS.md`          |
 
-- **Template Usage** - Time saved by using pattern templates
-- **Early Exit Reviews** - Skipped review iterations for high-confidence plans
-- **Express Planning** - Simplified planning for trivial tasks
-- **Real-Time Linting** - Errors caught during implementation vs assertion
-- **Decision Criteria** - Reduced review iterations through clear criteria
-- **Technical Defaults** - Reduced clarification questions
-
-## Quick Start
-
-### View Current Metrics
+## View metrics
 
 ```bash
-# Generate report for last 30 days
+# Generate report for the last 30 days
 ./scripts/generate-weekly-report.sh 30d
 
 # View the report
 cat .valora/METRICS_REPORT.md
 ```
 
-### Understanding the Dashboard
-
-The metrics dashboard shows:
-
-1. **Executive Summary** - Overall workflow performance
-2. **Optimisation Adoption** - Usage rates of each optimisation
-3. **Optimisation Performance** - Time savings by optimisation type
-4. **Phase Breakdown** - Time spent in each workflow phase
-5. **Quality Metrics** - Code/test/review quality scores
-6. **Recommendations** - Actionable improvements
-
-## Optimisation Types
-
-### 1. Plan Templates
-
-**What it is**: Pre-built implementation plans for common patterns (REST API, React components, database migrations).
-
-**How it helps**:
-
-- Reduces planning time from 13-15 min to 4-6 min
-- Ensures consistency across similar implementations
-- Includes best practices by default
-
-**Example**:
+Weekly reports are also generated automatically every Monday at 09:00 UTC by GitHub Actions and posted as GitHub Issues.
 
 ```bash
-# Use template for REST API
-valora plan "Add users API" --pattern=rest-api
+gh issue list --label metrics,weekly-report
+gh issue view <number>
 ```
 
-**Metrics**:
+## Interpret the dashboard
+
+**Time Efficiency Score**:
+
+| Score  | Interpretation                                             |
+| ------ | ---------------------------------------------------------- |
+| 90–100 | Excellent — consistently hitting optimisation targets      |
+| 70–89  | Good — regular optimisation usage, room for improvement    |
+| 50–69  | Fair — some optimisations used, increase adoption          |
+| < 50   | Poor — optimisations underutilised, review recommendations |
+
+**Quality score targets** (optimisations must not compromise quality):
+
+| Metric         | Target   |
+| -------------- | -------- |
+| Code quality   | > 80/100 |
+| Test quality   | > 80/100 |
+| Review quality | > 70/100 |
+
+## Act on recommendations
+
+| Dashboard message                | Actions                                                                                                     |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| "Template usage below target"    | Add `--pattern=rest-api` (or relevant type) to plan commands; create custom templates for frequent patterns |
+| "Early exit rate below target"   | Improve plan quality — add specific acceptance criteria, explicit file paths, and dependency lists          |
+| "Express planning underutilised" | Break complex tasks into smaller pieces; use `--mode=express` for trivial changes                           |
+| "Linter errors in assert phase"  | Verify real-time linting is enabled; check ESLint configuration                                             |
+
+## Raw metrics queries
+
+```bash
+# Extract JSON metrics for a period
+./scripts/metrics 30d > metrics.json
+
+# Query specific optimisations
+jq '.templateUsage' metrics.json
+jq '.earlyExit' metrics.json
+jq '.qualityScores' metrics.json
+
+# Check adoption against targets
+./scripts/metrics 30d | jq '{
+  template_rate: .templateUsage.rate,
+  early_exit_rate: .earlyExit.rate,
+  express_rate: .expressPlanning.rate
+}'
+```
+
+---
+
+<details>
+<summary><strong>Optimisation details — how each metric is collected and what drives it</strong></summary>
+
+### Plan templates
+
+Pre-built implementation plans for common patterns (REST API, React components, database migrations). Reduces planning time from 13–15 min to 4–6 min by providing a structured starting point.
+
+Metrics collected:
 
 - Usage rate (target: 40%)
-- Average time saved: 8-10 minutes
-- Total time saved: Cumulative across all workflows
+- Pattern detected and confidence score
+- Average time saved per use
+- Cumulative time saved
 
-### 2. Early Exit Reviews
+Tracked field: `commands[].optimization_metrics.template_used`
 
-**What it is**: Skip additional review iterations when initial confidence is high (≥8.5/10).
+### Early exit reviews
 
-**How it helps**:
+When a plan's initial confidence score is ≥ 8.5/10 with no critical blockers and all dimension scores ≥ 7.0, subsequent review iterations are skipped. This saves 10–15 min on high-quality plans without compromising quality.
 
-- Saves 10-15 minutes per high-quality plan
-- Reduces unnecessary back-and-forth
-- Maintains quality through clear thresholds
-
-**Triggers when**:
-
-- Overall confidence ≥ 8.5
-- No critical blockers
-- All dimension scores ≥ 7.0
-
-**Metrics**:
+Metrics collected:
 
 - Trigger rate (target: 30%)
-- Confidence distribution
-- Average time saved: 10-15 minutes
+- Confidence distribution across reviews
+- Average iterations before exit
 
-### 3. Express Planning
+Tracked field: `commands[].optimization_metrics.early_exit_triggered`
 
-**What it is**: Simplified 2-3 minute planning for trivial tasks (complexity < 3).
+### Express planning
 
-**How it helps**:
+For tasks with complexity < 3, a simplified 2–3 min planning mode is used instead of the full 13–15 min pipeline. Maintains plan structure for documentation purposes.
 
-- Saves 10-12 minutes on simple tasks
-- Reduces overhead for minor changes
-- Maintains plan structure for documentation
-
-**Example trivial tasks**:
-
-- Update a constant value
-- Fix a typo
-- Add a simple helper function
-
-**Metrics**:
+Metrics collected:
 
 - Usage rate (target: 15%)
-- Average complexity: < 3/10
-- Average time saved: 10-12 minutes
+- Average complexity score of express plans
+- Average time saved
 
-### 4. Parallel Validation
+Tracked field: `commands[].optimization_metrics.planning_mode = "express"`
 
-**What it is**: Run plan validation checks concurrently instead of sequentially.
+### Parallel validation
 
-**How it helps**:
+`valora review-plan` runs four validation checks concurrently (technical feasibility, risk coverage, step quality, test strategy). Reduces validation time from 16–18 min to 4–6 min.
 
-- Reduces validation time from 16-18 min to 4-6 min
-- Faster feedback on plan quality
-- Maintains thorough validation
+Metrics collected:
 
-**Checks run in parallel**:
+- Count of reviews using parallel validation
+- Average validation duration
 
-- Technical feasibility
-- Risk coverage
-- Step quality
-- Test strategy
+### Real-time linting
 
-**Metrics**:
-
-- Reviews using parallel validation
-- Average time: 4-6 min (vs 16-18 min sequential)
-- Average time saved: 12-15 minutes
-
-### 5. Real-Time Linting
-
-**What it is**: Run ESLint during code generation instead of only in assert phase.
-
-**How it helps**:
-
-- Catches errors earlier
-- Enables auto-fixes during implementation
-- Reduces assert phase failures
-
-**Workflow**:
+ESLint runs during code generation rather than only during the assert phase. Errors are auto-fixed immediately, reducing assert phase failures.
 
 ```plaintext
 Implement → Real-time ESLint → Auto-fix → Continue
 ```
 
-**Metrics**:
+Metrics collected:
 
-- Errors found real-time vs assert phase
+- Errors found in real-time vs assert phase
 - Auto-fix rate
-- Average time saved: 3-5 minutes
+- Implementations using real-time linting
 
-### 6. Decision Criteria
+Tracked field: `commands[].quality_metrics.lint_errors_realtime`
 
-**What it is**: Explicit thresholds for go/no-go decisions in reviews.
+### Decision criteria
 
-**How it helps**:
+Explicit numeric thresholds for go/no-go decisions in reviews (e.g., dependency count < 5 = good, risk count by complexity tier). Reduces subjective uncertainty and the number of review iterations.
 
-- Reduces subjective uncertainty
-- Fewer review iterations
-- Clearer improvement paths
+Metrics collected:
 
-**Criteria examples**:
-
-- Dependency count: <5 good, 5-10 acceptable, >15 escalate
-- Risk count by complexity: Simple (2-4), Moderate (5-8), Complex (9-15)
-
-**Metrics**:
-
-- Average iterations: target reduction to ~1.5
+- Average iterations per review (target: ~1.5)
 - Single-iteration rate
-- Average time saved: 5-8 minutes
 
-### 7. Technical Defaults
+### Technical defaults
 
-**What it is**: Pre-defined technology choices to reduce clarification questions.
+Pre-defined technology choices (package manager: pnpm, testing: Vitest/Playwright, linting: ESLint + Prettier) are injected into prompts, eliminating "which tool?" clarification questions.
 
-**How it helps**:
+Metrics collected:
 
-- Eliminates "which tool?" questions
-- Ensures consistency
-- Speeds up onboarding
+- Clarification reduction rate (target: 60%)
+- Average questions asked (target: ~3, down from ~8.2)
 
-**Examples**:
+</details>
 
-- Package manager: pnpm (never npm/yarn)
-- Testing: Vitest (unit), Playwright (E2E)
-- Linting: ESLint + Prettier
+<details>
+<summary><strong>Metrics schema — session JSON structure</strong></summary>
 
-**Metrics**:
+Metrics are stored in session files at `.valora/sessions/<session-id>/session.json`.
 
-- Clarification reduction: target 60%
-- Average questions: reduced from 8.2 to ~3
-- Average time saved: 12-15 minutes
+**Relevant fields per command**:
 
-## Viewing Metrics
+```json
+{
+	"command": "plan",
+	"timestamp": "2026-02-02T10:00:00.000Z",
+	"duration_ms": 240000,
+	"success": true,
+	"optimization_metrics": {
+		"template_used": "PATTERN_REST_API",
+		"planning_mode": "template",
+		"complexity_score": 4.2,
+		"pattern_detected": "REST_API",
+		"pattern_confidence": 0.85,
+		"time_saved_minutes": 8.5
+	},
+	"quality_metrics": {
+		"lint_errors_realtime": 5,
+		"auto_fixes_applied": 4,
+		"files_generated": 2
+	},
+	"tokens_used": 12500
+}
+```
 
-### Automated Weekly Reports
+**For review-plan commands**:
 
-**Every Monday at 9am UTC**, GitHub Actions automatically:
+```json
+{
+	"command": "review-plan",
+	"optimization_metrics": {
+		"early_exit_triggered": true,
+		"initial_confidence": 9.2,
+		"time_saved_minutes": 12.0
+	},
+	"quality_metrics": {
+		"plan_approved": true,
+		"review_score": 92,
+		"iterations": 1
+	}
+}
+```
 
-1. Extracts metrics from session logs
-2. Generates dashboard report
+</details>
+
+<details>
+<summary><strong>Storage, automation, and advanced configuration</strong></summary>
+
+### Storage location
+
+- Session files: `.valora/sessions/<session-id>/session.json`
+- Generated report: `.valora/METRICS_REPORT.md`
+- GitHub Actions workflow: `.github/workflows/metrics-dashboard.yml`
+
+### Automated weekly reports
+
+GitHub Actions runs every Monday at 09:00 UTC:
+
+1. Extracts metrics from all session logs
+2. Generates the dashboard report
 3. Commits to `.valora/METRICS_REPORT.md`
-4. Creates GitHub issue with summary
+4. Creates a GitHub Issue with a summary
 
-**View in GitHub**:
-
-```bash
-# List metrics reports
-gh issue list --label metrics,weekly-report
-
-# View specific report
-gh issue view <number>
-```
-
-### Manual Report Generation
-
-**Local generation**:
+Trigger manually:
 
 ```bash
-# Generate for last 30 days
-./scripts/generate-weekly-report.sh 30d
-
-# Generate for last 7 days
-./scripts/generate-weekly-report.sh 7d
-
-# Create GitHub issue
-./scripts/generate-weekly-report.sh 30d --issue
+gh workflow run "Weekly Metrics Dashboard" --field period=30d --field create_issue=true
+gh run watch
 ```
 
-### Raw Metrics Extraction
+### Baseline times
 
-**Extract JSON metrics**:
-
-```bash
-# Extract metrics
-./scripts/metrics 30d > metrics.json
-
-# Query specific data
-jq '.templateUsage' metrics.json
-jq '.earlyExit' metrics.json
-jq '.qualityScores' metrics.json
-```
-
-## Interpreting Results
-
-### Overall Efficiency Score
-
-The **Time Efficiency Score** indicates overall workflow improvement:
-
-- **90-100**: Excellent - consistently hitting optimisation targets
-- **70-89**: Good - regular optimisation usage, room for improvement
-- **50-69**: Fair - some optimisations used, increase adoption
-- **<50**: Poor - optimisations underutilised, review recommendations
-
-### Optimisation Adoption Rates
-
-Each optimisation has a target adoption rate:
-
-| Optimisation     | Target | Interpretation                    |
-| ---------------- | ------ | --------------------------------- |
-| Plan Templates   | 40%    | 40% of plans should use templates |
-| Early Exit       | 30%    | 30% of reviews should exit early  |
-| Express Planning | 15%    | 15% of plans should be express    |
-
-**If below target**: Review recommendations in the report for improvement actions.
-
-### Time Savings
-
-**Total Time Saved** = (Baseline Time - Actual Time) × Workflows
-
-**Example**:
-
-- Baseline: 3h 12m per workflow
-- Actual: 2h 10m per workflow
-- Workflows: 10
-- Time Saved: (192 - 130) × 10 = 620 minutes = 10.3 hours
-
-### Quality Scores
-
-Metrics track quality to ensure optimisations don't compromise code quality:
-
-| Metric         | Target  | Current (Example) |
-| -------------- | ------- | ----------------- |
-| Code Quality   | >80/100 | 88/100 ✓          |
-| Test Quality   | >80/100 | 85/100 ✓          |
-| Review Quality | >70/100 | 65/100 ⚠          |
-
-**Green (✓)**: Meeting or exceeding target
-**Yellow (⚠)**: Below target, needs improvement
-
-## Acting on Recommendations
-
-The dashboard provides actionable recommendations based on metrics:
-
-### "Template usage below target"
-
-**Actions**:
-
-1. Review common task patterns in backlog
-2. Create custom templates for frequent patterns
-3. Use `--pattern` flag when planning
-
-**Example**:
-
-```bash
-# Identify patterns
-grep -r "Add.*API" knowledge-base/BACKLOG.md
-
-# Use template
-valora plan "Add orders API" --pattern=rest-api
-```
-
-### "Early exit rate below target"
-
-**Actions**:
-
-1. Review confidence thresholds in plans
-2. Improve plan quality to increase confidence
-3. Ensure clear acceptance criteria
-
-### "Express planning underutilized"
-
-**Actions**:
-
-1. Break down complex tasks into smaller pieces
-2. Use express mode for simple tasks
-3. Review complexity assessment
-
-**Example**:
-
-```bash
-# Instead of:
-valora plan "Update user model and fix validation"
-
-# Break into:
-valora plan "Update user model" --complexity-threshold=2
-valora plan "Fix user validation" --complexity-threshold=2
-```
-
-### "Linter errors in assert phase"
-
-**Actions**:
-
-1. Verify real-time linting is enabled
-2. Check ESLint configuration
-3. Review auto-fix settings
-
-## Best Practices
-
-### 1. Consistent Pattern Usage
-
-When similar tasks appear, use the same pattern:
-
-```bash
-# All API endpoints use template
-valora plan "Add users API" --pattern=rest-api
-valora plan "Add orders API" --pattern=rest-api
-valora plan "Add products API" --pattern=rest-api
-```
-
-### 2. Leverage Express Planning
-
-For simple tasks, use express mode:
-
-```bash
-# Simple changes
-valora plan "Fix typo in error message" --mode=express
-valora plan "Update version number" --mode=express
-```
-
-### 3. High-Quality Plans
-
-Write clear plans to trigger early exit:
-
-- Specific acceptance criteria
-- Clear file paths
-- Explicit dependencies
-- Comprehensive risk assessment
-
-### 4. Review Metrics Regularly
-
-Check weekly reports to:
-
-- Identify improvement opportunities
-- Track optimisation adoption
-- Ensure quality isn't compromised
-
-### 5. Customise for Your Workflow
-
-Create custom templates for your common patterns:
-
-```bash
-# Copy existing template
-cp data/templates/plans/PATTERN_REST_API.md \
-   .valora/templates/plans/PATTERN_CUSTOM.md
-
-# Edit for your needs
-code .valora/templates/plans/PATTERN_CUSTOM.md
-```
-
-## Troubleshooting
-
-### No Metrics Data
-
-**Problem**: Dashboard shows 0 workflows
-
-**Solutions**:
-
-1. Execute workflow commands (`/plan`, `/review-plan`, `/implement`, `/assert`)
-2. Verify session logs exist: `ls .valora/sessions/*/`
-3. Check date range matches your activity
-
-### Low Optimisation Rates
-
-**Problem**: All optimisation rates are 0%
-
-**Solutions**:
-
-1. Use pattern templates: add `--pattern=<type>` to plan commands
-2. Ensure plans have high initial quality for early exit
-3. Break complex tasks into smaller pieces for express planning
-
-### Missing Quality Metrics
-
-**Problem**: Quality scores not showing
-
-**Solutions**:
-
-1. Run assert phase: `valora assert`
-2. Verify linting runs during implementation
-3. Complete review-plan for review scores
-
-## Configuration
-
-### Baseline Times
-
-Baseline times are configured in `scripts/extract-metrics.ts`:
+Baseline times (used to calculate time savings) are configured in `scripts/extract-metrics.ts`:
 
 ```typescript
 const BASELINE_TIMES = {
@@ -447,28 +253,21 @@ const BASELINE_TIMES = {
 		plan: 24.8,
 		'review-plan': 39.6,
 		implement: 62.4
-		// ...
 	}
 };
 ```
 
-Adjust these based on your team's historical data.
+Adjust these to match your team's historical data.
 
-### Optimisation Targets
+### Optimisation targets
 
 Targets are defined in `documentation/architecture/metrics-dashboard.md`:
 
-- Template Usage: 40%
-- Early Exit Rate: 30%
-- Express Planning: 15%
+- Template usage: 40%
+- Early exit rate: 30%
+- Express planning: 15%
 
-Adjust in the dashboard generation script if needed.
-
-## Advanced Usage
-
-### Custom Queries
-
-Extract specific insights using jq:
+### Advanced queries
 
 ```bash
 # Template usage by pattern
@@ -479,28 +278,21 @@ Extract specific insights using jq:
 
 # Phase-by-phase time breakdown
 ./scripts/metrics 30d | jq '.phaseBreakdown'
+
+# Compare periods
+./scripts/metrics 7d > metrics-7d.json
+./scripts/metrics 30d > metrics-30d.json
+jq -s '{
+  weekly_workflows: .[0].totalWorkflows,
+  monthly_workflows: .[1].totalWorkflows,
+  weekly_time_saved: (.[0].totalTimeSaved / 60 | floor),
+  monthly_time_saved: (.[1].totalTimeSaved / 60 | floor)
+}' metrics-7d.json metrics-30d.json
 ```
 
-### CI/CD Integration
-
-Include metrics in your CI pipeline:
-
-```yaml
-# .github/workflows/deploy.yml
-- name: Check optimization targets
-  run: |
-    TEMPLATE_RATE=$(./scripts/metrics 7d | jq -r '.templateUsage.rate')
-    if (( $(echo "$TEMPLATE_RATE < 40" | bc -l) )); then
-      echo "⚠️ Template usage below target"
-    fi
-```
-
-### Export to Analytics
-
-Export metrics to your analytics platform:
+### Export to CSV
 
 ```bash
-# Export as CSV
 ./scripts/metrics 30d | jq -r '
   ["Date","Workflows","Templates","EarlyExit","TimeSaved"],
   [
@@ -513,25 +305,20 @@ Export metrics to your analytics platform:
 ' > metrics.csv
 ```
 
-## Related Documentation
+### CI/CD integration
 
-### User Guides
+```yaml
+# .github/workflows/deploy.yml
+- name: Check optimisation targets
+  run: |
+    TEMPLATE_RATE=$(./scripts/metrics 7d | jq -r '.templateUsage.rate')
+    if (( $(echo "$TEMPLATE_RATE < 40" | bc -l) )); then
+      echo "Template usage below target"
+    fi
+```
 
-- [Metrics Quick Start](./metrics-quickstart.md) - 5-minute quick start
-- [Workflow Optimisations](./workflow-optimisations.md) - Detailed optimisation descriptions
-- [Best Practices](./best-practices.md) - Recommended usage patterns
-- [Configuration](./configuration.md) - Configure metrics system
-
-### Technical References
-
-- [Metrics System Architecture](../architecture/metrics-system.md) - Technical implementation
-- [Metrics Dashboard](../architecture/metrics-dashboard.md) - Comprehensive metrics reference
-- [Automated Reporting](../operations/automated-reporting.md) - Automation setup
-
-### Scripts
-
-- [Scripts README](../../scripts/README.md) - Script usage and troubleshooting
+</details>
 
 ---
 
-_For technical details on metrics implementation, see the [Architecture Documentation](../architecture/metrics-system.md)._
+See also: [Metrics Quick Start](./metrics-quickstart.md) · [Best Practices](./best-practices.md) · [Automated Reporting](../operations/automated-reporting.md)

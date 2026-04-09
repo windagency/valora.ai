@@ -13,6 +13,16 @@ import {
 	DEFAULT_LOG_MAX_FILES,
 	DEFAULT_LOG_MAX_SIZE_MB,
 	DEFAULT_LOG_RETENTION_ENABLED,
+	DEFAULT_MEMORY_DECISION_HALF_LIFE_DAYS,
+	DEFAULT_MEMORY_ENABLED,
+	DEFAULT_MEMORY_EPISODIC_HALF_LIFE_DAYS,
+	DEFAULT_MEMORY_ERROR_HALF_LIFE_MULTIPLIER,
+	DEFAULT_MEMORY_INJECTION_STRENGTH_THRESHOLD,
+	DEFAULT_MEMORY_INJECTION_TOKEN_BUDGET,
+	DEFAULT_MEMORY_MAX_ENTRIES_PER_STORE,
+	DEFAULT_MEMORY_PRUNE_THRESHOLD,
+	DEFAULT_MEMORY_RETRIEVAL_BOOST_DAYS,
+	DEFAULT_MEMORY_SEMANTIC_HALF_LIFE_DAYS,
 	DEFAULT_SESSION_CLEANUP_INTERVAL_HOURS,
 	DEFAULT_SESSION_COMPRESS_AFTER_DAYS,
 	DEFAULT_SESSION_DRY_RUN,
@@ -137,12 +147,27 @@ export const PATHS_CONFIG_SCHEMA = z.object({
 	sessions_dir: z.string().optional()
 });
 
+// Memory configuration schema
+export const MEMORY_CONFIG_SCHEMA = z.object({
+	decision_half_life_days: z.number().min(1).max(365).default(DEFAULT_MEMORY_DECISION_HALF_LIFE_DAYS),
+	enabled: z.boolean().default(DEFAULT_MEMORY_ENABLED),
+	episodic_half_life_days: z.number().min(1).max(365).default(DEFAULT_MEMORY_EPISODIC_HALF_LIFE_DAYS),
+	error_half_life_multiplier: z.number().min(1).max(10).default(DEFAULT_MEMORY_ERROR_HALF_LIFE_MULTIPLIER),
+	injection_strength_threshold: z.number().min(0).max(1).default(DEFAULT_MEMORY_INJECTION_STRENGTH_THRESHOLD),
+	injection_token_budget: z.number().min(100).max(10000).default(DEFAULT_MEMORY_INJECTION_TOKEN_BUDGET),
+	max_entries_per_store: z.number().min(10).max(10000).default(DEFAULT_MEMORY_MAX_ENTRIES_PER_STORE),
+	prune_threshold: z.number().min(0).max(1).default(DEFAULT_MEMORY_PRUNE_THRESHOLD),
+	retrieval_boost_days: z.number().min(0).max(30).default(DEFAULT_MEMORY_RETRIEVAL_BOOST_DAYS),
+	semantic_half_life_days: z.number().min(1).max(365).default(DEFAULT_MEMORY_SEMANTIC_HALF_LIFE_DAYS)
+});
+
 // Main configuration schema
 export const CONFIG_SCHEMA = z.object({
 	defaults: DEFAULTS_CONFIG_SCHEMA,
 	features: FEATURE_FLAGS_SCHEMA.optional(),
 	hooks: HOOKS_CONFIG_SCHEMA.optional(),
 	logging: LOGGING_RETENTION_CONFIG_SCHEMA.optional(),
+	memory: MEMORY_CONFIG_SCHEMA.optional(),
 	paths: PATHS_CONFIG_SCHEMA.optional(),
 	providers: PROVIDERS_CONFIG_SCHEMA,
 	sessions: SESSION_RETENTION_CONFIG_SCHEMA.optional()
@@ -154,6 +179,7 @@ export type DefaultsConfig = z.infer<typeof DEFAULTS_CONFIG_SCHEMA>;
 export type FeatureFlags = z.infer<typeof FEATURE_FLAGS_SCHEMA>;
 export type HooksConfigSchema = z.infer<typeof HOOKS_CONFIG_SCHEMA>;
 export type LoggingRetentionConfig = z.infer<typeof LOGGING_RETENTION_CONFIG_SCHEMA>;
+export type MemoryRetentionConfig = z.infer<typeof MEMORY_CONFIG_SCHEMA>;
 export type PathsConfig = z.infer<typeof PATHS_CONFIG_SCHEMA>;
 export type ProviderConfig = z.infer<typeof PROVIDER_CONFIG_SCHEMA>;
 export type ProvidersConfig = z.infer<typeof PROVIDERS_CONFIG_SCHEMA>;

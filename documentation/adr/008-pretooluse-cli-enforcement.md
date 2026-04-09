@@ -1,5 +1,7 @@
 # ADR-008: PreToolUse Hook Enforcement for Modern CLI Toolkit
 
+> **Decision**: A PreToolUse hook (`enforce-modern-cli.sh`) intercepts `run_terminal_cmd` calls and blocks legacy CLI commands (`grep`, `find`, `ls`, `tree`, `npm`, `git push`) in favour of modern alternatives, enforced automatically without modifying Valora core code.
+
 ## Status
 
 Accepted

@@ -1,28 +1,6 @@
-# Architecture Documentation
+# Architecture
 
-> Comprehensive architecture documentation for VALORA.
-
-## Overview
-
-This section provides detailed technical architecture documentation following the C4 model approach. It covers system context, container architecture, component design, and data flow.
-
-## Contents
-
-1. [System Architecture](./system-architecture.md) - High-level system design
-2. [Component Architecture](./components.md) - Module-level design
-3. [Data Flow](./data-flow.md) - Data and control flow diagrams
-4. [Session Optimisation](./session-optimization.md) - Session-based performance optimisations
-5. [Metrics System](./metrics-system.md) - Workflow metrics collection and reporting
-6. [Metrics Dashboard](./metrics-dashboard.md) - Comprehensive metrics tracking reference
-
-## Related Documentation
-
-- [Architecture Decision Records](../adr/README.md) - Key decisions and rationale
-- [Developer Guide](../developer-guide/README.md) - Implementation details
-
-## Architecture Principles
-
-VALORA is built on these core principles:
+Valora follows a modular, layered architecture built on five core principles:
 
 | Principle         | Description                                     |
 | ----------------- | ----------------------------------------------- |
@@ -32,13 +10,25 @@ VALORA is built on these core principles:
 | **Observability** | Comprehensive logging and metrics               |
 | **Resilience**    | Graceful error handling and recovery            |
 
-## C4 Model Diagrams
+## Contents
 
-### Level 1: System Context
+| Document                                          | Purpose                                   |
+| ------------------------------------------------- | ----------------------------------------- |
+| [System Architecture](./system-architecture.md)   | High-level system design — start here     |
+| [Component Architecture](./components.md)         | Module-level design                       |
+| [Data Flow](./data-flow.md)                       | Data and control flow diagrams            |
+| [Session Optimisation](./session-optimization.md) | Session-based performance optimisations   |
+| [Metrics System](./metrics-system.md)             | Workflow metrics collection and reporting |
+| [Metrics Dashboard](./metrics-dashboard.md)       | Metrics tracking reference                |
+| [ADRs](../adr/README.md)                          | Architecture decisions and rationale      |
+
+---
+
+## System Context
 
 ```mermaid
 C4Context
-    title System Context Diagram - VALORA
+    title System Context — VALORA
 
     Person(developer, "Developer", "Uses the engine for AI-assisted development")
 
@@ -58,11 +48,11 @@ C4Context
     Rel(orchestrator, filesystem, "Reads/Writes", "FS")
 ```
 
-### Level 2: Container Diagram
+## Container Architecture
 
 ```mermaid
 C4Container
-    title Container Diagram - VALORA
+    title Container Diagram — VALORA
 
     Person(developer, "Developer", "Uses CLI or IDE")
 
@@ -86,57 +76,12 @@ C4Container
     Rel(llm_layer, llm_api, "Calls", "HTTPS")
 ```
 
-### Level 3: Component Overview
+---
 
-See [Component Architecture](./components.md) for detailed component diagrams.
+<details>
+<summary><strong>External MCP client architecture</strong></summary>
 
-## Technology Stack
-
-### Runtime Environment
-
-| Component       | Technology | Version |
-| --------------- | ---------- | ------- |
-| Runtime         | Node.js    | 18+     |
-| Language        | TypeScript | 5.x     |
-| Package Manager | pnpm       | 10.x    |
-
-### Dependencies
-
-| Category        | Library                   | Purpose                     |
-| --------------- | ------------------------- | --------------------------- |
-| CLI             | Commander                 | Command parsing             |
-| UI              | Ink, Chalk                | Terminal UI                 |
-| Validation      | Zod                       | Schema validation           |
-| LLM - Anthropic | @anthropic-ai/sdk         | Claude integration          |
-| LLM - OpenAI    | openai                    | GPT integration             |
-| LLM - Google    | @google/generative-ai     | Gemini integration          |
-| MCP             | @modelcontextprotocol/sdk | Protocol implementation     |
-| External MCP    | MCP Client SDK            | External server connections |
-
-### Development Tools
-
-| Tool       | Purpose         |
-| ---------- | --------------- |
-| ESLint     | Code linting    |
-| Prettier   | Code formatting |
-| Vitest     | Testing         |
-| Playwright | E2E testing     |
-| Husky      | Git hooks       |
-
-## External MCP Client Integration
-
-VALORA can connect to **15 external MCP servers** as a client, enabling extended capabilities with user approval workflows.
-
-| Category            | Servers                                   |
-| ------------------- | ----------------------------------------- |
-| **Browser/Testing** | Playwright, Chrome DevTools, BrowserStack |
-| **Design**          | Figma, Storybook                          |
-| **Development**     | GitHub, Serena, Context7                  |
-| **Infrastructure**  | Terraform, Firebase, Google Cloud         |
-| **Data**            | MongoDB, Elastic                          |
-| **Observability**   | Grafana, DeepResearch                     |
-
-### External MCP Architecture
+Valora connects to 15 external MCP servers as a client, with user approval for each connection.
 
 ```mermaid
 flowchart LR
@@ -148,7 +93,7 @@ flowchart LR
         AuditLog["Audit Logger"]
     end
 
-    subgraph External["External MCP Servers (15)"]
+    subgraph External["External MCP Servers"]
         Browser["Browser: Playwright, Chrome DevTools, BrowserStack"]
         Dev["Dev: GitHub, Serena, Context7"]
         Infra["Infra: Terraform, Firebase, GCP"]
@@ -169,8 +114,6 @@ flowchart LR
     ClientMgr --> AuditLog
 ```
 
-### External MCP Components
-
 | Component              | Responsibility                                       |
 | ---------------------- | ---------------------------------------------------- |
 | **MCP Client Manager** | Connection lifecycle, tool discovery, caching        |
@@ -179,37 +122,56 @@ flowchart LR
 | **Audit Logger**       | Security logging of all MCP operations               |
 | **Tool Proxy**         | Timeout enforcement, risk assessment, error handling |
 
-### Security Features
+</details>
 
-| Feature                 | Description                                  |
-| ----------------------- | -------------------------------------------- |
-| **Risk Assessment**     | Automatic scoring based on capabilities      |
-| **User Approval**       | Interactive approval before connections      |
-| **Tool Filtering**      | Allowlist/blocklist for sensitive operations |
-| **Audit Logging**       | Full operation trail for compliance          |
-| **Timeout Enforcement** | Configurable execution limits                |
+<details>
+<summary><strong>Key architectural decisions</strong></summary>
 
-## Key Architectural Decisions
+| Decision                   | Rationale                                       |
+| -------------------------- | ----------------------------------------------- |
+| Multi-agent architecture   | Specialisation improves output quality          |
+| Three-tier execution       | Flexibility for different use cases and budgets |
+| Session-based state        | Context preservation across commands            |
+| Pipeline-based execution   | Composable, testable workflows                  |
+| Provider abstraction       | LLM vendor independence                         |
+| External MCP with approval | Security-first external tool integration        |
 
-| Decision                   | Rationale                                |
-| -------------------------- | ---------------------------------------- |
-| Multi-agent architecture   | Specialisation improves output quality   |
-| Three-tier execution       | Flexibility for different use cases      |
-| Session-based state        | Context preservation across commands     |
-| Pipeline-based execution   | Composable, testable workflows           |
-| Provider abstraction       | LLM vendor independence                  |
-| External MCP with approval | Security-first external tool integration |
+See [Architecture Decision Records](../adr/README.md) for the full rationale behind each decision.
 
-See [Architecture Decision Records](../adr/README.md) for detailed decisions.
+</details>
 
-## Quality Attributes
+<details>
+<summary><strong>Technology stack</strong></summary>
+
+| Component       | Technology | Version  |
+| --------------- | ---------- | -------- |
+| Runtime         | Node.js    | >=18.0.0 |
+| Language        | TypeScript | 5.x      |
+| Package manager | npm / pnpm | 10.x     |
+
+| Category        | Library                   | Purpose                 |
+| --------------- | ------------------------- | ----------------------- |
+| CLI             | Commander                 | Command parsing         |
+| UI              | Ink, Chalk                | Terminal UI             |
+| Validation      | Zod                       | Schema validation       |
+| LLM — Anthropic | @anthropic-ai/sdk         | Claude integration      |
+| LLM — OpenAI    | openai                    | GPT integration         |
+| LLM — Google    | @google/generative-ai     | Gemini integration      |
+| MCP             | @modelcontextprotocol/sdk | Protocol implementation |
+| Testing         | Vitest                    | Unit/integration        |
+| E2E testing     | Playwright                | End-to-end              |
+
+</details>
+
+<details>
+<summary><strong>Quality attributes</strong></summary>
 
 ### Performance
 
 - Sub-second CLI response time
 - Streaming LLM responses
 - Efficient session serialisation
-- Persistent stage output caching (2-3 min savings per context load)
+- Persistent stage output caching (2–3 min savings per context load)
 
 ### Reliability
 
@@ -220,7 +182,6 @@ See [Architecture Decision Records](../adr/README.md) for detailed decisions.
 ### Maintainability
 
 - Modular architecture
-- Comprehensive documentation
 - High test coverage
 
 ### Security
@@ -229,22 +190,4 @@ See [Architecture Decision Records](../adr/README.md) for detailed decisions.
 - Environment-based configuration
 - Input validation with Zod
 
-## Evolution Strategy
-
-### Current State
-
-- Core CLI functionality
-- Basic MCP integration
-- Multi-provider LLM support
-
-### Near-Term Roadmap
-
-- Enhanced MCP sampling
-- Parallel exploration mode
-- Improved agent collaboration
-
-### Long-Term Vision
-
-- Team collaboration features
-- Enterprise integrations
-- Custom agent development
+</details>

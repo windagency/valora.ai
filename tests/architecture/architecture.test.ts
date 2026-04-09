@@ -228,6 +228,7 @@ describe('Architecture Tests', () => {
 					'services..',
 					'executor..',
 					'session..',
+					'memory..',
 					'llm..',
 					'config..',
 					'output..',
@@ -321,6 +322,7 @@ describe('Architecture Tests', () => {
 					'output..',
 					'services..',
 					'session..',
+					'memory..',
 					'utils..',
 					'exploration..',
 					'cleanup..',
@@ -335,6 +337,30 @@ describe('Architecture Tests', () => {
 				.because(
 					'Executor orchestrates workflow and can use logging, CLI utilities, MCP infrastructure, and UI adapters for prompting'
 				)
+				.check(srcProject.allClasses());
+		});
+	});
+
+	describe('Memory Module Rules', () => {
+		it('memory module should not depend on presentation layers', () => {
+			noClasses()
+				.that()
+				.resideInAPackage('memory..')
+				.should()
+				.dependOnClassesThat()
+				.resideInAnyPackage('cli..', 'mcp..', 'ui..')
+				.because('Memory is a domain layer and must not depend on presentation concerns')
+				.check(srcProject.allClasses());
+		});
+
+		it('memory module should not depend on higher application layers', () => {
+			noClasses()
+				.that()
+				.resideInAPackage('memory..')
+				.should()
+				.dependOnClassesThat()
+				.resideInAnyPackage('services..', 'executor..', 'session..')
+				.because('Memory is foundational domain infrastructure and must remain independent of higher layers')
 				.check(srcProject.allClasses());
 		});
 	});
@@ -506,7 +532,7 @@ describe('Architecture Tests', () => {
 					while ((match = importRegex.exec(content)) !== null) {
 						const pkg = match[1].split('/')[0]; // Get package name from scoped imports
 
-						// Skip allowed packages and local aliased imports (like 'types/', 'output/', etc.)
+						// Skip allowed packages and local aliased imports (like 'types/', 'output/', 'memory/', etc.)
 						if (
 							!allowedPackages.includes(pkg) &&
 							!pkg.startsWith('@types') &&
@@ -515,6 +541,7 @@ describe('Architecture Tests', () => {
 							pkg !== 'utils' &&
 							pkg !== 'services' &&
 							pkg !== 'config' &&
+							pkg !== 'memory' &&
 							pkg !== 'vitest'
 						) {
 							// This is likely a third-party npm package

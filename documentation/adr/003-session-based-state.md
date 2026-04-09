@@ -1,5 +1,7 @@
 # ADR-003: Session-Based State Management
 
+> **Decision**: Valora persists execution state in file-based sessions under `.valora/sessions/`, automatically propagating outputs from each command into the context of subsequent commands in the same workflow.
+
 ## Status
 
 Accepted

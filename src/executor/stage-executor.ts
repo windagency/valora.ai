@@ -613,6 +613,7 @@ export class StageExecutor {
 		executionContext: ExecutionContext
 	): Promise<{
 		agent: AgentDefinition;
+		agentMemory: null | string;
 		availableAgents: null | string;
 		codebaseMap: null | string;
 		escalationCriteria?: string[];
@@ -624,6 +625,7 @@ export class StageExecutor {
 		const agent = await this.agentLoader.loadAgent(executionContext.agentRole);
 		const projectGuidance = await loadProjectGuidance();
 		const projectKnowledge = await loadProjectKnowledge(executionContext.knowledgeFiles ?? []);
+		const agentMemory = await this.loadAgentMemory(executionContext);
 
 		// Filter agents to only load the one matching the current execution context
 		// This avoids loading unnecessary agents (e.g., backend agent for a frontend task)
@@ -651,6 +653,7 @@ export class StageExecutor {
 
 		return {
 			agent,
+			agentMemory,
 			availableAgents,
 			codebaseMap,
 			escalationCriteria: agent.decision_making?.escalation_criteria,
@@ -686,6 +689,7 @@ export class StageExecutor {
 		stage: PipelineStage,
 		resources: {
 			agent: AgentDefinition;
+			agentMemory: null | string;
 			availableAgents: null | string;
 			codebaseMap: null | string;
 			escalationCriteria?: string[];
@@ -696,6 +700,7 @@ export class StageExecutor {
 		enrichedInputs: Record<string, unknown>
 	): { systemMessage: string; userMessage: string } {
 		const systemMessage = this.messageBuilderService.buildSystemMessage({
+			agentMemory: resources.agentMemory,
 			agentProfile: resources.agent.content,
 			availableAgents: resources.availableAgents,
 			codebaseMap: resources.codebaseMap,
@@ -1670,5 +1675,52 @@ Summarize ALL changes you made during tool execution. Output ONLY the JSON code 
 			stage: stage.stage,
 			success: false
 		};
+	}
+
+	/**
+	 * Load relevant agent memories for context injection.
+	 *
+	 * Queries the memory store for entries matching the current command,
+	 * agent role, and any file paths referenced by the execution context.
+	 * Non-fatal: returns null on any error to avoid blocking pipeline execution.
+	 */
+	private async loadAgentMemory(executionContext: ExecutionContext): Promise<null | string> {
+		try {
+			const storeModule = await import('memory/store');
+			const managerModule = await import('memory/manager');
+			const { formatMemoryForInjection } = await import('./memory-formatter');
+			const { getConfigLoader } = await import('config/loader');
+
+			const config = getConfigLoader().get();
+			const memConfig = config.memory;
+			if (memConfig?.enabled === false) {
+				return null;
+			}
+
+			const store = new storeModule.MemoryStore();
+			const manager = new managerModule.MemoryManager(store, memConfig);
+
+			const tags = [executionContext.commandName, executionContext.agentRole].filter(Boolean);
+			const minStrength = memConfig?.injection_strength_threshold ?? 0.2;
+			const tokenBudget = memConfig?.injection_token_budget ?? 2000;
+
+			const results = await manager.query({
+				agentRole: executionContext.agentRole,
+				limit: 20,
+				minStrength,
+				strengthen: true,
+				tags
+			});
+
+			if (results.length === 0) {
+				return null;
+			}
+
+			await manager.flush();
+			return formatMemoryForInjection(results, tokenBudget);
+		} catch {
+			// Non-fatal: memory injection failure must never block pipeline execution
+			return null;
+		}
 	}
 }

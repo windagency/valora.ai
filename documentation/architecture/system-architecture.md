@@ -1,10 +1,6 @@
 # System Architecture
 
-> High-level architectural design of VALORA.
-
-## Overview
-
-VALORA is a TypeScript-based platform that orchestrates AI agents to automate software development workflows. It provides a CLI interface, MCP server integration, and multi-provider LLM support.
+> High-level architectural design of VALORA — a TypeScript CLI that orchestrates 11 AI agents across 24 commands for software development automation.
 
 ## System Context
 
@@ -58,17 +54,11 @@ C4Container
 
     Container_Boundary(engine, "VALORA") {
         Container(cli, "CLI Layer", "Node.js/TypeScript", "Command parsing, user interaction, output formatting")
-
         Container(orch, "Orchestration Layer", "TypeScript", "Pipeline execution, stage management, coordination")
-
         Container(agent, "Agent Layer", "TypeScript", "Agent registry, selection, prompt assembly")
-
         Container(llm, "LLM Layer", "TypeScript", "Provider abstraction, request handling, response processing")
-
         Container(mcp, "MCP Server", "TypeScript", "Model Context Protocol, tool handling")
-
         Container(session, "Session Layer", "TypeScript", "State persistence, context management")
-
         Container(config, "Config Layer", "TypeScript", "Configuration loading, validation")
 
         ContainerDb(session_store, "Session Store", "JSON Files", "Persistent session data")
@@ -97,192 +87,46 @@ C4Container
 
 ## Layer Responsibilities
 
-### CLI Layer
+| Layer             | Purpose                                             | Key Components                                                          |
+| ----------------- | --------------------------------------------------- | ----------------------------------------------------------------------- |
+| CLI               | User interaction and command handling               | Command Parser, Resolver, Wizard, Result Presenter                      |
+| Orchestration     | Workflow execution and coordination                 | Pipeline, Stage Executor, Variable Resolver                             |
+| Code Intelligence | AST-based codebase understanding, LSP integration   | AST Parser, Symbol Index, Smart Context, LSP Client                     |
+| Agent             | AI agent management and selection                   | Agent Registry, Loader, Selector, Prompt Assembler                      |
+| LLM               | Multi-provider AI integration                       | Provider Registry, Anthropic/OpenAI/Google/Cursor                       |
+| MCP Server        | IDE integration via Model Context Protocol          | Server, Tool Handler, Prompt Handler, Session Service                   |
+| Session           | Persistent state management                         | Session Service, Repository, Context Manager                            |
+| Memory            | Cross-session agent learning with exponential decay | Memory Store, Memory Manager, Consolidation Service, Extraction Service |
+| Configuration     | Application configuration                           | Config Loader, Schema Validator (Zod), Provider Config                  |
 
-**Purpose**: User interaction and command handling
+## Key Design Decisions
 
-| Component        | Responsibility                 |
-| ---------------- | ------------------------------ |
-| Command Parser   | Parse CLI arguments and flags  |
-| Command Resolver | Resolve command specifications |
-| Wizard           | Interactive configuration      |
-| Output Formatter | Format and display results     |
-| Error Handler    | User-friendly error messages   |
+| Decision                  | Choice                                                | Rationale                                                                                                   |
+| ------------------------- | ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Execution model           | Local, single-user, sequential                        | Simplicity; no infrastructure dependencies                                                                  |
+| Provider abstraction      | Normalised `LLMUsage` across all providers            | Cache metrics and cost tracking work identically regardless of model                                        |
+| Session storage           | File-based JSON with dual snapshot/full               | Zero infrastructure; fast resume via lightweight snapshot                                                   |
+| Context window management | Automatic flush + summarisation at 80%                | Prevents hard context-limit failures during long pipelines                                                  |
+| Security perimeter        | Credential Guard + Command Guard + Injection Detector | Defence-in-depth for local-execution threat model                                                           |
+| Codebase intelligence     | tree-sitter WASM + LSP (spawn-on-demand)              | Language-agnostic parsing; rich type info without bundling a server                                         |
+| Agent memory retention    | File-based exponential decay, no external deps        | Native implementation avoids SQLite/embedding dependencies; Jaccard tag-similarity enables merge without ML |
 
-### Orchestration Layer
+<details>
+<summary><strong>Non-Functional Requirement Mapping</strong></summary>
 
-**Purpose**: Workflow execution and coordination
+| NFR             | Mechanism                                                                |
+| --------------- | ------------------------------------------------------------------------ |
+| Performance     | Prompt caching (up to 90% input token savings); AST symbol index on disk |
+| Reliability     | Retry logic on transient LLM errors; session snapshots for fast recovery |
+| Security        | Credential Guard, Command Guard, Injection Detector, Tool Validator      |
+| Observability   | Structured JSON logs; per-request spending ledger (`spending.jsonl`)     |
+| Extensibility   | Provider registry pattern; file-driven command/agent definitions         |
+| Maintainability | Dependency injection container; typed pipeline events                    |
 
-| Component           | Responsibility             |
-| ------------------- | -------------------------- |
-| Pipeline            | Execute command pipelines  |
-| Stage Executor      | Execute individual stages  |
-| Execution Context   | Maintain execution state   |
-| Variable Resolution | Resolve template variables |
-| Coordinator         | Multi-step coordination    |
+</details>
 
-### Code Intelligence Layer
-
-**Purpose**: AST-based codebase understanding and language server integration
-
-| Component          | Responsibility                                      |
-| ------------------ | --------------------------------------------------- |
-| AST Parser         | Parse source files via tree-sitter WASM             |
-| Symbol Index       | Build and query a persistent codebase symbol index  |
-| Smart Context      | Budget-aware context extraction for token reduction |
-| LSP Client Manager | Manage language server connections                  |
-| LSP Tools          | Go-to-definition, hover info, diagnostics           |
-
-### Agent Layer
-
-**Purpose**: AI agent management and selection
-
-| Component        | Responsibility             |
-| ---------------- | -------------------------- |
-| Agent Registry   | Store agent definitions    |
-| Agent Loader     | Load agent configurations  |
-| Agent Selector   | Dynamic agent selection    |
-| Prompt Assembler | Build prompts with context |
-
-### LLM Layer
-
-**Purpose**: Multi-provider AI integration
-
-| Component          | Responsibility                                           |
-| ------------------ | -------------------------------------------------------- |
-| Provider Registry  | Register LLM providers                                   |
-| Provider Interface | Abstract provider operations                             |
-| Anthropic Provider | Claude integration + explicit prompt caching breakpoints |
-| OpenAI Provider    | GPT integration + automatic cache metric extraction      |
-| Google Provider    | Gemini integration + automatic cache metric extraction   |
-| Cursor Provider    | Cursor subscription (MCP, no caching)                    |
-| Token Estimator    | Cost estimation with cache-aware pricing                 |
-
-All providers normalise cache metrics into `LLMUsage.cache_creation_input_tokens` and `LLMUsage.cache_read_input_tokens`. The token estimator includes per-model cache pricing (write and read rates) for accurate cost calculation.
-
-### MCP Server Layer
-
-**Purpose**: IDE integration via MCP
-
-| Component       | Responsibility         |
-| --------------- | ---------------------- |
-| Server          | Handle MCP connections |
-| Tool Handler    | Execute tool requests  |
-| Prompt Handler  | Handle prompt requests |
-| Session Service | MCP session management |
-
-### Session Layer
-
-**Purpose**: Persistent state management
-
-| Component          | Responsibility      |
-| ------------------ | ------------------- |
-| Session Service    | CRUD operations     |
-| Session Repository | File persistence    |
-| Context Manager    | Context aggregation |
-
-### Configuration Layer
-
-**Purpose**: Application configuration
-
-| Component        | Responsibility           |
-| ---------------- | ------------------------ |
-| Config Loader    | Load configuration files |
-| Schema Validator | Validate with Zod        |
-| Provider Config  | LLM provider settings    |
-
-## Execution Flow
-
-### Command Execution
-
-```mermaid
-sequenceDiagram
-    participant User
-    participant CLI
-    participant Resolver
-    participant Pipeline
-    participant Agent
-    participant LLM
-    participant Session
-
-    User->>CLI: valora plan "feature"
-    CLI->>Resolver: resolveCommand("plan")
-    Resolver-->>CLI: CommandSpec
-    CLI->>Pipeline: execute(spec, args)
-    Pipeline->>Session: loadContext()
-    Session-->>Pipeline: context
-    Pipeline->>Agent: selectAgent(task)
-    Agent-->>Pipeline: @lead
-    Pipeline->>LLM: sendPrompt(prompt)
-    LLM-->>Pipeline: response
-    Pipeline->>Session: saveOutput()
-    Pipeline-->>CLI: result
-    CLI-->>User: formatted output
-```
-
-### MCP Integration
-
-```mermaid
-sequenceDiagram
-    participant Cursor
-    participant MCP
-    participant Handler
-    participant Pipeline
-    participant LLM
-
-    Cursor->>MCP: tool request
-    MCP->>Handler: handleTool(request)
-    Handler->>Pipeline: execute(command)
-    Pipeline->>LLM: sendPrompt()
-    LLM-->>Pipeline: response
-    Pipeline-->>Handler: result
-    Handler-->>MCP: tool response
-    MCP-->>Cursor: result
-```
-
-## Deployment Architecture
-
-The engine runs locally on the developer's machine:
-
-```mermaid
-graph TB
-    subgraph "Developer Machine"
-        subgraph "Runtime"
-            NODE[Node.js Runtime]
-            CLI[CLI Process]
-            MCP[MCP Server]
-        end
-
-        subgraph "Storage"
-            CONFIG[Config Files]
-            SESSIONS[Session Files]
-            LOGS[Log Files]
-        end
-
-        subgraph "IDE"
-            CURSOR[Cursor IDE]
-        end
-    end
-
-    subgraph "Cloud Services"
-        ANTHROPIC[Anthropic API]
-        OPENAI[OpenAI API]
-        GOOGLE[Google AI API]
-        GITHUB[GitHub API]
-    end
-
-    CLI --> CONFIG
-    CLI --> SESSIONS
-    CLI --> LOGS
-    MCP --> CLI
-    CURSOR --> MCP
-    CLI --> ANTHROPIC
-    CLI --> OPENAI
-    CLI --> GOOGLE
-    CLI --> GITHUB
-```
-
-## Security Architecture
+<details>
+<summary><strong>Security Architecture</strong></summary>
 
 ### Authentication Flow
 
@@ -307,17 +151,14 @@ flowchart TD
 | Sessions      | Local storage, no sensitive data     |
 | Network       | HTTPS only for API calls             |
 
-## Scalability Considerations
+### Security Component Summary
 
-### Current Design
+| Component          | Vulnerability Class                        | Severity |
+| ------------------ | ------------------------------------------ | -------- |
+| Credential Guard   | Credential leakage via env/output/files    | Critical |
+| Command Guard      | Command injection and data exfiltration    | Critical |
+| Injection Detector | Indirect prompt injection via tool results | High     |
+| Tool Validator     | MCP tool poisoning via descriptions        | High     |
+| Integrity Monitor  | Rug pull attacks via tool-set drift        | High     |
 
-- Single-user, local execution
-- Sequential command processing
-- File-based session storage
-
-### Future Considerations
-
-- Multi-user support
-- Parallel agent execution
-- Database-backed sessions
-- Remote execution capability
+</details>

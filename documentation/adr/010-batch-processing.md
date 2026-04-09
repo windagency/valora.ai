@@ -1,5 +1,7 @@
 # ADR-010: Async Batch Processing
 
+> **Decision**: An opt-in `--batch` CLI flag submits eligible single-call pipeline stages to provider batch APIs (Anthropic, OpenAI), reducing token costs by approximately 50% in exchange for asynchronous result retrieval.
+
 ## Status
 
 Accepted

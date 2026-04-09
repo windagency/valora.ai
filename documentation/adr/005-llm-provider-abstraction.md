@@ -1,5 +1,7 @@
 # ADR-005: LLM Provider Abstraction
 
+> **Decision**: All LLM calls go through a normalised `LLMProvider` interface, allowing Anthropic, OpenAI, Google, Cursor, and local model servers to be switched via configuration without code changes.
+
 ## Status
 
 Accepted
@@ -314,7 +316,7 @@ Only support OpenAI-compatible APIs.
 
 ## Configuration
 
-Provider configuration in `config.json`:
+Provider configuration in `config.json`. Model strings are passed through to the provider API unchanged — use the model identifier from the provider's documentation:
 
 ```json
 {
@@ -322,14 +324,14 @@ Provider configuration in `config.json`:
 		"anthropic": {
 			"enabled": true,
 			"models": {
-				"haiku": "claude-3-haiku-20240307",
-				"sonnet": "claude-3-5-sonnet-20241022"
+				"fast": "<haiku-tier model>",
+				"default": "<sonnet-tier model>"
 			}
 		},
 		"openai": {
 			"enabled": true,
 			"models": {
-				"gpt5": "gpt-5-turbo"
+				"strategic": "<reasoning-tier model>"
 			}
 		}
 	},

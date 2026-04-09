@@ -4,6 +4,7 @@
 | ---------------- | -------------------------------------------- |
 | **Type**         | Atom / Molecule / Organism / Template / Page |
 | **Path**         | `src/components/[path]/[ComponentName].tsx`  |
+| **Audience**     | Consumers + Maintainers                      |
 | **Last Updated** | [YYYY-MM-DD]                                 |
 
 ---
@@ -103,7 +104,8 @@ import { ComponentName } from 'src/components/ComponentName';
 
 ---
 
-## Accessibility
+<details>
+<summary><strong>Accessibility Details</strong></summary>
 
 | Feature             | Implementation                    |
 | ------------------- | --------------------------------- |
@@ -119,9 +121,10 @@ import { ComponentName } from 'src/components/ComponentName';
 <ComponentName aria-label="Action description" aria-disabled={disabled} role="button" />
 ```
 
----
+</details>
 
-## Testing
+<details>
+<summary><strong>Testing</strong></summary>
 
 ### Unit Tests
 
@@ -161,6 +164,8 @@ it('has no accessibility violations', async () => {
 });
 ```
 
+</details>
+
 ---
 
 ## Related Components
@@ -170,11 +175,3 @@ it('has no accessibility violations', async () => {
 | `Button`      | Similar      | Base button component   |
 | `IconButton`  | Variant      | Icon-only version       |
 | `ButtonGroup` | Parent       | Groups multiple buttons |
-
----
-
-## Changelog
-
-| Version | Date         | Changes                |
-| ------- | ------------ | ---------------------- |
-| 1.0.0   | [YYYY-MM-DD] | Initial implementation |

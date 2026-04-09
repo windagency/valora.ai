@@ -15,6 +15,8 @@ import { generatePerformanceReport, getPerformanceProfiler } from 'utils/perform
 import { getCurrentResourceUsage, getResourceMonitor, getResourceStats } from 'utils/resource-monitor';
 import { type GetRecordsOptions, getSpendingTracker } from 'utils/spending-tracker';
 
+import { configureUsageSubcommand } from './usage';
+
 /**
  * Display CPU information
  */
@@ -622,4 +624,6 @@ export function configureMonitoringCommand(program: CommandAdapter): void {
 				process.exit(1);
 			}
 		});
+
+	configureUsageSubcommand(monitoringCmd);
 }

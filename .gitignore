@@ -290,3 +290,6 @@ dist/
 reports/
 # Bundled CLI tools (populated by postinstall)
 vendor/
+
+# Git worktrees
+.worktrees/

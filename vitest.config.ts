@@ -20,6 +20,7 @@ export default defineConfig({
 			llm: path.resolve(__dirname, './src/llm'),
 			lsp: path.resolve(__dirname, './src/lsp'),
 			mcp: path.resolve(__dirname, './src/mcp'),
+			memory: path.resolve(__dirname, './src/memory'),
 			output: path.resolve(__dirname, './src/output'),
 			services: path.resolve(__dirname, './src/services'),
 			session: path.resolve(__dirname, './src/session'),

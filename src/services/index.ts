@@ -22,6 +22,12 @@ export {
 	GitStashProtectionService
 } from './git-stash-protection.service';
 export { getIdempotencyStore, IdempotencyStoreService, resetIdempotencyStore } from './idempotency-store.service';
+export {
+	getMemoryConsolidation,
+	MemoryConsolidationService,
+	resetMemoryConsolidation
+} from './memory-consolidation.service';
+export { getMemoryExtraction, MemoryExtractionService, resetMemoryExtraction } from './memory-extraction.service';
 export { TaskClassifierService } from './task-classifier.service';
 export {
 	DomainKeywordRegistry,

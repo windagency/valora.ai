@@ -6,7 +6,7 @@ import { useCallback, useState } from 'react';
 
 import type { DashboardTab, SessionSubTab, ViewMode } from 'ui/dashboard/types';
 
-const TAB_ORDER: DashboardTab[] = ['overview', 'performance', 'agents', 'cache', 'audit'];
+const TAB_ORDER: DashboardTab[] = ['overview', 'performance', 'agents', 'cache', 'audit', 'usage'];
 const SUB_TAB_ORDER: SessionSubTab[] = ['overview', 'optimization', 'quality', 'tokens', 'spending'];
 
 export interface NavigationActions {

@@ -1,63 +1,74 @@
 # User Guide
 
-> Getting started with VALORA for everyday development tasks.
-
-## Overview
-
-This guide is designed for developers who want to use VALORA to automate and enhance their software development workflow. You will learn how to execute commands, understand workflows, and leverage AI agents for various development tasks.
+Getting started with Valora for everyday development tasks.
 
 ## Contents
 
-1. [Quick Start](./quick-start.md) - Get up and running in 5 minutes
-2. [Workflows](./workflows.md) - Common development patterns
-3. [Commands](./commands.md) - Complete command reference
-4. [Dry Run Mode](./dry-run-mode.md) - Preview changes before execution
-5. [Metrics and Optimisation](./metrics.md) - Track and improve workflow efficiency
-   - [Metrics Quick Start](./metrics-quickstart.md) - 5-minute metrics setup
-   - [Workflow Optimisations](./workflow-optimisations.md) - Detailed optimisation reference
-6. [Configuration](./configuration.md) - Configure and customise the engine
-7. [Best Practices](./best-practices.md) - Recommended usage patterns
-8. [Troubleshooting](./troubleshooting.md) - Common issues and solutions
+| Document                                       | Purpose                                               |
+| ---------------------------------------------- | ----------------------------------------------------- |
+| [Quick Start](./quick-start.md)                | Install and run your first command in 5 minutes       |
+| [Workflows](./workflows.md)                    | Common development patterns end-to-end                |
+| [Commands](./commands.md)                      | Complete command reference                            |
+| [Dry Run Mode](./dry-run-mode.md)              | Preview changes before execution                      |
+| [Metrics and Optimisation](./metrics.md)       | Track and improve workflow efficiency                 |
+| [Metrics Quick Start](./metrics-quickstart.md) | 5-minute metrics setup                                |
+| [Configuration](./configuration.md)            | Configure providers, agents, and external MCP servers |
+| [Best Practices](./best-practices.md)          | Recommended usage patterns                            |
+| [Troubleshooting](./troubleshooting.md)        | Common issues and solutions                           |
+
+**New to Valora?** Start with [Quick Start](./quick-start.md).
+
+---
 
 ## What You Can Do
 
-VALORA helps you with:
-
-| Task Category       | Commands                                      | Description                                       |
+| Category            | Commands                                      | Description                                       |
 | ------------------- | --------------------------------------------- | ------------------------------------------------- |
 | **Planning**        | `refine-specs`, `create-prd`, `plan`          | Define requirements and implementation strategies |
-| **Task Management** | `create-backlog`, `fetch-task`, `refine-task` | Manage and prioritise work                        |
+| **Task management** | `create-backlog`, `fetch-task`, `refine-task` | Manage and prioritise work                        |
 | **Implementation**  | `implement`, `gather-knowledge`               | Execute code changes with AI assistance           |
 | **Quality**         | `assert`, `test`, `review-code`               | Validate and review your work                     |
 | **Delivery**        | `commit`, `create-pr`                         | Create commits and pull requests                  |
 
-## Execution Modes
+## Prerequisites
 
-The engine supports three execution modes:
+- Node.js >=18.0.0
+- Cursor IDE (recommended) or a compatible editor
+- API keys (optional — Tier 2 works without them)
 
-### Tier 1: MCP Sampling (Future)
+---
 
-- **Status**: Not yet available
-- **Cost**: Free (Cursor subscription)
-- **Use Case**: Native Cursor integration
+<details>
+<summary><strong>Execution modes</strong></summary>
 
-### Tier 2: Guided Completion Mode (Current Default)
+Valora supports three execution tiers:
+
+### Tier 2: Guided Completion (default)
 
 - **Status**: Active
 - **Cost**: Free (Cursor subscription)
 - **Setup**: Zero configuration
-- **How It Works**: VALORA generates structured prompts for Cursor AI to process
+- **How it works**: Valora generates structured prompts for Cursor AI to process
 
 ### Tier 3: API Key Fallback
 
 - **Status**: Available when configured
 - **Cost**: Pay per API call
-- **Setup**: Configure API keys via `valora config setup`
-- **Use Case**: Autonomous execution
+- **Setup**: `valora config setup` or set environment variables
+- **Use case**: Autonomous execution without IDE
 
-## External MCP Integration
+### Tier 1: MCP Sampling
 
-VALORA can connect to external MCP servers to extend capabilities:
+- **Status**: Not yet available
+- **Cost**: Free (Cursor subscription)
+- **Use case**: Native Cursor integration (future)
+
+</details>
+
+<details>
+<summary><strong>External MCP servers</strong></summary>
+
+Valora can connect to 15 external MCP servers. Each connection requires user approval.
 
 | Server              | Risk   | Capabilities                                 |
 | ------------------- | ------ | -------------------------------------------- |
@@ -77,46 +88,8 @@ VALORA can connect to external MCP servers to extend capabilities:
 | **Grafana**         | Low    | Observability and monitoring dashboards      |
 | **Storybook**       | Low    | Component documentation and testing          |
 
-### Security Features
-
-- **User Approval**: Interactive prompt before connecting to external servers
-- **Risk Assessment**: Automatic risk scoring based on server capabilities
-- **Tool Filtering**: Configure allowlist/blocklist for sensitive operations
-- **Audit Logging**: Complete operation trail in `.valora/logs/mcp-audit.jsonl`
+Security features: user approval prompt, risk assessment, tool allowlist/blocklist, audit logging at `.valora/logs/mcp-audit.jsonl`.
 
 See [Configuration](./configuration.md#external-mcp-configuration) for setup details.
 
-## Prerequisites
-
-Before using the engine:
-
-1. **Node.js 18+** installed
-2. **pnpm** package manager
-3. **Cursor IDE** (recommended) or compatible editor
-4. **API keys** (optional, for Tier 3 execution)
-
-## Quick Example
-
-```bash
-# Run a planning command
-valora plan "Add user authentication with OAuth"
-```
-
-The engine will:
-
-1. Analyse your request
-2. Select the appropriate agent (`@lead`)
-3. Generate a structured implementation plan
-4. Provide step-by-step guidance
-
-## Next Steps
-
-- **New to the engine?** Start with [Quick Start](./quick-start.md)
-- **Know the basics?** Explore [Workflows](./workflows.md)
-- **Need command details?** See [Commands](./commands.md)
-
-## Getting Help
-
-- Check the [Developer Guide](../developer-guide/README.md) for technical details
-- Review [Architecture Documentation](../architecture/README.md) for system design
-- View logs at `.valora/logs/` for troubleshooting
+</details>

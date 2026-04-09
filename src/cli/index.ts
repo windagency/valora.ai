@@ -24,6 +24,7 @@ import { configureConfigCommand } from './commands/config';
 import { configureDashboardCommand } from './commands/dashboard';
 import { configureDoctorCommand } from './commands/doctor';
 import {
+	configureConsolidateCommand,
 	configureExecCommand,
 	configureListCommand,
 	configureRolloutCommand,
@@ -119,6 +120,7 @@ configureListCommand(program);
 configureExecCommand(program);
 configureRolloutCommand(program);
 configureShortcutCommands(program);
+configureConsolidateCommand(program);
 configureCompletionCommand(program);
 configureTemplateCommand(program);
 configureInitCommand(program);

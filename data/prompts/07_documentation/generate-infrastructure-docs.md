@@ -64,9 +64,31 @@ tokens:
 
 # Generate Infrastructure Documentation
 
+## Documentation Philosophy — MANDATORY
+
+Every document has two audiences. Confusing them makes documentation useless to both.
+
+1. **Consumers (operators)** scan to find what they need under pressure: the command to run, the config to change, the diagram to orient themselves. They do not read security compliance matrices first.
+2. **Maintainers** need the full picture: why the network is segmented this way, what compliance frameworks apply, the security rationale behind a deployment gate. They work with auditors and make architectural changes.
+
+**Structure rule**: Lead with WHAT it is. Follow with HOW to operate it. Bury the WHY and security posture behind `<details>` collapsible sections.
+
+**Use this exact HTML syntax for all maintainer-depth sections:**
+
+```markdown
+<details>
+<summary><strong>Section Title</strong></summary>
+
+Content here — architecture decisions, security controls, compliance details.
+
+</details>
+```
+
+**If a section has no meaningful project-specific content, omit it entirely.** Security sections are important — but only when they contain actual project-specific controls, not generic advice.
+
 ## Objective
 
-Generate 6 comprehensive infrastructure documentation files by **writing them directly to disk** using the `write` tool. Apply British English for prose and include Mermaid diagrams as specified.
+Generate 6 comprehensive audience-layered infrastructure documentation files by **writing them directly to disk** using the `write` tool. Apply British English for prose and include Mermaid diagrams as specified.
 
 ## CRITICAL: Write Files Directly
 
@@ -185,213 +207,151 @@ Use `list_dir` to check if `knowledge-base/infrastructure/` exists.
 
 Use the `write` tool to create `knowledge-base/infrastructure/HLD.md` with:
 
-**Required sections**:
+**Consumer Surface (always present — leads the document)**:
 
-1. **Purpose** - Document scope
-2. **System Overview** - High-level system description
-3. **C4 Context Diagram** (Mermaid C4Context)
-4. **C4 Container Diagram** (Mermaid C4Container)
-5. **Technology Stack** - Complete technology inventory
-6. **Non-Functional Requirements** - NFR mapping
-7. **External Integrations** - Third-party services
-8. **Security Architecture** - Comprehensive security section including:
-   - Threat model overview (STRIDE categories addressed)
-   - Trust boundaries and data flow security
-   - Authentication and authorisation architecture
-   - Data classification (public, internal, confidential, restricted)
-   - Encryption standards (at-rest, in-transit, key management)
-   - Security controls matrix with compliance mapping
-9. **Compliance Overview** - Regulatory and framework compliance:
-   - Applicable compliance frameworks
-   - Control implementation status
-   - Audit readiness checklist
-   - Exceptions and remediation timeline
-10. **Troubleshooting** - Common issues
-11. **Best Practices** - Architecture best practices
-12. **Related Documentation** - Cross-references
-13. **Changelog** - Version history
+1. **Purpose** — one sentence
+2. **System Overview** — 2-3 sentences + C4 Context Diagram (Mermaid C4Context)
+3. **C4 Container Diagram** (Mermaid C4Container)
+4. **Technology Stack** — complete technology inventory table: `Technology | Version | Purpose`
+5. **External Integrations** — third-party services table: `Service | Purpose | Authentication Method`
+
+**Maintainer Depth (use `<details>` tags)**:
+
+6. `<details>` **Non-Functional Requirements** — NFR mapping: `Requirement | Target | Current | Notes`
+7. `<details>` **Security Architecture** — threat model overview, trust boundaries, authentication architecture, data classification, encryption standards, security controls matrix with compliance mapping
+8. `<details>` **Compliance Overview** — applicable frameworks, control implementation status, audit readiness, exceptions and remediation timeline
+
+**Conditional (only if project-specific content exists)**:
+
+9. **Related Documentation** — cross-references
 
 ### Step 3: Generate and Write CONTAINER.md
 
 Use the `write` tool to create `knowledge-base/infrastructure/CONTAINER.md` with:
 
-**Required sections**:
+**Consumer Surface (always present — leads the document)**:
 
-1. **Purpose** - Container strategy overview
-2. **Container Overview** - Inventory and purposes
+1. **Purpose** — one sentence
+2. **Container Overview** — inventory table: `Container | Purpose | Port | Base Image`
 3. **Container Topology Diagram** (Mermaid)
-4. **Dockerfile Configuration** - Image build
-5. **Docker Compose Setup** - Orchestration
-6. **Image Management** - Registry, versioning
-7. **Environment Configuration** - Env vars
-8. **Volume Management** - Storage
-9. **Networking** - Container networking
-10. **Health Checks** - Monitoring
-11. **Container Security** - Security hardening section including:
-    - Base image security (approved registries, vulnerability thresholds)
-    - Image scanning integration (Trivy, Snyk, or equivalent)
-    - Runtime security (read-only filesystems, non-root users, capabilities)
-    - Secrets management (never in images, injection methods)
-    - Network policies and segmentation
-    - Security contexts and pod security standards
-12. **Troubleshooting** - Container issues
-13. **Best Practices** - Container best practices
-14. **Related Documentation** - Cross-references
-15. **Changelog** - Version history
+4. **Key Commands** — copy-paste commands for build, run, stop, logs
+5. **Environment Configuration** — env vars table: `Variable | Required | Default | Description`
+
+**Maintainer Depth (use `<details>` tags)**:
+
+6. `<details>` **Dockerfile Configuration** — image build details, multi-stage build rationale
+7. `<details>` **Docker Compose Setup** — orchestration configuration and service dependencies
+8. `<details>` **Image Management** — registry, versioning strategy, tagging conventions
+9. `<details>` **Volume Management** — storage configuration and persistence strategy
+10. `<details>` **Networking** — container networking setup and inter-service communication
+11. `<details>` **Health Checks** — health check configuration and failure thresholds
+12. `<details>` **Container Security** — base image security, image scanning, runtime security (read-only FS, non-root), secrets injection, network policies
+
+**Conditional (only if project-specific content exists)**:
+
+13. **Related Documentation** — cross-references
 
 ### Step 4: Generate and Write DEPLOYMENT.md
 
 Use the `write` tool to create `knowledge-base/infrastructure/DEPLOYMENT.md` with:
 
-**Required sections**:
+**Consumer Surface (always present — leads the document)**:
 
-1. **Purpose** - Deployment strategy
+1. **Purpose** — one sentence
 2. **Deployment Pipeline Diagram** (Mermaid flowchart)
-3. **Environments** - Environment definitions
-4. **CI/CD Configuration** - Pipeline config
-5. **Deployment Process** - Step-by-step
-6. **Release Process** - Release workflow
-7. **Rollback Procedures** - Rollback strategy
-8. **Health Checks** - Post-deployment
-9. **Environment Variables** - Config by env
-10. **Secrets Management** - Sensitive data handling:
-    - Secrets storage (vault, cloud secrets manager)
-    - Rotation policies and procedures
-    - Access audit logging
-    - Emergency revocation process
-11. **Security Gates** - Pre-deployment security checks:
-    - SAST (Static Application Security Testing) requirements
-    - DAST (Dynamic Application Security Testing) integration
-    - Dependency vulnerability scanning
-    - Container image scanning
-    - Infrastructure-as-Code security scanning
-    - Compliance policy-as-code checks
-    - Required approvals for production
-12. **Compliance Verification** - Deployment compliance:
-    - Change management documentation
-    - Approval workflows and audit trails
-    - Environment parity verification
-    - Configuration drift detection
-13. **Troubleshooting** - Deployment issues
-14. **Best Practices** - Deployment best practices
-15. **Related Documentation** - Cross-references
-16. **Changelog** - Version history
+3. **Environments** — table: `Environment | URL | Deploy Branch | Auto-Deploy`
+4. **How to Deploy** — numbered step-by-step for the most common deployment scenario
+5. **Rollback Procedure** — numbered steps to roll back a bad deployment
+
+**Maintainer Depth (use `<details>` tags)**:
+
+6. `<details>` **CI/CD Configuration** — pipeline YAML reference, trigger conditions, approval gates
+7. `<details>` **Release Process** — versioning strategy, release branch workflow, change log generation
+8. `<details>` **Environment Variables** — config by environment: `Variable | Dev | Staging | Production`
+9. `<details>` **Secrets Management** — secrets storage, rotation policies, access audit logging, emergency revocation
+10. `<details>` **Security Gates** — SAST, DAST, dependency scanning, container scanning, IaC scanning, required approvals
+11. `<details>` **Compliance Verification** — change management, approval audit trails, environment parity, drift detection
+
+**Conditional (only if project-specific content exists)**:
+
+12. **Related Documentation** — cross-references
 
 ### Step 5: Generate and Write LOGGING.md
 
 Use the `write` tool to create `knowledge-base/infrastructure/LOGGING.md` with:
 
-**Required sections**:
+**Consumer Surface (always present — leads the document)**:
 
-1. **Purpose** - Observability strategy
+1. **Purpose** — one sentence
 2. **Observability Architecture Diagram** (Mermaid)
-3. **Logging Strategy** - Log levels, formats
-4. **Log Aggregation** - Centralised logging
-5. **Metrics Collection** - Application metrics
-6. **Alerting** - Alert rules
-7. **Tracing** - Distributed tracing
-8. **Dashboards** - Monitoring dashboards
-9. **Log Analysis** - Common queries
-10. **Security Logging** - Security-specific logging:
-    - Authentication events (success, failure, MFA)
-    - Authorisation decisions (access granted/denied)
-    - Administrative actions (user management, config changes)
-    - Data access patterns (sensitive data queries)
-    - Security alerts and anomalies
-    - Compliance-required events by framework
-11. **Audit Trail Requirements** - Compliance audit logging:
-    - Immutable log storage
-    - Log integrity verification
-    - Retention periods by compliance framework
-    - Chain of custody documentation
-    - Audit log access controls
-12. **PII and Sensitive Data Handling** - Data protection in logs:
-    - PII detection and masking
-    - Sensitive field redaction
-    - Log sanitisation procedures
-    - Data residency considerations
-13. **Troubleshooting** - Observability issues
-14. **Best Practices** - Logging best practices
-15. **Related Documentation** - Cross-references
-16. **Changelog** - Version history
+3. **Log Levels** — table: `Level | When to Use | Example`
+4. **How to Query Logs** — copy-paste queries for the most common scenarios (errors, auth failures, slow requests)
+5. **Alert Rules** — table: `Alert | Condition | Severity | Owner`
+
+**Maintainer Depth (use `<details>` tags)**:
+
+6. `<details>` **Log Aggregation** — centralised logging architecture, ingestion pipeline, retention policies
+7. `<details>` **Metrics Collection** — what metrics are collected, naming conventions, Prometheus/OTEL setup
+8. `<details>` **Tracing** — distributed tracing setup, sampling strategy, trace context propagation
+9. `<details>` **Dashboards** — dashboard inventory, what each monitors, alert thresholds
+10. `<details>` **Security Logging** — authentication events, authorisation decisions, administrative actions, security alerts, compliance-required events by framework
+11. `<details>` **Audit Trail Requirements** — immutable storage, integrity verification, retention periods by framework, access controls
+12. `<details>` **PII and Sensitive Data Handling** — PII detection, field redaction, log sanitisation, data residency
+
+**Conditional (only if project-specific content exists)**:
+
+13. **Related Documentation** — cross-references
 
 ### Step 6: Generate and Write LZ.md
 
 Use the `write` tool to create `knowledge-base/infrastructure/LZ.md` with:
 
-**Required sections**:
+**Consumer Surface (always present — leads the document)**:
 
-1. **Purpose** - Landing zone overview
+1. **Purpose** — one sentence
 2. **Network Topology Diagram** (Mermaid)
-3. **Cloud Resources** - Resource inventory
-4. **VPC Structure** - Virtual network config
-5. **Security Boundaries** - Security zones and trust levels
-6. **Network Security** - Network security controls:
-   - Network segmentation strategy
-   - Firewall rules and security groups
-   - Web Application Firewall (WAF) configuration
-   - DDoS protection measures
-   - Private endpoints and service mesh
-7. **IAM Policies** - Access management:
-   - Role-based access control (RBAC) model
-   - Least privilege implementation
-   - Service account management
-   - Cross-account access patterns
-   - Emergency access procedures
-8. **Encryption Standards** - Data protection:
-   - Encryption at rest (algorithms, key lengths)
-   - Encryption in transit (TLS versions, cipher suites)
-   - Key management (KMS, HSM, rotation)
-   - Certificate management
-9. **Resource Groups** - Organisation
-10. **Connectivity** - Network connectivity
-11. **Compliance Framework Implementation** - Detailed compliance:
-    - Framework-specific control mapping
-    - Evidence collection procedures
-    - Continuous compliance monitoring
-    - Gap analysis and remediation tracking
-    - Audit preparation checklist
-12. **Security Monitoring** - Infrastructure security:
-    - Cloud security posture management (CSPM)
-    - Configuration compliance scanning
-    - Vulnerability management
-    - Intrusion detection/prevention
-13. **Troubleshooting** - Infrastructure issues
-14. **Best Practices** - Cloud best practices
-15. **Related Documentation** - Cross-references
-16. **Changelog** - Version history
+3. **Cloud Resources** — inventory table: `Resource | Type | Region | Purpose`
+4. **VPC Structure** — CIDR ranges, subnet layout, availability zones
+5. **Resource Groups** — organisation and tagging strategy table
+
+**Maintainer Depth (use `<details>` tags)**:
+
+6. `<details>` **Security Boundaries** — security zones, trust levels, data classification per zone
+7. `<details>` **Network Security** — segmentation strategy, firewall rules, WAF config, DDoS protection, private endpoints
+8. `<details>` **IAM Policies** — RBAC model, least-privilege implementation, service accounts, cross-account patterns, emergency access
+9. `<details>` **Encryption Standards** — at-rest and in-transit standards, key management (KMS/HSM), certificate management, rotation schedules
+10. `<details>` **Connectivity** — network connectivity between environments, VPN/Direct Connect, peering
+11. `<details>` **Compliance Framework Implementation** — control mapping per framework, evidence collection, continuous monitoring, gap analysis
+12. `<details>` **Security Monitoring** — CSPM configuration, compliance scanning, vulnerability management, intrusion detection
+
+**Conditional (only if project-specific content exists)**:
+
+13. **Related Documentation** — cross-references
 
 ### Step 7: Generate and Write WORKFLOW.md
 
 Use the `write` tool to create `knowledge-base/infrastructure/WORKFLOW.md` with:
 
-**Required sections**:
+**Consumer Surface (always present — leads the document)**:
 
-1. **Purpose** - Workflow overview
+1. **Purpose** — one sentence
 2. **Git Flow Diagram** (Mermaid gitGraph)
-3. **Branch Naming** - Conventions
-4. **Commit Guidelines** - Message standards
-5. **Pull Request Process** - PR workflow
-6. **Code Review** - Review guidelines including security review
-7. **Security in CI/CD** - Security integration:
-   - Branch protection rules
-   - Required security checks before merge
-   - Automated security scanning (SAST, secrets detection)
-   - Dependency vulnerability checks
-   - Code signing and provenance
-   - Security review requirements for sensitive changes
-8. **Release Process** - Release workflow
-9. **Hotfix Process** - Emergency fixes with security considerations
-10. **Access Control** - Repository and pipeline access:
-    - Repository access levels
-    - Pipeline secrets access
-    - Deployment credentials management
-    - Periodic access reviews
-11. **Development Environment** - Local setup
-12. **Troubleshooting** - Workflow issues
-13. **Best Practices** - Dev best practices including secure coding
-14. **Related Documentation** - Cross-references
-15. **Changelog** - Version history
+3. **Branch Naming** — conventions table: `Type | Pattern | Example`
+4. **Commit Guidelines** — format, scope rules, example
+5. **Pull Request Process** — numbered steps, required approvals, checklist
+
+**Maintainer Depth (use `<details>` tags)**:
+
+6. `<details>` **Code Review Guidelines** — what to look for, security review requirements for sensitive changes
+7. `<details>` **Security in CI/CD** — branch protection rules, required security checks (SAST, secrets detection, dependency scans), code signing
+8. `<details>` **Release Process** — versioning, release branch workflow, changelog generation, tag signing
+9. `<details>` **Hotfix Process** — emergency fix workflow with security considerations and approval bypass criteria
+10. `<details>` **Access Control** — repository access levels, pipeline secrets management, deployment credentials, periodic access reviews
+11. `<details>` **Development Environment** — local setup for new contributors
+
+**Conditional (only if project-specific content exists)**:
+
+12. **Related Documentation** — cross-references
 
 ### Step 8: Generate Security Compliance Summary
 
@@ -580,16 +540,15 @@ After writing all files, output JSON with metadata only (no content).
 ## Success Criteria
 
 - ✅ All 6 files written using `write` tool
-- ✅ Each document includes standardised header
-- ✅ All required sections present (including security sections)
+- ✅ Each document includes standardised header with Audience field
+- ✅ Consumer surface leads each document and is scannable without expanding anything
+- ✅ Maintainer depth sections (including security and compliance) use `<details><summary>` tags
+- ✅ No empty or generic boilerplate sections — omit rather than pad
 - ✅ Mermaid diagrams render correctly
 - ✅ British English used consistently
 - ✅ Cross-references use correct relative paths
-- ✅ Completeness score >= 85% for each document
-- ✅ Security sections included in all documents per security topics matrix
-- ✅ Compliance frameworks addressed with control mappings
-- ✅ Security review checklist populated and ready for review
-- ✅ All security gaps documented with remediation plans
+- ✅ Security sections contain project-specific controls (not generic advice) in `<details>` blocks
+- ✅ Security compliance summary metadata populated
 
 ## Error Handling
 

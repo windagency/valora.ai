@@ -1,5 +1,7 @@
 # ADR-006: Automatic Context Flush and Resume
 
+> **Decision**: When LLM context usage reaches 80% of the window, Valora automatically summarises the conversation history and reconstructs a fresh context, allowing long-running operations to complete without manual intervention.
+
 ## Status
 
 Accepted
@@ -156,6 +158,6 @@ Summarise at fixed intervals regardless of context usage.
 
 ## References
 
-- [Context Management Module](../../../src/context-management/)
-- [Configuration Constants](../../../src/config/constants.ts)
+- [Context Management Module](../../src/context-management/)
+- [Configuration Constants](../../src/config/constants.ts)
 - [Pipeline Execution Model](./004-pipeline-execution-model.md)

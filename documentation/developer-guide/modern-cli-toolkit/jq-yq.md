@@ -1,5 +1,19 @@
 # jq and yq reference
 
+## Quick Reference
+
+| Command                                   | Purpose                    | Example                                         |
+| ----------------------------------------- | -------------------------- | ----------------------------------------------- |
+| `jq '.name' file.json`                    | Extract a field            | `jq '.version' package.json`                    |
+| `jq -r '.name'`                           | Raw output (no quotes)     | `jq -r '.name' package.json`                    |
+| `jq '.[] \| select(.status == "active")'` | Filter array elements      | `jq '.[] \| select(.enabled)' config.json`      |
+| `yq '.metadata.name' file.yaml`           | Extract a YAML field       | `yq '.spec.replicas' deployment.yaml`           |
+| `yq -i '.key = "val"' file.yaml`          | In-place edit YAML         | `yq -i '.spec.replicas = 3' deployment.yaml`    |
+| `yq -o=json '.' file.yaml`                | Convert YAML to JSON       | `yq -o=json '.' config.yaml \| jq '.key'`       |
+| `yq 'select(.kind == "Deployment")'`      | Filter multi-document YAML | `yq 'select(.kind == "Service")' manifest.yaml` |
+
+---
+
 ## jq — JSON processor
 
 ### Essential patterns for agents
@@ -45,10 +59,25 @@ jq -r '.scripts.test // .scripts.jest // "no test script"' package.json
 jq '.version = "2.0.0"' package.json > tmp.json && mv tmp.json package.json
 
 # In-place edit alternative using a temp file
-jq '.dependencies.typescript = "^5.0.0"' package.json | sponge package.json
-# If sponge unavailable:
 TMP=$(mktemp) && jq '.dependencies.typescript = "^5.0.0"' package.json > "$TMP" && mv "$TMP" package.json
 ```
+
+### Flags reference
+
+| Flag        | Purpose                           | Example                               |
+| ----------- | --------------------------------- | ------------------------------------- |
+| `-r`        | Raw output (no quotes on strings) | `jq -r '.name'`                       |
+| `-e`        | Exit 1 if output is null/false    | `jq -e '.key'` for conditional checks |
+| `-c`        | Compact output (one line)         | `jq -c '.'` for piping                |
+| `-s`        | Slurp: read all inputs into array | `jq -s '.' file1.json file2.json`     |
+| `-S`        | Sort keys                         | `jq -S '.'` for deterministic output  |
+| `--arg`     | Inject string variable            | `jq --arg v "$VAR" '.[$v]'`           |
+| `--argjson` | Inject JSON variable              | `jq --argjson n 5 '.items[:$n]'`      |
+| `--rawfile` | Read raw file into variable       | `jq --rawfile t template.txt`         |
+| `--tab`     | Use tabs for indentation          | `jq --tab '.'`                        |
+
+<details>
+<summary><strong>Advanced jq Patterns</strong></summary>
 
 ### Advanced patterns
 
@@ -69,19 +98,7 @@ jq -s '.[0] * .[1]' base.json override.json  # Deep merge
 jq --stream 'select(.[0][-1] == "name") | .[1]' huge.json
 ```
 
-### Flags reference
-
-| Flag        | Purpose                           | Example                               |
-| ----------- | --------------------------------- | ------------------------------------- |
-| `-r`        | Raw output (no quotes on strings) | `jq -r '.name'`                       |
-| `-e`        | Exit 1 if output is null/false    | `jq -e '.key'` for conditional checks |
-| `-c`        | Compact output (one line)         | `jq -c '.'` for piping                |
-| `-s`        | Slurp: read all inputs into array | `jq -s '.' file1.json file2.json`     |
-| `-S`        | Sort keys                         | `jq -S '.'` for deterministic output  |
-| `--arg`     | Inject string variable            | `jq --arg v "$VAR" '.[$v]'`           |
-| `--argjson` | Inject JSON variable              | `jq --argjson n 5 '.items[:$n]'`      |
-| `--rawfile` | Read raw file into variable       | `jq --rawfile t template.txt`         |
-| `--tab`     | Use tabs for indentation          | `jq --tab '.'`                        |
+</details>
 
 ---
 
@@ -141,9 +158,6 @@ yq -p=xml '.' config.xml
 
 # YAML → JSON → pipe to jq for complex transforms
 yq -o=json '.' config.yaml | jq '.complex.transform'
-
-# Properties file → YAML
-yq -p=props '.' app.properties
 ```
 
 ### In-place editing
@@ -175,9 +189,10 @@ yq '. *= load("override.yaml")' base.yaml
 | `-N`          | No document separators | Suppress `---` in output  |
 | `--no-colors` | Disable colour output  | For piping to other tools |
 
-### Multi-document handling tips
+<details>
+<summary><strong>Multi-Document Handling</strong></summary>
 
-Kubernetes manifests and Helm outputs often contain multiple YAML documents separated by `---`. Key patterns:
+Kubernetes manifests and Helm outputs often contain multiple YAML documents separated by `---`.
 
 ```bash
 # Count documents
@@ -192,3 +207,5 @@ yq 'select(.metadata.name == "my-app")' manifest.yaml
 # Extract all images from all deployments
 yq 'select(.kind == "Deployment") | .spec.template.spec.containers[].image' manifest.yaml
 ```
+
+</details>

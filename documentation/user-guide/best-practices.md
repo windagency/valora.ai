@@ -1,537 +1,91 @@
 # Best Practices
 
-Recommended practices for using VALORA effectively.
-
-## Workflow Organization
-
-### 1. Start with Clear Requirements
-
-**DO**:
-
-```bash
-# Clear, specific task description
-valora plan "Add user authentication with OAuth 2.0 using Google provider"
-```
-
-**DON'T**:
-
-```bash
-# Vague, ambiguous task
-valora plan "add auth"
-```
-
-### 2. Break Down Complex Tasks
-
-**DO**:
-
-```bash
-# Break into manageable pieces
-valora plan "Add User model with email and password fields"
-valora plan "Implement password hashing with bcrypt"
-valora plan "Add login endpoint with JWT tokens"
-```
-
-**DON'T**:
-
-```bash
-# Overwhelming complexity in one task
-valora plan "Build complete authentication system with OAuth, JWT, password reset, MFA, and session management"
-```
-
-### 3. Follow the Development Lifecycle
-
-Recommended workflow:
-
-```bash
-1. valora refine-specs           # Define requirements
-2. valora create-prd             # Document product requirements
-3. valora plan                   # Create implementation plan
-4. valora review-plan            # Validate plan quality
-5. valora implement              # Execute implementation
-6. valora assert                 # Validate completeness
-7. valora test                   # Run tests
-8. valora review-code            # Code review
-9. valora commit                 # Create commit
-10. valora create-pr             # Open pull request
-```
-
-## Template Usage
-
-### Use Pattern Templates
-
-**When to use**:
-
-- REST API endpoints
-- React components
-- Database migrations
-- Common architectural patterns
-
-**Example**:
-
-```bash
-# Use template for 8-10 min time savings
-valora plan "Add orders API" --pattern=rest-api
-
-# Instead of
-valora plan "Add orders API"  # Takes 13-15 min
-```
-
-### Create Custom Templates
-
-For recurring patterns in your codebase:
-
-```bash
-# Create template
-cp data/templates/plans/PATTERN_REST_API.md \
-   .valora/templates/plans/PATTERN_CUSTOM.md
-
-# Edit for your needs
-code .valora/templates/plans/PATTERN_CUSTOM.md
-
-# Use template
-valora plan "Custom task" --pattern=custom
-```
-
-## Quality Assurance
-
-### Always Run Assert Phase
-
-**DO**:
-
-```bash
-valora implement
-valora assert  # Catch issues early
-```
-
-**DON'T**:
-
-```bash
-valora implement
-# Skip validation - issues discovered later
-```
-
-### Use Dry Run for Important Changes
-
-**Preview before executing**:
-
-```bash
-valora implement --dry-run
-# Review generated plan
-valora implement  # Execute after review
-```
-
-### Review High-Complexity Plans
-
-```bash
-valora plan "Complex feature"
-valora review-plan  # Validate before implementing
-```
-
-## Performance Optimization
-
-### 1. Enable Parallel Execution
-
-```json
-{
-	"execution": {
-		"enable_parallel_execution": true,
-		"max_concurrent_stages": 4
-	}
-}
-```
-
-### 2. Use Appropriate Models
-
-```bash
-# Complex planning
-valora plan --model claude-sonnet-4.6 "Design microservices architecture"
-
-# Simple tasks
-valora implement --model claude-haiku "Fix typo in README"
-
-# Code review
-valora review-code --model gpt-5-thinking-high
-```
-
-### 3. Leverage Express Planning
-
-For trivial tasks (complexity < 3):
-
-```bash
-valora plan --mode=express "Update version number"
-valora plan --mode=express "Fix typo in error message"
-```
-
-### 4. Clean Up Old Sessions
-
-```bash
-# Regular cleanup
-valora session cleanup --days 30
-
-# Or configure automatic cleanup
-{
-  "session": {
-    "cleanup_days": 30,
-    "cleanup_enabled": true
-  }
-}
-```
-
-## Session Management
-
-### Resume Sessions Efficiently
-
-```bash
-# Resume last session
-valora --resume plan "Continue previous work"
-
-# Resume specific session
-valora --session <session-id> implement
-```
-
-### Clear Context When Needed
-
-```bash
-# Start fresh session
-valora --new-session plan "New feature"
-
-# Clear context for current session
-valora session clear-context
-```
-
-## Metrics and Continuous Improvement
-
-### Track Metrics Regularly
-
-```bash
-# Weekly review
-./scripts/generate-weekly-report.sh 30d
-
-# Check specific metrics
-./scripts/metrics 7d | jq '.templateUsage, .earlyExit'
-```
-
-### Act on Recommendations
-
-Review weekly metrics reports and:
-
-1. **Template usage low?** Create more templates
-2. **Early exit rate low?** Improve plan quality
-3. **Express planning underused?** Break down tasks
-
-### Review Quality Scores
-
-Monitor quality to ensure optimizations don't compromise code quality:
-
-```bash
-./scripts/metrics 30d | jq '.qualityScores'
-```
-
-## Team Collaboration
-
-### Document Decisions
-
-Use clarification answers to document decisions:
-
-```bash
-# Clarifications are saved in session
-valora plan "Add caching layer"
-# Answer questions about tech choices
-# Decisions preserved for team context
-```
-
-### Share Templates
-
-Share custom templates with team:
-
-```bash
-# Commit templates to repo
-git add .valora/templates/plans/PATTERN_TEAM.md
-git commit -m "Add team pattern template"
-git push
-```
-
-### Standardize Configuration
-
-```json
-{
-	"team": {
-		"name": "backend-team",
-		"default_agent": "software-engineer-typescript-backend",
-		"baseline_times": {
-			"avgWorkflowTime": 180
-		}
-	}
-}
-```
-
-## Security Best Practices
-
-### Protect API Keys
-
-**DO**:
-
-```bash
-# Use environment variables
-export ANTHROPIC_API_KEY="sk-ant-..."
-
-# Or use .env file (gitignored)
-echo "ANTHROPIC_API_KEY=sk-ant-..." >> .env
-source .env
-```
-
-**DON'T**:
-
-```bash
-# Commit API keys
-echo '{"api_key": "sk-ant-..."}' > .valora/config.json
-git add .valora/config.json  # DON'T DO THIS
-```
-
-### Enable Session Encryption
-
-```json
-{
-	"session": {
-		"encryption": true
-	}
-}
-```
-
-### Review Generated Code
-
-Always review AI-generated code for:
-
-- Security vulnerabilities
-- Input validation
-- Error handling
-- Authentication/authorization
-
-### Supply Chain Security
-
-The project enforces supply chain hardening via `.npmrc` and `package.json`. Key protections:
-
-- **Frozen lockfile** — `pnpm install` cannot silently modify `pnpm-lock.yaml`
-- **Blocked install scripts** — dependency lifecycle scripts are disabled, preventing the primary vector for supply chain attacks
-- **Build allowlist** — `pnpm.onlyBuiltDependencies` explicitly lists packages permitted to run build scripts (empty by default)
-- **Vulnerability overrides** — `pnpm.overrides` patches known transitive vulnerabilities
-- **Automated updates** — Dependabot opens grouped PRs weekly for minor/patch updates
-
-Run audits regularly:
-
-```bash
-# Check production dependencies for vulnerabilities
-pnpm audit:prod
-
-# Check for high/critical issues only
-pnpm audit --prod --audit-level=high
-```
-
-See [ADR-009](../adr/009-supply-chain-hardening.md) for the full architectural rationale.
-
-## Code Quality
-
-### Follow Project Standards
-
-Ensure AI follows your coding standards:
-
-- Reference standards in prompts
-- Use linters and formatters
-- Enable real-time validation
-- Review generated code
-
-### Use Technical Defaults
-
-Document standard tech choices:
-
-```markdown
-# data/templates/standards/TECHNICAL_DEFAULTS.md
-
-- Package Manager: pnpm
-- Testing: Vitest (unit), Playwright (E2E)
-- Linting: ESLint + Prettier
-- TypeScript: Strict mode enabled
-```
-
-### Validate Test Coverage
-
-```bash
-valora test
-valora validate-coverage --threshold=80
-```
-
-## Error Handling
-
-### Check Logs on Errors
-
-```bash
-# View recent logs
-tail -50 .valora/logs/ai-$(date +%Y-%m-%d).log
-
-# Follow logs in real-time
-tail -f .valora/logs/ai-$(date +%Y-%m-%d).log
-```
-
-### Retry Failed Commands
-
-```bash
-# Retry with increased timeout
-valora plan --timeout=900000 "Complex task"
-
-# Use different model
-valora plan --model=claude-sonnet-4.6 "Task"
-```
-
-### Preserve Failed Sessions
-
-Don't delete sessions with errors - they contain valuable context for debugging.
-
-## Anti-Patterns to Avoid
-
-### ❌ Skipping Plan Review
-
-```bash
-# Bad
-valora plan "Feature"
-valora implement  # Implementing without review
-```
-
-```bash
-# Good
-valora plan "Feature"
-valora review-plan  # Validate before implementing
-valora implement
-```
-
-### ❌ Not Using Templates for Common Patterns
-
-```bash
-# Bad - takes 13-15 min
-valora plan "Add users API"
-```
-
-```bash
-# Good - takes 4-6 min
-valora plan "Add users API" --pattern=rest-api
-```
-
-### ❌ Ignoring Metrics Recommendations
-
-Weekly reports show actionable improvements - act on them.
-
-### ❌ One Massive Task
-
-```bash
-# Bad
-valora plan "Implement entire authentication system"
-```
-
-```bash
-# Good
-valora plan "Add User model"
-valora plan "Add password hashing"
-valora plan "Add login endpoint"
-```
-
-### ❌ Not Committing Regularly
-
-```bash
-# Bad
-# Implement multiple features without commits
-```
-
-```bash
-# Good
-valora implement "Feature 1"
-valora assert
-valora commit
-valora implement "Feature 2"
-valora assert
-valora commit
-```
-
-## Tips and Tricks
-
-### 1. Use Command Aliases
-
-```bash
-# Create aliases in .valora/config.json
-{
-  "commands": {
-    "aliases": {
-      "p": "plan",
-      "i": "implement",
-      "r": "review-plan",
-      "a": "assert",
-      "c": "commit"
-    }
-  }
-}
-
-# Use aliases
-valora p "Feature"
-valora r
-valora i
-valora a
-valora c
-```
-
-### 2. Set Default Arguments
+A quick-reference summary of recommended practices for VALORA. For command sequences and detailed rationale, see the [Workflows guide](./workflows.md).
+
+## Rules at a glance
+
+| Rule                                                                    | When                                   | Why                                                                               | More info                                                                |
+| ----------------------------------------------------------------------- | -------------------------------------- | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| Always plan before implementing                                         | Every task                             | Unplanned implementations produce inconsistent results and waste review cycles    | [Workflow 1, step 8](./workflows.md#workflow-1-new-feature-development)  |
+| Run `review-plan` before `implement`                                    | After every `plan`                     | Catches architectural and logic issues before code is written                     | [Workflow 1, step 9](./workflows.md#workflow-1-new-feature-development)  |
+| Use `--pattern` for common tasks                                        | REST API, React, DB, auth, jobs        | Reduces planning time from 13–15 min to 4–6 min                                   | [Speed-Up Options](./workflows.md#speed-up-options)                      |
+| Use express mode for trivial tasks                                      | Complexity < 3                         | Saves ~10–12 min on minor changes                                                 | [Workflow 6](./workflows.md#workflow-6-quick-task)                       |
+| Use tiered planning for complex features                                | Complexity > 5                         | Catches architectural issues in ~5 min before committing to detailed planning     | [Workflow 5](./workflows.md#workflow-5-tiered-planning-complex-features) |
+| Run `assert` immediately after `implement`                              | After every implementation             | Catches completeness issues early, before test and review phases                  | [Workflow 1, step 11](./workflows.md#workflow-1-new-feature-development) |
+| Use `validate-parallel` instead of sequential assert + review           | Post-implementation                    | Runs both concurrently, saving ~9 min                                             | [Speed-Up Options](./workflows.md#speed-up-options)                      |
+| Use `pre-check` before `review-code`                                    | Before every code review               | Automated checks (~1.5 min) eliminate obvious issues before manual review         | [Workflow 4](./workflows.md#workflow-4-code-review)                      |
+| Enforce coverage gates                                                  | After every test run                   | Prevents test quality from quietly degrading                                      | [Coverage validation](./workflows.md#coverage-validation-gates)          |
+| Use `--mode=step-by-step` for large refactors                           | Refactoring tasks                      | Breaks changes into verifiable steps, reducing regression risk                    | [Workflow 3](./workflows.md#workflow-3-refactoring)                      |
+| Commit after each task, not after multiple                              | Every completed task                   | Keeps commits focused and reversible                                              | —                                                                        |
+| Write specific task descriptions                                        | Every `plan` call                      | Vague descriptions produce vague plans                                            | —                                                                        |
+| Break large tasks into smaller ones                                     | Complexity ≥ 5                         | Enables express planning and reduces planning overhead                            | [Workflow 5](./workflows.md#workflow-5-tiered-planning-complex-features) |
+| Answer P0 clarification questions                                       | During interactive stages              | P0 questions block core functionality; skipping them introduces gaps              | [Interactive Clarification](./workflows.md#interactive-clarification)    |
+| Run `feedback` after every workflow                                     | After commit / PR                      | Feeds the metrics system for continuous improvement                               | [Workflow 1, step 14](./workflows.md#workflow-1-new-feature-development) |
+| Review metrics weekly                                                   | Ongoing                                | Identifies optimisation opportunities and prevents quality drift                  | [Metrics guide](./metrics.md)                                            |
+| Store API keys in environment variables, not config files               | Setup                                  | Config files can be accidentally committed                                        | —                                                                        |
+| Never commit `pnpm-lock.yaml` modifications outside a dependency update | Dependency management                  | The lockfile is the source of truth for reproducible installs                     | —                                                                        |
+| Run `pnpm audit:prod` regularly                                         | Ongoing                                | Catches known vulnerabilities in production dependencies                          | —                                                                        |
+| Do not delete sessions with errors                                      | Debugging                              | Failed sessions contain diagnostic context                                        | [Troubleshooting](./troubleshooting.md)                                  |
+| Share custom templates via git                                          | Team projects                          | Ensures consistency across the team                                               | —                                                                        |
+| Run `valora consolidate` after decision-heavy sessions                  | After architecture or refactoring work | Prevents memory store bloat and ensures git-invalidation removes stale context    | [Memory configuration](./configuration.md#memory-system-configuration)   |
+| Review `AGENT MEMORY` in debug logs before trusting injected context    | Before acting on AI recommendations    | Injected memories may reference outdated code paths; verify against current state | —                                                                        |
+
+## Anti-patterns
+
+| Anti-pattern                                  | Problem                                                            | Correct approach                                                                              |
+| --------------------------------------------- | ------------------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
+| `valora implement` without `valora plan`      | No structured plan; agent guesses intent                           | Always run `plan` first                                                                       |
+| `valora plan "build entire auth system"`      | Overwhelming complexity in one task                                | Break into `plan "Add User model"`, `plan "Add password hashing"`, etc.                       |
+| Skipping `review-plan`                        | Architectural issues discovered during implementation              | Always validate the plan before writing code                                                  |
+| Skipping `assert`                             | Issues surface later in test or review phases                      | Run `assert` immediately after `implement`                                                    |
+| Not using `--pattern` for REST/React/DB tasks | 13–15 min planning instead of 4–6 min                              | Add `--pattern=rest-api`, `--pattern=react-feature`, or `--pattern=database`                  |
+| Ignoring weekly metrics recommendations       | Optimisation opportunities missed                                  | Act on low template-usage and early-exit recommendations                                      |
+| Committing API keys to config files           | Security exposure                                                  | Use `export ANTHROPIC_API_KEY=...` or a gitignored `.env` file                                |
+| Never running `valora consolidate`            | Memory stores grow unbounded; stale patterns injected into prompts | Run `valora consolidate --dry-run` periodically to inspect, then without `--dry-run` to prune |
+
+## Session and configuration tips
+
+**Aliases** — define short aliases in `.valora/config.json` to speed up common commands:
 
 ```json
 {
 	"commands": {
-		"plan": {
-			"default_args": {
-				"complexity_threshold": 5
-			}
+		"aliases": {
+			"p": "plan",
+			"i": "implement",
+			"r": "review-plan",
+			"a": "assert",
+			"c": "commit"
 		}
 	}
 }
 ```
 
-### 3. Use Context from Previous Commands
+**Session context** — VALORA preserves context across commands in the same session. There is no need to re-specify the task after `plan`; `implement`, `test`, and `review-code` all pick it up automatically.
 
-The engine preserves context across commands:
-
-```bash
-valora plan "Add feature"
-# Context available
-
-valora implement
-# Uses plan context automatically
-
-valora review-code
-# Uses implementation context
-```
-
-### 4. Leverage Parallel Validation
-
-Enabled by default, saves 12-15 min per review:
+**Resume sessions** — if a session was interrupted:
 
 ```bash
-valora review-plan  # Runs 4 validations in parallel
+valora --resume plan "Continue previous work"
+valora --session <session-id> implement
 ```
 
-### 5. Monitor Optimization Adoption
+**Custom templates** — copy an existing pattern and adapt it for your codebase:
 
 ```bash
-# Check if you're hitting targets
-./scripts/metrics 30d | jq '{
-  template_rate: .templateUsage.rate,
-  early_exit_rate: .earlyExit.rate,
-  express_rate: .expressPlanning.rate
-}'
+cp data/templates/plans/PATTERN_REST_API.md .valora/templates/plans/PATTERN_CUSTOM.md
+code .valora/templates/plans/PATTERN_CUSTOM.md
+valora plan "Custom task" --pattern=custom
 ```
 
-## Recommended Reading Order
+## Security summary
 
-1. [Quick Start](./quick-start.md) - Get started
-2. **This document** - Learn best practices
-3. [Workflows](./workflows.md) - Common patterns
-4. [Commands](./commands.md) - Command details
-5. [Metrics](./metrics.md) - Track efficiency
+- Store API keys in environment variables or a gitignored `.env` file — never in `.valora/config.json`
+- The project enforces `frozen-lockfile=true` and `ignore-scripts=true` in `.npmrc`. Add packages that legitimately need build scripts to `pnpm.onlyBuiltDependencies`
+- Enable session encryption: `{ "session": { "encryption": true } }`
+- Always review AI-generated code for input validation, error handling, and authentication logic
+- Run `pnpm audit:prod` regularly; see [ADR-009](../adr/009-supply-chain-hardening.md) for full supply chain rationale
 
 ---
 
-_These practices evolve based on team experience. Share your learnings!_
+For command sequences, full rationale, and edge cases, see the [Workflows guide](./workflows.md).

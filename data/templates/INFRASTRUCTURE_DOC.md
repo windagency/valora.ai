@@ -1,80 +1,67 @@
 # [Document Title]
 
-| Attribute        | Value                       |
-| ---------------- | --------------------------- |
-| **Purpose**      | [Brief purpose description] |
-| **Version**      | 1.0.0                       |
-| **Author**       | AI Documentation Generator  |
-| **Created**      | [YYYY-MM-DD]                |
-| **Last Updated** | [YYYY-MM-DD]                |
-| **Status**       | Draft                       |
+| Attribute        | Value                   |
+| ---------------- | ----------------------- |
+| **Purpose**      | [One-sentence purpose]  |
+| **Audience**     | Consumers + Maintainers |
+| **Version**      | 1.0.0                   |
+| **Last Updated** | [YYYY-MM-DD]            |
+| **Status**       | Draft                   |
 
 ---
 
-## Overview
+## Quick Reference
 
-[High-level overview of the document scope and content. Use British English for prose.]
+[Scannable summary — the "menu" an operator reads under pressure]
+
+| Item           | Value / Location   | Notes                 |
+| -------------- | ------------------ | --------------------- |
+| [Key config]   | `[value or path]`  | [When to change this] |
+| [Key command]  | `[command]`        | [What it does]        |
+| [Key endpoint] | `[URL or address]` | [Purpose]             |
 
 ---
 
-## [Main Section 1]
-
-[Content for main section. Include relevant diagrams using Mermaid syntax.]
+## Architecture Overview
 
 ```mermaid
 flowchart TB
     A[Component A] --> B[Component B]
     B --> C[Component C]
+    C --> D[(Data Store)]
 ```
 
-### [Subsection 1.1]
-
-[Detailed content]
-
-### [Subsection 1.2]
-
-[Detailed content]
+[2-3 sentences describing the architecture. What it is, not why.]
 
 ---
 
-## [Main Section 2]
+## Configuration Reference
 
-[Content for section 2]
-
-| Column 1 | Column 2 | Column 3 |
-| -------- | -------- | -------- |
-| Value 1  | Value 2  | Value 3  |
-
----
-
-## Configuration
-
-[Configuration details with code examples using American English]
+[The settings an operator needs to know. Environment variables, ports, files.]
 
 ```yaml
-# Example configuration
+# Key configuration
 service:
   name: example-service
   port: 3000
   environment: production
 ```
 
+| Variable    | Default     | Required | Description        |
+| ----------- | ----------- | -------- | ------------------ |
+| `[ENV_VAR]` | `[default]` | Yes / No | [What it controls] |
+
 ---
 
-## Troubleshooting
+## Key Operations
 
-### Common Issues
-
-| Issue     | Symptoms              | Resolution                |
-| --------- | --------------------- | ------------------------- |
-| [Issue 1] | [Observable symptoms] | [Step-by-step resolution] |
-| [Issue 2] | [Observable symptoms] | [Step-by-step resolution] |
-| [Issue 3] | [Observable symptoms] | [Step-by-step resolution] |
-
-### Diagnostic Commands
+[Commands and procedures an operator runs day-to-day]
 
 ```bash
-# Check service status
+# Start service
+systemctl start [service-name]
+
+# Check status
 systemctl status [service-name]
 
 # View logs
@@ -84,40 +71,58 @@ journalctl -u [service-name] -f
 curl -v http://localhost:3000/health
 ```
 
+---
+
+<details>
+<summary><strong>Architecture Decisions and Rationale</strong></summary>
+
+[WHY it is structured this way. What was considered. Constraints that shaped the design. What a maintainer needs to understand before changing anything significant.]
+
+### Why [specific infrastructure decision]
+
+[Explanation and rationale]
+
+### Why [another decision]
+
+[Explanation]
+
+</details>
+
+<details>
+<summary><strong>Security and Compliance</strong></summary>
+
+[Security posture, compliance framework mappings, controls. This depth is essential for security reviewers but should not be the first thing an operator sees.]
+
+### Security Controls
+
+| Control               | Implementation     | Compliance Mapping |
+| --------------------- | ------------------ | ------------------ |
+| [Control description] | [How it's applied] | [Framework ref]    |
+
+### Known Gaps and Remediation
+
+| Gap        | Severity | Remediation Plan | Target Date |
+| ---------- | -------- | ---------------- | ----------- |
+| [Gap desc] | Medium   | [Plan]           | [Date]      |
+
+</details>
+
+<details>
+<summary><strong>Troubleshooting</strong></summary>
+
+[Project-specific known issues only. Generic advice belongs nowhere.]
+
+| Issue            | Symptoms              | Resolution                |
+| ---------------- | --------------------- | ------------------------- |
+| [Specific issue] | [Observable symptoms] | [Step-by-step resolution] |
+
 ### Escalation Path
 
 1. Check application logs for errors
 2. Verify configuration settings
-3. Check network connectivity
-4. Contact platform team if issue persists
+3. Contact platform team if issue persists
 
----
-
-## Best Practices
-
-### Do
-
-- Follow infrastructure-as-code principles
-- Implement proper monitoring and alerting
-- Use environment-specific configurations
-- Document all manual interventions
-- Maintain disaster recovery procedures
-
-### Don't
-
-- Store secrets in plain text or version control
-- Make undocumented changes to production
-- Skip testing in staging environments
-- Ignore security advisories
-- Neglect backup verification
-
-### Checklist
-
-- [ ] Infrastructure changes reviewed and approved
-- [ ] Monitoring configured for new components
-- [ ] Documentation updated
-- [ ] Rollback procedure documented
-- [ ] Security scan completed
+</details>
 
 ---
 
@@ -127,12 +132,3 @@ curl -v http://localhost:3000/health
 | ------------------------------------- | ------------ | ------------------- |
 | [Document A](./DOCUMENT_A.md)         | Related      | [Brief description] |
 | [Document B](../domain/DOCUMENT_B.md) | See Also     | [Brief description] |
-| [Document C](./DOCUMENT_C.md)         | Depends On   | [Brief description] |
-
----
-
-## Changelog
-
-| Version | Date         | Author                     | Changes               |
-| ------- | ------------ | -------------------------- | --------------------- |
-| 1.0.0   | [YYYY-MM-DD] | AI Documentation Generator | Initial documentation |

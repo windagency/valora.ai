@@ -34,6 +34,15 @@
 			"model": "claude-sonnet-4.6",
 			"agent": "lead"
 		},
+		"consolidate": {
+			"name": "consolidate",
+			"description": "Consolidate agent memory: prune decayed entries, merge similar patterns, git-invalidate stale memories, and auto-promote high-value entries",
+			"experimental": true,
+			"argument-hint": "[--prune-only] [--dry-run] [--since=<ISO-date>]",
+			"allowed-tools": ["run_terminal_cmd"],
+			"model": "none",
+			"agent": "system"
+		},
 		"create-backlog": {
 			"name": "create-backlog",
 			"description": "Decompose Product Requirements Document into prioritized, actionable task backlog",

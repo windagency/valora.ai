@@ -1,5 +1,7 @@
 # ADR-002: Guidance vs Knowledge Separation
 
+> **Decision**: Guidance files (AI behaviour instructions) are always loaded for every command, while project knowledge files (PRD, FUNCTIONAL, BACKLOG) are loaded selectively per command via `knowledge_files` configuration.
+
 ## Status
 
 Accepted
@@ -96,6 +98,26 @@ System message construction follows this priority:
 
 - **Breaking Change**: Old behaviour of loading all knowledge-base files is removed
 - **Cache Separation**: Guidance and knowledge now have separate caches
+
+## Alternatives Considered
+
+### Alternative 1: Load All Knowledge Files for Every Command
+
+Continue loading all files from `knowledge-base/` for every command, regardless of relevance.
+
+**Rejected because**: Token consumption grows linearly with the knowledge base size, and unrelated context degrades LLM reasoning quality.
+
+### Alternative 2: Runtime Relevance Scoring
+
+Use a lightweight relevance model to decide at runtime which knowledge files to include based on the current task description.
+
+**Rejected because**: Adds complexity and latency; command-level configuration is simpler, deterministic, and easier to audit.
+
+### Alternative 3: Single Merged Knowledge File
+
+Maintain one large merged knowledge document that is always loaded.
+
+**Rejected because**: Merging destroys the structural boundaries between documents and makes selective loading impossible.
 
 ## Implementation
 

@@ -103,19 +103,56 @@ This prompt executes with streaming and parallel validation:
 
 Execute validation checks concurrently for all generated documents:
 
-**1.1 Completeness Validation**
+**1.1 Quality Validation (Three-Dimension Scoring)**
 
-For each document, verify:
+Replace single completeness measurement with three weighted dimensions:
 
-- [ ] All required sections present (per documentation_plan)
-- [ ] Section content not empty
-- [ ] Minimum word count per section (100 words)
-- [ ] Document header present and formatted
+**Dimension 1 — Consumer Surface Score (weight: 50%)**
 
-**Scoring**:
+For each document, verify the consumer-facing sections are present and functional:
+
+- [ ] Document has an Audience field in the header
+- [ ] First section after header is Purpose (one sentence), Quick Reference, or Overview
+- [ ] Consumer surface sections present (minimum: Purpose + primary content + scannable tables/diagrams)
+- [ ] No section in the consumer surface requires reading another section first
+- [ ] Working examples or copy-paste commands present
 
 ```
-completeness = (sections_present / sections_required) * 100
+consumer_surface_score = (consumer_sections_present / consumer_sections_expected) * 100
+```
+
+Consumer sections are always required. This score is strict.
+
+**Dimension 2 — Information Density Score (weight: 30%)**
+
+For each section, assess content quality:
+
+- [ ] No section under 30 meaningful words (excluding headers, code blocks, table structures)
+- [ ] No generic boilerplate detected (phrases like "follow best practices", "ensure quality", "as needed" with no specifics)
+- [ ] At least one working example in consumer surface sections
+- [ ] `<details>` tags used for maintainer-depth content
+
+```
+density_score = 100 - (empty_sections * 20) - (boilerplate_sections * 15) - (missing_examples * 10)
+```
+
+**Dimension 3 — Structure Score (weight: 20%)**
+
+Verify the document uses the audience-layered structure:
+
+- [ ] `<details><summary>` tags present for maintainer-depth sections
+- [ ] Consumer surface (quick reference, diagrams, examples) precedes `<details>` blocks
+- [ ] No more than 10 top-level headings (section bloat indicator — warn, don't fail)
+- [ ] Quick Reference table or equivalent scannable element present
+
+```
+structure_score = (structure_checks_passed / structure_checks_total) * 100
+```
+
+**Overall Quality Score**:
+
+```
+overall_quality = (consumer_surface_score * 0.50) + (density_score * 0.30) + (structure_score * 0.20)
 ```
 
 **1.2 Cross-Reference Validation**
@@ -213,21 +250,25 @@ After parallel operations complete:
 
 **3.2 Determine Validation Status**
 
-| Overall Score | Status  | Action                         |
-| ------------- | ------- | ------------------------------ |
-| >= 95%        | PASS    | Proceed to next step           |
-| 85-94%        | WARN    | Proceed with noted limitations |
-| 70-84%        | PARTIAL | Suggest targeted regeneration  |
-| < 70%         | FAIL    | Block, require regeneration    |
+| Overall Quality Score | Status  | Action                          |
+| --------------------- | ------- | ------------------------------- |
+| >= 90%                | PASS    | Proceed to next step            |
+| 75-89%                | WARN    | Proceed with noted quality gaps |
+| 60-74%                | PARTIAL | Suggest targeted regeneration   |
+| < 60%                 | FAIL    | Block, require regeneration     |
 
 **3.3 Generate Quality Issues List**
 
 For any issues found, document:
 
 - Document affected
-- Issue type (missing section, broken link, invalid diagram)
+- Issue type: `missing_consumer_surface` | `empty_section` | `boilerplate_content` | `missing_details_tags` | `broken_link` | `invalid_diagram` | `section_bloat`
 - Severity (high, medium, low)
 - Recommendation
+
+Flag as high severity: missing consumer surface, empty sections, no `<details>` tags when maintainer content exists.
+Flag as medium severity: boilerplate content, more than 10 top-level headings.
+Flag as low severity: minor cross-reference issues, missing optional sections.
 
 ### Phase 4: Generate Handoff Summary
 
@@ -282,36 +323,157 @@ Create comprehensive summary for user:
 {
 	"validation_results": {
 		"status": "PASS",
-		"overall_score": 94,
-		"completeness": {
+		"overall_score": 92,
+		"scoring_model": "consumer_surface(50%) + information_density(30%) + structure(20%)",
+		"quality": {
 			"infrastructure": {
-				"score": 94,
+				"score": 92,
 				"documents": [
-					{ "file": "HLD.md", "score": 95, "issues": [] },
-					{ "file": "CONTAINER.md", "score": 93, "issues": [] },
-					{ "file": "DEPLOYMENT.md", "score": 94, "issues": [] },
-					{ "file": "LOGGING.md", "score": 91, "issues": ["Missing metrics examples"] },
-					{ "file": "LZ.md", "score": 89, "issues": ["Compliance section needs expansion"] },
-					{ "file": "WORKFLOW.md", "score": 94, "issues": [] }
+					{
+						"file": "HLD.md",
+						"consumer_score": 95,
+						"density_score": 90,
+						"structure_score": 100,
+						"overall": 93,
+						"details_tags_present": true,
+						"issues": []
+					},
+					{
+						"file": "CONTAINER.md",
+						"consumer_score": 93,
+						"density_score": 88,
+						"structure_score": 100,
+						"overall": 92,
+						"details_tags_present": true,
+						"issues": []
+					},
+					{
+						"file": "DEPLOYMENT.md",
+						"consumer_score": 94,
+						"density_score": 90,
+						"structure_score": 100,
+						"overall": 93,
+						"details_tags_present": true,
+						"issues": []
+					},
+					{
+						"file": "LOGGING.md",
+						"consumer_score": 90,
+						"density_score": 82,
+						"structure_score": 100,
+						"overall": 88,
+						"details_tags_present": true,
+						"issues": ["Missing concrete query examples in consumer surface"]
+					},
+					{
+						"file": "LZ.md",
+						"consumer_score": 88,
+						"density_score": 85,
+						"structure_score": 100,
+						"overall": 88,
+						"details_tags_present": true,
+						"issues": []
+					},
+					{
+						"file": "WORKFLOW.md",
+						"consumer_score": 94,
+						"density_score": 91,
+						"structure_score": 100,
+						"overall": 93,
+						"details_tags_present": true,
+						"issues": []
+					}
 				]
 			},
 			"backend": {
-				"score": 92,
+				"score": 91,
 				"documents": [
-					{ "file": "ARCHITECTURE.md", "score": 93, "issues": [] },
-					{ "file": "API.md", "score": 91, "issues": [] },
-					{ "file": "DATA.md", "score": 94, "issues": [] },
-					{ "file": "TESTING.md", "score": 90, "issues": [] },
-					{ "file": "CODING-ASSERTIONS.md", "score": 92, "issues": [] }
+					{
+						"file": "ARCHITECTURE.md",
+						"consumer_score": 93,
+						"density_score": 88,
+						"structure_score": 100,
+						"overall": 92,
+						"details_tags_present": true,
+						"issues": []
+					},
+					{
+						"file": "API.md",
+						"consumer_score": 95,
+						"density_score": 90,
+						"structure_score": 100,
+						"overall": 93,
+						"details_tags_present": true,
+						"issues": []
+					},
+					{
+						"file": "DATA.md",
+						"consumer_score": 92,
+						"density_score": 88,
+						"structure_score": 100,
+						"overall": 91,
+						"details_tags_present": true,
+						"issues": []
+					},
+					{
+						"file": "TESTING.md",
+						"consumer_score": 90,
+						"density_score": 85,
+						"structure_score": 100,
+						"overall": 89,
+						"details_tags_present": true,
+						"issues": []
+					},
+					{
+						"file": "CODING-ASSERTIONS.md",
+						"consumer_score": 92,
+						"density_score": 88,
+						"structure_score": 100,
+						"overall": 91,
+						"details_tags_present": true,
+						"issues": []
+					}
 				]
 			},
 			"frontend": {
-				"score": 96,
+				"score": 93,
 				"documents": [
-					{ "file": "ARCHITECTURE.md", "score": 96, "issues": [] },
-					{ "file": "DESIGN.md", "score": 95, "issues": [] },
-					{ "file": "TESTING.md", "score": 94, "issues": [] },
-					{ "file": "CODING-ASSERTIONS.md", "score": 97, "issues": [] }
+					{
+						"file": "ARCHITECTURE.md",
+						"consumer_score": 95,
+						"density_score": 90,
+						"structure_score": 100,
+						"overall": 93,
+						"details_tags_present": true,
+						"issues": []
+					},
+					{
+						"file": "DESIGN.md",
+						"consumer_score": 94,
+						"density_score": 92,
+						"structure_score": 100,
+						"overall": 94,
+						"details_tags_present": true,
+						"issues": []
+					},
+					{
+						"file": "TESTING.md",
+						"consumer_score": 91,
+						"density_score": 88,
+						"structure_score": 100,
+						"overall": 91,
+						"details_tags_present": true,
+						"issues": []
+					},
+					{
+						"file": "CODING-ASSERTIONS.md",
+						"consumer_score": 95,
+						"density_score": 91,
+						"structure_score": 100,
+						"overall": 94,
+						"details_tags_present": true,
+						"issues": []
+					}
 				]
 			}
 		},
@@ -384,12 +546,15 @@ Create comprehensive summary for user:
 
 ## Success Criteria
 
-- ✅ All documents validated for completeness
+- ✅ All documents validated with three-dimension quality scoring
+- ✅ Consumer surface verified: present, scannable, leads each document
+- ✅ `<details>` tags verified: present for maintainer-depth content
+- ✅ Empty and boilerplate sections detected and flagged
 - ✅ Cross-references verified (>= 95% valid)
 - ✅ Diagrams syntax validated
-- ✅ Security sections checked (if applicable)
+- ✅ Security sections checked (must be in `<details>` blocks, not flat)
 - ✅ Backups created for existing files
-- ✅ Overall completeness >= 85%
+- ✅ Overall quality score >= 75% (warn) or >= 90% (pass)
 - ✅ Handoff summary generated
 - ✅ Time savings calculated and reported
 
@@ -441,12 +606,14 @@ Create comprehensive summary for user:
 - Streaming backup creation
 - Unified error handling
 
-**Validation thresholds**:
+**Validation thresholds** (quality score, not raw section count):
 
-- PASS: >= 95% overall
-- WARN: 85-94% overall
-- PARTIAL: 70-84% overall
-- FAIL: < 70% overall
+- PASS: >= 90% overall quality
+- WARN: 75-89% overall quality
+- PARTIAL: 60-74% overall quality
+- FAIL: < 60% overall quality
+
+**Quality dimensions**: consumer surface (50%) + information density (30%) + structure (20%)
 
 **Time savings**:
 

@@ -166,9 +166,22 @@ Use the **@lead** agent profile for orchestration, with domain-specific agents f
 - **@software-engineer-typescript-backend** for backend documentation
 - **@software-engineer-typescript-frontend** for frontend documentation
 
+## Documentation Philosophy — MANDATORY
+
+Every document has two audiences. Confusing them makes documentation useless to both.
+
+1. **Consumers** scan like a menu: find the thing, see what it takes, copy the example, move on. They will not read a wall of text. Too much information and no information accomplish the same goal — both get skipped.
+2. **Maintainers** need the full picture: why there are two calls, why a field is nullable, the historical context. They debug at 2AM.
+
+**Structure rule**: Lead with WHAT it does. Follow with HOW to use it. Bury the WHY behind `<details>` collapsible sections. The goal is not completeness. The goal is transferring the right information to the right person at the right moment.
+
+**Collapsible sections are mandatory for maintainer context.** Use HTML `<details><summary>` tags. Consumers skim past them. Maintainers expand them.
+
+**If a section has no meaningful project-specific content, omit it.** An empty "Best Practices" section with generic advice is worse than no section.
+
 ## Goal
 
-Generate **comprehensive technical documentation** (15 files) across infrastructure, backend, and frontend domains through an automated 7-stage pipeline:
+Generate **comprehensive audience-layered technical documentation** (15 files) across infrastructure, backend, and frontend domains through an automated 7-stage pipeline:
 
 1. **Context**: Load PRD, FUNCTIONAL, BACKLOG, and codebase context
 2. **Analyze**: Plan documentation structure, identify diagram needs
@@ -307,14 +320,26 @@ All architecture documents include Mermaid diagrams:
 
 ### Standard Sections
 
-All documents include:
+All documents follow a **two-tier structure** that serves both audiences:
 
-- **Purpose** section at the top
-- **Overview** with key concepts
-- **Detailed content** with diagrams
-- **Troubleshooting** section
-- **Best Practices** section
-- **Changelog** table at the bottom
+**Consumer Surface (always present — leads every document)**:
+
+- **Purpose** — one sentence describing what this document is about
+- **Quick Reference** — a scannable table or bullet list (the "menu")
+- **Primary content** with diagrams and copy-paste examples
+
+**Maintainer Depth (collapsible — always uses `<details>` tags)**:
+
+- Design rationale and historical context (why decisions were made)
+- Edge cases and known caveats
+- Troubleshooting — only when project-specific issues exist, not generic advice
+
+**Conditional (include only when the project has specific content)**:
+
+- Security sections (for infrastructure docs)
+- Cross-references (flat, at the bottom)
+
+Never include empty sections or generic boilerplate. A section with placeholder advice is worse than no section.
 
 ### Cross-References
 
@@ -401,14 +426,14 @@ After successful execution, display handoff summary:
 **Pipeline succeeds when**:
 
 1. ✅ All requested stages complete successfully
-2. ✅ Completeness score >= 85% (ideally >= 95%)
-3. ✅ All required sections present in each document
+2. ✅ Quality score >= 85% (consumer surface 50% + information density 30% + structure 20%)
+3. ✅ Consumer surface is scannable in under 60 seconds per document
 4. ✅ Mermaid diagrams render correctly
 5. ✅ Cross-references resolve to valid paths
 6. ✅ British English spelling in prose sections
 7. ✅ Standardised headers on all documents
-8. ✅ Troubleshooting and best practices sections included
-9. ✅ Changelog tables at document end
+8. ✅ Maintainer depth uses `<details>` tags and does not clutter consumer surface
+9. ✅ No empty or generic boilerplate sections
 10. ✅ User receives clear handoff summary
 
 ---
@@ -459,7 +484,7 @@ After successful execution, display handoff summary:
 - ❌ Generate without prerequisites (PRD, FUNCTIONAL, BACKLOG)
 - ❌ Create broken cross-references
 - ❌ Mix British/American English within documents
-- ❌ Omit troubleshooting or best practices sections
+- ❌ Force sections with no project-specific content (empty sections are worse than no section)
 
 ---
 
