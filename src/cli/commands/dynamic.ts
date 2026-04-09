@@ -519,23 +519,30 @@ export function configureRolloutCommand(program: CommandAdapter): void {
  */
 export function configureShortcutCommands(program: CommandAdapter): void {
 	const shortcuts = [
-		'plan',
+		'assert',
+		'commit',
+		'create-backlog',
+		'create-pr',
+		'create-prd',
+		'feedback',
+		'fetch-task',
+		'gather-knowledge',
+		'generate-all-documentation',
+		'generate-docs',
 		'implement',
-		'review-plan',
+		'plan',
+		'plan-architecture',
+		'plan-implementation',
+		'pre-check',
+		'refine-specs',
+		'refine-task',
 		'review-code',
 		'review-functional',
+		'review-plan',
 		'test',
-		'commit',
-		'create-pr',
-		'refine-specs',
-		'create-prd',
-		'create-backlog',
-		'generate-docs',
-		'fetch-task',
-		'refine-task',
-		'gather-knowledge',
-		'assert',
-		'feedback'
+		'validate-coverage',
+		'validate-parallel',
+		'validate-plan'
 	];
 
 	shortcuts.forEach((cmd) => {
@@ -637,4 +644,47 @@ export function configureShortcutCommands(program: CommandAdapter): void {
 			}
 		});
 	});
+}
+
+/**
+ * Configure the memory consolidate command.
+ *
+ * Consolidate runs the full memory maintenance cycle: prune decayed entries,
+ * run git-based invalidation, merge similar patterns, and auto-promote
+ * high-value memories to the semantic store.
+ */
+export function configureConsolidateCommand(program: CommandAdapter): void {
+	program
+		.command('consolidate')
+		.description('Consolidate agent memory: prune, merge, and git-invalidate learned patterns')
+		.option('--prune-only', 'Only prune decayed entries without merging or promoting')
+		.option('--dry-run', 'Show what would change without modifying the memory store')
+		.option('--since <date>', 'Override git log start date (ISO format, e.g. 2026-01-01)')
+		.action(async (options: { dryRun?: boolean; pruneOnly?: boolean; since?: string }) => {
+			try {
+				const { getMemoryConsolidation } = await import('services/memory-consolidation.service');
+				const service = getMemoryConsolidation();
+				const result = await service.consolidate({
+					dryRun: options.dryRun ?? false,
+					pruneOnly: options.pruneOnly ?? false,
+					since: options.since
+				});
+
+				// Display results — use console.log directly (this is a CLI command handler)
+				console.log('\n✓ Memory consolidation complete\n');
+				console.log(`  Pruned:         ${result.pruned} entries`);
+				console.log(`  Git-invalidated:${result.gitInvalidated} entries`);
+				console.log(`  Stale-marked:   ${result.staleMarked} entries`);
+				console.log(`  Merged:         ${result.merged} entries`);
+				console.log(`  Promoted:       ${result.promoted} entries`);
+				console.log(`  Duration:       ${result.durationMs}ms\n`);
+
+				if (options.dryRun) {
+					console.log('  (dry-run mode — no changes written)\n');
+				}
+			} catch (error) {
+				console.error('Memory consolidation failed:', error instanceof Error ? error.message : String(error));
+				process.exit(1);
+			}
+		});
 }

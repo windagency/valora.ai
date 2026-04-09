@@ -93,7 +93,7 @@ describe('Dependency Rules', () => {
 			// We'll do a soft check
 			noClasses()
 				.that()
-				.resideInAnyPackage('services..', 'session..', 'llm..')
+				.resideInAnyPackage('services..', 'session..', 'memory..', 'llm..')
 				.should()
 				.dependOnClassesThat()
 				.resideInAnyPackage('cli..', 'mcp..', 'ui..')
@@ -116,11 +116,11 @@ describe('Dependency Rules', () => {
 		});
 
 		it('domain should minimize dependencies on presentation', () => {
-			// Services and session should not depend on presentation
+			// Services, session, memory, and llm should not depend on presentation
 			// Executor can have limited CLI dependencies for utilities
 			noClasses()
 				.that()
-				.resideInAnyPackage('services..', 'session..', 'llm..')
+				.resideInAnyPackage('services..', 'session..', 'memory..', 'llm..')
 				.should()
 				.dependOnClassesThat()
 				.resideInAnyPackage('cli..', 'mcp..', 'ui..')
@@ -150,6 +150,7 @@ describe('Dependency Rules', () => {
 				'config',
 				'di',
 				'session',
+				'memory',
 				'services',
 				'llm',
 				'exploration',

@@ -38,6 +38,7 @@
 			"llm/*": ["./src/llm/*"],
 			"lsp/*": ["./src/lsp/*"],
 			"mcp/*": ["./src/mcp/*"],
+			"memory/*": ["./src/memory/*"],
 			"output/*": ["./src/output/*"],
 			"services/*": ["./src/services/*"],
 			"session/*": ["./src/session/*"],

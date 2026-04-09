@@ -290,6 +290,10 @@ flowchart TD
 │   ├── manifest.json
 │   ├── files.json
 │   └── symbols-*.json
+├── memory/              ← Agent memory stores (biologically-inspired decay)
+│   ├── episodic.json    #   7-day half-life events and observations
+│   ├── semantic.json    #   30-day half-life extracted patterns and insights
+│   └── decisions.json   #   21-day half-life architectural decisions
 └── spending.jsonl        ← append-only per-request cost ledger
 ```
 
@@ -358,17 +362,23 @@ LLM prompt token caching is handled server-side by the provider APIs — the pro
 
 ## Metrics and Observability
 
-| Metric               | Type      | Description                                |
-| -------------------- | --------- | ------------------------------------------ |
-| command_duration     | Histogram | Command execution time                     |
-| llm_request_duration | Histogram | LLM API latency                            |
-| session_count        | Gauge     | Active sessions                            |
-| error_count          | Counter   | Errors by type                             |
-| token_usage          | Counter   | Tokens consumed                            |
-| cache_read_tokens    | Counter   | Tokens read from prompt cache              |
-| cache_write_tokens   | Counter   | Tokens written to prompt cache             |
-| cost_usd             | Ledger    | Per-request USD cost (spending.jsonl)      |
-| cache_savings_usd    | Ledger    | Per-request cache savings (spending.jsonl) |
+| Metric                 | Type      | Description                                                |
+| ---------------------- | --------- | ---------------------------------------------------------- |
+| command_duration       | Histogram | Command execution time                                     |
+| llm_request_duration   | Histogram | LLM API latency                                            |
+| session_count          | Gauge     | Active sessions                                            |
+| error_count            | Counter   | Errors by type                                             |
+| token_usage            | Counter   | Tokens consumed                                            |
+| cache_read_tokens      | Counter   | Tokens read from prompt cache                              |
+| cache_write_tokens     | Counter   | Tokens written to prompt cache                             |
+| cost_usd               | Ledger    | Per-request USD cost (spending.jsonl)                      |
+| cache_savings_usd      | Ledger    | Per-request cache savings (spending.jsonl)                 |
+| memory:created         | Event     | New memory entry created from feedback output              |
+| memory:accessed        | Event     | Memory entry accessed; half-life extended by boost days    |
+| memory:pruned          | Event     | Entry removed; strength fell below `prune_threshold`       |
+| memory:promoted        | Event     | Episodic entry promoted to semantic store                  |
+| memory:stale           | Event     | Entry confidence downgraded to `stale`                     |
+| consolidation:complete | Event     | Full consolidation cycle finished (pruned/merged/promoted) |
 
 ### Log Structure
 

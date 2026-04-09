@@ -67,3 +67,12 @@ export function generateDecisionId(): string {
 export function generateShortId(): string {
 	return nanoid(6);
 }
+
+/**
+ * Generate a unique memory entry ID
+ *
+ * @returns A prefixed unique memory ID
+ */
+export function generateMemoryId(): string {
+	return `mem-${nanoid(12)}`;
+}

@@ -87,27 +87,29 @@ C4Container
 
 ## Layer Responsibilities
 
-| Layer             | Purpose                                           | Key Components                                         |
-| ----------------- | ------------------------------------------------- | ------------------------------------------------------ |
-| CLI               | User interaction and command handling             | Command Parser, Resolver, Wizard, Result Presenter     |
-| Orchestration     | Workflow execution and coordination               | Pipeline, Stage Executor, Variable Resolver            |
-| Code Intelligence | AST-based codebase understanding, LSP integration | AST Parser, Symbol Index, Smart Context, LSP Client    |
-| Agent             | AI agent management and selection                 | Agent Registry, Loader, Selector, Prompt Assembler     |
-| LLM               | Multi-provider AI integration                     | Provider Registry, Anthropic/OpenAI/Google/Cursor      |
-| MCP Server        | IDE integration via Model Context Protocol        | Server, Tool Handler, Prompt Handler, Session Service  |
-| Session           | Persistent state management                       | Session Service, Repository, Context Manager           |
-| Configuration     | Application configuration                         | Config Loader, Schema Validator (Zod), Provider Config |
+| Layer             | Purpose                                             | Key Components                                                          |
+| ----------------- | --------------------------------------------------- | ----------------------------------------------------------------------- |
+| CLI               | User interaction and command handling               | Command Parser, Resolver, Wizard, Result Presenter                      |
+| Orchestration     | Workflow execution and coordination                 | Pipeline, Stage Executor, Variable Resolver                             |
+| Code Intelligence | AST-based codebase understanding, LSP integration   | AST Parser, Symbol Index, Smart Context, LSP Client                     |
+| Agent             | AI agent management and selection                   | Agent Registry, Loader, Selector, Prompt Assembler                      |
+| LLM               | Multi-provider AI integration                       | Provider Registry, Anthropic/OpenAI/Google/Cursor                       |
+| MCP Server        | IDE integration via Model Context Protocol          | Server, Tool Handler, Prompt Handler, Session Service                   |
+| Session           | Persistent state management                         | Session Service, Repository, Context Manager                            |
+| Memory            | Cross-session agent learning with exponential decay | Memory Store, Memory Manager, Consolidation Service, Extraction Service |
+| Configuration     | Application configuration                           | Config Loader, Schema Validator (Zod), Provider Config                  |
 
 ## Key Design Decisions
 
-| Decision                  | Choice                                                | Rationale                                                            |
-| ------------------------- | ----------------------------------------------------- | -------------------------------------------------------------------- |
-| Execution model           | Local, single-user, sequential                        | Simplicity; no infrastructure dependencies                           |
-| Provider abstraction      | Normalised `LLMUsage` across all providers            | Cache metrics and cost tracking work identically regardless of model |
-| Session storage           | File-based JSON with dual snapshot/full               | Zero infrastructure; fast resume via lightweight snapshot            |
-| Context window management | Automatic flush + summarisation at 80%                | Prevents hard context-limit failures during long pipelines           |
-| Security perimeter        | Credential Guard + Command Guard + Injection Detector | Defence-in-depth for local-execution threat model                    |
-| Codebase intelligence     | tree-sitter WASM + LSP (spawn-on-demand)              | Language-agnostic parsing; rich type info without bundling a server  |
+| Decision                  | Choice                                                | Rationale                                                                                                   |
+| ------------------------- | ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Execution model           | Local, single-user, sequential                        | Simplicity; no infrastructure dependencies                                                                  |
+| Provider abstraction      | Normalised `LLMUsage` across all providers            | Cache metrics and cost tracking work identically regardless of model                                        |
+| Session storage           | File-based JSON with dual snapshot/full               | Zero infrastructure; fast resume via lightweight snapshot                                                   |
+| Context window management | Automatic flush + summarisation at 80%                | Prevents hard context-limit failures during long pipelines                                                  |
+| Security perimeter        | Credential Guard + Command Guard + Injection Detector | Defence-in-depth for local-execution threat model                                                           |
+| Codebase intelligence     | tree-sitter WASM + LSP (spawn-on-demand)              | Language-agnostic parsing; rich type info without bundling a server                                         |
+| Agent memory retention    | File-based exponential decay, no external deps        | Native implementation avoids SQLite/embedding dependencies; Jaccard tag-similarity enables merge without ML |
 
 <details>
 <summary><strong>Non-Functional Requirement Mapping</strong></summary>

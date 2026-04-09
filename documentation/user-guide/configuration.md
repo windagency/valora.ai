@@ -4,22 +4,32 @@
 
 ## Config Quick Reference
 
-| Setting                               | Default           | Description                                     |
-| ------------------------------------- | ----------------- | ----------------------------------------------- |
-| `llm.default_provider`                | `"anthropic"`     | Active LLM provider                             |
-| `llm.providers.*.api_key_env`         | provider-specific | Environment variable holding the API key        |
-| `llm.providers.*.default_model`       | provider-specific | Model used when none is specified               |
-| `llm.providers.*.timeout_ms`          | `300000`          | Request timeout in milliseconds                 |
-| `execution.default_mode`              | `"guided"`        | Execution mode: `guided` or `api`               |
-| `execution.enable_parallel_execution` | `true`            | Allow parallel pipeline stages                  |
-| `execution.max_concurrent_stages`     | `4`               | Maximum stages running simultaneously           |
-| `session.auto_save`                   | `true`            | Save session state automatically                |
-| `session.auto_save_interval_ms`       | `5000`            | Auto-save interval                              |
-| `session.cleanup_days`                | `30`              | Delete sessions older than N days               |
-| `session.encryption`                  | `true`            | Encrypt session data at rest                    |
-| `logging.level`                       | `"info"`          | Log verbosity: `debug`, `info`, `warn`, `error` |
-| `logging.file_enabled`                | `true`            | Write logs to file                              |
-| `logging.daily_file_max_size_mb`      | `100`             | Rotate log file at this size                    |
+| Setting                               | Default           | Description                                              |
+| ------------------------------------- | ----------------- | -------------------------------------------------------- |
+| `llm.default_provider`                | `"anthropic"`     | Active LLM provider                                      |
+| `llm.providers.*.api_key_env`         | provider-specific | Environment variable holding the API key                 |
+| `llm.providers.*.default_model`       | provider-specific | Model used when none is specified                        |
+| `llm.providers.*.timeout_ms`          | `300000`          | Request timeout in milliseconds                          |
+| `execution.default_mode`              | `"guided"`        | Execution mode: `guided` or `api`                        |
+| `execution.enable_parallel_execution` | `true`            | Allow parallel pipeline stages                           |
+| `execution.max_concurrent_stages`     | `4`               | Maximum stages running simultaneously                    |
+| `session.auto_save`                   | `true`            | Save session state automatically                         |
+| `session.auto_save_interval_ms`       | `5000`            | Auto-save interval                                       |
+| `session.cleanup_days`                | `30`              | Delete sessions older than N days                        |
+| `session.encryption`                  | `true`            | Encrypt session data at rest                             |
+| `logging.level`                       | `"info"`          | Log verbosity: `debug`, `info`, `warn`, `error`          |
+| `logging.file_enabled`                | `true`            | Write logs to file                                       |
+| `logging.daily_file_max_size_mb`      | `100`             | Rotate log file at this size                             |
+| `memory.enabled`                      | `true`            | Enable or disable the agent memory system                |
+| `memory.episodic_half_life_days`      | `7`               | Decay half-life for episodic memory (events, errors)     |
+| `memory.semantic_half_life_days`      | `30`              | Decay half-life for semantic memory (patterns, insights) |
+| `memory.decision_half_life_days`      | `21`              | Decay half-life for decision memory (architecture)       |
+| `memory.retrieval_boost_days`         | `2`               | Days added to half-life each time an entry is accessed   |
+| `memory.prune_threshold`              | `0.05`            | Minimum strength below which an entry is pruned          |
+| `memory.max_entries_per_store`        | `500`             | Maximum entries per JSON store before automatic pruning  |
+| `memory.error_half_life_multiplier`   | `2`               | Half-life multiplier applied to error entries (isError)  |
+| `memory.injection_token_budget`       | `2000`            | Maximum tokens allocated for injected agent memory       |
+| `memory.injection_strength_threshold` | `0.2`             | Minimum entry strength required for prompt injection     |
 
 ## Configuration Cascade
 
@@ -877,6 +887,18 @@ The generated `.valora/.gitignore` excludes `config.json` by default. **Do not c
 		"enabled": true,
 		"registry_path": ".valora/external-mcp.json"
 	},
+	"memory": {
+		"enabled": true,
+		"episodic_half_life_days": 7,
+		"semantic_half_life_days": 30,
+		"decision_half_life_days": 21,
+		"retrieval_boost_days": 2,
+		"prune_threshold": 0.05,
+		"max_entries_per_store": 500,
+		"error_half_life_multiplier": 2,
+		"injection_token_budget": 2000,
+		"injection_strength_threshold": 0.2
+	},
 	"commands": {
 		"plan": {
 			"default_args": {
@@ -905,6 +927,46 @@ The generated `.valora/.gitignore` excludes `config.json` by default. **Do not c
 ```
 
 See `data/config.default.json` for the full default configuration shipped with VALORA.
+
+</details>
+
+---
+
+## Memory System Configuration
+
+The memory system stores three classes of agent learning across sessions, each with exponential-decay retention. Every access to an entry extends its half-life by `retrieval_boost_days`. Entries flagged as errors (`isError: true`) receive `error_half_life_multiplier ×` their base half-life, ensuring repeated mistakes are remembered longer.
+
+<details>
+<summary><strong>Memory categories, confidence tiers, and consolidation phases</strong></summary>
+
+**Memory categories:**
+
+| Category  | Half-life | Use case                                                     | Default half-life |
+| --------- | --------- | ------------------------------------------------------------ | ----------------- |
+| Episodic  | 7 days    | Session events, test failures, transient observations        | 7 days            |
+| Semantic  | 30 days   | Extracted patterns, team conventions, cross-session insights | 30 days           |
+| Decisions | 21 days   | Architectural decisions, tool selections, design rationale   | 21 days           |
+
+**Confidence tiers** (injected into agent prompts in this order):
+
+| Tier       | Source                                            |
+| ---------- | ------------------------------------------------- |
+| `verified` | Confirmed by user feedback (satisfaction ≥ 8)     |
+| `observed` | Drawn from pipeline errors and bottlenecks        |
+| `inferred` | Extracted from improvement patterns               |
+| `stale`    | Demoted by git invalidation or superseded entries |
+
+**Consolidation phases** (triggered by `valora consolidate` or automatically after `feedback`):
+
+1. **Prune** — Remove entries whose computed strength falls below `prune_threshold`
+2. **Git-invalidate** — Cross-reference recent git commits; weaken entries tied to changed or reverted paths
+3. **Jaccard-merge** — Combine episodic entries with tag-set overlap ≥ 0.6 into semantic entries
+4. **Auto-promote** — Move verified episodic entries with ≥ 5 accesses into the semantic store
+
+**Tuning injection:**
+
+- `injection_token_budget` — Caps the `AGENT MEMORY` context block inserted into agent prompts (default: 2000 tokens). Reduce if you observe context budget pressure.
+- `injection_strength_threshold` — Only entries with computed strength ≥ this value are injected (default: 0.2). Increase to inject fewer, higher-confidence memories.
 
 </details>
 

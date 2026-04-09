@@ -64,7 +64,7 @@ describe('Module Boundaries', () => {
 				.get()
 				.filter((c) => c.packagePath.toString().startsWith('services'));
 
-			const allowedPackages = ['services', 'types', 'utils', 'output'];
+			const allowedPackages = ['services', 'types', 'utils', 'output', 'memory'];
 
 			serviceClasses.forEach((serviceClass) => {
 				const violatingDeps = serviceClass.dependencies.filter((dep) => {
@@ -111,6 +111,7 @@ describe('Module Boundaries', () => {
 					'output..',
 					'services..',
 					'session..',
+					'memory..',
 					'exploration..',
 					'cleanup..',
 					'cli..',
@@ -126,6 +127,44 @@ describe('Module Boundaries', () => {
 					'Executor orchestrates workflow and can use limited CLI utilities, UI adapters, MCP infrastructure, and logging'
 				)
 				.check(srcProject.allClasses());
+		});
+	});
+
+	describe('Memory Module Boundaries', () => {
+		it('memory module should be isolated from presentation and application layers', () => {
+			noClasses()
+				.that()
+				.resideInAPackage('memory..')
+				.should()
+				.dependOnClassesThat()
+				.resideInAnyPackage('cli..', 'mcp..', 'ui..', 'services..', 'executor..', 'session..')
+				.because('Memory is foundational domain infrastructure and must remain decoupled from higher layers')
+				.check(srcProject.allClasses());
+		});
+
+		it('memory module should only use infrastructure dependencies', () => {
+			// Manual check: memory can only use types, config, output, utils
+			const memoryClasses = srcProject
+				.allClasses()
+				.get()
+				.filter((c) => c.packagePath.toString().startsWith('memory'));
+
+			const allowedPackages = ['memory', 'types', 'config', 'output', 'utils'];
+
+			memoryClasses.forEach((memoryClass) => {
+				const violatingDeps = memoryClass.dependencies.filter((dep) => {
+					const depPath = dep.typeScriptClass.packagePath.toString();
+					if (depPath.includes('node_modules')) return false;
+					return !allowedPackages.some((pkg) => depPath.startsWith(pkg));
+				});
+
+				if (violatingDeps.length > 0) {
+					const violations = violatingDeps.map((d) => d.typeScriptClass.packagePath.toString()).join(', ');
+					throw new Error(
+						`Memory class ${memoryClass.getSimpleName()} has disallowed dependencies: ${violations}. Memory module may only use types, config, output, and utils.`
+					);
+				}
+			});
 		});
 	});
 

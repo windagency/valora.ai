@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-2.3.4-blue?style=flat-square" alt="Version" />
+  <img src="https://img.shields.io/badge/version-2.4.0-blue?style=flat-square" alt="Version" />
   <img src="https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen?style=flat-square&logo=node.js" alt="Node" />
   <img src="https://img.shields.io/badge/typescript-5.x-3178c6?style=flat-square&logo=typescript" alt="TypeScript" />
   <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="License" />
@@ -179,7 +179,7 @@ npm install -g @windagency/valora       # npm
 
 # Verify installation
 valora --version
-# Should output: 2.3.4
+# Should output: 2.4.0
 ```
 
 ### Project Setup
@@ -290,24 +290,25 @@ export LOCAL_DEFAULT_MODEL=llama3.1
 
 ### Complete Command Reference
 
-| Command             | Agent            | Description                            |
-| ------------------- | ---------------- | -------------------------------------- |
-| `refine-specs`      | @product-manager | Collaboratively refine specifications  |
-| `create-prd`        | @product-manager | Generate Product Requirements Document |
-| `create-backlog`    | @product-manager | Decompose PRD into tasks               |
-| `fetch-task`        | @product-manager | Retrieve next priority task            |
-| `refine-task`       | @product-manager | Clarify task requirements              |
-| `gather-knowledge`  | @lead            | Analyse codebase context               |
-| `plan`              | @lead            | Create implementation plan             |
-| `review-plan`       | @lead            | Validate plan quality                  |
-| `implement`         | Dynamic          | Execute code changes                   |
-| `assert`            | @asserter        | Validate implementation                |
-| `test`              | @qa              | Execute test suites                    |
-| `review-code`       | @lead            | Code quality review                    |
-| `review-functional` | @lead            | Functional review                      |
-| `commit`            | @lead            | Create conventional commits            |
-| `create-pr`         | @lead            | Generate pull request                  |
-| `feedback`          | @product-manager | Capture outcomes                       |
+| Command             | Agent            | Description                                          |
+| ------------------- | ---------------- | ---------------------------------------------------- |
+| `refine-specs`      | @product-manager | Collaboratively refine specifications                |
+| `create-prd`        | @product-manager | Generate Product Requirements Document               |
+| `create-backlog`    | @product-manager | Decompose PRD into tasks                             |
+| `fetch-task`        | @product-manager | Retrieve next priority task                          |
+| `refine-task`       | @product-manager | Clarify task requirements                            |
+| `gather-knowledge`  | @lead            | Analyse codebase context                             |
+| `plan`              | @lead            | Create implementation plan                           |
+| `review-plan`       | @lead            | Validate plan quality                                |
+| `implement`         | Dynamic          | Execute code changes                                 |
+| `assert`            | @asserter        | Validate implementation                              |
+| `test`              | @qa              | Execute test suites                                  |
+| `review-code`       | @lead            | Code quality review                                  |
+| `review-functional` | @lead            | Functional review                                    |
+| `commit`            | @lead            | Create conventional commits                          |
+| `create-pr`         | @lead            | Generate pull request                                |
+| `feedback`          | @product-manager | Capture outcomes                                     |
+| `consolidate`       | @lead            | Consolidate and prune memory stores _(experimental)_ |
 
 ### Command Categories
 
@@ -425,6 +426,7 @@ valora/                          # npm package root
 │   ├── executor/                # Pipeline execution
 │   ├── llm/                     # LLM provider integrations
 │   ├── lsp/                     # LSP integration (language server protocol client)
+│   ├── memory/                  # Biologically-inspired memory (exponential-decay stores)
 │   ├── mcp/                     # MCP server implementation
 │   ├── security/                # Agentic AI security (credential, command, injection guards)
 │   ├── session/                 # Session management
@@ -434,7 +436,7 @@ valora/                          # npm package root
 │   └── ...
 ├── data/                        # Built-in resources (shipped with package)
 │   ├── agents/                  # Agent definitions (11 agents)
-│   ├── commands/                # Command specifications (24 commands)
+│   ├── commands/                # Command specifications (25 commands)
 │   ├── prompts/                 # Structured prompts by phase
 │   ├── templates/               # Document templates
 │   ├── hooks/                   # Hook scripts
@@ -461,6 +463,10 @@ When installed in a project, VALORA supports a `.valora/` directory for local ov
 ├── sessions/                    # Session state (gitignored)
 ├── logs/                        # Execution logs (gitignored)
 ├── index/                       # Codebase symbol index (gitignored)
+├── memory/                      # Agent memory stores (gitignored)
+│   ├── episodic.json            #   7-day half-life events and observations
+│   ├── semantic.json            #   30-day half-life patterns and insights
+│   └── decisions.json           #   21-day half-life architectural decisions
 └── cache/                       # Cache data (gitignored)
 ```
 

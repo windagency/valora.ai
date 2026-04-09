@@ -1,35 +1,36 @@
 # Command Reference
 
-> Complete reference for all 24 commands in VALORA v2.3.4.
+> Complete reference for all 25 commands in VALORA.
 
 ## Commands Quick Reference
 
-| Command                      | Agent            | Purpose                                            | Key flags                                                |
-| ---------------------------- | ---------------- | -------------------------------------------------- | -------------------------------------------------------- |
-| `refine-specs`               | @product-manager | Collaboratively refine specifications              | `--domain`, `--stakeholders`                             |
-| `create-prd`                 | @product-manager | Generate PRD from specifications                   | `--specs-file`, `--template`                             |
-| `create-backlog`             | @product-manager | Decompose PRD into tasks                           | `--granularity`, `--format`                              |
-| `generate-docs`              | @lead            | Generate technical documentation                   | `--domain`, `--quick`, `--extract-only`                  |
-| `generate-all-documentation` | @lead            | Parallel documentation generation (~6 min faster)  | `--skip-review`, `--cache-context`, `--security-context` |
-| `fetch-task`                 | @product-manager | Retrieve task from backlog                         | `--task-id`, `--priority`, `--domain`                    |
-| `refine-task`                | @product-manager | Clarify task requirements                          | `--task-id`, `--interactive`                             |
-| `gather-knowledge`           | @lead            | Analyse codebase context                           | `--scope`, `--domain`, `--depth`                         |
-| `plan`                       | @lead            | Create implementation plan                         | `--mode`, `--pattern`, `--complexity-threshold`          |
-| `plan-architecture`          | @lead            | High-level architecture plan (Phase 1)             | `--task-id`, `--backlog-file`                            |
-| `plan-implementation`        | @lead            | Detailed implementation plan (Phase 2)             | `--arch-plan`, `--task-id`                               |
-| `validate-plan`              | @lead            | Pre-review validation (catches 60–70% of issues)   | `--fix`, `--strict`                                      |
-| `validate-coverage`          | @qa              | Test coverage validation with quality scoring      | `--threshold`, `--strict`, `--fail-on-decrease`          |
-| `pre-check`                  | @qa              | Automated code quality pre-checks before review    | `--fix`, `--strict`, `--ci`                              |
-| `review-plan`                | @lead            | Validate implementation plan                       | `--strict-mode`, `--focus`, `--checklist`                |
-| `implement`                  | Dynamic          | Execute code changes                               | `--agent`, `--mode`, `--step`                            |
-| `assert`                     | @asserter        | Validate implementation                            | `--severity`, `--quick`                                  |
-| `test`                       | @qa              | Execute test suites                                | `--type`, `--coverage-threshold`                         |
-| `validate-parallel`          | @lead            | Run assert + review-code in parallel (~50% faster) | `--quick`, `--severity`, `--focus`                       |
-| `review-code`                | @lead            | Code quality review                                | `--severity`, `--focus`, `--checklist`, `--auto-only`    |
-| `review-functional`          | @lead            | Functional review                                  | `--severity`, `--check-a11y`                             |
-| `commit`                     | @lead            | Create conventional commits                        | `--scope`, `--breaking`, `--update-changelog`            |
-| `create-pr`                  | @lead            | Generate pull request                              | `--draft`, `--auto-assign`, `--link-issues`              |
-| `feedback`                   | @product-manager | Capture outcomes                                   | `--command`, `--satisfaction`, `--suggest-improvements`  |
+| Command                        | Agent            | Purpose                                            | Key flags                                                |
+| ------------------------------ | ---------------- | -------------------------------------------------- | -------------------------------------------------------- |
+| `refine-specs`                 | @product-manager | Collaboratively refine specifications              | `--domain`, `--stakeholders`                             |
+| `create-prd`                   | @product-manager | Generate PRD from specifications                   | `--specs-file`, `--template`                             |
+| `create-backlog`               | @product-manager | Decompose PRD into tasks                           | `--granularity`, `--format`                              |
+| `generate-docs`                | @lead            | Generate technical documentation                   | `--domain`, `--quick`, `--extract-only`                  |
+| `generate-all-documentation`   | @lead            | Parallel documentation generation (~6 min faster)  | `--skip-review`, `--cache-context`, `--security-context` |
+| `fetch-task`                   | @product-manager | Retrieve task from backlog                         | `--task-id`, `--priority`, `--domain`                    |
+| `refine-task`                  | @product-manager | Clarify task requirements                          | `--task-id`, `--interactive`                             |
+| `gather-knowledge`             | @lead            | Analyse codebase context                           | `--scope`, `--domain`, `--depth`                         |
+| `plan`                         | @lead            | Create implementation plan                         | `--mode`, `--pattern`, `--complexity-threshold`          |
+| `plan-architecture`            | @lead            | High-level architecture plan (Phase 1)             | `--task-id`, `--backlog-file`                            |
+| `plan-implementation`          | @lead            | Detailed implementation plan (Phase 2)             | `--arch-plan`, `--task-id`                               |
+| `validate-plan`                | @lead            | Pre-review validation (catches 60–70% of issues)   | `--fix`, `--strict`                                      |
+| `validate-coverage`            | @qa              | Test coverage validation with quality scoring      | `--threshold`, `--strict`, `--fail-on-decrease`          |
+| `pre-check`                    | @qa              | Automated code quality pre-checks before review    | `--fix`, `--strict`, `--ci`                              |
+| `review-plan`                  | @lead            | Validate implementation plan                       | `--strict-mode`, `--focus`, `--checklist`                |
+| `implement`                    | Dynamic          | Execute code changes                               | `--agent`, `--mode`, `--step`                            |
+| `assert`                       | @asserter        | Validate implementation                            | `--severity`, `--quick`                                  |
+| `test`                         | @qa              | Execute test suites                                | `--type`, `--coverage-threshold`                         |
+| `validate-parallel`            | @lead            | Run assert + review-code in parallel (~50% faster) | `--quick`, `--severity`, `--focus`                       |
+| `review-code`                  | @lead            | Code quality review                                | `--severity`, `--focus`, `--checklist`, `--auto-only`    |
+| `review-functional`            | @lead            | Functional review                                  | `--severity`, `--check-a11y`                             |
+| `commit`                       | @lead            | Create conventional commits                        | `--scope`, `--breaking`, `--update-changelog`            |
+| `create-pr`                    | @lead            | Generate pull request                              | `--draft`, `--auto-assign`, `--link-issues`              |
+| `feedback`                     | @product-manager | Capture outcomes                                   | `--command`, `--satisfaction`, `--suggest-improvements`  |
+| `consolidate` _(experimental)_ | @lead (system)   | Consolidate and prune the agent memory stores      | `--prune-only`, `--dry-run`, `--since`                   |
 
 > **Note on batch stages:** Several commands have stages marked `batch: true`, eligible when `--batch` is set and the provider supports it (Anthropic and OpenAI only). See [Batch Processing](#batch-processing) for details.
 
@@ -988,6 +989,51 @@ valora feedback --command=implement --satisfaction=8 --suggest-improvements
 ```
 
 **Agent:** @product-manager | **Model:** Claude Haiku 4.5
+
+---
+
+## consolidate _(Experimental)_
+
+> Consolidate and prune the biologically-inspired memory stores. Runs automatically after `feedback` completes successfully; invoke manually for maintenance.
+
+```bash
+valora consolidate [options]
+```
+
+| Option         | Description                                               |
+| -------------- | --------------------------------------------------------- |
+| `--prune-only` | Run the pruning phase only; skip merge and promote steps  |
+| `--dry-run`    | Preview all changes without persisting any modifications  |
+| `--since`      | Only process entries older than N days (e.g. `--since=7`) |
+
+**Example usage:**
+
+```bash
+# Full consolidation cycle (prune → git-invalidate → merge → promote)
+valora consolidate
+
+# Preview what would be pruned without making changes
+valora consolidate --dry-run
+
+# Remove only expired entries, skip merge/promote
+valora consolidate --prune-only
+
+# Dry-run on entries older than 5 days
+valora consolidate --since=5 --dry-run
+```
+
+**Consolidation output fields:**
+
+| Field            | Description                                             |
+| ---------------- | ------------------------------------------------------- |
+| `pruned`         | Entries removed (strength fell below `prune_threshold`) |
+| `gitInvalidated` | Entries weakened due to conflicting git history         |
+| `merged`         | Episodic entries Jaccard-merged into semantic store     |
+| `promoted`       | High-access verified entries promoted to semantic store |
+| `staleMarked`    | Entries marked `stale` after destructive git commits    |
+| `durationMs`     | Total consolidation cycle duration                      |
+
+**Agent:** system (no LLM call) | **Status:** Experimental
 
 ---
 

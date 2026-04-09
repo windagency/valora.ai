@@ -23,6 +23,8 @@ export interface SystemMessageOptions {
 	agentProfile: string;
 	/** Pre-loaded available agents content */
 	availableAgents?: null | string;
+	/** Learned patterns & decisions from prior sessions */
+	agentMemory?: null | string;
 	/** Compact codebase map from AST index */
 	codebaseMap?: null | string;
 	/** Escalation criteria to include */
@@ -59,6 +61,7 @@ export class MessageBuilderService {
 	 */
 	buildSystemMessage(options: SystemMessageOptions): string {
 		const {
+			agentMemory,
 			agentProfile,
 			availableAgents,
 			codebaseMap,
@@ -96,6 +99,12 @@ export class MessageBuilderService {
 		if (projectKnowledge) {
 			messageParts.push('');
 			messageParts.push(projectKnowledge);
+		}
+
+		// 5.25. Append agent memory if available (learned patterns & decisions)
+		if (agentMemory) {
+			messageParts.push('');
+			messageParts.push(agentMemory);
 		}
 
 		// 5.5. Append codebase map if available (AST-generated overview)

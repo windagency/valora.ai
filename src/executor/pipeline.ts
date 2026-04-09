@@ -18,6 +18,7 @@ import { ExecutionError } from 'utils/error-handler';
 import type { AgentLoader } from './agent-loader';
 import type { PromptLoader } from './prompt-loader';
 
+import { type ExecutionContext } from './execution-context';
 import { getInputPreResolver, type InputPreResolver, type PreResolvedInputs } from './input-pre-resolver';
 import {
 	getInteractiveQuestionHandler,
@@ -239,6 +240,9 @@ export class PipelineExecutor {
 			// Emit pipeline complete event
 			this.eventEmitter.emitPipelineComplete(executionContext.commandName, duration, requiredStagesSuccessful);
 
+			// Trigger memory extraction after successful feedback pipeline
+			await this.maybeTriggerMemoryExtraction(executionContext, requiredStagesSuccessful, stageOutputs);
+
 			// Flush any pending file writes with user confirmation
 			if (this.stageExecutor.hasPendingWrites()) {
 				await this.stageExecutor.flushPendingWrites();
@@ -277,6 +281,9 @@ export class PipelineExecutor {
 				});
 
 				this.eventEmitter.emitPipelineComplete(executionContext.commandName, duration, requiredStagesSuccessful);
+
+				// Trigger memory extraction after successful feedback pipeline
+				await this.maybeTriggerMemoryExtraction(executionContext, requiredStagesSuccessful, stageOutputs);
 
 				// Flush any pending file writes with user confirmation
 				if (this.stageExecutor.hasPendingWrites()) {
@@ -351,6 +358,51 @@ export class PipelineExecutor {
 		}
 
 		return lastResult;
+	}
+
+	/**
+	 * Trigger memory extraction only when a feedback pipeline completed successfully.
+	 * Guards the commandName + requiredStagesSuccessful check so execute() stays below
+	 * the cyclomatic-complexity ceiling.
+	 */
+	private async maybeTriggerMemoryExtraction(
+		executionContext: ExecutionContext,
+		requiredStagesSuccessful: boolean,
+		stageOutputs: StageOutput[]
+	): Promise<void> {
+		if (executionContext.commandName === 'feedback' && requiredStagesSuccessful) {
+			await this.triggerMemoryExtraction(executionContext, stageOutputs);
+		}
+	}
+
+	/**
+	 * Trigger memory extraction from feedback pipeline stage outputs.
+	 * Non-fatal: errors are logged as warnings and must never block pipeline execution.
+	 */
+	private async triggerMemoryExtraction(
+		executionContext: ExecutionContext,
+		stageOutputs: StageOutput[]
+	): Promise<void> {
+		try {
+			const { getMemoryExtraction } = await import('services/memory-extraction.service');
+			const extractor = getMemoryExtraction();
+			const sessionId = executionContext.sessionInfo?.sessionId ?? 'unknown';
+			const agentRole = executionContext.agentRole;
+			const entries = await extractor.extractFromFeedbackOutputs(stageOutputs, sessionId, agentRole);
+			if (entries.length > 0) {
+				const logger = getLogger();
+				logger.info(`Extracted ${entries.length} memory entries from feedback session`, {
+					command: executionContext.commandName,
+					sessionId
+				});
+			}
+		} catch (error) {
+			// Non-fatal: memory extraction must never block pipeline execution
+			const logger = getLogger();
+			logger.warn('Memory extraction from feedback failed', {
+				error: error instanceof Error ? error.message : String(error)
+			});
+		}
 	}
 
 	/**

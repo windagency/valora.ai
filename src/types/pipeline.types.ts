@@ -9,11 +9,17 @@ import type { HookEventName } from './hook.types';
 
 export enum PipelineEventType {
 	AGENT_THINKING = 'agent:thinking',
+	CONSOLIDATION_COMPLETE = 'consolidation:complete',
 	ESCALATION_ABORTED = 'escalation:aborted',
 	ESCALATION_RESOLVED = 'escalation:resolved',
 	ESCALATION_TRIGGERED = 'escalation:triggered',
 	LLM_REQUEST = 'llm:request',
 	LLM_RESPONSE = 'llm:response',
+	MEMORY_ACCESSED = 'memory:accessed',
+	MEMORY_CREATED = 'memory:created',
+	MEMORY_PROMOTED = 'memory:promoted',
+	MEMORY_PRUNED = 'memory:pruned',
+	MEMORY_STALE = 'memory:stale',
 	PIPELINE_COMPLETE = 'pipeline:complete',
 	PIPELINE_ERROR = 'pipeline:error',
 	PIPELINE_START = 'pipeline:start',
@@ -88,6 +94,47 @@ export interface WorktreeInfoData {
 /**
  * Session information for pipeline events
  */
+export interface ConsolidationCompleteData {
+	durationMs: number;
+	gitInvalidated: number;
+	merged: number;
+	promoted: number;
+	pruned: number;
+	staleMarked: number;
+}
+
+export interface MemoryAccessedData {
+	category: string;
+	entryId: string;
+	strength: number;
+}
+
+export interface MemoryCreatedData {
+	agentRole: string;
+	category: string;
+	confidence: string;
+	entryId: string;
+	tags: string[];
+}
+
+export interface MemoryPromotedData {
+	accessCount: number;
+	entryId: string;
+	newCategory: string;
+	previousCategory: string;
+}
+
+export interface MemoryPrunedData {
+	category: string;
+	count: number;
+}
+
+export interface MemoryStaledData {
+	category: string;
+	entryId: string;
+	reason: string;
+}
+
 export interface PipelineEventData {
 	agent?: string;
 	commandName?: string;

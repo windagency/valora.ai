@@ -9,11 +9,17 @@ import { EventEmitter } from 'events';
 
 import {
 	type AgentThinkingData,
+	type ConsolidationCompleteData,
 	type EscalationAbortedData,
 	type EscalationResolvedData,
 	type EscalationTriggeredData,
 	type LLMRequestData,
 	type LLMResponseData,
+	type MemoryAccessedData,
+	type MemoryCreatedData,
+	type MemoryPromotedData,
+	type MemoryPrunedData,
+	type MemoryStaledData,
 	type PipelineEventData,
 	PipelineEventType,
 	type PipelineStartData,
@@ -227,6 +233,72 @@ export class PipelineEventEmitter extends EventEmitter {
 			...data,
 			timestamp: Date.now(),
 			type: PipelineEventType.TOOL_HOOK_POST
+		} as PipelineEventData);
+	}
+
+	/**
+	 * Emit memory created event
+	 */
+	emitMemoryCreated(data: MemoryCreatedData): void {
+		this.emit(PipelineEventType.MEMORY_CREATED, {
+			...data,
+			timestamp: Date.now(),
+			type: PipelineEventType.MEMORY_CREATED
+		} as PipelineEventData);
+	}
+
+	/**
+	 * Emit memory promoted event
+	 */
+	emitMemoryPromoted(data: MemoryPromotedData): void {
+		this.emit(PipelineEventType.MEMORY_PROMOTED, {
+			...data,
+			timestamp: Date.now(),
+			type: PipelineEventType.MEMORY_PROMOTED
+		} as PipelineEventData);
+	}
+
+	/**
+	 * Emit consolidation complete event
+	 */
+	emitConsolidationComplete(data: ConsolidationCompleteData): void {
+		this.emit(PipelineEventType.CONSOLIDATION_COMPLETE, {
+			...data,
+			timestamp: Date.now(),
+			type: PipelineEventType.CONSOLIDATION_COMPLETE
+		} as PipelineEventData);
+	}
+
+	/**
+	 * Emit memory accessed event
+	 */
+	emitMemoryAccessed(data: MemoryAccessedData): void {
+		this.emit(PipelineEventType.MEMORY_ACCESSED, {
+			...data,
+			timestamp: Date.now(),
+			type: PipelineEventType.MEMORY_ACCESSED
+		} as PipelineEventData);
+	}
+
+	/**
+	 * Emit memory staled event
+	 */
+	emitMemoryStaled(data: MemoryStaledData): void {
+		this.emit(PipelineEventType.MEMORY_STALE, {
+			...data,
+			timestamp: Date.now(),
+			type: PipelineEventType.MEMORY_STALE
+		} as PipelineEventData);
+	}
+
+	/**
+	 * Emit memory pruned event
+	 */
+	emitMemoryPruned(data: MemoryPrunedData): void {
+		this.emit(PipelineEventType.MEMORY_PRUNED, {
+			...data,
+			timestamp: Date.now(),
+			type: PipelineEventType.MEMORY_PRUNED
 		} as PipelineEventData);
 	}
 

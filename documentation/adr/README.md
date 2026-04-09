@@ -22,6 +22,7 @@ Architecture Decision Records (ADRs) capture important architectural decisions m
 | [009](./009-supply-chain-hardening.md)                             | Supply Chain Hardening                             | Accepted | 2026-03 |
 | [010](./010-batch-processing.md)                                   | Async Batch Processing                             | Accepted | 2026-03 |
 | [010](./010-pipeline-resilience-and-tool-failure-observability.md) | Pipeline Resilience and Tool-Failure Observability | Accepted | 2026-03 |
+| [011](./011-biologically-inspired-memory.md)                       | Biologically-Inspired Agent Memory System          | Accepted | 2026-04 |
 
 > **Note on duplicate numbers**: ADR numbers 002 and 010 each have two files. This occurred because separate decisions were recorded under the same sequence number before a numbering correction was made. Both files under each duplicate number are valid, accepted decisions. When creating new ADRs, use the next available number after 010 (i.e., start at 011).
 
