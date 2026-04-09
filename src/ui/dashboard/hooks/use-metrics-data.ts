@@ -66,7 +66,8 @@ const REFRESH_RATES: Record<DashboardTab, number> = {
 	audit: 3000,
 	cache: 5000,
 	overview: 1000,
-	performance: 2000
+	performance: 2000,
+	usage: 10000
 };
 
 interface CmdOptMetrics {

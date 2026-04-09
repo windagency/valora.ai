@@ -17,12 +17,14 @@ import { TabBar } from './dashboard/components/tab-bar';
 import { useDashboardData } from './dashboard/hooks/use-dashboard-data';
 import { useMetricsData } from './dashboard/hooks/use-metrics-data';
 import { useNavigation } from './dashboard/hooks/use-navigation';
+import { useUsageAnalyticsData } from './dashboard/hooks/use-usage-analytics-data';
 import { AgentAnalyticsView } from './dashboard/views/agent-analytics-view';
 import { AuditLogView } from './dashboard/views/audit-log-view';
 import { CacheStatsView } from './dashboard/views/cache-stats-view';
 import { DashboardView } from './dashboard/views/dashboard-view';
 import { PerformanceView } from './dashboard/views/performance-view';
 import { SessionDetailsView } from './dashboard/views/session-details-view';
+import { UsageAnalyticsView } from './dashboard/views/usage-analytics-view';
 import { getTUIAdapter } from './tui-adapter.interface';
 
 // Re-export types for backward compatibility
@@ -44,7 +46,8 @@ const TAB_KEYS: Record<string, DashboardTab> = {
 	'2': 'performance',
 	'3': 'agents',
 	'4': 'cache',
-	'5': 'audit'
+	'5': 'audit',
+	'6': 'usage'
 };
 
 /**
@@ -56,6 +59,7 @@ function Dashboard(): React.JSX.Element {
 	const nav = useNavigation();
 	const { data, fetchData, sessionStore } = useDashboardData();
 	const { agentData, auditData, cacheData, computeMetricsSummary, performanceData } = useMetricsData(nav.activeTab);
+	const { data: usageData, refresh: refreshUsage } = useUsageAnalyticsData();
 	const [selectedSession, setSelectedSession] = useState<null | Session>(null);
 
 	const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -161,7 +165,10 @@ function Dashboard(): React.JSX.Element {
 				if (summary) data.metricsSummary = summary;
 			});
 		}
-	}, [fetchData, computeMetricsSummary, nav.activeTab, data]);
+		if (nav.activeTab === 'usage') {
+			refreshUsage();
+		}
+	}, [fetchData, computeMetricsSummary, nav.activeTab, data, refreshUsage]);
 
 	const handleDashboardNavigation = useCallback(
 		(
@@ -238,6 +245,7 @@ function Dashboard(): React.JSX.Element {
 				{nav.activeTab === 'agents' && <AgentAnalyticsView data={agentData} />}
 				{nav.activeTab === 'cache' && <CacheStatsView data={cacheData} />}
 				{nav.activeTab === 'audit' && <AuditLogView data={auditData} />}
+				{nav.activeTab === 'usage' && <UsageAnalyticsView data={usageData} />}
 			</Box>
 			<Box marginTop={1}>
 				<HelpBar activeTab={nav.activeTab} hasSubTabs={nav.viewMode === 'details'} mode={nav.viewMode} />

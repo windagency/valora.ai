@@ -1021,7 +1021,7 @@ valora dash
 │                              │ ✓ implement  2m ago              │
 │                              │ ✓ plan       5m ago              │
 ├───────────────────────────────┴──────────────────────────────────┤
-│ j/k: Navigate  Enter: View Details  r: Refresh  q: Quit        │
+│ 1-6: Tab  j/k: Navigate  Enter: View Details  r: Refresh  q: Quit │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -1029,6 +1029,7 @@ valora dash
 
 | Key       | Action                   |
 | --------- | ------------------------ |
+| `1`–`6`   | Switch dashboard tab     |
 | `j` / `k` | Navigate session list    |
 | `Enter`   | View session details     |
 | `r`       | Refresh data             |
@@ -1101,6 +1102,15 @@ valora monitoring spending --top 10
 valora monitoring spending --by-model
 valora monitoring spending --since 2026-03-01
 
+# Cross-session usage analytics
+valora monitoring usage
+valora monitoring usage --since-days 14
+valora monitoring usage --by-model
+valora monitoring usage --by-command
+valora monitoring usage --daily
+valora monitoring usage --format markdown --output usage-report.md
+valora monitoring usage --model claude-sonnet-4-6 --since 2026-04-01
+
 # Reset all in-process metrics
 valora monitoring reset
 ```
@@ -1113,6 +1123,21 @@ valora monitoring reset
 | `--by-model`         | Group summary by model instead of command | —       |
 | `--since <date>`     | Filter records on or after this date      | —       |
 | `-f, --format <fmt>` | `table` or `json`                         | `table` |
+
+**`monitoring usage` flags:**
+
+| Flag               | Description                                   | Default |
+| ------------------ | --------------------------------------------- | ------- |
+| `--since <date>`   | Filter records on or after this ISO 8601 date | —       |
+| `--since-days <n>` | Show last N days of usage                     | `7`     |
+| `--top <n>`        | Top N costliest requests to display           | `10`    |
+| `--by-model`       | Show model breakdown only                     | `false` |
+| `--by-command`     | Show command breakdown only                   | `false` |
+| `--daily`          | Show daily breakdown only                     | `false` |
+| `--model <name>`   | Filter analytics to a single model            | —       |
+| `--command <name>` | Filter analytics to a single command          | —       |
+| `--format <fmt>`   | Output format: `table`, `json`, or `markdown` | `table` |
+| `--output <path>`  | Write report to file instead of stdout        | —       |
 
 <details>
 <summary><strong>Spending ledger format and example output</strong></summary>

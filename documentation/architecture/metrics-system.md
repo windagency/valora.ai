@@ -57,6 +57,11 @@ For detailed per-stage and per-tool breakdown, switch to the **Performance** tab
 # View spending summary
 valora monitoring spending
 
+# Cross-session usage analytics (default: last 7 days)
+valora monitoring usage
+valora monitoring usage --since-days 14 --by-model
+valora monitoring usage --format markdown --output usage-report.md
+
 # Extract metrics JSON (last 30 days)
 pnpm tsx scripts/extract-metrics.ts 30d
 
@@ -77,6 +82,16 @@ The `SpendingTracker` (`src/utils/spending-tracker.ts`) provides four query meth
 | `getTotals()`       | Aggregate `totalCostUsd`, `cacheSavingsUsd`, `requestCount`, `totalTokens` |
 
 These methods back both `valora monitoring spending` and the dashboard **Spending** sub-tab.
+
+The `UsageAnalytics` class (`src/utils/usage-analytics.ts`) wraps `SpendingTracker` with higher-level aggregations:
+
+| Method                          | Returns                                                          |
+| ------------------------------- | ---------------------------------------------------------------- |
+| `analyze(opts?)`                | `UsageSummary` — by model, by command, daily, costliest requests |
+| `generateJsonReport(opts?)`     | Full analytics as a JSON string                                  |
+| `generateMarkdownReport(opts?)` | Human-readable markdown report with tables and trend data        |
+
+`UsageAnalytics` backs `valora monitoring usage` and the dashboard **Usage** tab (key `6`).
 
 ---
 

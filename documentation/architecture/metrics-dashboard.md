@@ -4,20 +4,34 @@
 
 ## Dashboard Overview
 
-The dashboard (`valora dash`) provides a live view of metrics collected from session data. It is structured into tabs: **Overview**, **Performance**, and **Spending**.
+The dashboard (`valora dash`) provides a live view of metrics collected from session data. It is structured into six tabs navigated with keys `1`–`6`: **Overview**, **Performance**, **Agents**, **Cache**, **Audit**, and **Usage**.
 
 ### Key Metrics at a Glance
 
-| Metric                        | Where to Find It                  | Source                                      |
-| ----------------------------- | --------------------------------- | ------------------------------------------- |
-| Average workflow time         | Overview tab — Executive Summary  | Session `duration_ms` aggregation           |
-| Template adoption rate        | Overview tab — Optimization panel | `optimization_metrics.planning_mode`        |
-| Early exit rate               | Overview tab — Optimization panel | `optimization_metrics.early_exit_triggered` |
-| Loop exhaustions              | Overview tab — Metrics Summary    | `quality_metrics.tool_loop_exhaustions`     |
-| Tool failures                 | Overview tab — Metrics Summary    | `quality_metrics.tool_failures`             |
-| Per-request cost              | Spending tab                      | `.valora/spending.jsonl`                    |
-| Cache savings                 | Spending tab                      | `.valora/spending.jsonl`                    |
-| Per-stage execution breakdown | Performance tab                   | `StageOutput.metadata.executionQuality`     |
+| Metric                        | Where to Find It                  | Source                                         |
+| ----------------------------- | --------------------------------- | ---------------------------------------------- |
+| Average workflow time         | Overview tab — Executive Summary  | Session `duration_ms` aggregation              |
+| Template adoption rate        | Overview tab — Optimization panel | `optimization_metrics.planning_mode`           |
+| Early exit rate               | Overview tab — Optimization panel | `optimization_metrics.early_exit_triggered`    |
+| Loop exhaustions              | Overview tab — Metrics Summary    | `quality_metrics.tool_loop_exhaustions`        |
+| Tool failures                 | Overview tab — Metrics Summary    | `quality_metrics.tool_failures`                |
+| Per-request cost              | Spending tab                      | `.valora/spending.jsonl`                       |
+| Cache savings                 | Spending tab / Usage tab          | `.valora/spending.jsonl`                       |
+| Per-stage execution breakdown | Performance tab                   | `StageOutput.metadata.executionQuality`        |
+| Cross-session cost by model   | Usage tab (key `6`)               | `UsageAnalytics` over `.valora/spending.jsonl` |
+| Cross-session cost by command | Usage tab (key `6`)               | `UsageAnalytics` over `.valora/spending.jsonl` |
+| Daily cost trend (7 days)     | Usage tab (key `6`)               | `UsageAnalytics` — sparkline + table           |
+
+### Dashboard Tabs
+
+| Key | Tab         | Description                                                                        |
+| --- | ----------- | ---------------------------------------------------------------------------------- |
+| `1` | Overview    | Session list, system health, git worktrees, recent commands                        |
+| `2` | Performance | Per-stage execution breakdown and quality metrics                                  |
+| `3` | Agents      | Agent analytics and model selection metrics                                        |
+| `4` | Cache       | Cache hit/miss statistics                                                          |
+| `5` | Audit       | Audit log events                                                                   |
+| `6` | Usage       | Cross-session cost and token analytics: summary, by model, by command, daily trend |
 
 ### Accessing the Dashboard
 
@@ -27,6 +41,10 @@ valora dash
 
 # View spending summary in terminal
 valora monitoring spending
+
+# Cross-session usage analytics in terminal
+valora monitoring usage
+valora monitoring usage --since-days 14 --format markdown
 
 # Generate a markdown dashboard report
 pnpm tsx scripts/extract-metrics.ts 30d | pnpm tsx scripts/generate-dashboard.ts

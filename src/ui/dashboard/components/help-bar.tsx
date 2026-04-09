@@ -36,7 +36,7 @@ export function HelpBar({
 				</Text>
 			) : (
 				<Text>
-					<Text color="cyan">1-5</Text>: Tab <Text color="cyan">j/k</Text>: Navigate{' '}
+					<Text color="cyan">1-6</Text>: Tab <Text color="cyan">j/k</Text>: Navigate{' '}
 					{activeTab === 'overview' && (
 						<>
 							<Text color="cyan">Enter</Text>: Details{' '}
