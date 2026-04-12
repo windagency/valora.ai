@@ -1,3 +1,4 @@
+import { includeIgnoreFile } from '@eslint/compat';
 import js from '@eslint/js';
 import tseslint from '@typescript-eslint/eslint-plugin';
 import tsparser from '@typescript-eslint/parser';
@@ -9,27 +10,17 @@ import prettierPlugin from 'eslint-plugin-prettier';
 import sortPlugin from 'eslint-plugin-sort';
 import sortDestructureKeys from 'eslint-plugin-sort-destructure-keys';
 import unusedImports from 'eslint-plugin-unused-imports';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export default [
+	includeIgnoreFile(path.resolve(__dirname, '.gitignore')),
 	js.configs.recommended,
 	perfectionist.configs['recommended-natural'],
 	{
-		ignores: [
-			'.pnpm-store/**',
-			'.stryker-tmp/**',
-			'coverage/**',
-			'dist/**',
-			'node_modules/**',
-			'reportss/**',
-			'tests/**',
-			'__tests__/**',
-			'**/*.spec.ts',
-			'**/*.test.ts',
-			'**/*.config.ts',
-			'**/*.config.cjs',
-			'**/*.config.js',
-			'**/*.config.mjs'
-		]
+		ignores: ['**/*.spec.ts', '**/*.test.ts', '**/*.config.ts', '**/*.config.cjs', '**/*.config.js', '**/*.config.mjs']
 	},
 	// Base config for all files (no type-checking)
 	{
@@ -40,7 +31,13 @@ export default [
 				__dirname: 'readonly',
 				__filename: 'readonly',
 				afterAll: 'readonly',
+				afterEach: 'readonly',
 				beforeAll: 'readonly',
+				beforeEach: 'readonly',
+				describe: 'readonly',
+				expect: 'readonly',
+				it: 'readonly',
+				test: 'readonly',
 				Buffer: 'readonly',
 				clearInterval: 'readonly',
 				clearTimeout: 'readonly',

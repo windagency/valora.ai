@@ -34,6 +34,7 @@ const SKIP_DOCUMENT_OUTPUT_COMMANDS: Set<string> = new Set([
 	'fetch-task',
 	'help',
 	'implement', // Produces code changes, not documents
+	'pre-check', // Produces a transient check report, not a persistent document
 	'review-code',
 	'review-plan',
 	'status'

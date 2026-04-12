@@ -1,6 +1,6 @@
 {
 	"name": "@windagency/valora",
-	"version": "2.4.0",
+	"version": "2.4.1",
 	"description": "VALORA - AI-assisted development workflow orchestration with agnostic multi-LLM support, session-based state, and Cursor MCP integration",
 	"keywords": [
 		"valora",
@@ -149,6 +149,7 @@
 		"zod": "^3.22.4"
 	},
 	"devDependencies": {
+		"@eslint/compat": "^2.0.5",
 		"@eslint/js": "^9.39.1",
 		"@playwright/test": "^1.40.0",
 		"@stryker-mutator/core": "^8.7.1",

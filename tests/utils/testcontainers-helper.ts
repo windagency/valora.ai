@@ -15,101 +15,11 @@ let LocalStackContainer: any;
 let GenericContainer: any;
 let testcontainersInitialized = false;
 
-async function initializeTestcontainers() {
-	if (testcontainersInitialized) return;
-
-	try {
-		const pgModule = await import('@testcontainers/postgresql');
-		const redisModule = await import('@testcontainers/redis');
-		const localstackModule = await import('@testcontainers/localstack');
-		const genericModule = await import('testcontainers');
-
-		PostgreSqlContainer = pgModule.PostgreSqlContainer;
-		RedisContainer = redisModule.RedisContainer;
-		LocalStackContainer = localstackModule.LocalstackContainer;
-		GenericContainer = genericModule.GenericContainer;
-		testcontainersInitialized = true;
-	} catch (error) {
-		console.warn('Testcontainers not available, using mock implementations for tests');
-		// Create mock implementations
-		PostgreSqlContainer = class MockPostgreSqlContainer {
-			withDatabase() {
-				return this;
-			}
-			withUsername() {
-				return this;
-			}
-			withPassword() {
-				return this;
-			}
-			withExposedPorts() {
-				return this;
-			}
-			async start() {
-				return {
-					getDatabase: () => 'test',
-					getHost: () => 'localhost',
-					getMappedPort: () => 5432,
-					getPassword: () => 'test',
-					getUsername: () => 'test',
-					stop: async () => {}
-				};
-			}
-		};
-
-		RedisContainer = class MockRedisContainer {
-			withExposedPorts() {
-				return this;
-			}
-			async start() {
-				return {
-					getHost: () => 'localhost',
-					getMappedPort: () => 6379,
-					stop: async () => {}
-				};
-			}
-		};
-
-		LocalStackContainer = class MockLocalStackContainer {
-			withServices() {
-				return this;
-			}
-			withExposedPorts() {
-				return this;
-			}
-			async start() {
-				return {
-					getHost: () => 'localhost',
-					getMappedPort: () => 4566,
-					stop: async () => {}
-				};
-			}
-		};
-
-		GenericContainer = class MockGenericContainer {
-			withExposedPorts() {
-				return this;
-			}
-			withEnvironment() {
-				return this;
-			}
-			withCommand() {
-				return this;
-			}
-			async start() {
-				return {
-					stop: async () => {}
-				};
-			}
-		};
-	}
-}
-
 export class TestcontainersHelper {
+	private customContainers: Map<string, any> = new Map();
+	private localstackContainer?: any;
 	private postgresContainer?: any;
 	private redisContainer?: any;
-	private localstackContainer?: any;
-	private customContainers: Map<string, any> = new Map();
 
 	/**
 	 * Start shared containers that can be reused across tests
@@ -229,10 +139,10 @@ export class TestcontainersHelper {
 	async startCustomContainer(
 		name: string,
 		containerConfig: {
+			command?: string[];
+			environment?: Record<string, string>;
 			image: string;
 			ports?: number[];
-			environment?: Record<string, string>;
-			command?: string[];
 		}
 	): Promise<any> {
 		if (this.customContainers.has(name)) {
@@ -284,19 +194,19 @@ export class TestcontainersHelper {
 		try {
 			// Check database connectivity
 			if (this.postgresContainer) {
-				const dbUrl = await this.getDatabaseUrl();
+				const _dbUrl = await this.getDatabaseUrl();
 				// Basic connectivity check would go here
 			}
 
 			// Check Redis connectivity
 			if (this.redisContainer) {
-				const redisUrl = await this.getRedisUrl();
+				const _redisUrl = await this.getRedisUrl();
 				// Basic connectivity check would go here
 			}
 
 			return true;
-		} catch (error) {
-			console.error('Container health check failed:', error);
+		} catch (_error) {
+			console.error('Container health check failed:', _error);
 			return false;
 		}
 	}
@@ -314,5 +224,95 @@ export class TestcontainersHelper {
 		if (this.redisContainer) {
 			// FLUSHDB command would go here
 		}
+	}
+}
+
+async function initializeTestcontainers() {
+	if (testcontainersInitialized) return;
+
+	try {
+		const pgModule = await import('@testcontainers/postgresql');
+		const redisModule = await import('@testcontainers/redis');
+		const localstackModule = await import('@testcontainers/localstack');
+		const genericModule = await import('testcontainers');
+
+		PostgreSqlContainer = pgModule.PostgreSqlContainer;
+		RedisContainer = redisModule.RedisContainer;
+		LocalStackContainer = localstackModule.LocalstackContainer;
+		GenericContainer = genericModule.GenericContainer;
+		testcontainersInitialized = true;
+	} catch (_error) {
+		console.warn('Testcontainers not available, using mock implementations for tests');
+		// Create mock implementations
+		PostgreSqlContainer = class MockPostgreSqlContainer {
+			async start() {
+				return {
+					getDatabase: () => 'test',
+					getHost: () => 'localhost',
+					getMappedPort: () => 5432,
+					getPassword: () => 'test',
+					getUsername: () => 'test',
+					stop: async () => {}
+				};
+			}
+			withDatabase() {
+				return this;
+			}
+			withExposedPorts() {
+				return this;
+			}
+			withPassword() {
+				return this;
+			}
+			withUsername() {
+				return this;
+			}
+		};
+
+		RedisContainer = class MockRedisContainer {
+			async start() {
+				return {
+					getHost: () => 'localhost',
+					getMappedPort: () => 6379,
+					stop: async () => {}
+				};
+			}
+			withExposedPorts() {
+				return this;
+			}
+		};
+
+		LocalStackContainer = class MockLocalStackContainer {
+			async start() {
+				return {
+					getHost: () => 'localhost',
+					getMappedPort: () => 4566,
+					stop: async () => {}
+				};
+			}
+			withExposedPorts() {
+				return this;
+			}
+			withServices() {
+				return this;
+			}
+		};
+
+		GenericContainer = class MockGenericContainer {
+			async start() {
+				return {
+					stop: async () => {}
+				};
+			}
+			withCommand() {
+				return this;
+			}
+			withEnvironment() {
+				return this;
+			}
+			withExposedPorts() {
+				return this;
+			}
+		};
 	}
 }

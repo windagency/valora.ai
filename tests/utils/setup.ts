@@ -26,7 +26,7 @@ async function initializeTestcontainersHelper() {
 		const { TestcontainersHelper } = await import('./testcontainers-helper.js');
 		testcontainersHelper = new TestcontainersHelper();
 		testcontainersAvailable = true;
-	} catch (error) {
+	} catch (_error) {
 		console.warn('Testcontainers not available, running tests without containerized dependencies');
 		testcontainersAvailable = false;
 	}

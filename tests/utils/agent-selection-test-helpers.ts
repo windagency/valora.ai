@@ -5,8 +5,9 @@
  * for the dynamic sub-agent selection system tests
  */
 
-import { AgentSelection, TaskContext } from 'types/agent.types';
 import { vi } from 'vitest';
+
+import { AgentSelection, TaskContext } from 'types/agent.types';
 
 // Test data factories
 export class TestDataFactory {
@@ -155,7 +156,7 @@ export class PerformanceUtils {
 	static async measureExecutionTime<T>(
 		operation: () => Promise<T>,
 		label: string
-	): Promise<{ result: T; duration: number }> {
+	): Promise<{ duration: number; result: T }> {
 		const startTime = Date.now();
 		const result = await operation();
 		const duration = Date.now() - startTime;
@@ -172,14 +173,14 @@ export class PerformanceUtils {
 	/**
 	 * Gets performance statistics for a label
 	 */
-	static getPerformanceStats(label: string): {
-		count: number;
+	static getPerformanceStats(label: string): null | {
 		avg: number;
-		min: number;
+		count: number;
 		max: number;
+		min: number;
 		p95: number;
 		p99: number;
-	} | null {
+	} {
 		const measurements = this.measurements.get(label);
 		if (!measurements || measurements.length === 0) {
 			return null;
@@ -323,11 +324,11 @@ export class MockUtils {
 // Accuracy measurement utilities
 export class AccuracyUtils {
 	private static results: Array<{
-		expected: string;
 		actual: string;
 		confidence: number;
-		fallback: boolean;
 		correct: boolean;
+		expected: string;
+		fallback: boolean;
 	}> = [];
 
 	/**
@@ -347,12 +348,12 @@ export class AccuracyUtils {
 	 * Gets accuracy statistics
 	 */
 	static getAccuracyStats(): {
-		total: number;
-		correct: number;
-		incorrect: number;
 		accuracy: number;
 		avgConfidence: number;
+		correct: number;
 		fallbackRate: number;
+		incorrect: number;
+		total: number;
 	} {
 		if (this.results.length === 0) {
 			return {
@@ -393,8 +394,8 @@ export class AccuracyUtils {
 	 * Validates accuracy against thresholds
 	 */
 	static validateAccuracy(thresholds: {
-		minAccuracy?: number;
 		maxFallbackRate?: number;
+		minAccuracy?: number;
 		minAvgConfidence?: number;
 	}): boolean {
 		const stats = this.getAccuracyStats();
@@ -456,12 +457,12 @@ export class ScenarioBuilder {
 	 * Builds comprehensive test scenarios
 	 */
 	static buildScenarios(): Array<{
-		name: string;
+		category: string;
 		description: string;
-		taskContext: TaskContext;
 		expectedAgent: string;
 		minConfidence: number;
-		category: string;
+		name: string;
+		taskContext: TaskContext;
 	}> {
 		const taskContexts = TestDataFactory.createTaskContexts();
 
