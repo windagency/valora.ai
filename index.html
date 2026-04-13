@@ -3,17 +3,16 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta http-equiv="refresh" content="0; url=talks/en/biological-inspired-memory.html">
 <title>Valora Talks</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
 <style>
 :root {
-  --bg: #091525; --surface: #0d1e35; --text: #cce0f5;
-  --dim: #6b9cc0; --faint: #3a6080; --primary: #3b9edd;
-  --third: #4ecdc4; --border: rgba(59,158,221,0.18);
-  --grid-line: rgba(59,158,221,0.06);
+  --bg: #091525; --surface: #0d1e35; --elevated: #122540;
+  --text: #cce0f5; --dim: #6b9cc0; --faint: #3a6080;
+  --primary: #3b9edd; --third: #4ecdc4; --secondary: #f5c842;
+  --border: rgba(59,158,221,0.18); --grid-line: rgba(59,158,221,0.06);
   --font-body: 'DM Sans', system-ui, sans-serif;
   --font-mono: 'Fira Code', monospace;
 }
@@ -26,52 +25,130 @@ body {
   background-image:
     linear-gradient(var(--grid-line) 1px, transparent 1px),
     linear-gradient(90deg, var(--grid-line) 1px, transparent 1px),
-    radial-gradient(ellipse at 50% 30%, rgba(59,158,221,.1) 0%, transparent 55%);
-  background-size: 32px 32px, 32px 32px, 100% 100%;
+    radial-gradient(ellipse at 50% 20%, rgba(59,158,221,.10) 0%, transparent 55%),
+    radial-gradient(ellipse at 80% 80%, rgba(139,92,246,.07) 0%, transparent 45%);
+  background-size: 32px 32px, 32px 32px, 100% 100%, 100% 100%;
   -webkit-font-smoothing: antialiased;
+  padding: 40px 20px;
 }
-.card {
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: 10px; padding: 48px 56px; text-align: center;
-  max-width: 560px; width: 90%;
+.wrapper {
+  width: 100%; max-width: 760px;
+  display: flex; flex-direction: column; align-items: center; gap: 40px;
 }
+.header { text-align: center; }
 .eyebrow {
   font-family: var(--font-mono); font-size: 11px; letter-spacing: .2em;
   text-transform: uppercase; color: var(--primary);
   display: flex; align-items: center; justify-content: center; gap: 8px;
-  margin-bottom: 24px;
+  margin-bottom: 16px;
 }
 .eyebrow::before, .eyebrow::after {
-  content: ''; display: inline-block; width: 20px; height: 1px; background: var(--primary);
+  content: ''; display: inline-block; width: 24px; height: 1px; background: var(--primary);
 }
-h1 {
-  font-size: clamp(24px, 4vw, 36px); font-weight: 600;
-  letter-spacing: -.01em; line-height: 1.2; margin-bottom: 12px;
+.header h1 {
+  font-size: clamp(26px, 4vw, 38px); font-weight: 600;
+  letter-spacing: -.02em; line-height: 1.15; margin-bottom: 10px;
 }
-p { font-size: 17px; color: var(--dim); line-height: 1.6; margin-bottom: 32px; }
+.header p { font-size: 16px; color: var(--dim); line-height: 1.6; }
+.talks {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 16px; width: 100%;
+}
+.talk-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; overflow: hidden;
+  display: flex; flex-direction: column;
+  transition: border-color .2s, transform .2s;
+}
+.talk-card:hover { border-color: rgba(59,158,221,.45); transform: translateY(-2px); }
+.talk-card-accent { height: 3px; background: linear-gradient(90deg, var(--primary), var(--third)); }
+.talk-card-accent.amber { background: linear-gradient(90deg, var(--secondary), var(--primary)); }
+.talk-card-body { padding: 24px 28px; flex: 1; display: flex; flex-direction: column; gap: 12px; }
+.talk-meta {
+  display: flex; align-items: center; gap: 8px;
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--faint);
+}
+.lang-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: rgba(59,158,221,.10); color: var(--primary);
+  border: 1px solid rgba(59,158,221,.22); border-radius: 3px;
+  padding: 1px 7px; font-family: var(--font-mono); font-size: 9px;
+  letter-spacing: .12em; text-transform: uppercase; font-weight: 500;
+}
+.lang-badge.amber { background: rgba(245,200,66,.10); color: var(--secondary); border-color: rgba(245,200,66,.22); }
+.talk-card h2 {
+  font-size: clamp(16px, 2.2vw, 20px); font-weight: 600;
+  letter-spacing: -.01em; line-height: 1.25; color: var(--text);
+}
+.talk-card p { font-size: 14px; color: var(--dim); line-height: 1.6; flex: 1; }
+.talk-card-footer { padding: 0 28px 24px; }
 a.cta {
-  display: inline-flex; align-items: center; gap: 10px;
+  display: inline-flex; align-items: center; gap: 8px;
   background: var(--primary); color: #fff; text-decoration: none;
-  font-weight: 500; font-size: 15px; padding: 12px 28px;
-  border-radius: 6px; transition: opacity .2s;
+  font-weight: 500; font-size: 14px; padding: 10px 22px;
+  border-radius: 5px; transition: opacity .2s; white-space: nowrap;
 }
 a.cta:hover { opacity: .85; }
-.meta {
-  margin-top: 24px; font-family: var(--font-mono); font-size: 10px;
+a.cta.amber { background: var(--secondary); color: #091525; }
+.footer {
+  font-family: var(--font-mono); font-size: 10px;
   letter-spacing: .12em; text-transform: uppercase; color: var(--faint);
+  text-align: center;
 }
 </style>
 </head>
 <body>
-<div class="card">
-  <div class="eyebrow">Valora Talks</div>
-  <h1>Teaching Machines to Remember</h1>
-  <p>A Biologically-Inspired Persistent Memory for AI Agent Orchestration — 30-minute tech pitch.</p>
-  <a class="cta" href="talks/en/biological-inspired-memory.html">
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-    Open slide deck
-  </a>
-  <div class="meta">windagency/valora.ai · 2026</div>
+<div class="wrapper">
+
+  <header class="header">
+    <div class="eyebrow">Valora Talks</div>
+    <h1>Slide Decks</h1>
+    <p>Presentations on VALORA — AI workflow orchestration for development teams.</p>
+  </header>
+
+  <div class="talks">
+
+    <div class="talk-card">
+      <div class="talk-card-accent"></div>
+      <div class="talk-card-body">
+        <div class="talk-meta">
+          <span class="lang-badge">EN</span>
+          Tech Talk &middot; 30 min
+        </div>
+        <h2>Teaching Machines to Remember</h2>
+        <p>A biologically-inspired persistent memory for AI agent orchestration &mdash; Ebbinghaus decay, Jaccard consolidation, git invalidation.</p>
+      </div>
+      <div class="talk-card-footer">
+        <a class="cta" href="talks/en/biological-inspired-memory.html">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Open deck
+        </a>
+      </div>
+    </div>
+
+    <div class="talk-card">
+      <div class="talk-card-accent amber"></div>
+      <div class="talk-card-body">
+        <div class="talk-meta">
+          <span class="lang-badge amber">FR</span>
+          Pr&eacute;sentation Produit &middot; 2026
+        </div>
+        <h2>VALORA &mdash; Pr&eacute;sentation Produit 2026</h2>
+        <p>Orchestration IA de workflows &mdash; 11 agents sp&eacute;cialis&eacute;s, 8 phases de gouvernance, 25 commandes. M&eacute;moire biologique v2.4.</p>
+      </div>
+      <div class="talk-card-footer">
+        <a class="cta amber" href="talks/fr/presentation.html">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="#091525" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Ouvrir la pr&eacute;sentation
+        </a>
+      </div>
+    </div>
+
+  </div>
+
+  <footer class="footer">windagency/valora.ai &middot; 2026</footer>
+
 </div>
 </body>
 </html>
