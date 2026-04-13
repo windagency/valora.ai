@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="refresh" content="0; url=talks/biological-inspired-memory.html">
+<title>Valora Talks</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #091525; --surface: #0d1e35; --text: #cce0f5;
+  --dim: #6b9cc0; --faint: #3a6080; --primary: #3b9edd;
+  --third: #4ecdc4; --border: rgba(59,158,221,0.18);
+  --grid-line: rgba(59,158,221,0.06);
+  --font-body: 'DM Sans', system-ui, sans-serif;
+  --font-mono: 'Fira Code', monospace;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: var(--font-body);
+  background: var(--bg); color: var(--text);
+  min-height: 100vh; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  background-image:
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px),
+    radial-gradient(ellipse at 50% 30%, rgba(59,158,221,.1) 0%, transparent 55%);
+  background-size: 32px 32px, 32px 32px, 100% 100%;
+  -webkit-font-smoothing: antialiased;
+}
+.card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; padding: 48px 56px; text-align: center;
+  max-width: 560px; width: 90%;
+}
+.eyebrow {
+  font-family: var(--font-mono); font-size: 11px; letter-spacing: .2em;
+  text-transform: uppercase; color: var(--primary);
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  margin-bottom: 24px;
+}
+.eyebrow::before, .eyebrow::after {
+  content: ''; display: inline-block; width: 20px; height: 1px; background: var(--primary);
+}
+h1 {
+  font-size: clamp(24px, 4vw, 36px); font-weight: 600;
+  letter-spacing: -.01em; line-height: 1.2; margin-bottom: 12px;
+}
+p { font-size: 17px; color: var(--dim); line-height: 1.6; margin-bottom: 32px; }
+a.cta {
+  display: inline-flex; align-items: center; gap: 10px;
+  background: var(--primary); color: #fff; text-decoration: none;
+  font-weight: 500; font-size: 15px; padding: 12px 28px;
+  border-radius: 6px; transition: opacity .2s;
+}
+a.cta:hover { opacity: .85; }
+.meta {
+  margin-top: 24px; font-family: var(--font-mono); font-size: 10px;
+  letter-spacing: .12em; text-transform: uppercase; color: var(--faint);
+}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="eyebrow">Valora Talks</div>
+  <h1>Teaching Machines to Remember</h1>
+  <p>A Biologically-Inspired Persistent Memory for AI Agent Orchestration — 30-minute tech pitch.</p>
+  <a class="cta" href="talks/biological-inspired-memory.html">
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    Open slide deck
+  </a>
+  <div class="meta">windagency/valora.ai · 2026</div>
+</div>
+</body>
+</html>

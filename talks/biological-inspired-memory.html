@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Teaching Machines to Remember — Valora Memory Pitch</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=Fira+Code:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ══════════════════════════════════════════════
+   VALORA BLUEPRINT — Design System Tokens
+══════════════════════════════════════════════ */
+:root {
+  --font-body: 'DM Sans', system-ui, sans-serif;
+  --font-mono: 'Fira Code', 'Cascadia Code', monospace;
+  --bg:        #091525;
+  --surface:   #0d1e35;
+  --elevated:  #122540;
+  --deep:      #060c18;
+  --text:      #cce0f5;
+  --dim:       #6b9cc0;
+  --faint:     #3a6080;
+  --primary:   #3b9edd;
+  --primary-d: rgba(59,158,221,0.12);
+  --secondary: #f5c842;
+  --secondary-d: rgba(245,200,66,0.10);
+  --third:     #4ecdc4;
+  --third-d:   rgba(78,205,196,0.10);
+  --red:       #ff6b6b;
+  --red-d:     rgba(255,107,107,0.10);
+  --purple:    #8b5cf6;
+  --purple-d:  rgba(139,92,246,0.10);
+  --border:    rgba(59,158,221,0.18);
+  --border-b:  rgba(59,158,221,0.32);
+  --grid-line: rgba(59,158,221,0.06);
+  --code-bg:   #060c18;
+  --code-text: #a5d8ff;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:var(--font-body);background:var(--bg);color:var(--text);overflow:hidden;-webkit-font-smoothing:antialiased;}
+
+/* ── DECK ENGINE ── */
+.deck{height:100dvh;overflow-y:auto;scroll-snap-type:y mandatory;scroll-behavior:smooth;-webkit-overflow-scrolling:touch;}
+.slide{height:100dvh;scroll-snap-align:start;overflow:hidden;position:relative;display:flex;flex-direction:column;justify-content:center;padding:clamp(36px,5vh,72px) clamp(40px,7vw,110px);isolation:isolate;opacity:0;transform:translateY(36px) scale(0.985);transition:opacity .6s cubic-bezier(.16,1,.3,1),transform .6s cubic-bezier(.16,1,.3,1);background-image:linear-gradient(var(--grid-line) 1px,transparent 1px),linear-gradient(90deg,var(--grid-line) 1px,transparent 1px);background-size:32px 32px;}
+.slide.visible{opacity:1;transform:none;}
+.slide .reveal{opacity:0;transform:translateY(18px);transition:opacity .5s cubic-bezier(.16,1,.3,1),transform .5s cubic-bezier(.16,1,.3,1);}
+.slide.visible .reveal{opacity:1;transform:none;}
+.slide.visible .reveal:nth-child(1){transition-delay:.08s;}
+.slide.visible .reveal:nth-child(2){transition-delay:.17s;}
+.slide.visible .reveal:nth-child(3){transition-delay:.26s;}
+.slide.visible .reveal:nth-child(4){transition-delay:.35s;}
+.slide.visible .reveal:nth-child(5){transition-delay:.44s;}
+.slide.visible .reveal:nth-child(6){transition-delay:.53s;}
+.slide.visible .reveal:nth-child(7){transition-delay:.62s;}
+@media(prefers-reduced-motion:reduce){.slide,.slide .reveal{opacity:1!important;transform:none!important;transition:none!important;}}
+
+/* ── NAV CHROME ── */
+.deck-progress{position:fixed;top:0;left:0;height:3px;background:linear-gradient(90deg,var(--primary),var(--third));z-index:100;transition:width .3s ease;pointer-events:none;}
+.deck-dots{position:fixed;right:clamp(10px,1.8vw,20px);top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:7px;z-index:100;padding:8px;background:rgba(9,21,37,.7);border-radius:16px;backdrop-filter:blur(6px);border:1px solid var(--border);}
+.deck-dot{width:7px;height:7px;border-radius:50%;background:var(--faint);border:none;padding:0;cursor:pointer;transition:opacity .2s,transform .2s,background .2s;}
+.deck-dot:hover{background:var(--dim);transform:scale(1.3);}
+.deck-dot.active{background:var(--primary);transform:scale(1.6);}
+.deck-counter{position:fixed;bottom:clamp(10px,1.8vh,20px);right:clamp(14px,2vw,24px);font-family:var(--font-mono);font-size:11px;color:var(--faint);z-index:100;font-variant-numeric:tabular-nums;}
+.deck-hints{position:fixed;bottom:clamp(10px,1.8vh,20px);left:50%;transform:translateX(-50%);font-family:var(--font-mono);font-size:10px;color:var(--faint);z-index:100;transition:opacity .5s;white-space:nowrap;}
+.deck-hints.faded{opacity:0;pointer-events:none;}
+
+/* ── TYPOGRAPHY ── */
+.slide__eyebrow{font-family:var(--font-mono);font-size:clamp(9px,1.1vw,11px);font-weight:500;letter-spacing:.2em;text-transform:uppercase;color:var(--primary);margin-bottom:clamp(10px,1.5vh,20px);display:flex;align-items:center;gap:8px;}
+.slide__eyebrow::before{content:'';display:inline-block;width:20px;height:1px;background:var(--primary);}
+.slide__eyebrow.amber{color:var(--secondary);}
+.slide__eyebrow.amber::before{background:var(--secondary);}
+.slide__eyebrow.teal{color:var(--third);}
+.slide__eyebrow.teal::before{background:var(--third);}
+.slide__eyebrow.red{color:var(--red);}
+.slide__eyebrow.red::before{background:var(--red);}
+.slide__eyebrow.purple{color:var(--purple);}
+.slide__eyebrow.purple::before{background:var(--purple);}
+.slide__display{font-size:clamp(52px,10vw,112px);font-weight:600;letter-spacing:-.02em;line-height:.95;text-wrap:balance;color:var(--text);}
+.slide__heading{font-size:clamp(26px,4.5vw,46px);font-weight:600;letter-spacing:-.01em;line-height:1.15;text-wrap:balance;color:var(--text);}
+.slide__subheading{font-size:clamp(18px,2.5vw,28px);font-weight:400;color:var(--dim);line-height:1.4;}
+.slide__body{font-size:clamp(15px,1.9vw,21px);line-height:1.65;color:var(--dim);}
+
+/* ── DECOR ── */
+.slide__decor{position:absolute;pointer-events:none;z-index:0;}
+
+/* ── STAT BAR ── */
+.stat-bar{display:flex;flex-wrap:wrap;gap:1px;background:var(--border);border:1px solid var(--border);border-radius:5px;overflow:hidden;width:fit-content;}
+.stat-item{padding:6px 16px;background:var(--surface);display:flex;flex-direction:column;gap:2px;}
+.stat-value{font-family:var(--font-mono);font-size:clamp(13px,1.6vw,17px);font-weight:500;color:var(--primary);line-height:1;}
+.stat-value.amber{color:var(--secondary);}
+.stat-value.teal{color:var(--third);}
+.stat-value.red{color:var(--red);}
+.stat-value.purple{color:var(--purple);}
+.stat-label{font-family:var(--font-mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);}
+
+/* ── TAGS ── */
+.tag{font-family:var(--font-mono);font-size:clamp(8px,.9vw,10px);letter-spacing:.1em;text-transform:uppercase;padding:2px 7px;border-radius:3px;display:inline-block;}
+.tag-blue{background:var(--primary-d);color:var(--primary);border:1px solid rgba(59,158,221,.25);}
+.tag-amber{background:var(--secondary-d);color:var(--secondary);border:1px solid rgba(245,200,66,.25);}
+.tag-teal{background:var(--third-d);color:var(--third);border:1px solid rgba(78,205,196,.25);}
+.tag-red{background:var(--red-d);color:var(--red);border:1px solid rgba(255,107,107,.25);}
+.tag-purple{background:var(--purple-d);color:var(--purple);border:1px solid rgba(139,92,246,.25);}
+
+/* ── CARD ── */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:clamp(14px,2vh,22px) clamp(14px,1.8vw,20px);}
+.card-accent-top{border-top:2px solid var(--primary);}
+.card-accent-top.amber{border-top-color:var(--secondary);}
+.card-accent-top.teal{border-top-color:var(--third);}
+.card-accent-top.red{border-top-color:var(--red);}
+
+/* ── BULLETS ── */
+.bullets{list-style:none;padding:0;margin-top:clamp(12px,2vh,20px);}
+.bullets li{padding:8px 0 8px 22px;position:relative;font-size:clamp(14px,1.8vw,20px);line-height:1.55;color:var(--dim);}
+.bullets li::before{content:'';position:absolute;left:0;top:17px;width:6px;height:6px;border-radius:50%;background:var(--primary);}
+.bullets.teal li::before{background:var(--third);}
+.bullets li strong{color:var(--text);font-weight:500;}
+
+/* ── CODE BLOCK ── */
+.code-block{background:var(--code-bg);border:1px solid var(--border);border-radius:8px;padding:clamp(16px,2.5vh,28px) clamp(16px,2.5vw,28px);position:relative;width:100%;}
+.code-filename{position:absolute;top:-11px;left:20px;font-family:var(--font-mono);font-size:10px;font-weight:600;padding:3px 10px;border-radius:4px;background:var(--primary);color:#fff;}
+.code-filename.amber{background:var(--secondary);color:#000;}
+.code-filename.teal{background:var(--third);color:#000;}
+.code-block pre{margin:0;overflow-x:auto;}
+.code-block code{font-family:var(--font-mono);font-size:clamp(11px,1.3vw,15px);line-height:1.75;color:var(--code-text);}
+.hl{color:var(--secondary);}
+.hl2{color:var(--third);}
+.hl3{color:var(--primary);}
+.cm{color:var(--faint);font-style:italic;}
+.str{color:#a5f3fc;}
+.kw{color:var(--purple);}
+.tp{color:#c084fc;}
+
+/* ── PIPELINE ── */
+.pipeline{display:flex;align-items:stretch;gap:0;flex:1;min-height:0;margin-top:clamp(10px,1.8vh,20px);}
+.pipeline-step{flex:1;background:var(--surface);border:1px solid var(--border);border-top:2px solid var(--primary);border-radius:6px;padding:clamp(12px,2vh,20px) clamp(10px,1.2vw,16px);display:flex;flex-direction:column;min-width:0;}
+.pipeline-step.s2{border-top-color:var(--secondary);}
+.pipeline-step.s3{border-top-color:var(--third);}
+.pipeline-step.s4{border-top-color:var(--purple);}
+.pipeline-num{font-family:var(--font-mono);font-size:clamp(8px,.9vw,11px);font-weight:600;color:var(--primary);letter-spacing:.1em;margin-bottom:4px;}
+.pipeline-step.s2 .pipeline-num{color:var(--secondary);}
+.pipeline-step.s3 .pipeline-num{color:var(--third);}
+.pipeline-step.s4 .pipeline-num{color:var(--purple);}
+.pipeline-name{font-size:clamp(11px,1.2vw,15px);font-weight:600;color:var(--text);line-height:1.3;margin-bottom:4px;}
+.pipeline-desc{font-size:clamp(10px,1vw,12px);color:var(--faint);line-height:1.4;flex:1;}
+.pipeline-cmd{font-family:var(--font-mono);font-size:clamp(8px,.85vw,10px);color:var(--third);background:var(--third-d);border:1px solid rgba(78,205,196,.2);border-radius:3px;padding:2px 6px;margin-top:6px;align-self:flex-start;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;}
+.pipeline-arrow{display:flex;align-items:center;padding:0 clamp(2px,.3vw,5px);color:var(--faint);flex-shrink:0;opacity:.4;}
+
+/* ── ARCH LAYERS ── */
+.arch-wrap{display:flex;flex-direction:column;gap:clamp(6px,1vh,10px);flex:1;min-height:0;margin-top:clamp(10px,1.5vh,18px);}
+.arch-layer{background:var(--surface);border:1px solid var(--border);border-radius:6px;border-left:3px solid var(--primary);padding:clamp(10px,1.5vh,16px) clamp(14px,2vw,22px);display:flex;align-items:center;gap:clamp(12px,2vw,24px);flex:1;min-height:0;}
+.arch-layer.s2{border-left-color:var(--secondary);}
+.arch-layer.s3{border-left-color:var(--third);}
+.arch-layer.s4{border-left-color:var(--red);}
+.arch-layer-label{font-family:var(--font-mono);font-size:clamp(9px,1vw,12px);font-weight:600;text-transform:uppercase;letter-spacing:.12em;color:var(--primary);min-width:clamp(80px,9vw,120px);flex-shrink:0;}
+.arch-layer.s2 .arch-layer-label{color:var(--secondary);}
+.arch-layer.s3 .arch-layer-label{color:var(--third);}
+.arch-layer.s4 .arch-layer-label{color:var(--red);}
+.arch-components{display:flex;gap:clamp(6px,1vw,10px);flex-wrap:wrap;flex:1;}
+.arch-comp{background:var(--elevated);border:1px solid var(--border);border-radius:4px;padding:5px 11px;font-size:clamp(11px,1.2vw,14px);color:var(--text);font-weight:500;}
+
+/* ── SLIDE: TITLE ── */
+.slide--title{justify-content:center;align-items:center;text-align:center;}
+
+/* ── SLIDE: SPLIT ── */
+.slide--split{padding:0;}
+.slide--split .slide__panels{display:grid;grid-template-columns:1fr 1fr;height:100%;}
+.slide__panel{padding:clamp(36px,5vh,72px) clamp(32px,4vw,56px);display:flex;flex-direction:column;justify-content:center;}
+.slide__panel--primary{background:var(--surface);}
+.slide__panel--secondary{background:var(--elevated);}
+
+/* ── SLIDE: QUOTE ── */
+.slide--quote{justify-content:center;align-items:center;text-align:center;padding:clamp(60px,10vh,120px) clamp(60px,12vw,180px);}
+.slide__quote-mark{font-size:clamp(80px,14vw,160px);line-height:.5;opacity:.06;font-family:Georgia,serif;pointer-events:none;margin-bottom:-10px;color:var(--primary);}
+.slide--quote blockquote{font-size:clamp(20px,3.2vw,38px);font-weight:400;line-height:1.4;font-style:italic;color:var(--text);}
+.slide--quote cite{font-family:var(--font-mono);font-size:clamp(10px,1.2vw,13px);font-style:normal;margin-top:clamp(16px,3vh,28px);display:block;letter-spacing:.15em;text-transform:uppercase;color:var(--faint);}
+
+/* ── STORES ── */
+.stores-wrap{display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(10px,1.5vw,18px);margin-top:clamp(12px,2vh,22px);}
+.store-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;display:flex;flex-direction:column;}
+.store-card-head{padding:clamp(10px,1.6vh,16px) clamp(14px,2vw,20px);background:var(--elevated);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;}
+.store-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;background:var(--primary);}
+.store-card.s2 .store-dot{background:var(--secondary);}
+.store-card.s3 .store-dot{background:var(--third);}
+.store-filename{font-family:var(--font-mono);font-size:clamp(10px,1.1vw,13px);font-weight:600;color:var(--text);}
+.store-card-body{padding:clamp(14px,2vh,20px);flex:1;display:flex;flex-direction:column;gap:8px;}
+.store-half{font-family:var(--font-mono);font-size:clamp(22px,3vw,34px);font-weight:300;color:var(--primary);line-height:1;}
+.store-card.s2 .store-half{color:var(--secondary);}
+.store-card.s3 .store-half{color:var(--third);}
+.store-half-label{font-family:var(--font-mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);margin-top:-4px;}
+.store-desc{font-size:clamp(11px,1.2vw,14px);color:var(--faint);line-height:1.45;}
+.store-example{font-family:var(--font-mono);font-size:clamp(9px,.95vw,11px);color:var(--dim);background:var(--code-bg);border:1px solid var(--border);border-radius:4px;padding:6px 10px;margin-top:auto;line-height:1.55;font-style:italic;}
+
+/* ── TIERS 4-UP ── */
+.tiers4-wrap{display:grid;grid-template-columns:1fr 1fr;gap:clamp(10px,1.5vw,16px);flex:1;min-height:0;margin-top:clamp(10px,1.5vh,18px);}
+.tier4-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:clamp(14px,2vh,22px) clamp(14px,1.8vw,20px);display:flex;flex-direction:column;gap:6px;position:relative;overflow:hidden;}
+.tier4-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--primary);}
+.tier4-card.t2::before{background:var(--secondary);}
+.tier4-card.t3::before{background:var(--third);}
+.tier4-card.t4::before{background:var(--faint);}
+.tier4-badge{font-family:var(--font-mono);font-size:9px;font-weight:600;letter-spacing:.15em;text-transform:uppercase;padding:2px 8px;border-radius:3px;align-self:flex-start;background:var(--primary-d);color:var(--primary);border:1px solid rgba(59,158,221,.3);}
+.tier4-card.t2 .tier4-badge{background:var(--secondary-d);color:var(--secondary);border-color:rgba(245,200,66,.3);}
+.tier4-card.t3 .tier4-badge{background:var(--third-d);color:var(--third);border-color:rgba(78,205,196,.3);}
+.tier4-card.t4 .tier4-badge{background:rgba(58,96,128,.15);color:var(--dim);border-color:rgba(58,96,128,.3);}
+.tier4-name{font-size:clamp(15px,1.8vw,20px);font-weight:600;color:var(--text);}
+.tier4-desc{font-size:clamp(11px,1.2vw,14px);color:var(--faint);line-height:1.45;}
+.tier4-meta{font-family:var(--font-mono);font-size:clamp(10px,1.1vw,12px);}
+
+/* ── FORMULA ── */
+.formula-wrap{background:var(--code-bg);border:1px solid var(--border);border-radius:8px;padding:clamp(20px,3vh,32px) clamp(24px,3.5vw,40px);display:flex;align-items:center;justify-content:center;gap:clamp(16px,2.5vw,28px);flex-wrap:wrap;}
+.formula-main{font-family:var(--font-mono);font-size:clamp(20px,3.5vw,40px);font-weight:500;color:var(--text);letter-spacing:-.01em;white-space:nowrap;}
+.formula-main .f-var{color:var(--secondary);}
+.formula-main .f-const{color:var(--third);}
+.formula-main .f-op{color:var(--faint);}
+.formula-divider{width:1px;height:40px;background:var(--border);flex-shrink:0;}
+.formula-annotation{font-size:clamp(11px,1.2vw,14px);color:var(--faint);line-height:1.6;max-width:240px;}
+
+/* ── INJECT STEPS ── */
+.inject-steps{display:flex;flex-direction:column;gap:4px;}
+.inject-step{padding:8px 14px;border-radius:5px;background:var(--surface);border:1px solid var(--border);display:flex;align-items:center;gap:12px;}
+.inject-step.highlight{background:rgba(59,158,221,.1);border-color:var(--primary);}
+.inject-step-num{font-family:var(--font-mono);font-size:11px;font-weight:600;color:var(--faint);min-width:28px;}
+.inject-step.highlight .inject-step-num{color:var(--primary);}
+.inject-step-name{font-size:clamp(12px,1.4vw,16px);color:var(--dim);flex:1;}
+.inject-step.highlight .inject-step-name{color:var(--text);font-weight:500;}
+.inject-step-badge{font-family:var(--font-mono);font-size:9px;letter-spacing:.12em;padding:2px 7px;border-radius:3px;background:var(--primary-d);color:var(--primary);border:1px solid rgba(59,158,221,.3);}
+
+/* ── TERMINAL ── */
+.terminal{background:var(--code-bg);border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+.terminal-bar{padding:8px 14px;background:var(--elevated);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;}
+.terminal-dot{width:10px;height:10px;border-radius:50%;}
+.terminal-title{font-family:var(--font-mono);font-size:10px;color:var(--faint);letter-spacing:.1em;margin-left:4px;}
+.terminal-body{padding:clamp(14px,2.5vh,24px) clamp(16px,2.5vw,24px);}
+.terminal-body code{font-family:var(--font-mono);font-size:clamp(11px,1.3vw,14px);line-height:1.8;color:var(--code-text);display:block;white-space:pre;}
+.t-prompt{color:var(--third);}
+.t-ok{color:var(--third);}
+.t-num{color:var(--secondary);}
+.t-dim{color:var(--faint);}
+.t-key{color:var(--primary);}
+
+@media(max-width:900px){.stores-wrap,.tiers4-wrap{grid-template-columns:1fr;}.slide--split .slide__panels{grid-template-columns:1fr;}}
+@media print{.deck{overflow:visible;scroll-snap-type:none;}.slide{height:100vh;page-break-after:always;opacity:1!important;transform:none!important;}.deck-progress,.deck-dots,.deck-counter,.deck-hints{display:none!important;}}
+</style>
+</head>
+<body>
+<div class="deck">
+
+
+<!-- ═══════════════════════════════════
+  01 · TITLE  (centered)
+════════════════════════════════════ -->
+<section class="slide slide--title" style="background-image:linear-gradient(var(--grid-line) 1px,transparent 1px),linear-gradient(90deg,var(--grid-line) 1px,transparent 1px),radial-gradient(ellipse at 50% 15%,rgba(59,158,221,.14) 0%,transparent 55%),radial-gradient(ellipse at 80% 85%,rgba(139,92,246,.09) 0%,transparent 45%),radial-gradient(ellipse at 15% 75%,rgba(78,205,196,.07) 0%,transparent 40%);background-size:32px 32px,32px 32px,100% 100%,100% 100%,100% 100%;">
+  <svg class="slide__decor" style="top:0;right:0;" width="80" height="80" viewBox="0 0 80 80"><line x1="80" y1="0" x2="80" y2="28" stroke="#3b9edd" stroke-width="1.5" opacity=".25"/><line x1="52" y1="0" x2="80" y2="0" stroke="#3b9edd" stroke-width="1.5" opacity=".25"/></svg>
+  <svg class="slide__decor" style="bottom:0;left:0;" width="80" height="80" viewBox="0 0 80 80"><line x1="0" y1="52" x2="0" y2="80" stroke="#4ecdc4" stroke-width="1.5" opacity=".25"/><line x1="0" y1="80" x2="28" y2="80" stroke="#4ecdc4" stroke-width="1.5" opacity=".25"/></svg>
+
+  <div class="reveal" style="margin-bottom:clamp(20px,3.5vh,36px);">
+    <svg width="220" height="55" viewBox="0 0 480 120" xmlns="http://www.w3.org/2000/svg" style="display:block;margin:0 auto;">
+      <defs>
+        <linearGradient id="vG" x1="50%" y1="0%" x2="50%" y2="100%"><stop offset="0%" stop-color="#00d4ff"/><stop offset="52%" stop-color="#8b5cf6"/><stop offset="100%" stop-color="#6d28d9"/></linearGradient>
+        <linearGradient id="hG" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#00d4ff" stop-opacity="1"/><stop offset="45%" stop-color="#8b5cf6" stop-opacity=".7"/><stop offset="100%" stop-color="#00d4ff" stop-opacity=".45"/></linearGradient>
+        <linearGradient id="tG" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#c8e4ff"/><stop offset="45%" stop-color="#eef4ff"/><stop offset="80%" stop-color="#a5f3fc"/><stop offset="100%" stop-color="#c4b5fd"/></linearGradient>
+        <filter id="gl" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur in="SourceGraphic" stdDeviation="3.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+        <filter id="sb" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur in="SourceGraphic" stdDeviation="8"/></filter>
+      </defs>
+      <g transform="translate(12,7) scale(0.55)">
+        <polygon points="42,55 58,55 100,155 142,55 158,55 100,165" fill="#6d28d9" filter="url(#sb)" opacity=".5"/>
+        <polygon points="100,8 180,54 180,146 100,192 20,146 20,54" fill="#0b1422"/>
+        <polygon points="100,8 180,54 180,146 100,192 20,146 20,54" fill="none" stroke="url(#hG)" stroke-width="2" opacity=".9"/>
+        <polygon points="42,55 58,55 100,155 142,55 158,55 100,165" fill="url(#vG)"/>
+        <circle cx="42" cy="55" r="5" fill="#00d4ff" filter="url(#gl)"/><circle cx="158" cy="55" r="5" fill="#00d4ff" filter="url(#gl)"/>
+        <circle cx="100" cy="160" r="9" fill="#00d4ff" filter="url(#gl)"/><circle cx="100" cy="160" r="4" fill="white"/>
+      </g>
+      <line x1="128" y1="22" x2="128" y2="98" stroke="#00d4ff" stroke-width=".5" opacity=".18"/>
+      <text x="146" y="67" font-family="'DM Sans',sans-serif" font-size="40" font-weight="300" letter-spacing="9" fill="url(#tG)">VALORA</text>
+    </svg>
+  </div>
+
+  <div class="reveal"><span class="slide__eyebrow" style="justify-content:center;">Tech Pitch · 2026 · 30 min</span></div>
+  <h1 class="reveal slide__display" style="max-width:820px;">Teaching Machines<br>to Remember</h1>
+  <p class="reveal slide__subheading" style="max-width:620px;margin-top:clamp(14px,2.5vh,24px);">A Biologically-Inspired Persistent Memory<br>for AI Agent Orchestration</p>
+  <div class="reveal" style="margin-top:clamp(24px,4vh,40px);display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+    <span class="tag tag-blue">Episodic · Semantic · Decisions</span>
+    <span class="tag tag-teal">Zero Dependencies</span>
+    <span class="tag tag-amber">Ebbinghaus Forgetting Curve</span>
+  </div>
+</section>
+
+
+<!-- ═══════════════════════════════════
+  02 · THE PROBLEM  (left-heavy)
+════════════════════════════════════ -->
+<section class="slide" style="background-image:linear-gradient(var(--grid-line) 1px,transparent 1px),linear-gradient(90deg,var(--grid-line) 1px,transparent 1px),radial-gradient(ellipse at 90% 50%,rgba(255,107,107,.09) 0%,transparent 45%);background-size:32px 32px,32px 32px,100% 100%;">
+  <svg class="slide__decor" style="top:0;left:0;" width="70" height="70" viewBox="0 0 70 70"><line x1="0" y1="0" x2="24" y2="0" stroke="#ff6b6b" stroke-width="1.5" opacity=".2"/><line x1="0" y1="0" x2="0" y2="24" stroke="#ff6b6b" stroke-width="1.5" opacity=".2"/></svg>
+
+  <p class="reveal slide__eyebrow red">01 — The Amnesia Problem</p>
+  <h2 class="reveal slide__heading" style="max-width:680px;">11 agents. Every session<br>starts from zero.</h2>
+  <p class="reveal slide__body" style="max-width:560px;margin-top:clamp(10px,1.5vh,16px);">Valora orchestrates 11 specialised AI agents through multi-stage pipelines. Each is capable. But the moment a session ends, everything learned vanishes.</p>
+
+  <div class="reveal" style="display:flex;flex-direction:column;gap:clamp(8px,1.2vh,14px);margin-top:clamp(18px,3vh,30px);max-width:680px;">
+    <div class="card card-accent-top red" style="display:flex;align-items:flex-start;gap:14px;">
+      <svg width="20" height="20" viewBox="0 0 20 20" style="flex-shrink:0;margin-top:3px;"><circle cx="10" cy="10" r="9" fill="none" stroke="#ff6b6b" stroke-width="1.5"/><line x1="10" y1="6" x2="10" y2="11" stroke="#ff6b6b" stroke-width="2" stroke-linecap="round"/><circle cx="10" cy="14" r="1" fill="#ff6b6b"/></svg>
+      <div><p style="font-size:clamp(13px,1.5vw,17px);font-weight:600;color:var(--text);">Repeated mistakes</p><p style="font-size:clamp(12px,1.3vw,15px);color:var(--faint);margin-top:3px;">An agent flags the same anti-pattern in sprint 1, sprint 5, sprint 12. Each time a fresh discovery.</p></div>
+    </div>
+    <div class="card card-accent-top amber" style="display:flex;align-items:flex-start;gap:14px;">
+      <svg width="20" height="20" viewBox="0 0 20 20" style="flex-shrink:0;margin-top:3px;"><path d="M10 2 L18 18 H2 Z" fill="none" stroke="#f5c842" stroke-width="1.5" stroke-linejoin="round"/><line x1="10" y1="8" x2="10" y2="13" stroke="#f5c842" stroke-width="2" stroke-linecap="round"/><circle cx="10" cy="15.5" r="1" fill="#f5c842"/></svg>
+      <div><p style="font-size:clamp(13px,1.5vw,17px);font-weight:600;color:var(--text);">Rediscovered patterns</p><p style="font-size:clamp(12px,1.3vw,15px);color:var(--faint);margin-top:3px;">Conventions emerge in the codebase. Agents reverse-engineer them on every run instead of building on accumulated knowledge.</p></div>
+    </div>
+    <div class="card card-accent-top" style="display:flex;align-items:flex-start;gap:14px;">
+      <svg width="20" height="20" viewBox="0 0 20 20" style="flex-shrink:0;margin-top:3px;"><circle cx="10" cy="10" r="9" fill="none" stroke="#3b9edd" stroke-width="1.5"/><path d="M7 8 A3 3 0 1 1 13 8" fill="none" stroke="#3b9edd" stroke-width="1.5" stroke-linecap="round"/><line x1="10" y1="11" x2="10" y2="15" stroke="#3b9edd" stroke-width="1.5" stroke-linecap="round"/></svg>
+      <div><p style="font-size:clamp(13px,1.5vw,17px);font-weight:600;color:var(--text);">Lost decisions</p><p style="font-size:clamp(12px,1.3vw,15px);color:var(--faint);margin-top:3px;">The team chooses an architectural direction. Agents propose already-rejected alternatives. The <code style="font-family:var(--font-mono);color:var(--third);font-size:.9em;">knowledge-base/</code> directory was empty.</p></div>
+    </div>
+  </div>
+
+  <div class="reveal" style="margin-top:clamp(18px,2.8vh,28px);">
+    <div class="stat-bar">
+      <div class="stat-item"><span class="stat-value">11</span><span class="stat-label">Agents</span></div>
+      <div class="stat-item"><span class="stat-value red">0</span><span class="stat-label">Persistent memories</span></div>
+      <div class="stat-item"><span class="stat-value amber">∞</span><span class="stat-label">Repeated discoveries</span></div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ═══════════════════════════════════
+  03 · QUOTE  (centered)
+════════════════════════════════════ -->
+<section class="slide slide--quote" style="background-image:linear-gradient(var(--grid-line) 1px,transparent 1px),linear-gradient(90deg,var(--grid-line) 1px,transparent 1px),radial-gradient(ellipse at 50% 40%,rgba(139,92,246,.1) 0%,transparent 50%);background-size:32px 32px,32px 32px,100% 100%;">
+  <p class="reveal" style="font-family:var(--font-mono);font-size:clamp(9px,1.1vw,11px);letter-spacing:.2em;text-transform:uppercase;color:var(--purple);margin-bottom:clamp(18px,3vh,30px);">02 — Neuroscience Inspiration</p>
+  <div class="reveal slide__quote-mark">"</div>
+  <blockquote class="reveal">Without mental repetition, the newly formed connections in the brain are subject to a process of forgetting which, following a regular course, is most rapid immediately after learning.</blockquote>
+  <cite class="reveal">Hermann Ebbinghaus — Über das Gedächtnis, 1885</cite>
+  <div class="reveal" style="margin-top:clamp(24px,4vh,40px);display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+    <span class="tag tag-purple">The Forgetting Curve</span>
+    <span class="tag tag-blue">141 years old · still the specification</span>
+  </div>
+</section>
+
+
+<!-- ═══════════════════════════════════
+  04 · FORGETTING CURVE VISUAL  (right-heavy)
+════════════════════════════════════ -->
+<section class="slide" style="background-image:linear-gradient(var(--grid-line) 1px,transparent 1px),linear-gradient(90deg,var(--grid-line) 1px,transparent 1px),radial-gradient(ellipse at 10% 50%,rgba(139,92,246,.09) 0%,transparent 45%);background-size:32px 32px,32px 32px,100% 100%;">
+  <div style="display:grid;grid-template-columns:1fr 1.6fr;gap:clamp(32px,5vw,64px);align-items:center;height:100%;max-height:75vh;">
+    <div>
+      <p class="reveal slide__eyebrow purple">02 — Forgetting Curve</p>
+      <h2 class="reveal" style="font-size:clamp(22px,3.5vw,38px);font-weight:600;letter-spacing:-.01em;">Three stores.<br>Three timescales.</h2>
+      <p class="reveal" style="font-size:clamp(13px,1.5vw,17px);color:var(--faint);margin-top:clamp(12px,2vh,20px);line-height:1.6;">Each memory category has a half-life tuned to its nature. Observations fade fast. Patterns persist. Decisions outlive both.</p>
+      <div class="reveal" style="display:flex;flex-direction:column;gap:10px;margin-top:clamp(16px,2.8vh,26px);">
+        <div style="display:flex;align-items:center;gap:10px;"><svg width="28" height="12"><line x1="0" y1="6" x2="28" y2="6" stroke="#ff6b6b" stroke-width="2.5"/></svg><span style="font-family:var(--font-mono);font-size:clamp(10px,1.1vw,13px);color:var(--text);">episodic.json</span><span class="tag tag-red">7d</span></div>
+        <div style="display:flex;align-items:center;gap:10px;"><svg width="28" height="12"><line x1="0" y1="6" x2="28" y2="6" stroke="#f5c842" stroke-width="2.5"/></svg><span style="font-family:var(--font-mono);font-size:clamp(10px,1.1vw,13px);color:var(--text);">decisions.json</span><span class="tag tag-amber">21d</span></div>
+        <div style="display:flex;align-items:center;gap:10px;"><svg width="28" height="12"><line x1="0" y1="6" x2="28" y2="6" stroke="#4ecdc4" stroke-width="2.5"/></svg><span style="font-family:var(--font-mono);font-size:clamp(10px,1.1vw,13px);color:var(--text);">semantic.json</span><span class="tag tag-teal">30d</span></div>
+      </div>
+      <p class="reveal" style="font-family:var(--font-mono);font-size:clamp(12px,1.4vw,15px);margin-top:clamp(18px,2.8vh,26px);color:var(--third);background:var(--third-d);border:1px solid rgba(78,205,196,.2);border-radius:5px;padding:8px 14px;display:inline-block;">strength = 0.5^(elapsed / halfLife)</p>
+    </div>
+
+    <div class="reveal" style="background:var(--code-bg);border:1px solid var(--border);border-radius:10px;padding:clamp(16px,2.5vh,24px);position:relative;">
+      <span style="position:absolute;top:-11px;left:20px;font-family:var(--font-mono);font-size:10px;font-weight:600;padding:3px 10px;border-radius:4px;background:var(--purple);color:#fff;">Ebbinghaus Forgetting Curve</span>
+      <svg viewBox="0 0 420 165" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;">
+        <!-- grid -->
+        <line x1="40" y1="20" x2="410" y2="20" stroke="rgba(59,158,221,.08)" stroke-width="1"/>
+        <line x1="40" y1="52" x2="410" y2="52" stroke="rgba(59,158,221,.08)" stroke-width="1"/>
+        <line x1="40" y1="84" x2="410" y2="84" stroke="rgba(59,158,221,.08)" stroke-width="1"/>
+        <line x1="40" y1="116" x2="410" y2="116" stroke="rgba(59,158,221,.08)" stroke-width="1"/>
+        <line x1="40" y1="148" x2="410" y2="148" stroke="rgba(59,158,221,.08)" stroke-width="1"/>
+        <line x1="40"  y1="20" x2="40"  y2="148" stroke="rgba(59,158,221,.08)" stroke-width="1"/>
+        <line x1="106" y1="20" x2="106" y2="148" stroke="rgba(59,158,221,.08)" stroke-width="1"/>
+        <line x1="172" y1="20" x2="172" y2="148" stroke="rgba(59,158,221,.08)" stroke-width="1"/>
+        <line x1="238" y1="20" x2="238" y2="148" stroke="rgba(59,158,221,.08)" stroke-width="1"/>
+        <line x1="304" y1="20" x2="304" y2="148" stroke="rgba(59,158,221,.08)" stroke-width="1"/>
+        <line x1="370" y1="20" x2="370" y2="148" stroke="rgba(59,158,221,.08)" stroke-width="1"/>
+        <!-- y labels -->
+        <text x="32" y="24"  text-anchor="end" font-family="'Fira Code',monospace" font-size="9" fill="#3a6080">1.0</text>
+        <text x="32" y="88"  text-anchor="end" font-family="'Fira Code',monospace" font-size="9" fill="#3a6080">0.5</text>
+        <text x="32" y="152" text-anchor="end" font-family="'Fira Code',monospace" font-size="9" fill="#3a6080">0.0</text>
+        <!-- x labels -->
+        <text x="40"  y="160" text-anchor="middle" font-family="'Fira Code',monospace" font-size="9" fill="#3a6080">0</text>
+        <text x="106" y="160" text-anchor="middle" font-family="'Fira Code',monospace" font-size="9" fill="#3a6080">7d</text>
+        <text x="172" y="160" text-anchor="middle" font-family="'Fira Code',monospace" font-size="9" fill="#3a6080">14d</text>
+        <text x="238" y="160" text-anchor="middle" font-family="'Fira Code',monospace" font-size="9" fill="#3a6080">21d</text>
+        <text x="304" y="160" text-anchor="middle" font-family="'Fira Code',monospace" font-size="9" fill="#3a6080">28d</text>
+        <text x="370" y="160" text-anchor="middle" font-family="'Fira Code',monospace" font-size="9" fill="#3a6080">30d</text>
+        <!-- half-strength reference -->
+        <line x1="40" y1="84" x2="410" y2="84" stroke="rgba(59,158,221,.15)" stroke-width="1" stroke-dasharray="4,4"/>
+        <text x="414" y="87" font-family="'Fira Code',monospace" font-size="8" fill="#3b9edd" opacity=".7">½</text>
+        <!-- episodic 7d red: y=20+(1-0.5^(d/7))*128 -->
+        <polyline points="40,20 53,31 66,42 80,52 93,61 106,84 120,93 133,101 150,108 172,116 200,124 238,131 304,139 370,142" fill="none" stroke="#ff6b6b" stroke-width="2.2" stroke-linejoin="round" opacity=".9"/>
+        <circle cx="106" cy="84" r="4" fill="none" stroke="#ff6b6b" stroke-width="1.5"/>
+        <line x1="106" y1="20" x2="106" y2="84" stroke="#ff6b6b" stroke-width="1" stroke-dasharray="3,3" opacity=".35"/>
+        <text x="109" y="18" font-family="'Fira Code',monospace" font-size="8" fill="#ff6b6b" opacity=".8">½ @ 7d</text>
+        <!-- decisions 21d amber: y=20+(1-0.5^(d/21))*128 -->
+        <polyline points="40,20 66,29 106,40 133,47 172,57 200,63 238,84 280,93 304,99 370,110" fill="none" stroke="#f5c842" stroke-width="2.2" stroke-linejoin="round" opacity=".9"/>
+        <circle cx="238" cy="84" r="4" fill="none" stroke="#f5c842" stroke-width="1.5"/>
+        <line x1="238" y1="20" x2="238" y2="84" stroke="#f5c842" stroke-width="1" stroke-dasharray="3,3" opacity=".35"/>
+        <text x="241" y="18" font-family="'Fira Code',monospace" font-size="8" fill="#f5c842" opacity=".8">½ @ 21d</text>
+        <!-- semantic 30d teal: y=20+(1-0.5^(d/30))*128 -->
+        <polyline points="40,20 80,28 133,36 172,43 238,55 304,67 370,84" fill="none" stroke="#4ecdc4" stroke-width="2.2" stroke-linejoin="round" opacity=".9"/>
+        <circle cx="370" cy="84" r="4" fill="none" stroke="#4ecdc4" stroke-width="1.5"/>
+        <text x="374" y="83" font-family="'Fira Code',monospace" font-size="8" fill="#4ecdc4" opacity=".8">½ @ 30d</text>
+      </svg>
+    </div>
+  </div>
+</section>
+
+
+<!-- ═══════════════════════════════════
+  05 · BIO → AGENT MAPPING  (split)
+════════════════════════════════════ -->
+<section class="slide slide--split">
+  <div class="slide__panels">
+    <div class="slide__panel slide__panel--primary" style="background-image:radial-gradient(ellipse at 30% 60%,rgba(139,92,246,.08) 0%,transparent 50%);">
+      <p class="reveal slide__eyebrow purple">Neuroscience</p>
+      <h2 class="reveal" style="font-size:clamp(20px,3vw,32px);font-weight:600;letter-spacing:-.01em;margin-bottom:clamp(16px,2.5vh,24px);">The biological model</h2>
+      <div class="reveal" style="display:flex;flex-direction:column;gap:clamp(10px,1.5vh,16px);">
+        <div style="padding:clamp(12px,1.8vh,18px);background:var(--elevated);border-radius:6px;border-left:3px solid var(--purple);"><p style="font-size:clamp(13px,1.5vw,17px);font-weight:600;color:var(--text);">Ebbinghaus Forgetting Curve</p><p style="font-size:clamp(11px,1.2vw,14px);color:var(--faint);margin-top:4px;">Memory strength decays exponentially without reinforcement.</p></div>
+        <div style="padding:clamp(12px,1.8vh,18px);background:var(--elevated);border-radius:6px;border-left:3px solid var(--secondary);"><p style="font-size:clamp(13px,1.5vw,17px);font-weight:600;color:var(--text);">Spaced Repetition</p><p style="font-size:clamp(11px,1.2vw,14px);color:var(--faint);margin-top:4px;">Retrieving a memory strengthens it, pushing the decay curve into the future.</p></div>
+        <div style="padding:clamp(12px,1.8vh,18px);background:var(--elevated);border-radius:6px;border-left:3px solid var(--red);"><p style="font-size:clamp(13px,1.5vw,17px);font-weight:600;color:var(--text);">Error Amplification (Amygdala)</p><p style="font-size:clamp(11px,1.2vw,14px);color:var(--faint);margin-top:4px;">Mistakes are tagged with extra durability. We remember embarrassments longer than trivia.</p></div>
+        <div style="padding:clamp(12px,1.8vh,18px);background:var(--elevated);border-radius:6px;border-left:3px solid var(--third);"><p style="font-size:clamp(13px,1.5vw,17px);font-weight:600;color:var(--text);">Hippocampal Consolidation</p><p style="font-size:clamp(11px,1.2vw,14px);color:var(--faint);margin-top:4px;">Episodic memories compress into semantic knowledge during low-activity periods (sleep).</p></div>
+      </div>
+    </div>
+    <div class="slide__panel slide__panel--secondary" style="background-image:radial-gradient(ellipse at 70% 40%,rgba(59,158,221,.08) 0%,transparent 50%);">
+      <p class="reveal slide__eyebrow">Valora equivalent</p>
+      <h2 class="reveal" style="font-size:clamp(20px,3vw,32px);font-weight:600;letter-spacing:-.01em;margin-bottom:clamp(16px,2.5vh,24px);">The agent model</h2>
+      <div class="reveal" style="display:flex;flex-direction:column;gap:clamp(10px,1.5vh,16px);">
+        <div style="padding:clamp(12px,1.8vh,18px);background:var(--surface);border-radius:6px;border-left:3px solid var(--primary);"><p style="font-family:var(--font-mono);font-size:clamp(12px,1.4vw,16px);color:var(--third);">strength = 0.5^(t / halfLife)</p><p style="font-size:clamp(11px,1.2vw,14px);color:var(--faint);margin-top:4px;">The specification taken directly from Ebbinghaus. Pure maths, zero abstractions.</p></div>
+        <div style="padding:clamp(12px,1.8vh,18px);background:var(--surface);border-radius:6px;border-left:3px solid var(--secondary);"><p style="font-family:var(--font-mono);font-size:clamp(12px,1.4vw,16px);color:var(--secondary);">halfLife += accessCount × 2d</p><p style="font-size:clamp(11px,1.2vw,14px);color:var(--faint);margin-top:4px;">Each retrieval adds 2 days to the effective half-life. Frequently queried patterns persist.</p></div>
+        <div style="padding:clamp(12px,1.8vh,18px);background:var(--surface);border-radius:6px;border-left:3px solid var(--red);"><p style="font-family:var(--font-mono);font-size:clamp(12px,1.4vw,16px);color:var(--red);">isError → halfLife × 2</p><p style="font-size:clamp(11px,1.2vw,14px);color:var(--faint);margin-top:4px;">Error entries get double the base half-life. Hard lessons outlive routine observations.</p></div>
+        <div style="padding:clamp(12px,1.8vh,18px);background:var(--surface);border-radius:6px;border-left:3px solid var(--third);"><p style="font-family:var(--font-mono);font-size:clamp(12px,1.4vw,16px);color:var(--third);">valora consolidate</p><p style="font-size:clamp(11px,1.2vw,14px);color:var(--faint);margin-top:4px;">Jaccard-similarity merge promotes observations into durable semantic patterns.</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ═══════════════════════════════════
+  06 · SYSTEM ARCHITECTURE  (left-heavy, stores)
+════════════════════════════════════ -->
+<section class="slide" style="background-image:linear-gradient(var(--grid-line) 1px,transparent 1px),linear-gradient(90deg,var(--grid-line) 1px,transparent 1px),radial-gradient(ellipse at 85% 20%,rgba(59,158,221,.1) 0%,transparent 45%);background-size:32px 32px,32px 32px,100% 100%;">
+  <p class="reveal slide__eyebrow">03 — System Architecture</p>
+  <h2 class="reveal slide__heading">Three stores. One coherent model.</h2>
+  <p class="reveal slide__body" style="max-width:640px;margin-top:clamp(8px,1.2vh,14px);">All memory lives under <code style="font-family:var(--font-mono);color:var(--third);">.valora/memory/</code> — gitignored by default, per-project, zero infrastructure required.</p>
+
+  <div class="reveal stores-wrap" style="flex:1;min-height:0;align-items:stretch;">
+    <div class="store-card">
+      <div class="store-card-head"><div class="store-dot"></div><span class="store-filename">episodic.json</span><span class="tag tag-red" style="margin-left:auto;">7 days</span></div>
+      <div class="store-card-body">
+        <div class="store-half" style="color:var(--red);">7<span style="font-size:.55em;letter-spacing:0;">d</span></div>
+        <div class="store-half-label">Default half-life</div>
+        <div class="store-desc">Raw timestamped observations written during pipeline execution. Decays quickly — noisy, context-specific, short-lived by design.</div>
+        <div class="store-example">"no-console lint rule triggered in src/cli/index.ts — suppressed with eslint-disable"</div>
+      </div>
+    </div>
+    <div class="store-card s2">
+      <div class="store-card-head"><div class="store-dot"></div><span class="store-filename">decisions.json</span><span class="tag tag-amber" style="margin-left:auto;">21 days</span></div>
+      <div class="store-card-body">
+        <div class="store-half">21<span style="font-size:.55em;letter-spacing:0;">d</span></div>
+        <div class="store-half-label">Default half-life</div>
+        <div class="store-desc">Architectural choices with rationale. Middle decay rate — decisions age, but the reasoning behind them matters longer than observations.</div>
+        <div class="store-example">"Auth middleware rewritten for compliance, not tech debt — session tokens stored differently"</div>
+      </div>
+    </div>
+    <div class="store-card s3">
+      <div class="store-card-head"><div class="store-dot"></div><span class="store-filename">semantic.json</span><span class="tag tag-teal" style="margin-left:auto;">30 days</span></div>
+      <div class="store-card-body">
+        <div class="store-half">30<span style="font-size:.55em;letter-spacing:0;">d</span></div>
+        <div class="store-half-label">Default half-life</div>
+        <div class="store-desc">Distilled, reusable patterns consolidated from multiple episodic observations. Validated knowledge. Survives the longest.</div>
+        <div class="store-example">"Integration tests always use Testcontainers; mock-based integration tests are forbidden"</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="reveal" style="margin-top:clamp(12px,2vh,20px);display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+    <span class="tag tag-teal">Zero new runtime dependencies</span>
+    <span class="tag tag-blue">Pure TypeScript · File I/O only</span>
+    <span style="font-family:var(--font-mono);font-size:11px;color:var(--faint);">Up to 500 entries per store · configurable</span>
+  </div>
+</section>
+
+
+<!-- ═══════════════════════════════════
+  07 · DECAY ENGINE  (centered, code)
+════════════════════════════════════ -->
+<section class="slide" style="align-items:center;background-image:linear-gradient(var(--grid-line) 1px,transparent 1px),linear-gradient(90deg,var(--grid-line) 1px,transparent 1px),radial-gradient(ellipse at 50% 85%,rgba(245,200,66,.07) 0%,transparent 45%);background-size:32px 32px,32px 32px,100% 100%;">
+  <p class="reveal slide__eyebrow amber" style="align-self:center;">04 — The Decay Engine</p>
+  <h2 class="reveal slide__heading" style="text-align:center;margin-bottom:clamp(18px,3vh,30px);">One formula governs all memory.</h2>
+
+  <div class="reveal formula-wrap" style="margin-bottom:clamp(16px,2.5vh,26px);">
+    <div class="formula-main"><span class="f-var">strength</span><span class="f-op"> = </span><span class="f-const">0.5</span><span class="f-op"> ^ ( </span><span class="f-var">elapsed</span><span class="f-op"> / </span><span class="f-var">halfLife</span><span class="f-op"> )</span></div>
+    <div class="formula-divider"></div>
+    <div class="formula-annotation">At <strong style="color:var(--text);">t=0</strong>, strength is <strong style="color:var(--text);">1.0</strong>.<br>After one half-life, <strong style="color:var(--secondary);">0.5</strong>.<br>Asymptotic — no hard expiry cliffs.</div>
+  </div>
+
+  <div class="reveal code-block" style="max-width:820px;">
+    <span class="code-filename amber">decay.ts</span>
+    <pre><code><span class="kw">export function</span> <span class="hl2">computeStrength</span>(referenceAt<span class="tp">: string</span>, halfLifeDays<span class="tp">: number</span>, now = Date.now())<span class="tp">: number</span> {
+  <span class="kw">const</span> elapsedDays = (now - <span class="kw">new</span> Date(referenceAt).getTime()) / <span class="hl3">MS_PER_DAY</span>;
+  <span class="kw">return</span> Math.pow(<span class="hl">0.5</span>, elapsedDays / halfLifeDays);  <span class="cm">// now injectable for deterministic tests</span>
+}
+
+<span class="kw">export function</span> <span class="hl2">computeEffectiveHalfLife</span>(
+  base<span class="tp">: number</span>, accessCount<span class="tp">: number</span>, isError<span class="tp">: boolean</span>,
+  retrievalBoostDays = <span class="hl">2</span>, errorMultiplier = <span class="hl">2</span>
+)<span class="tp">: number</span> {
+  <span class="kw">const</span> b = isError ? base * errorMultiplier : base;   <span class="cm">// amygdala effect</span>
+  <span class="kw">return</span> b + accessCount * retrievalBoostDays;          <span class="cm">// spaced repetition</span>
+}</code></pre>
+  </div>
+
+  <div class="reveal" style="display:flex;gap:clamp(10px,1.5vw,16px);margin-top:clamp(14px,2.2vh,22px);flex-wrap:wrap;justify-content:center;">
+    <div style="background:var(--elevated);border:1px solid var(--border);border-radius:5px;padding:8px 16px;text-align:center;"><div style="font-family:var(--font-mono);font-size:clamp(16px,2vw,22px);color:var(--secondary);font-weight:500;">2×</div><div style="font-family:var(--font-mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);">Error multiplier</div></div>
+    <div style="background:var(--elevated);border:1px solid var(--border);border-radius:5px;padding:8px 16px;text-align:center;"><div style="font-family:var(--font-mono);font-size:clamp(16px,2vw,22px);color:var(--third);font-weight:500;">+2d</div><div style="font-family:var(--font-mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);">Per retrieval</div></div>
+    <div style="background:var(--elevated);border:1px solid var(--border);border-radius:5px;padding:8px 16px;text-align:center;"><div style="font-family:var(--font-mono);font-size:clamp(16px,2vw,22px);color:var(--primary);font-weight:500;">0.05</div><div style="font-family:var(--font-mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);">Prune threshold</div></div>
+    <div style="background:var(--elevated);border:1px solid var(--border);border-radius:5px;padding:8px 16px;text-align:center;"><div style="font-family:var(--font-mono);font-size:clamp(16px,2vw,22px);color:var(--purple);font-weight:500;">pure fn</div><div style="font-family:var(--font-mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);">No side effects</div></div>
+  </div>
+</section>
+
+
+<!-- ═══════════════════════════════════
+  08 · CONFIDENCE TIERS  (right-heavy, 2×2)
+════════════════════════════════════ -->
+<section class="slide" style="background-image:linear-gradient(var(--grid-line) 1px,transparent 1px),linear-gradient(90deg,var(--grid-line) 1px,transparent 1px),radial-gradient(ellipse at 5% 50%,rgba(59,158,221,.09) 0%,transparent 40%);background-size:32px 32px,32px 32px,100% 100%;">
+  <div style="display:grid;grid-template-columns:1fr 1.5fr;gap:clamp(32px,5vw,60px);align-items:center;height:100%;max-height:80vh;">
+    <div>
+      <p class="reveal slide__eyebrow">04 — Memory Entry</p>
+      <h2 class="reveal" style="font-size:clamp(22px,3.2vw,36px);font-weight:600;letter-spacing:-.01em;margin-bottom:clamp(14px,2vh,22px);">Confidence tiers<br>drive injection order.</h2>
+      <p class="reveal" style="font-size:clamp(13px,1.5vw,17px);color:var(--faint);line-height:1.6;margin-bottom:clamp(14px,2vh,20px);">Every entry carries a confidence tier. Agents weight memories accordingly: higher tiers override lower ones when they conflict.</p>
+      <div class="reveal code-block">
+        <span class="code-filename">memory.types.ts</span>
+        <pre><code><span class="kw">type</span> <span class="tp">ConfidenceTier</span> =
+  | <span class="str">'verified'</span>   <span class="cm">// ← highest trust</span>
+  | <span class="str">'observed'</span>
+  | <span class="str">'inferred'</span>
+  | <span class="str">'stale'</span>;    <span class="cm">// ← never injected</span>
+
+<span class="cm">// Injection: verified → observed → inferred
+// Stale entries are always excluded.</span></code></pre>
+      </div>
+    </div>
+
+    <div class="reveal tiers4-wrap">
+      <div class="tier4-card"><div class="tier4-badge">Verified</div><div class="tier4-name">Confirmed truth</div><div class="tier4-desc">Multiple agents or runs have validated this observation. Highest priority in prompt injection — respected most.</div><div class="tier4-meta" style="color:var(--primary);">→ Injected first</div></div>
+      <div class="tier4-card t2"><div class="tier4-badge">Observed</div><div class="tier4-name">Single-source fact</div><div class="tier4-desc">Recorded once by one agent. Reliable enough to surface, but not yet corroborated. Second priority.</div><div class="tier4-meta" style="color:var(--secondary);">→ Injected second</div></div>
+      <div class="tier4-card t3"><div class="tier4-badge">Inferred</div><div class="tier4-name">Derived pattern</div><div class="tier4-desc">Generated by Jaccard-similarity consolidation. A potential pattern, not confirmed. Third priority.</div><div class="tier4-meta" style="color:var(--third);">→ Injected last</div></div>
+      <div class="tier4-card t4"><div class="tier4-badge">Stale</div><div class="tier4-name">Git-invalidated</div><div class="tier4-desc">Downgraded when <code style="font-family:var(--font-mono);font-size:10px;">relatedPaths</code> intersect with files changed since last consolidation. Reverted decisions auto-stale.</div><div class="tier4-meta" style="color:var(--faint);">→ Never injected</div></div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ═══════════════════════════════════
+  09 · CONSOLIDATION PIPELINE  (full pipeline)
+════════════════════════════════════ -->
+<section class="slide" style="background-image:linear-gradient(var(--grid-line) 1px,transparent 1px),linear-gradient(90deg,var(--grid-line) 1px,transparent 1px),radial-gradient(ellipse at 50% 10%,rgba(78,205,196,.09) 0%,transparent 45%);background-size:32px 32px,32px 32px,100% 100%;">
+  <p class="reveal slide__eyebrow teal">05 — Consolidation Pipeline</p>
+  <h2 class="reveal slide__heading">Individual observations become shared wisdom.</h2>
+  <p class="reveal slide__body" style="max-width:700px;margin-top:clamp(8px,1.2vh,14px);">Triggered via <code style="font-family:var(--font-mono);color:var(--third);">valora consolidate</code> or automatically after a successful <code style="font-family:var(--font-mono);color:var(--third);">feedback</code> pipeline. Four steps, always in sequence.</p>
+
+  <div class="reveal pipeline">
+    <div class="pipeline-step">
+      <div class="pipeline-num">STEP 01</div>
+      <div class="pipeline-name">Prune decayed entries</div>
+      <div class="pipeline-desc">Compute <code style="font-family:var(--font-mono);font-size:10px;color:var(--third);">computeStrength()</code> for every entry. Remove entries below the prune threshold (0.05). Stores stay lean automatically — no manual housekeeping.</div>
+      <div class="pipeline-cmd">strength &lt; 0.05 → delete</div>
+    </div>
+    <div class="pipeline-arrow">→</div>
+    <div class="pipeline-step s2">
+      <div class="pipeline-num">STEP 02</div>
+      <div class="pipeline-name">Git invalidation</div>
+      <div class="pipeline-desc">Run <code style="font-family:var(--font-mono);font-size:9px;color:var(--secondary);">git log --name-only --since=lastConsolidatedAt</code>. Entries whose <code style="font-family:var(--font-mono);font-size:9px;">relatedPaths</code> intersect changed files are downgraded to <em>stale</em>.</div>
+      <div class="pipeline-cmd" style="background:var(--secondary-d);color:var(--secondary);border-color:rgba(245,200,66,.2);">paths ∩ changed → stale</div>
+    </div>
+    <div class="pipeline-arrow">→</div>
+    <div class="pipeline-step s3">
+      <div class="pipeline-num">STEP 03</div>
+      <div class="pipeline-name">Jaccard similarity merge</div>
+      <div class="pipeline-desc">Scan episodic entries pairwise. Compute <code style="font-family:var(--font-mono);font-size:9px;color:var(--third);">|A∩B| / |A∪B|</code> on tag sets. Pairs with overlap ≥ 0.6 merge into a semantic entry. No embeddings required.</div>
+      <div class="pipeline-cmd">Jaccard ≥ 0.6 → semantic</div>
+    </div>
+    <div class="pipeline-arrow">→</div>
+    <div class="pipeline-step s4">
+      <div class="pipeline-num">STEP 04</div>
+      <div class="pipeline-name">Auto-promote</div>
+      <div class="pipeline-desc">High-access <em>verified</em> episodic entries not caught by similarity merge are promoted to the semantic store directly. Patterns agents repeatedly query deserve a longer half-life.</div>
+      <div class="pipeline-cmd" style="background:var(--purple-d);color:var(--purple);border-color:rgba(139,92,246,.2);">verified + high-access → semantic</div>
+    </div>
+  </div>
+
+  <div class="reveal" style="margin-top:clamp(14px,2.2vh,22px);">
+    <div class="stat-bar">
+      <div class="stat-item"><span class="stat-value red">pruned</span><span class="stat-label">Decayed entries</span></div>
+      <div class="stat-item"><span class="stat-value amber">gitInvalidated</span><span class="stat-label">Code-staled</span></div>
+      <div class="stat-item"><span class="stat-value teal">merged</span><span class="stat-label">Episodic→semantic</span></div>
+      <div class="stat-item"><span class="stat-value purple">promoted</span><span class="stat-label">Auto-elevated</span></div>
+      <div class="stat-item"><span class="stat-value">durationMs</span><span class="stat-label">Cycle time</span></div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ═══════════════════════════════════
+  10 · CONTEXT INJECTION  (centered/split)
+════════════════════════════════════ -->
+<section class="slide" style="background-image:linear-gradient(var(--grid-line) 1px,transparent 1px),linear-gradient(90deg,var(--grid-line) 1px,transparent 1px),radial-gradient(ellipse at 50% 10%,rgba(59,158,221,.1) 0%,transparent 45%);background-size:32px 32px,32px 32px,100% 100%;">
+  <div style="display:grid;grid-template-columns:1fr 1.4fr;gap:clamp(32px,5vw,56px);align-items:center;max-height:80vh;height:100%;width:100%;">
+    <div>
+      <p class="reveal slide__eyebrow">06 — Context Injection</p>
+      <h2 class="reveal" style="font-size:clamp(20px,3vw,34px);font-weight:600;letter-spacing:-.01em;margin-bottom:clamp(12px,2vh,20px);">Memory arrives<br>at step 5.25.</h2>
+      <p class="reveal" style="font-size:clamp(13px,1.5vw,17px);color:var(--faint);line-height:1.6;margin-bottom:clamp(16px,2.5vh,24px);">Inserted in <code style="font-family:var(--font-mono);color:var(--third);">buildSystemMessage()</code> — after project knowledge, before the codebase map. Stale excluded. Token budget: 2 000.</p>
+      <div class="reveal inject-steps">
+        <div class="inject-step"><span class="inject-step-num">1</span><span class="inject-step-name">Project Guidance</span></div>
+        <div class="inject-step"><span class="inject-step-num">2</span><span class="inject-step-name">Agent Profile</span></div>
+        <div class="inject-step"><span class="inject-step-num">3</span><span class="inject-step-name">Prompt Content</span></div>
+        <div class="inject-step"><span class="inject-step-num">4</span><span class="inject-step-name">Available Agents</span></div>
+        <div class="inject-step"><span class="inject-step-num">5</span><span class="inject-step-name">Project Knowledge</span></div>
+        <div class="inject-step highlight"><span class="inject-step-num">5.25</span><span class="inject-step-name">Agent Memory</span><span class="inject-step-badge">NEW</span></div>
+        <div class="inject-step"><span class="inject-step-num">5.5</span><span class="inject-step-name">Codebase Map</span></div>
+        <div class="inject-step"><span class="inject-step-num">6</span><span class="inject-step-name">Output Format</span></div>
+        <div class="inject-step"><span class="inject-step-num">7</span><span class="inject-step-name">Escalation</span></div>
+      </div>
+    </div>
+
+    <div class="reveal code-block">
+      <span class="code-filename teal">Injected AGENT MEMORY block</span>
+      <pre><code><span class="hl3">## AGENT MEMORY (LEARNED PATTERNS &amp; DECISIONS)</span>
+
+<span class="cm">Memories from previous sessions, grouped by confidence.
+Weight decisions: VERIFIED &gt; OBSERVED &gt; INFERRED.</span>
+
+<span class="hl">### VERIFIED MEMORIES</span>
+
+- <span class="hl2">[decisions]</span> Auth middleware rewritten for compliance,
+  not tech debt <span class="cm">_(files: src/auth/middleware.ts)_</span>
+  <span class="cm">_Tags: auth, compliance, architecture_</span>
+
+<span class="hl">### OBSERVED MEMORIES</span>
+
+- <span class="hl2">[semantic]</span> All integration tests use Testcontainers;
+  mock-based integration tests are forbidden
+  <span class="cm">_Tags: testing, integration, containers_</span>
+
+- <span class="hl2">[semantic]</span> Named exports used exclusively in this project
+  <span class="cm">_Tags: code-style, exports, typescript_</span>
+
+<span class="cm">---</span></code></pre>
+    </div>
+  </div>
+</section>
+
+
+<!-- ═══════════════════════════════════
+  11 · DESIGN TRADE-OFFS  (arch layers)
+════════════════════════════════════ -->
+<section class="slide" style="background-image:linear-gradient(var(--grid-line) 1px,transparent 1px),linear-gradient(90deg,var(--grid-line) 1px,transparent 1px),radial-gradient(ellipse at 90% 75%,rgba(255,107,107,.07) 0%,transparent 40%);background-size:32px 32px,32px 32px,100% 100%;">
+  <p class="reveal slide__eyebrow red">07 — Design Trade-offs</p>
+  <h2 class="reveal slide__heading">Every alternative was evaluated.<br>Each rejected for concrete reasons.</h2>
+
+  <div class="reveal arch-wrap">
+    <div class="arch-layer" style="border-left-color:var(--red);">
+      <div class="arch-layer-label" style="color:var(--red);">Hippo Memory</div>
+      <div class="arch-components">
+        <div class="arch-comp" style="background:var(--red-d);border-color:rgba(255,107,107,.25);color:var(--red);">Node 22.5+ required</div>
+        <div class="arch-comp" style="background:var(--red-d);border-color:rgba(255,107,107,.25);color:var(--red);">SQLite native binary dep</div>
+        <div class="arch-comp" style="background:var(--red-d);border-color:rgba(255,107,107,.25);color:var(--red);">Single-agent design</div>
+        <div class="arch-comp" style="background:var(--red-d);border-color:rgba(255,107,107,.25);color:var(--red);">Overlaps SessionContextManager</div>
+      </div>
+    </div>
+    <div class="arch-layer s2">
+      <div class="arch-layer-label">SQLite + Embeddings</div>
+      <div class="arch-components">
+        <div class="arch-comp" style="background:var(--secondary-d);border-color:rgba(245,200,66,.25);color:var(--secondary);">better-sqlite3 native binary</div>
+        <div class="arch-comp" style="background:var(--secondary-d);border-color:rgba(245,200,66,.25);color:var(--secondary);">External API for similarity</div>
+        <div class="arch-comp" style="background:var(--secondary-d);border-color:rgba(245,200,66,.25);color:var(--secondary);">Higher cold-start cost</div>
+      </div>
+    </div>
+    <div class="arch-layer s3">
+      <div class="arch-layer-label">In-memory only</div>
+      <div class="arch-components">
+        <div class="arch-comp" style="background:var(--third-d);border-color:rgba(78,205,196,.25);color:var(--third);">Defeats the purpose</div>
+        <div class="arch-comp" style="background:var(--third-d);border-color:rgba(78,205,196,.25);color:var(--third);">No cross-session persistence</div>
+        <div class="arch-comp" style="background:var(--third-d);border-color:rgba(78,205,196,.25);color:var(--third);">Already handled by SessionContextManager</div>
+      </div>
+    </div>
+    <div class="arch-layer s4">
+      <div class="arch-layer-label">Redis / KV store</div>
+      <div class="arch-components">
+        <div class="arch-comp" style="background:var(--red-d);border-color:rgba(255,107,107,.25);color:var(--red);">Infrastructure dependency</div>
+        <div class="arch-comp" style="background:var(--red-d);border-color:rgba(255,107,107,.25);color:var(--red);">Violates ADR-001 / ADR-003</div>
+        <div class="arch-comp" style="background:var(--red-d);border-color:rgba(255,107,107,.25);color:var(--red);">"Zero infrastructure" principle</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="reveal" style="margin-top:clamp(14px,2.2vh,22px);display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+    <span class="tag tag-teal">Chosen: pure TypeScript · JSON stores · Jaccard tags</span>
+    <span class="tag tag-blue">0 new runtime dependencies · patch version bump only</span>
+  </div>
+</section>
+
+
+<!-- ═══════════════════════════════════
+  12 · RESULTS & WHAT'S NEXT  (split + terminal)
+════════════════════════════════════ -->
+<section class="slide" style="background-image:linear-gradient(var(--grid-line) 1px,transparent 1px),linear-gradient(90deg,var(--grid-line) 1px,transparent 1px),radial-gradient(ellipse at 50% 20%,rgba(59,158,221,.13) 0%,transparent 50%),radial-gradient(ellipse at 20% 80%,rgba(78,205,196,.08) 0%,transparent 40%),radial-gradient(ellipse at 80% 70%,rgba(139,92,246,.07) 0%,transparent 40%);background-size:32px 32px,32px 32px,100% 100%,100% 100%,100% 100%;">
+  <svg class="slide__decor" style="top:0;right:0;" width="80" height="80" viewBox="0 0 80 80"><line x1="80" y1="0" x2="80" y2="28" stroke="#3b9edd" stroke-width="1.5" opacity=".25"/><line x1="52" y1="0" x2="80" y2="0" stroke="#3b9edd" stroke-width="1.5" opacity=".25"/></svg>
+  <svg class="slide__decor" style="bottom:0;left:0;" width="80" height="80" viewBox="0 0 80 80"><line x1="0" y1="52" x2="0" y2="80" stroke="#4ecdc4" stroke-width="1.5" opacity=".25"/><line x1="0" y1="80" x2="28" y2="80" stroke="#4ecdc4" stroke-width="1.5" opacity=".25"/></svg>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:clamp(32px,5vw,60px);align-items:center;height:100%;max-height:78vh;">
+    <div>
+      <p class="reveal slide__eyebrow">08 — Results &amp; What's Next</p>
+      <h2 class="reveal" style="font-size:clamp(22px,3.2vw,38px);font-weight:600;letter-spacing:-.01em;margin-bottom:clamp(14px,2.2vh,22px);">Cross-session learning<br>starts today.</h2>
+
+      <div class="reveal" style="display:flex;flex-direction:column;gap:clamp(8px,1.2vh,14px);">
+        <div style="display:flex;align-items:flex-start;gap:10px;"><span style="color:var(--third);font-size:18px;flex-shrink:0;margin-top:2px;">→</span><span style="font-size:clamp(13px,1.5vw,17px);color:var(--dim);line-height:1.45;"><strong style="color:var(--text);">Self-pruning</strong> — stores stay lean without manual housekeeping</span></div>
+        <div style="display:flex;align-items:flex-start;gap:10px;"><span style="color:var(--third);font-size:18px;flex-shrink:0;margin-top:2px;">→</span><span style="font-size:clamp(13px,1.5vw,17px);color:var(--dim);line-height:1.45;"><strong style="color:var(--text);">Git consistency</strong> — reverted decisions become stale automatically</span></div>
+        <div style="display:flex;align-items:flex-start;gap:10px;"><span style="color:var(--third);font-size:18px;flex-shrink:0;margin-top:2px;">→</span><span style="font-size:clamp(13px,1.5vw,17px);color:var(--dim);line-height:1.45;"><strong style="color:var(--text);">Graceful degradation</strong> — memory failures never block pipelines</span></div>
+        <div style="display:flex;align-items:flex-start;gap:10px;"><span style="color:var(--third);font-size:18px;flex-shrink:0;margin-top:2px;">→</span><span style="font-size:clamp(13px,1.5vw,17px);color:var(--dim);line-height:1.45;"><strong style="color:var(--text);">Fully configurable</strong> — half-lives, boost, token budget in <code style="font-family:var(--font-mono);font-size:12px;color:var(--third);">valora.config.json</code></span></div>
+      </div>
+
+      <div class="reveal" style="margin-top:clamp(18px,3vh,28px);">
+        <p style="font-family:var(--font-mono);font-size:clamp(9px,1vw,11px);letter-spacing:.14em;text-transform:uppercase;color:var(--faint);margin-bottom:10px;">On the roadmap</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <span class="tag tag-purple">Embedding-based merge</span>
+          <span class="tag tag-blue">Encrypted stores</span>
+          <span class="tag tag-amber">Background scheduler</span>
+          <span class="tag tag-teal">Global cross-repo memory</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="reveal terminal">
+      <div class="terminal-bar">
+        <div class="terminal-dot" style="background:#ff6b6b;"></div>
+        <div class="terminal-dot" style="background:#f5c842;"></div>
+        <div class="terminal-dot" style="background:#4ecdc4;"></div>
+        <span class="terminal-title">TERMINAL</span>
+      </div>
+      <div class="terminal-body"><code><span class="t-prompt">$</span> valora consolidate
+
+<span class="t-dim">  [memory] Running consolidation cycle...</span>
+
+<span class="t-ok">  ✓</span> <span class="t-key">Pruned           </span><span class="t-num">3</span><span class="t-dim"> decayed entries</span>
+<span class="t-ok">  ✓</span> <span class="t-key">Git-invalidated  </span><span class="t-num">2</span><span class="t-dim"> entries (src/auth/middleware.ts)</span>
+<span class="t-ok">  ✓</span> <span class="t-key">Merged           </span><span class="t-num">6</span><span class="t-dim"> episodic → 3 semantic</span>
+<span class="t-ok">  ✓</span> <span class="t-key">Promoted         </span><span class="t-num">1</span><span class="t-dim"> entry to semantic store</span>
+<span class="t-ok">  ✓</span> <span class="t-key">Stale-marked     </span><span class="t-num">2</span><span class="t-dim"> entries</span>
+
+<span class="t-dim">  Duration: 158ms</span>
+
+<span class="t-prompt">$</span> <span class="t-dim">_</span></code></div>
+    </div>
+  </div>
+</section>
+
+
+</div><!-- /deck -->
+
+
+<script>
+function SlideEngine(){
+  this.deck=document.querySelector('.deck');
+  this.slides=[].slice.call(document.querySelectorAll('.slide'));
+  this.current=0; this.total=this.slides.length;
+  this.buildChrome(); this.bindEvents(); this.observe(); this.update();
+}
+SlideEngine.prototype.buildChrome=function(){
+  var bar=document.createElement('div');bar.className='deck-progress';document.body.appendChild(bar);this.bar=bar;
+  var dots=document.createElement('div');dots.className='deck-dots';var self=this;
+  this.slides.forEach(function(_,i){var d=document.createElement('button');d.className='deck-dot';d.title='Slide '+(i+1);d.onclick=function(){self.goTo(i);};dots.appendChild(d);});
+  document.body.appendChild(dots);this.dots=[].slice.call(dots.children);
+  var ctr=document.createElement('div');ctr.className='deck-counter';document.body.appendChild(ctr);this.counter=ctr;
+  var hints=document.createElement('div');hints.className='deck-hints';hints.textContent='← → or scroll to navigate';document.body.appendChild(hints);this.hints=hints;
+  this.hintTimer=setTimeout(function(){hints.classList.add('faded');},4000);
+};
+SlideEngine.prototype.bindEvents=function(){
+  var self=this;
+  document.addEventListener('keydown',function(e){
+    if(e.target.closest('.code-block,input,textarea,[contenteditable]'))return;
+    if(['ArrowDown','ArrowRight',' ','PageDown'].indexOf(e.key)>-1){e.preventDefault();self.next();}
+    else if(['ArrowUp','ArrowLeft','PageUp'].indexOf(e.key)>-1){e.preventDefault();self.prev();}
+    else if(e.key==='Home'){e.preventDefault();self.goTo(0);}
+    else if(e.key==='End'){e.preventDefault();self.goTo(self.total-1);}
+    self.fadeHints();
+  });
+  var tY;
+  this.deck.addEventListener('touchstart',function(e){tY=e.touches[0].clientY;},{passive:true});
+  this.deck.addEventListener('touchend',function(e){var dy=tY-e.changedTouches[0].clientY;if(Math.abs(dy)>50){dy>0?self.next():self.prev();}});
+};
+SlideEngine.prototype.observe=function(){
+  var self=this;
+  var obs=new IntersectionObserver(function(entries){entries.forEach(function(entry){if(entry.isIntersecting){entry.target.classList.add('visible');self.current=self.slides.indexOf(entry.target);self.update();}});},{threshold:0.5});
+  this.slides.forEach(function(s){obs.observe(s);});
+};
+SlideEngine.prototype.goTo=function(i){this.slides[Math.max(0,Math.min(i,this.total-1))].scrollIntoView({behavior:'smooth'});};
+SlideEngine.prototype.next=function(){if(this.current<this.total-1)this.goTo(this.current+1);};
+SlideEngine.prototype.prev=function(){if(this.current>0)this.goTo(this.current-1);};
+SlideEngine.prototype.update=function(){
+  this.bar.style.width=((this.current+1)/this.total*100)+'%';
+  var c=this.current;this.dots.forEach(function(d,i){d.classList.toggle('active',i===c);});
+  this.counter.textContent=(this.current+1)+' / '+this.total;
+};
+SlideEngine.prototype.fadeHints=function(){clearTimeout(this.hintTimer);this.hints.classList.add('faded');};
+document.addEventListener('DOMContentLoaded',function(){new SlideEngine();});
+</script>
+</body>
+</html>
