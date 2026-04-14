@@ -1,0 +1,1695 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VALORA — Product Presentation 2026</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=Fira+Code:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ══════════════════════════════════════════════
+   VALORA BLUEPRINT — Design System Tokens
+══════════════════════════════════════════════ */
+:root {
+  --font-body: 'DM Sans', system-ui, sans-serif;
+  --font-mono: 'Fira Code', 'Cascadia Code', monospace;
+
+  --bg:        #091525;
+  --surface:   #0d1e35;
+  --elevated:  #122540;
+  --deep:      #060c18;
+
+  --text:      #cce0f5;
+  --dim:       #6b9cc0;
+  --faint:     #3a6080;
+
+  --primary:   #3b9edd;
+  --primary-d: rgba(59,158,221,0.12);
+  --secondary: #f5c842;
+  --secondary-d: rgba(245,200,66,0.10);
+  --third:     #4ecdc4;
+  --third-d:   rgba(78,205,196,0.10);
+  --red:       #ff6b6b;
+  --red-d:     rgba(255,107,107,0.10);
+  --purple:    #8b5cf6;
+  --purple-d:  rgba(139,92,246,0.10);
+
+  --border:    rgba(59,158,221,0.18);
+  --border-b:  rgba(59,158,221,0.32);
+  --grid-line: rgba(59,158,221,0.06);
+
+  /* slide engine accent = primary blue */
+  --accent:     #3b9edd;
+  --accent-dim: rgba(59,158,221,0.10);
+  --code-bg:    #060c18;
+  --code-text:  #a5d8ff;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: var(--font-body);
+  background: var(--bg);
+  color: var(--text);
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ══════════════════════════════════════════════
+   DECK ENGINE
+══════════════════════════════════════════════ */
+.deck {
+  height: 100dvh;
+  overflow-y: auto;
+  scroll-snap-type: y mandatory;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
+.slide {
+  height: 100dvh;
+  scroll-snap-align: start;
+  overflow: hidden;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: clamp(36px,5vh,72px) clamp(40px,7vw,110px);
+  isolation: isolate;
+  opacity: 0;
+  transform: translateY(36px) scale(0.985);
+  transition: opacity .6s cubic-bezier(.16,1,.3,1), transform .6s cubic-bezier(.16,1,.3,1);
+  /* Blueprint grid background on every slide */
+  background-image:
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+.slide.visible { opacity:1; transform:none; }
+
+.slide .reveal {
+  opacity:0;
+  transform:translateY(18px);
+  transition: opacity .5s cubic-bezier(.16,1,.3,1), transform .5s cubic-bezier(.16,1,.3,1);
+}
+.slide.visible .reveal { opacity:1; transform:none; }
+.slide.visible .reveal:nth-child(1) { transition-delay:.08s; }
+.slide.visible .reveal:nth-child(2) { transition-delay:.17s; }
+.slide.visible .reveal:nth-child(3) { transition-delay:.26s; }
+.slide.visible .reveal:nth-child(4) { transition-delay:.35s; }
+.slide.visible .reveal:nth-child(5) { transition-delay:.44s; }
+.slide.visible .reveal:nth-child(6) { transition-delay:.53s; }
+.slide.visible .reveal:nth-child(7) { transition-delay:.62s; }
+
+@media (prefers-reduced-motion: reduce) {
+  .slide, .slide .reveal { opacity:1!important; transform:none!important; transition:none!important; }
+}
+
+/* ══════════════════════════════════════════════
+   NAV CHROME
+══════════════════════════════════════════════ */
+.deck-progress {
+  position:fixed; top:0; left:0; height:3px;
+  background: linear-gradient(90deg, var(--primary), var(--third));
+  z-index:100; transition: width .3s ease; pointer-events:none;
+}
+.deck-dots {
+  position:fixed; right:clamp(10px,1.8vw,20px); top:50%;
+  transform:translateY(-50%); display:flex; flex-direction:column;
+  gap:7px; z-index:100; padding:8px;
+  background:rgba(9,21,37,.7); border-radius:16px;
+  backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
+  border:1px solid var(--border);
+}
+.deck-dot {
+  width:7px; height:7px; border-radius:50%;
+  background:var(--faint); border:none; padding:0;
+  cursor:pointer; transition:opacity .2s, transform .2s, background .2s;
+}
+.deck-dot:hover { background:var(--dim); transform:scale(1.3); }
+.deck-dot.active { background:var(--primary); transform:scale(1.6); }
+.deck-counter {
+  position:fixed; bottom:clamp(10px,1.8vh,20px); right:clamp(14px,2vw,24px);
+  font-family:var(--font-mono); font-size:11px; color:var(--faint);
+  z-index:100; font-variant-numeric:tabular-nums;
+  text-shadow:0 1px 4px rgba(0,0,0,.5);
+}
+.deck-hints {
+  position:fixed; bottom:clamp(10px,1.8vh,20px); left:50%;
+  transform:translateX(-50%); font-family:var(--font-mono);
+  font-size:10px; color:var(--faint); z-index:100;
+  transition:opacity .5s; white-space:nowrap;
+  text-shadow:0 1px 4px rgba(0,0,0,.5);
+}
+.deck-hints.faded { opacity:0; pointer-events:none; }
+
+/* ══════════════════════════════════════════════
+   SHARED TYPOGRAPHY
+══════════════════════════════════════════════ */
+.slide__eyebrow {
+  font-family:var(--font-mono); font-size:clamp(9px,1.1vw,11px);
+  font-weight:500; letter-spacing:.2em; text-transform:uppercase;
+  color:var(--primary); margin-bottom:clamp(10px,1.5vh,20px);
+  display:flex; align-items:center; gap:8px;
+}
+.slide__eyebrow::before {
+  content:''; display:inline-block; width:20px; height:1px; background:var(--primary);
+}
+.slide__eyebrow.amber { color:var(--secondary); }
+.slide__eyebrow.amber::before { background:var(--secondary); }
+.slide__eyebrow.teal  { color:var(--third); }
+.slide__eyebrow.teal::before { background:var(--third); }
+
+.slide__display {
+  font-size:clamp(52px,10vw,112px); font-weight:600;
+  letter-spacing:-.02em; line-height:.95; text-wrap:balance;
+  color:var(--text);
+}
+.slide__heading {
+  font-size:clamp(26px,4.5vw,46px); font-weight:600;
+  letter-spacing:-.01em; line-height:1.15; text-wrap:balance;
+  color:var(--text);
+}
+.slide__subheading {
+  font-size:clamp(18px,2.5vw,28px); font-weight:400;
+  color:var(--dim); line-height:1.4; text-wrap:pretty;
+}
+.slide__body {
+  font-size:clamp(15px,1.9vw,21px); line-height:1.65;
+  color:var(--dim); text-wrap:pretty;
+}
+.slide__label {
+  font-family:var(--font-mono); font-size:clamp(9px,1vw,12px);
+  font-weight:500; text-transform:uppercase; letter-spacing:.15em;
+  color:var(--dim);
+}
+
+/* ══════════════════════════════════════════════
+   DECORATIVE ELEMENTS
+══════════════════════════════════════════════ */
+.slide__decor { position:absolute; pointer-events:none; z-index:0; }
+
+/* ══════════════════════════════════════════════
+   STAT BAR
+══════════════════════════════════════════════ */
+.stat-bar {
+  display:flex; flex-wrap:wrap; gap:1px;
+  background:var(--border); border:1px solid var(--border);
+  border-radius:5px; overflow:hidden; width:fit-content;
+}
+.stat-item {
+  padding:6px 16px; background:var(--surface);
+  display:flex; flex-direction:column; gap:2px;
+  border-right:1px solid var(--border);
+}
+.stat-item:last-child { border-right:none; }
+.stat-value {
+  font-family:var(--font-mono); font-size:clamp(13px,1.6vw,17px);
+  font-weight:500; color:var(--primary); line-height:1;
+}
+.stat-label {
+  font-family:var(--font-mono); font-size:9px;
+  letter-spacing:.1em; text-transform:uppercase; color:var(--faint);
+}
+
+/* ══════════════════════════════════════════════
+   TAG / BADGE
+══════════════════════════════════════════════ */
+.tag {
+  font-family:var(--font-mono); font-size:clamp(8px,.9vw,10px);
+  letter-spacing:.1em; text-transform:uppercase;
+  padding:2px 7px; border-radius:3px; display:inline-block;
+}
+.tag-blue   { background:var(--primary-d); color:var(--primary); border:1px solid rgba(59,158,221,.25); }
+.tag-amber  { background:var(--secondary-d); color:var(--secondary); border:1px solid rgba(245,200,66,.25); }
+.tag-teal   { background:var(--third-d); color:var(--third); border:1px solid rgba(78,205,196,.25); }
+.tag-red    { background:var(--red-d); color:var(--red); border:1px solid rgba(255,107,107,.25); }
+.tag-purple { background:var(--purple-d); color:var(--purple); border:1px solid rgba(139,92,246,.25); }
+
+/* ══════════════════════════════════════════════
+   CARD
+══════════════════════════════════════════════ */
+.card {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:6px; padding:clamp(14px,2vh,22px) clamp(14px,1.8vw,20px);
+}
+.card-accent-top { border-top:2px solid var(--primary); }
+.card-accent-top.amber { border-top-color:var(--secondary); }
+.card-accent-top.teal  { border-top-color:var(--third); }
+.card-accent-top.red   { border-top-color:var(--red); }
+.card-accent-top.purple { border-top-color:var(--purple); }
+
+/* ══════════════════════════════════════════════
+   SLIDE TYPE: TITLE
+══════════════════════════════════════════════ */
+.slide--title {
+  justify-content:center; align-items:center; text-align:center;
+}
+
+/* ══════════════════════════════════════════════
+   SLIDE TYPE: DIVIDER
+══════════════════════════════════════════════ */
+.slide--divider { justify-content:center; }
+.slide--divider .slide__number {
+  font-size:clamp(120px,22vw,260px); font-weight:300;
+  line-height:.85; opacity:.05; position:absolute;
+  top:50%; left:50%; transform:translate(-50%,-55%);
+  pointer-events:none; font-variant-numeric:tabular-nums;
+  color:var(--primary); font-family:var(--font-mono);
+}
+
+/* ══════════════════════════════════════════════
+   SLIDE TYPE: SPLIT
+══════════════════════════════════════════════ */
+.slide--split { padding:0; }
+.slide--split .slide__panels {
+  display:grid; grid-template-columns:1fr 1fr; height:100%;
+}
+.slide__panel {
+  padding:clamp(36px,5vh,72px) clamp(32px,4vw,56px);
+  display:flex; flex-direction:column; justify-content:center;
+}
+.slide__panel--primary { background:var(--surface); }
+.slide__panel--secondary { background:var(--elevated); }
+
+/* ══════════════════════════════════════════════
+   BULLETS
+══════════════════════════════════════════════ */
+.bullets { list-style:none; padding:0; margin-top:clamp(12px,2vh,20px); }
+.bullets li {
+  padding:8px 0 8px 22px; position:relative;
+  font-size:clamp(14px,1.8vw,20px); line-height:1.55; color:var(--dim);
+}
+.bullets li::before {
+  content:''; position:absolute; left:0; top:17px;
+  width:6px; height:6px; border-radius:50%; background:var(--primary);
+}
+.bullets.amber li::before { background:var(--secondary); }
+.bullets.teal  li::before { background:var(--third); }
+.bullets.red   li::before { background:var(--red); }
+
+.bullets li strong { color:var(--text); font-weight:500; }
+
+/* ══════════════════════════════════════════════
+   QUOTE SLIDE
+══════════════════════════════════════════════ */
+.slide--quote {
+  justify-content:center; align-items:center; text-align:center;
+  padding:clamp(60px,10vh,120px) clamp(60px,12vw,180px);
+}
+.slide__quote-mark {
+  font-size:clamp(80px,14vw,160px); line-height:.5;
+  opacity:.06; font-family:Georgia,serif; pointer-events:none;
+  margin-bottom:-10px; color:var(--primary);
+}
+.slide--quote blockquote {
+  font-size:clamp(20px,3.2vw,38px); font-weight:400;
+  line-height:1.4; font-style:italic; color:var(--text);
+}
+.slide--quote cite {
+  font-family:var(--font-mono); font-size:clamp(10px,1.2vw,13px);
+  font-style:normal; margin-top:clamp(16px,3vh,28px);
+  display:block; letter-spacing:.15em; text-transform:uppercase; color:var(--faint);
+}
+
+/* ══════════════════════════════════════════════
+   PIPELINE
+══════════════════════════════════════════════ */
+.pipeline {
+  display:flex; align-items:stretch; gap:0; flex:1; min-height:0;
+  margin-top:clamp(10px,1.8vh,20px);
+}
+.pipeline-step {
+  flex:1; background:var(--surface); border:1px solid var(--border);
+  border-top:2px solid var(--primary); border-radius:6px;
+  padding:clamp(12px,2vh,20px) clamp(10px,1.2vw,16px);
+  display:flex; flex-direction:column; min-width:0; overflow-wrap:break-word;
+}
+.pipeline-step.s2 { border-top-color:var(--secondary); }
+.pipeline-step.s3 { border-top-color:var(--third); }
+.pipeline-step.s4 { border-top-color:var(--purple); }
+.pipeline-step.s5 { border-top-color:var(--primary); }
+.pipeline-step.s6 { border-top-color:var(--secondary); }
+.pipeline-step.s7 { border-top-color:var(--third); }
+.pipeline-step.s8 { border-top-color:var(--red); }
+
+.pipeline-num {
+  font-family:var(--font-mono); font-size:clamp(8px,.9vw,11px);
+  font-weight:600; color:var(--primary); letter-spacing:.1em; margin-bottom:4px;
+}
+.pipeline-step.s2 .pipeline-num { color:var(--secondary); }
+.pipeline-step.s3 .pipeline-num { color:var(--third); }
+.pipeline-step.s4 .pipeline-num { color:var(--purple); }
+.pipeline-step.s6 .pipeline-num { color:var(--secondary); }
+.pipeline-step.s7 .pipeline-num { color:var(--third); }
+.pipeline-step.s8 .pipeline-num { color:var(--red); }
+
+.pipeline-name {
+  font-size:clamp(11px,1.2vw,15px); font-weight:600;
+  color:var(--text); line-height:1.3; margin-bottom:4px;
+}
+.pipeline-desc {
+  font-size:clamp(10px,1vw,12px); color:var(--faint);
+  line-height:1.4; flex:1;
+}
+.pipeline-cmd {
+  font-family:var(--font-mono); font-size:clamp(8px,.85vw,10px);
+  color:var(--third); background:var(--third-d); border:1px solid rgba(78,205,196,.2);
+  border-radius:3px; padding:2px 6px; margin-top:6px; align-self:flex-start;
+  overflow:hidden; white-space:nowrap; text-overflow:ellipsis; max-width:100%;
+}
+.pipeline-arrow {
+  display:flex; align-items:center; padding:0 clamp(2px,.3vw,5px);
+  color:var(--faint); flex-shrink:0; opacity:.4;
+}
+
+/* ══════════════════════════════════════════════
+   CODE BLOCK
+══════════════════════════════════════════════ */
+.code-block {
+  background:var(--code-bg); border:1px solid var(--border);
+  border-radius:8px; padding:clamp(20px,3vh,36px) clamp(20px,3vw,36px);
+  position:relative; width:100%; max-width:900px;
+}
+.code-filename {
+  position:absolute; top:-11px; left:20px;
+  font-family:var(--font-mono); font-size:10px; font-weight:600;
+  padding:3px 10px; border-radius:4px;
+  background:var(--primary); color:#fff;
+}
+.code-block pre { margin:0; overflow-x:auto; }
+.code-block code {
+  font-family:var(--font-mono); font-size:clamp(12px,1.4vw,16px);
+  line-height:1.75; color:var(--code-text);
+}
+.hl  { color:var(--secondary); }
+.hl2 { color:var(--third); }
+.hl3 { color:var(--primary); }
+.cm  { color:var(--faint); font-style:italic; }
+.str { color:#a5f3fc; }
+
+/* ══════════════════════════════════════════════
+   AGENT GRID
+══════════════════════════════════════════════ */
+.agent-grid {
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:clamp(6px,1vw,12px);
+  margin-top:clamp(10px,1.5vh,18px);
+  flex:1; min-height:0;
+}
+.agent-card {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:6px; padding:clamp(10px,1.5vh,16px) clamp(10px,1.2vw,14px);
+  display:flex; flex-direction:column; gap:4px;
+  border-left:2px solid var(--primary);
+  transition: border-color .2s, background .2s;
+}
+.agent-card:nth-child(2n)   { border-left-color:var(--third); }
+.agent-card:nth-child(3n)   { border-left-color:var(--secondary); }
+.agent-card:nth-child(4n)   { border-left-color:var(--purple); }
+.agent-tag {
+  font-family:var(--font-mono); font-size:clamp(9px,1vw,11px);
+  font-weight:500; color:var(--primary); letter-spacing:.04em;
+}
+.agent-card:nth-child(2n) .agent-tag { color:var(--third); }
+.agent-card:nth-child(3n) .agent-tag { color:var(--secondary); }
+.agent-card:nth-child(4n) .agent-tag { color:var(--purple); }
+.agent-name {
+  font-size:clamp(12px,1.3vw,15px); font-weight:600; color:var(--text); line-height:1.2;
+}
+.agent-desc {
+  font-size:clamp(10px,1vw,12px); color:var(--faint); line-height:1.4;
+}
+
+/* ══════════════════════════════════════════════
+   ARCHITECTURE LAYERS
+══════════════════════════════════════════════ */
+.arch-wrap {
+  display:flex; flex-direction:column; gap:clamp(6px,1vh,10px);
+  flex:1; min-height:0; margin-top:clamp(10px,1.5vh,18px);
+}
+.arch-layer {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:6px; border-left:3px solid var(--primary);
+  padding:clamp(10px,1.5vh,16px) clamp(14px,2vw,22px);
+  display:flex; align-items:center; gap:clamp(12px,2vw,24px); flex:1; min-height:0;
+}
+.arch-layer:nth-child(2) { border-left-color:var(--secondary); }
+.arch-layer:nth-child(3) { border-left-color:var(--third); }
+.arch-layer:nth-child(4) { border-left-color:var(--purple); }
+.arch-layer-label {
+  font-family:var(--font-mono); font-size:clamp(9px,1vw,12px);
+  font-weight:600; text-transform:uppercase; letter-spacing:.12em;
+  color:var(--primary); min-width:clamp(80px,9vw,120px);
+  flex-shrink:0;
+}
+.arch-layer:nth-child(2) .arch-layer-label { color:var(--secondary); }
+.arch-layer:nth-child(3) .arch-layer-label { color:var(--third); }
+.arch-layer:nth-child(4) .arch-layer-label { color:var(--purple); }
+.arch-components {
+  display:flex; gap:clamp(6px,1vw,10px); flex-wrap:wrap; flex:1;
+}
+.arch-comp {
+  background:var(--elevated); border:1px solid var(--border);
+  border-radius:4px; padding:6px 12px;
+  font-size:clamp(11px,1.2vw,14px); color:var(--text); font-weight:500;
+}
+.arch-arrow {
+  color:var(--faint); font-size:18px; flex-shrink:0;
+  display:flex; align-items:center; opacity:.5;
+}
+
+/* ══════════════════════════════════════════════
+   TIER CARDS
+══════════════════════════════════════════════ */
+.tiers-wrap {
+  display:grid; grid-template-columns:repeat(3,1fr);
+  gap:clamp(10px,1.5vw,18px); flex:1; min-height:0;
+  margin-top:clamp(10px,1.5vh,18px);
+}
+.tier-card {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:8px; padding:clamp(16px,2.5vh,28px) clamp(16px,2vw,24px);
+  display:flex; flex-direction:column; gap:clamp(8px,1.2vh,14px);
+  position:relative; overflow:hidden;
+}
+.tier-card::before {
+  content:''; position:absolute; top:0; left:0; right:0; height:3px;
+  background:var(--primary);
+}
+.tier-card.t2::before { background:var(--third); }
+.tier-card.t3::before { background:var(--purple); }
+.tier-badge {
+  font-family:var(--font-mono); font-size:9px; font-weight:600;
+  letter-spacing:.15em; text-transform:uppercase;
+  padding:3px 8px; border-radius:3px; align-self:flex-start;
+  background:var(--primary-d); color:var(--primary);
+  border:1px solid rgba(59,158,221,.3);
+}
+.tier-card.t2 .tier-badge { background:var(--third-d); color:var(--third); border-color:rgba(78,205,196,.3); }
+.tier-card.t3 .tier-badge { background:var(--purple-d); color:var(--purple); border-color:rgba(139,92,246,.3); }
+.tier-num {
+  font-family:var(--font-mono); font-size:clamp(36px,5vw,56px); font-weight:300;
+  color:var(--primary); line-height:1; opacity:.4;
+}
+.tier-card.t2 .tier-num { color:var(--third); }
+.tier-card.t3 .tier-num { color:var(--purple); }
+.tier-name {
+  font-size:clamp(16px,2vw,22px); font-weight:600; color:var(--text); line-height:1.2;
+}
+.tier-cost {
+  font-family:var(--font-mono); font-size:clamp(18px,2.5vw,30px);
+  font-weight:500; color:var(--secondary);
+}
+.tier-desc {
+  font-size:clamp(12px,1.3vw,15px); color:var(--faint); line-height:1.5; flex:1;
+}
+.tier-features { display:flex; flex-direction:column; gap:5px; }
+.tier-feat {
+  font-size:clamp(11px,1.2vw,13px); color:var(--dim);
+  display:flex; align-items:flex-start; gap:6px; line-height:1.3;
+}
+.tier-feat::before { content:'→'; color:var(--primary); flex-shrink:0; }
+.tier-card.t2 .tier-feat::before { color:var(--third); }
+.tier-card.t3 .tier-feat::before { color:var(--purple); }
+
+/* ══════════════════════════════════════════════
+   SECURITY GRID
+══════════════════════════════════════════════ */
+.sec-grid {
+  display:grid; grid-template-columns:repeat(3,1fr);
+  gap:clamp(8px,1.2vw,14px); flex:1; min-height:0;
+  margin-top:clamp(10px,1.5vh,18px);
+}
+.sec-card {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:6px; padding:clamp(12px,1.8vh,20px) clamp(12px,1.5vw,18px);
+  display:flex; flex-direction:column; gap:6px;
+}
+.sec-icon { flex-shrink:0; }
+.sec-name {
+  font-size:clamp(13px,1.5vw,17px); font-weight:600; color:var(--text);
+}
+.sec-desc {
+  font-size:clamp(11px,1.1vw,13px); color:var(--faint); line-height:1.45;
+}
+
+/* ══════════════════════════════════════════════
+   EXTENSION SLIDE
+══════════════════════════════════════════════ */
+.ext-grid {
+  display:grid; grid-template-columns:repeat(3,1fr);
+  gap:clamp(10px,1.5vw,18px); flex:1; min-height:0;
+  margin-top:clamp(10px,1.5vh,18px);
+}
+.ext-card {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:6px; display:flex; flex-direction:column; overflow:hidden;
+}
+.ext-card-head {
+  padding:clamp(10px,1.5vh,16px) clamp(12px,1.5vw,18px);
+  background:var(--elevated); border-bottom:1px solid var(--border);
+  display:flex; flex-direction:column; gap:4px;
+}
+.ext-card-title {
+  font-size:clamp(13px,1.5vw,16px); font-weight:600; color:var(--text);
+}
+.ext-card-body {
+  padding:clamp(10px,1.5vh,16px) clamp(12px,1.5vw,18px);
+  flex:1;
+}
+.dir-tree {
+  font-family:var(--font-mono); font-size:clamp(9px,1vw,12px);
+  line-height:1.65; color:var(--dim);
+}
+.dir-tree .dir { color:var(--secondary); }
+.dir-tree .file { color:var(--third); }
+.dir-tree .comment { color:var(--faint); font-style:italic; }
+
+/* ══════════════════════════════════════════════
+   COMMAND TABLE
+══════════════════════════════════════════════ */
+.cmd-grid {
+  display:grid; grid-template-columns:repeat(3,1fr);
+  gap:clamp(8px,1.2vw,14px); flex:1; min-height:0;
+  margin-top:clamp(10px,1.5vh,18px);
+}
+.cmd-col { background:var(--surface); border:1px solid var(--border); border-radius:6px; overflow:hidden; }
+.cmd-col-head {
+  padding:10px 14px; background:var(--elevated);
+  border-bottom:1px solid var(--border);
+  font-family:var(--font-mono); font-size:10px; font-weight:600;
+  text-transform:uppercase; letter-spacing:.14em; color:var(--primary);
+}
+.cmd-col:nth-child(2) .cmd-col-head { color:var(--secondary); }
+.cmd-col:nth-child(3) .cmd-col-head { color:var(--third); }
+.cmd-list { padding:8px 0; }
+.cmd-item {
+  padding:6px 14px; display:flex; flex-direction:column; gap:1px;
+  border-bottom:1px solid rgba(59,158,221,.06);
+}
+.cmd-item:last-child { border-bottom:none; }
+.cmd-name {
+  font-family:var(--font-mono); font-size:clamp(10px,1.1vw,12px);
+  color:var(--third); font-weight:500;
+}
+.cmd-desc {
+  font-size:clamp(10px,1.1vw,12px); color:var(--faint);
+}
+
+/* ══════════════════════════════════════════════
+   MODEL TABLE
+══════════════════════════════════════════════ */
+.model-table {
+  width:100%; border-collapse:collapse;
+  margin-top:clamp(12px,2vh,22px);
+}
+.model-table th {
+  font-family:var(--font-mono); font-size:clamp(9px,1vw,11px);
+  font-weight:600; text-transform:uppercase; letter-spacing:.12em;
+  color:var(--dim); text-align:left; padding:10px 14px;
+  border-bottom:2px solid var(--border-b);
+  background:var(--elevated);
+}
+.model-table td {
+  padding:clamp(10px,1.5vh,16px) 14px;
+  border-bottom:1px solid var(--border);
+  font-size:clamp(13px,1.5vw,17px); vertical-align:middle;
+}
+.model-table tbody tr:last-child td { border-bottom:none; }
+.model-table tbody tr:hover { background:var(--elevated); }
+
+/* ══════════════════════════════════════════════
+   FULL-BLEED CTA
+══════════════════════════════════════════════ */
+.slide--bleed { padding:0; justify-content:flex-end; }
+.slide__bg {
+  position:absolute; inset:0; z-index:0; background-size:cover; background-position:center;
+}
+.slide__scrim {
+  position:absolute; inset:0; z-index:1;
+  background:linear-gradient(to top, rgba(6,12,24,.92) 0%, rgba(6,12,24,.5) 45%, rgba(6,12,24,.2) 100%);
+}
+.slide--bleed .slide__content {
+  position:relative; z-index:2;
+  padding:clamp(40px,6vh,72px) clamp(40px,7vw,110px);
+}
+
+/* ══════════════════════════════════════════════
+   RESPONSIVE
+══════════════════════════════════════════════ */
+@media (max-height:700px) {
+  .slide { padding:clamp(20px,3.5vh,40px) clamp(32px,5.5vw,80px); }
+  .slide__display { font-size:clamp(40px,8vw,80px); }
+  .slide--divider .slide__number { font-size:clamp(90px,16vw,180px); }
+}
+@media (max-height:600px) {
+  .slide__decor { display:none; }
+  .slide--quote { padding:clamp(28px,5vh,56px) clamp(40px,8vw,100px); }
+  .slide__quote-mark { display:none; }
+}
+@media (max-height:500px) {
+  .slide { padding:clamp(14px,2.5vh,22px) clamp(20px,4vw,44px); }
+  .deck-dots { display:none; }
+}
+@media (max-width:900px) {
+  .agent-grid { grid-template-columns:repeat(2,1fr); }
+  .tiers-wrap { grid-template-columns:1fr; }
+  .sec-grid { grid-template-columns:repeat(2,1fr); }
+  .ext-grid { grid-template-columns:1fr; }
+  .cmd-grid { grid-template-columns:1fr; }
+  .slide--split .slide__panels { grid-template-columns:1fr; }
+}
+@media print {
+  .deck { overflow:visible; scroll-snap-type:none; }
+  .slide { height:100vh; page-break-after:always; opacity:1!important; transform:none!important; }
+  .deck-progress, .deck-dots, .deck-counter, .deck-hints { display:none!important; }
+}
+</style>
+</head>
+<body>
+<div class="deck">
+
+<!-- ─────────────────────────────────────────
+  SLIDE 1 — TITLE (centered)
+───────────────────────────────────────────── -->
+<section class="slide slide--title" style="background-image: linear-gradient(var(--grid-line) 1px,transparent 1px),linear-gradient(90deg,var(--grid-line) 1px,transparent 1px),radial-gradient(ellipse at 50% 20%, rgba(59,158,221,.12) 0%, transparent 55%), radial-gradient(ellipse at 80% 80%, rgba(139,92,246,.08) 0%, transparent 45%); background-size:32px 32px, 32px 32px, 100% 100%, 100% 100%;">
+
+  <!-- Corner decor top-right -->
+  <svg class="slide__decor" style="top:0;right:0;" width="80" height="80" viewBox="0 0 80 80">
+    <line x1="80" y1="0" x2="80" y2="28" stroke="#3b9edd" stroke-width="1.5" opacity=".25"/>
+    <line x1="52" y1="0" x2="80" y2="0" stroke="#3b9edd" stroke-width="1.5" opacity=".25"/>
+  </svg>
+  <!-- Corner decor bottom-left -->
+  <svg class="slide__decor" style="bottom:0;left:0;" width="80" height="80" viewBox="0 0 80 80">
+    <line x1="0" y1="52" x2="0" y2="80" stroke="#4ecdc4" stroke-width="1.5" opacity=".25"/>
+    <line x1="0" y1="80" x2="28" y2="80" stroke="#4ecdc4" stroke-width="1.5" opacity=".25"/>
+  </svg>
+
+  <div class="reveal" style="margin-bottom:clamp(16px,3vh,32px);">
+    <!-- VALORA Logo SVG inline -->
+    <svg width="260" height="65" viewBox="0 0 480 120" xmlns="http://www.w3.org/2000/svg" style="display:block;margin:0 auto;">
+      <defs>
+        <linearGradient id="vG" x1="50%" y1="0%" x2="50%" y2="100%">
+          <stop offset="0%" stop-color="#00d4ff"/>
+          <stop offset="52%" stop-color="#8b5cf6"/>
+          <stop offset="100%" stop-color="#6d28d9"/>
+        </linearGradient>
+        <linearGradient id="hG" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#00d4ff" stop-opacity="1"/>
+          <stop offset="45%" stop-color="#8b5cf6" stop-opacity=".7"/>
+          <stop offset="100%" stop-color="#00d4ff" stop-opacity=".45"/>
+        </linearGradient>
+        <linearGradient id="tG" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stop-color="#c8e4ff"/>
+          <stop offset="45%" stop-color="#eef4ff"/>
+          <stop offset="80%" stop-color="#a5f3fc"/>
+          <stop offset="100%" stop-color="#c4b5fd"/>
+        </linearGradient>
+        <filter id="gl" x="-80%" y="-80%" width="260%" height="260%">
+          <feGaussianBlur in="SourceGraphic" stdDeviation="3.5" result="b"/>
+          <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+        <filter id="sb" x="-100%" y="-100%" width="300%" height="300%">
+          <feGaussianBlur in="SourceGraphic" stdDeviation="8"/>
+        </filter>
+      </defs>
+      <g transform="translate(12,7) scale(0.55)">
+        <polygon points="42,55 58,55 100,155 142,55 158,55 100,165" fill="#6d28d9" filter="url(#sb)" opacity=".5"/>
+        <polygon points="100,8 180,54 180,146 100,192 20,146 20,54" fill="#0b1422"/>
+        <polygon points="100,8 180,54 180,146 100,192 20,146 20,54" fill="none" stroke="url(#hG)" stroke-width="2" opacity=".9"/>
+        <polygon points="42,55 58,55 100,155 142,55 158,55 100,165" fill="url(#vG)"/>
+        <line x1="20" y1="100" x2="42" y2="100" stroke="#00d4ff" stroke-width="1.5" opacity=".3"/>
+        <line x1="158" y1="100" x2="180" y2="100" stroke="#00d4ff" stroke-width="1.5" opacity=".3"/>
+        <circle cx="42" cy="55" r="5" fill="#00d4ff" filter="url(#gl)"/>
+        <circle cx="158" cy="55" r="5" fill="#00d4ff" filter="url(#gl)"/>
+        <circle cx="64" cy="82" r="3" fill="#00d4ff" opacity=".7"/>
+        <circle cx="76" cy="103" r="2.5" fill="#00d4ff" opacity=".45"/>
+        <circle cx="88" cy="126" r="2.5" fill="#8b5cf6" opacity=".6"/>
+        <circle cx="136" cy="82" r="3" fill="#00d4ff" opacity=".7"/>
+        <circle cx="124" cy="103" r="2.5" fill="#00d4ff" opacity=".45"/>
+        <circle cx="112" cy="126" r="2.5" fill="#8b5cf6" opacity=".6"/>
+        <circle cx="100" cy="160" r="9" fill="#00d4ff" filter="url(#gl)"/>
+        <circle cx="100" cy="160" r="4" fill="white"/>
+      </g>
+      <line x1="128" y1="22" x2="128" y2="98" stroke="#00d4ff" stroke-width=".5" opacity=".18"/>
+      <text x="146" y="67" font-family="'DM Sans',sans-serif" font-size="40" font-weight="300" letter-spacing="9" fill="url(#tG)">VALORA</text>
+      <text x="148" y="89" font-family="monospace" font-size="9.5" font-weight="400" letter-spacing="4" fill="#00d4ff" opacity=".68">AI WORKFLOW ORCHESTRATION</text>
+    </svg>
+  </div>
+
+  <div class="reveal">
+    <p class="slide__eyebrow" style="justify-content:center;margin-bottom:clamp(8px,1.5vh,16px);">Product Presentation · 2026</p>
+  </div>
+
+  <h1 class="reveal" style="font-size:clamp(28px,4.5vw,52px);font-weight:600;letter-spacing:-.02em;margin-bottom:clamp(8px,1.5vh,16px);color:var(--text);">
+    AI Workflow Orchestration
+  </h1>
+
+  <p class="reveal slide__body" style="max-width:640px;margin:0 auto clamp(20px,3vh,36px);">
+    Amplify your development teams with specialised AI agents that automate the complete software lifecycle.
+  </p>
+
+  <div class="reveal">
+    <div class="stat-bar" style="margin:0 auto;">
+      <div class="stat-item"><span class="stat-value">v2.4.1</span><span class="stat-label">Version</span></div>
+      <div class="stat-item"><span class="stat-value">TypeScript</span><span class="stat-label">Runtime</span></div>
+      <div class="stat-item"><span class="stat-value" style="color:var(--third);">MIT</span><span class="stat-label">Licence</span></div>
+      <div class="stat-item"><span class="stat-value" style="color:var(--secondary);">Node 18+</span><span class="stat-label">Requirements</span></div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ─────────────────────────────────────────
+  SLIDE 2 — QUOTE (centered)
+───────────────────────────────────────────── -->
+<section class="slide slide--quote" style="background-image:linear-gradient(var(--grid-line) 1px,transparent 1px),linear-gradient(90deg,var(--grid-line) 1px,transparent 1px),radial-gradient(ellipse at 50% 50%, rgba(59,158,221,.09) 0%, transparent 50%);background-size:32px 32px,32px 32px,100% 100%;">
+  <div class="slide__quote-mark reveal">&ldquo;</div>
+  <blockquote class="reveal">
+    The future of software development is not about replacing developers, but amplifying their capabilities through intelligent AI collaboration.
+  </blockquote>
+  <cite class="reveal">&mdash;&nbsp;VALORA — README.md</cite>
+</section>
+
+
+<!-- ─────────────────────────────────────────
+  SLIDE 3 — DIVIDER 01 (left edge)
+───────────────────────────────────────────── -->
+<section class="slide slide--divider" style="background-image:linear-gradient(var(--grid-line) 1px,transparent 1px),linear-gradient(90deg,var(--grid-line) 1px,transparent 1px),radial-gradient(ellipse at 15% 60%, rgba(255,107,107,.08) 0%, transparent 45%);background-size:32px 32px,32px 32px,100% 100%;">
+  <span class="slide__number">01</span>
+  <div>
+    <p class="slide__eyebrow red reveal" style="color:var(--red);">— The Context</p>
+    <h2 class="slide__heading reveal" style="font-size:clamp(32px,5.5vw,56px);">The Challenge of<br>Modern Development</h2>
+    <p class="slide__subheading reveal" style="margin-top:10px;">Why teams struggle to deliver quickly, without technical debt</p>
+  </div>
+</section>
+
+
+<!-- ─────────────────────────────────────────
+  SLIDE 4 — SPLIT (50/50 before/after)
+───────────────────────────────────────────── -->
+<section class="slide slide--split">
+  <div class="slide__panels">
+    <!-- LEFT: Traditional -->
+    <div class="slide__panel slide__panel--primary" style="background:var(--surface);background-image:linear-gradient(var(--grid-line) 1px,transparent 1px),linear-gradient(90deg,var(--grid-line) 1px,transparent 1px);background-size:32px 32px;border-right:1px solid var(--border);">
+      <p class="slide__eyebrow red reveal" style="color:var(--red);">Traditional Development</p>
+      <h3 class="reveal" style="font-size:clamp(20px,2.8vw,30px);font-weight:600;color:var(--text);margin-bottom:clamp(12px,2vh,20px);">Constant friction</h3>
+      <ul class="bullets red reveal">
+        <li><strong>Constant context switching</strong> between tools</li>
+        <li><strong>Manual documentation</strong> — often forgotten</li>
+        <li><strong>Inconsistent code reviews</strong> depending on the reviewer</li>
+        <li><strong>Time-consuming PRs</strong> — writing, formatting, tracking</li>
+        <li><strong>Sloppy commit messages</strong>, unreadable history</li>
+        <li><strong>Variable quality</strong> depending on team workload</li>
+      </ul>
+    </div>
+    <!-- RIGHT: With VALORA -->
+    <div class="slide__panel slide__panel--secondary" style="background:var(--elevated);background-image:linear-gradient(var(--grid-line) 1px,transparent 1px),linear-gradient(90deg,var(--grid-line) 1px,transparent 1px);background-size:32px 32px;">
+      <p class="slide__eyebrow teal reveal">With VALORA</p>
+      <h3 class="reveal" style="font-size:clamp(20px,2.8vw,30px);font-weight:600;color:var(--text);margin-bottom:clamp(12px,2vh,20px);">Unified &amp; automated workflow</h3>
+      <ul class="bullets teal reveal">
+        <li><strong>Unified workflow</strong> in a single CLI</li>
+        <li><strong>Auto-generated documentation</strong> at every stage</li>
+        <li><strong>Exhaustive AI reviews</strong>, reproducible</li>
+        <li><strong>PRs created in one command</strong> with full context</li>
+        <li><strong>Intelligent conventional commits</strong></li>
+        <li><strong>Consistent quality</strong>, independent of workload</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+
+<!-- ─────────────────────────────────────────
+  SLIDE 5 — DIVIDER 02
+───────────────────────────────────────────── -->
+<section class="slide slide--divider" style="background-image:linear-gradient(var(--grid-line) 1px,transparent 1px),linear-gradient(90deg,var(--grid-line) 1px,transparent 1px),radial-gradient(ellipse at 75% 40%, rgba(59,158,221,.1) 0%, transparent 45%);background-size:32px 32px,32px 32px,100% 100%;">
+  <span class="slide__number">02</span>
+  <div>
+    <p class="slide__eyebrow reveal">— Overview</p>
+    <h2 class="slide__heading reveal" style="font-size:clamp(32px,5.5vw,56px);">What is<br>VALORA?</h2>
+    <p class="slide__subheading reveal" style="margin-top:10px;">An acronym, a vision, a platform</p>
+  </div>
+</section>
+
+
+<!-- ─────────────────────────────────────────
+  SLIDE 6 — VALORA ACRONYM (left-heavy)
+───────────────────────────────────────────── -->
+<section class="slide" style="background-image:linear-gradient(var(--grid-line) 1px,transparent 1px),linear-gradient(90deg,var(--grid-line) 1px,transparent 1px),radial-gradient(ellipse at 20% 70%, rgba(139,92,246,.08) 0%, transparent 45%);background-size:32px 32px,32px 32px,100% 100%;">
+  <p class="slide__eyebrow reveal">Overview</p>
+  <h2 class="slide__heading reveal" style="margin-bottom:clamp(16px,2.5vh,28px);">
+    <span style="color:var(--primary);">V</span>ersatile&nbsp;<span style="color:var(--third);">A</span>gent&nbsp;<span style="color:var(--secondary);">L</span>ogic for&nbsp;<span style="color:var(--purple);">O</span>rchestrated&nbsp;<span style="color:var(--primary);">R</span>esponse&nbsp;<span style="color:var(--third);">A</span>rchitecture
+  </h2>
+
+  <div class="reveal" style="display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(8px,1.2vw,14px);">
+    <div class="card card-accent-top">
+      <p class="slide__eyebrow" style="margin-bottom:8px;">Powerful CLI</p>
+      <p style="font-size:clamp(13px,1.5vw,17px);color:var(--dim);line-height:1.45;">
+        TypeScript command-line interface — <span style="color:var(--text);font-weight:500;">25 commands</span> covering the entire lifecycle, from spec to PR.
+      </p>
+    </div>
+    <div class="card card-accent-top teal">
+      <p class="slide__eyebrow teal" style="margin-bottom:8px;">11 Specialised AI Agents</p>
+      <p style="font-size:clamp(13px,1.5vw,17px);color:var(--dim);line-height:1.45;">
+        Each agent is an expert — lead, QA, security, design, infrastructure — coordinated by the orchestration engine.
+      </p>
+    </div>
+    <div class="card card-accent-top amber">
+      <p class="slide__eyebrow amber" style="margin-bottom:8px;">8 Governance Phases</p>
+      <p style="font-size:clamp(13px,1.5vw,17px);color:var(--dim);line-height:1.45;">
+        Rigorous lifecycle from initialisation to feedback, with quality checkpoints at every stage.
+      </p>
+    </div>
+  </div>
+
+  <div class="reveal" style="margin-top:clamp(14px,2vh,22px);">
+    <div class="stat-bar">
+      <div class="stat-item"><span class="stat-value">11</span><span class="stat-label">Agents</span></div>
+      <div class="stat-item"><span class="stat-value">8</span><span class="stat-label">Phases</span></div>
+      <div class="stat-item"><span class="stat-value">25</span><span class="stat-label">Commands</span></div>
+      <div class="stat-item"><span class="stat-value" style="color:var(--third);">3</span><span class="stat-label">Execution modes</span></div>
+      <div class="stat-item"><span class="stat-value" style="color:var(--secondary);">15</span><span class="stat-label">MCP Servers</span></div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ─────────────────────────────────────────
+  SLIDE 7 — DIVIDER 03
+───────────────────────────────────────────── -->
+<section class="slide slide--divider" style="background-image:linear-gradient(var(--grid-line) 1px,transparent 1px),linear-gradient(90deg,var(--grid-line) 1px,transparent 1px),radial-gradient(ellipse at 30% 30%, rgba(78,205,196,.1) 0%, transparent 45%);background-size:32px 32px,32px 32px,100% 100%;">
+  <span class="slide__number">03</span>
+  <div>
+    <p class="slide__eyebrow teal reveal">— Specialised Agents</p>
+    <h2 class="slide__heading reveal" style="font-size:clamp(32px,5.5vw,56px);">The 11 Specialised<br>Agents</h2>
+    <p class="slide__subheading reveal" style="margin-top:10px;">The right expert for every task</p>
+  </div>
+</section>
+
+
+<!-- ─────────────────────────────────────────
+  SLIDE 8 — AGENTS GRID (full)
+───────────────────────────────────────────── -->
+<section class="slide" style="background-image:linear-gradient(var(--grid-line) 1px,transparent 1px),linear-gradient(90deg,var(--grid-line) 1px,transparent 1px),radial-gradient(ellipse at 80% 20%, rgba(78,205,196,.07) 0%, transparent 40%);background-size:32px 32px,32px 32px,100% 100%;">
+  <p class="slide__eyebrow teal reveal">Specialised Agents</p>
+  <h2 class="slide__heading reveal" style="margin-bottom:0;">Every agent, a dedicated expert</h2>
+
+  <div class="agent-grid reveal" style="margin-top:clamp(12px,2vh,22px);">
+    <div class="agent-card">
+      <span class="agent-tag">@lead</span>
+      <span class="agent-name">Technical Lead</span>
+      <span class="agent-desc">Architecture oversight, planning, comprehensive code reviews</span>
+    </div>
+    <div class="agent-card">
+      <span class="agent-tag">@product-manager</span>
+      <span class="agent-name">Product Manager</span>
+      <span class="agent-desc">Requirements, prioritisation, PRD, backlog, product feedback</span>
+    </div>
+    <div class="agent-card">
+      <span class="agent-tag">@software-engineer</span>
+      <span class="agent-name">Software Engineer</span>
+      <span class="agent-desc">Implementation specialists — frontend, backend, fullstack</span>
+    </div>
+    <div class="agent-card">
+      <span class="agent-tag">@platform-engineer</span>
+      <span class="agent-name">Platform Engineer</span>
+      <span class="agent-desc">Infrastructure, CI/CD, DevOps, deployment, monitoring</span>
+    </div>
+    <div class="agent-card">
+      <span class="agent-tag">@qa</span>
+      <span class="agent-name">QA Engineer</span>
+      <span class="agent-desc">Unit, integration, e2e tests — systematic quality assurance</span>
+    </div>
+    <div class="agent-card">
+      <span class="agent-tag">@secops-engineer</span>
+      <span class="agent-name">SecOps Engineer</span>
+      <span class="agent-desc">Security, compliance, audit, vulnerability detection</span>
+    </div>
+    <div class="agent-card">
+      <span class="agent-tag">@ui-ux-designer</span>
+      <span class="agent-name">UI/UX Designer</span>
+      <span class="agent-desc">Design, accessibility, user experience, components</span>
+    </div>
+    <div class="agent-card">
+      <span class="agent-tag">@asserter</span>
+      <span class="agent-name">Asserter</span>
+      <span class="agent-desc">Implementation validation, acceptance criteria verification</span>
+    </div>
+  </div>
+</section>
+
+
+<!-- ─────────────────────────────────────────
+  SLIDE 9 — DIVIDER 04
+───────────────────────────────────────────── -->
+<section class="slide slide--divider" style="background-image:linear-gradient(var(--grid-line) 1px,transparent 1px),linear-gradient(90deg,var(--grid-line) 1px,transparent 1px),radial-gradient(ellipse at 70% 70%, rgba(245,200,66,.08) 0%, transparent 45%);background-size:32px 32px,32px 32px,100% 100%;">
+  <span class="slide__number">04</span>
+  <div>
+    <p class="slide__eyebrow amber reveal">— Development Cycle</p>
+    <h2 class="slide__heading reveal" style="font-size:clamp(32px,5.5vw,56px);">Complete 8-Phase<br>Lifecycle</h2>
+    <p class="slide__subheading reveal" style="margin-top:10px;">From initialisation to feedback — no step missed</p>
+  </div>
+</section>
+
+
+<!-- ─────────────────────────────────────────
+  SLIDE 10 — PIPELINE 8 PHASES (full-width)
+───────────────────────────────────────────── -->
+<section class="slide" style="background-image:linear-gradient(var(--grid-line) 1px,transparent 1px),linear-gradient(90deg,var(--grid-line) 1px,transparent 1px),radial-gradient(ellipse at 50% 10%, rgba(245,200,66,.07) 0%, transparent 45%);background-size:32px 32px,32px 32px,100% 100%;padding:clamp(28px,4vh,52px) clamp(28px,4vw,60px);">
+  <p class="slide__eyebrow amber reveal">Development Cycle</p>
+  <h2 class="slide__heading reveal" style="margin-bottom:0;font-size:clamp(22px,3.5vw,36px);">The 8 phases of the VALORA lifecycle</h2>
+
+  <div class="pipeline reveal" style="margin-top:clamp(10px,1.5vh,18px);">
+    <div class="pipeline-step">
+      <div class="pipeline-num">01</div>
+      <div class="pipeline-name">Initialisation</div>
+      <div class="pipeline-desc">Project configuration, initial context</div>
+      <div class="pipeline-cmd">valora init</div>
+      <div class="pipeline-cmd">valora config setup</div>
+    </div>
+    <div class="pipeline-arrow">
+      <svg viewBox="0 0 20 20" width="16" height="16"><path d="M4 10h12m-4-4l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </div>
+    <div class="pipeline-step s2">
+      <div class="pipeline-num">02</div>
+      <div class="pipeline-name">Planning</div>
+      <div class="pipeline-desc">Specs, PRD, prioritised backlog</div>
+      <div class="pipeline-cmd">valora refine-specs</div>
+      <div class="pipeline-cmd">valora create-prd</div>
+      <div class="pipeline-cmd">valora generate-docs</div>
+      <div class="pipeline-cmd">valora create-backlog</div>
+    </div>
+    <div class="pipeline-arrow">
+      <svg viewBox="0 0 20 20" width="16" height="16"><path d="M4 10h12m-4-4l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </div>
+    <div class="pipeline-step s3">
+      <div class="pipeline-num">03</div>
+      <div class="pipeline-name">Context Gathering</div>
+      <div class="pipeline-desc">Codebase analysis, implementation plan</div>
+      <div class="pipeline-cmd">valora refine-task</div>
+      <div class="pipeline-cmd">valora plan</div>
+      <div class="pipeline-cmd">valora review-plan</div>
+    </div>
+    <div class="pipeline-arrow">
+      <svg viewBox="0 0 20 20" width="16" height="16"><path d="M4 10h12m-4-4l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </div>
+    <div class="pipeline-step s4">
+      <div class="pipeline-num">04</div>
+      <div class="pipeline-name">Implementation</div>
+      <div class="pipeline-desc">Code execution by dynamic agents</div>
+      <div class="pipeline-cmd">valora implement</div>
+      <div class="pipeline-cmd">valora assert</div>
+    </div>
+  </div>
+
+  <div class="pipeline reveal" style="margin-top:clamp(10px,1.5vh,18px);">
+    <div class="pipeline-arrow">
+      <svg viewBox="0 0 20 20" width="16" height="16"><path d="M4 10h12m-4-4l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </div>
+    <div class="pipeline-step s5">
+      <div class="pipeline-num">05</div>
+      <div class="pipeline-name">Testing</div>
+      <div class="pipeline-desc">Unit, integration, e2e suites</div>
+      <div class="pipeline-cmd">valora test</div>
+    </div>
+    <div class="pipeline-arrow">
+      <svg viewBox="0 0 20 20" width="16" height="16"><path d="M4 10h12m-4-4l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </div>
+    <div class="pipeline-step s6">
+      <div class="pipeline-num">06</div>
+      <div class="pipeline-name">Review</div>
+      <div class="pipeline-desc">Code, functional, security review</div>
+      <div class="pipeline-cmd">valora review-code</div>
+      <div class="pipeline-cmd">valora review-functional</div>
+    </div>
+    <div class="pipeline-arrow">
+      <svg viewBox="0 0 20 20" width="16" height="16"><path d="M4 10h12m-4-4l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </div>
+    <div class="pipeline-step s7">
+      <div class="pipeline-num">07</div>
+      <div class="pipeline-name">Delivery</div>
+      <div class="pipeline-desc">Conventional commits, automated PRs</div>
+      <div class="pipeline-cmd">valora create-pr</div>
+    </div>
+    <div class="pipeline-arrow">
+      <svg viewBox="0 0 20 20" width="16" height="16"><path d="M4 10h12m-4-4l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </div>
+    <div class="pipeline-step s8">
+      <div class="pipeline-num">08</div>
+      <div class="pipeline-name">Feedback</div>
+      <div class="pipeline-desc">Results capture, persistent memory and monitoring</div>
+      <div class="pipeline-cmd">valora feedback</div>
+      <div class="pipeline-cmd">valora consolidate</div>
+      <div class="pipeline-cmd">valora dash</div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ─────────────────────────────────────────
+  SLIDE 11 — DIVIDER 05
+───────────────────────────────────────────── -->
+<section class="slide slide--divider" style="background-image:linear-gradient(var(--grid-line) 1px,transparent 1px),linear-gradient(90deg,var(--grid-line) 1px,transparent 1px),radial-gradient(ellipse at 20% 50%, rgba(59,158,221,.1) 0%, transparent 45%);background-size:32px 32px,32px 32px,100% 100%;">
+  <span class="slide__number">05</span>
+  <div>
+    <p class="slide__eyebrow reveal">— Technical Architecture</p>
+    <h2 class="slide__heading reveal" style="font-size:clamp(32px,5.5vw,56px);">How It<br>Works</h2>
+    <p class="slide__subheading reveal" style="margin-top:10px;">4-layer architecture, extensible and modular</p>
+  </div>
+</section>
+
+
+<!-- ─────────────────────────────────────────
+  SLIDE 12 — ARCHITECTURE 4 LAYERS (full)
+───────────────────────────────────────────── -->
+<section class="slide" style="background-image:linear-gradient(var(--grid-line) 1px,transparent 1px),linear-gradient(90deg,var(--grid-line) 1px,transparent 1px),radial-gradient(ellipse at 85% 50%, rgba(59,158,221,.07) 0%, transparent 40%);background-size:32px 32px,32px 32px,100% 100%;padding:clamp(28px,4vh,52px) clamp(28px,4vw,60px);">
+  <p class="slide__eyebrow reveal">Technical Architecture</p>
+  <h2 class="slide__heading reveal" style="font-size:clamp(22px,3.5vw,36px);margin-bottom:0;">4-layer modular architecture</h2>
+
+  <div class="arch-wrap reveal">
+    <div class="arch-layer">
+      <div class="arch-layer-label">CLI Layer</div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-components">
+        <div class="arch-comp">Commands</div>
+        <div class="arch-comp">Assistant</div>
+        <div class="arch-comp">Dashboard</div>
+        <div class="arch-comp">Formatted output</div>
+        <div class="arch-comp" style="color:var(--dim);border-style:dashed;">src/cli/</div>
+      </div>
+    </div>
+    <div class="arch-layer">
+      <div class="arch-layer-label">Orchestrator</div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-components">
+        <div class="arch-comp">Pipeline Executor</div>
+        <div class="arch-comp">Stage Executor</div>
+        <div class="arch-comp">Context Manager</div>
+        <div class="arch-comp">Session Manager</div>
+        <div class="arch-comp" style="color:var(--third);border-color:rgba(78,205,196,.3);">Memory System</div>
+        <div class="arch-comp" style="color:var(--dim);border-style:dashed;">src/executor/ · src/memory/</div>
+      </div>
+    </div>
+    <div class="arch-layer">
+      <div class="arch-layer-label">Agents</div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-components">
+        <div class="arch-comp">Registry</div>
+        <div class="arch-comp">Dynamic Selection</div>
+        <div class="arch-comp">Prompt Loading</div>
+        <div class="arch-comp">11 Defined Agents</div>
+        <div class="arch-comp" style="color:var(--dim);border-style:dashed;">data/agents/</div>
+      </div>
+    </div>
+    <div class="arch-layer">
+      <div class="arch-layer-label">LLM Layer</div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-components">
+        <div class="arch-comp">Anthropic</div>
+        <div class="arch-comp">OpenAI</div>
+        <div class="arch-comp">Google</div>
+        <div class="arch-comp">MCP Sampling</div>
+        <div class="arch-comp" style="color:var(--dim);border-style:dashed;">3-tier fallback</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="reveal" style="margin-top:clamp(8px,1.2vh,14px);">
+    <div class="stat-bar">
+      <div class="stat-item"><span class="stat-value" style="color:var(--third);">AST</span><span class="stat-label">Code Intelligence</span></div>
+      <div class="stat-item"><span class="stat-value" style="color:var(--secondary);">LSP</span><span class="stat-label">Symbol Index</span></div>
+      <div class="stat-item"><span class="stat-value" style="color:var(--primary);">MCP</span><span class="stat-label">Tool Protocol</span></div>
+      <div class="stat-item"><span class="stat-value" style="color:var(--purple);">Session</span><span class="stat-label">Context persistence</span></div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ─────────────────────────────────────────
+  SLIDE 13 — BIOLOGICAL MEMORY (new)
+───────────────────────────────────────────── -->
+<section class="slide" style="background-image:linear-gradient(var(--grid-line) 1px,transparent 1px),linear-gradient(90deg,var(--grid-line) 1px,transparent 1px),radial-gradient(ellipse at 75% 25%, rgba(78,205,196,.1) 0%, transparent 45%),radial-gradient(ellipse at 20% 75%, rgba(139,92,246,.07) 0%, transparent 40%);background-size:32px 32px,32px 32px,100% 100%,100% 100%;padding:clamp(28px,4vh,52px) clamp(28px,4vw,60px);">
+  <p class="slide__eyebrow teal reveal">Technical Architecture · New in v2.4</p>
+  <h2 class="slide__heading reveal" style="font-size:clamp(22px,3.5vw,36px);margin-bottom:0;">Biological memory of agents</h2>
+
+  <div class="reveal" style="display:grid;grid-template-columns:1fr 1fr;gap:clamp(10px,1.5vw,18px);margin-top:clamp(12px,2vh,20px);">
+    <!-- Left: stores -->
+    <div style="display:flex;flex-direction:column;gap:clamp(6px,1vh,10px);">
+      <div class="card card-accent-top teal" style="padding:clamp(10px,1.5vh,16px) clamp(12px,1.5vw,18px);">
+        <p class="slide__eyebrow teal" style="margin-bottom:4px;font-size:9px;">Episodic · half-life 7 d</p>
+        <p style="font-size:clamp(12px,1.4vw,15px);color:var(--dim);line-height:1.4;">Timestamped observations per session — detected errors, code patterns, local decisions</p>
+      </div>
+      <div class="card card-accent-top" style="padding:clamp(10px,1.5vh,16px) clamp(12px,1.5vw,18px);">
+        <p class="slide__eyebrow" style="margin-bottom:4px;font-size:9px;">Semantic · half-life 30 d</p>
+        <p style="font-size:clamp(12px,1.4vw,15px);color:var(--dim);line-height:1.4;">Patterns consolidated by Jaccard similarity — cross-session architectural knowledge</p>
+      </div>
+      <div class="card card-accent-top amber" style="padding:clamp(10px,1.5vh,16px) clamp(12px,1.5vw,18px);">
+        <p class="slide__eyebrow amber" style="margin-bottom:4px;font-size:9px;">Decisions · half-life 21 d</p>
+        <p style="font-size:clamp(12px,1.4vw,15px);color:var(--dim);line-height:1.4;">Persistent architectural decisions — automatically invalidated by <code style="font-family:var(--font-mono);font-size:11px;color:var(--secondary);">git log</code></p>
+      </div>
+    </div>
+    <!-- Right: mechanics -->
+    <div style="display:flex;flex-direction:column;gap:clamp(8px,1.2vh,14px);">
+      <ul class="bullets teal" style="margin-top:0;">
+        <li><strong>Exponential decay</strong> — Ebbinghaus curve, automatic pruning without intervention</li>
+        <li><strong>Reinforcement on read</strong> — each access adds 2 d to the entry's half-life</li>
+        <li><strong>Error amplification</strong> — errors remembered 2× longer</li>
+        <li><strong>Confidence levels</strong> — <span style="color:var(--third);font-family:var(--font-mono);font-size:11px;">verified → observed → inferred → stale</span></li>
+        <li><strong>Zero dependencies</strong> — pure JSON, stored in <span style="color:var(--dim);font-family:var(--font-mono);font-size:11px;">.valora/memory/</span></li>
+      </ul>
+      <div class="code-block" style="padding:10px 16px;">
+        <span class="code-filename">terminal</span>
+        <pre style="font-size:clamp(11px,1.2vw,13px);"><code><span class="cm"># Manual consolidation</span>
+<span class="hl">valora</span> consolidate
+
+<span class="cm"># Simulation without writing</span>
+<span class="hl">valora</span> consolidate <span class="hl2">--dry-run</span>
+
+<span class="cm"># Auto-triggered after feedback</span></code></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ─────────────────────────────────────────
+  SLIDE 14 — DIVIDER 06
+───────────────────────────────────────────── -->
+<section class="slide slide--divider" style="background-image:linear-gradient(var(--grid-line) 1px,transparent 1px),linear-gradient(90deg,var(--grid-line) 1px,transparent 1px),radial-gradient(ellipse at 60% 60%, rgba(139,92,246,.1) 0%, transparent 45%);background-size:32px 32px,32px 32px,100% 100%;">
+  <span class="slide__number">06</span>
+  <div>
+    <p class="slide__eyebrow reveal" style="color:var(--purple);">— Execution Modes</p>
+    <h2 class="slide__heading reveal" style="font-size:clamp(32px,5.5vw,56px);">Three Execution<br>Modes</h2>
+    <p class="slide__subheading reveal" style="margin-top:10px;">From zero configuration to full autonomy</p>
+  </div>
+</section>
+
+
+<!-- ─────────────────────────────────────────
+  SLIDE 15 — 3 TIERS (3 columns)
+───────────────────────────────────────────── -->
+<section class="slide" style="background-image:linear-gradient(var(--grid-line) 1px,transparent 1px),linear-gradient(90deg,var(--grid-line) 1px,transparent 1px),radial-gradient(ellipse at 50% 80%, rgba(139,92,246,.07) 0%, transparent 45%);background-size:32px 32px,32px 32px,100% 100%;padding:clamp(28px,4vh,52px) clamp(28px,4vw,60px);">
+  <p class="slide__eyebrow reveal" style="color:var(--purple);">Execution Modes</p>
+  <h2 class="slide__heading reveal" style="font-size:clamp(22px,3.5vw,36px);margin-bottom:0;">Choose your level of autonomy</h2>
+
+  <div class="tiers-wrap reveal">
+    <div class="tier-card">
+      <div class="tier-badge">Recommended</div>
+      <div class="tier-num">01</div>
+      <div class="tier-name">MCP Sampling</div>
+      <div class="tier-cost">Free*</div>
+      <div class="tier-desc">Via your Cursor subscription. No API key, no configuration required.</div>
+      <div class="tier-features">
+        <div class="tier-feat">Uses Claude via Cursor</div>
+        <div class="tier-feat">Zero additional cost</div>
+        <div class="tier-feat">Available immediately</div>
+        <div class="tier-feat">Maximum autonomy</div>
+      </div>
+    </div>
+    <div class="tier-card t2">
+      <div class="tier-badge">No API Key</div>
+      <div class="tier-num">02</div>
+      <div class="tier-name">Guided Completion</div>
+      <div class="tier-cost">Free</div>
+      <div class="tier-desc">Generates structured prompts to copy into any AI assistant.</div>
+      <div class="tier-features">
+        <div class="tier-feat">Works everywhere</div>
+        <div class="tier-feat">Optimised prompts</div>
+        <div class="tier-feat">Compatible with all LLMs</div>
+        <div class="tier-feat">Full human control</div>
+      </div>
+    </div>
+    <div class="tier-card t3">
+      <div class="tier-badge">Advanced</div>
+      <div class="tier-num">03</div>
+      <div class="tier-name">Direct API</div>
+      <div class="tier-cost">Pay-per-use</div>
+      <div class="tier-desc">Direct calls to Anthropic, OpenAI or Google APIs — fully autonomous execution.</div>
+      <div class="tier-features">
+        <div class="tier-feat">Full autonomy</div>
+        <div class="tier-feat">Maximum power</div>
+        <div class="tier-feat">Automatic fallback</div>
+        <div class="tier-feat">Complete call audit</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ─────────────────────────────────────────
+  SLIDE 16 — MODEL OPTIMISATION (split)
+───────────────────────────────────────────── -->
+<section class="slide--split slide" style="padding:0;background-image:none;">
+  <div class="slide__panels">
+    <div class="slide__panel slide__panel--primary" style="background:var(--surface);background-image:linear-gradient(var(--grid-line) 1px,transparent 1px),linear-gradient(90deg,var(--grid-line) 1px,transparent 1px);background-size:32px 32px;border-right:1px solid var(--border);">
+      <p class="slide__eyebrow amber reveal">Model Optimisation</p>
+      <h2 class="slide__heading reveal" style="font-size:clamp(22px,3.2vw,34px);margin-bottom:clamp(14px,2vh,22px);">The right model for every task</h2>
+      <table class="model-table reveal">
+        <thead>
+          <tr>
+            <th>Model</th>
+            <th>Usage</th>
+            <th>%</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span style="color:var(--secondary);font-weight:600;">GPT-5 Thinking</span></td>
+            <td style="color:var(--dim);font-size:clamp(12px,1.4vw,15px);">Deep analysis, planning</td>
+            <td><span class="tag tag-amber">31%</span></td>
+          </tr>
+          <tr>
+            <td><span style="color:var(--primary);font-weight:600;">Claude Sonnet</span></td>
+            <td style="color:var(--dim);font-size:clamp(12px,1.4vw,15px);">Implementation, reviews</td>
+            <td><span class="tag tag-blue">31%</span></td>
+          </tr>
+          <tr>
+            <td><span style="color:var(--third);font-weight:600;">Claude Haiku</span></td>
+            <td style="color:var(--dim);font-size:clamp(12px,1.4vw,15px);">Quick tasks, validation</td>
+            <td><span class="tag tag-teal">38%</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="slide__panel slide__panel--secondary" style="background:var(--elevated);background-image:linear-gradient(var(--grid-line) 1px,transparent 1px),linear-gradient(90deg,var(--grid-line) 1px,transparent 1px);background-size:32px 32px;align-items:center;">
+      <p class="slide__eyebrow amber reveal" style="align-self:flex-start;">Strategic allocation</p>
+      <!-- Triangle SVG visualisation -->
+      <svg class="reveal" viewBox="0 0 260 240" width="min(260px,90%)" style="margin:0 auto;">
+        <defs>
+          <linearGradient id="triG" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#f5c842" stop-opacity=".6"/>
+            <stop offset="50%" stop-color="#3b9edd" stop-opacity=".6"/>
+            <stop offset="100%" stop-color="#4ecdc4" stop-opacity=".6"/>
+          </linearGradient>
+        </defs>
+        <polygon points="130,20 240,210 20,210" fill="url(#triG)" stroke="rgba(59,158,221,.3)" stroke-width="1.5"/>
+        <!-- Strategic vertex -->
+        <circle cx="130" cy="20" r="5" fill="#f5c842"/>
+        <text x="130" y="10" text-anchor="middle" font-family="'Fira Code',monospace" font-size="10" fill="#f5c842">Strategic</text>
+        <text x="130" y="0" text-anchor="middle" font-family="'Fira Code',monospace" font-size="9" fill="#f5c842" opacity=".7">31%</text>
+        <!-- Execution vertex -->
+        <circle cx="240" cy="210" r="5" fill="#3b9edd"/>
+        <text x="255" y="215" text-anchor="middle" font-family="'Fira Code',monospace" font-size="10" fill="#3b9edd">Exec.</text>
+        <text x="255" y="225" text-anchor="middle" font-family="'Fira Code',monospace" font-size="9" fill="#3b9edd" opacity=".7">31%</text>
+        <!-- Fast vertex -->
+        <circle cx="20" cy="210" r="5" fill="#4ecdc4"/>
+        <text x="5" y="215" text-anchor="middle" font-family="'Fira Code',monospace" font-size="10" fill="#4ecdc4">Fast</text>
+        <text x="5" y="225" text-anchor="middle" font-family="'Fira Code',monospace" font-size="9" fill="#4ecdc4" opacity=".7">38%</text>
+        <!-- Center label -->
+        <text x="130" y="130" text-anchor="middle" font-family="'DM Sans',sans-serif" font-size="12" fill="rgba(204,224,245,.6)">Balance</text>
+        <text x="130" y="145" text-anchor="middle" font-family="'DM Sans',sans-serif" font-size="11" fill="rgba(107,156,192,.5)">Cost / Speed / Quality</text>
+      </svg>
+    </div>
+  </div>
+</section>
+
+
+<!-- ─────────────────────────────────────────
+  SLIDE 17 — DIVIDER 07
+───────────────────────────────────────────── -->
+<section class="slide slide--divider" style="background-image:linear-gradient(var(--grid-line) 1px,transparent 1px),linear-gradient(90deg,var(--grid-line) 1px,transparent 1px),radial-gradient(ellipse at 40% 40%, rgba(255,107,107,.09) 0%, transparent 45%);background-size:32px 32px,32px 32px,100% 100%;">
+  <span class="slide__number">07</span>
+  <div>
+    <p class="slide__eyebrow red reveal" style="color:var(--red);">— Security &amp; Compliance</p>
+    <h2 class="slide__heading reveal" style="font-size:clamp(32px,5.5vw,56px);">Enterprise<br>Security</h2>
+    <p class="slide__subheading reveal" style="margin-top:10px;">Multi-layer protection for demanding environments</p>
+  </div>
+</section>
+
+
+<!-- ─────────────────────────────────────────
+  SLIDE 18 — SECURITY (6 cards)
+───────────────────────────────────────────── -->
+<section class="slide" style="background-image:linear-gradient(var(--grid-line) 1px,transparent 1px),linear-gradient(90deg,var(--grid-line) 1px,transparent 1px),radial-gradient(ellipse at 20% 80%, rgba(255,107,107,.07) 0%, transparent 40%);background-size:32px 32px,32px 32px,100% 100%;padding:clamp(28px,4vh,52px) clamp(28px,4vw,60px);">
+  <p class="slide__eyebrow red reveal" style="color:var(--red);">Security &amp; Compliance</p>
+  <h2 class="slide__heading reveal" style="font-size:clamp(22px,3.5vw,36px);margin-bottom:0;">6 levels of protection</h2>
+
+  <div class="sec-grid reveal">
+    <div class="sec-card" style="border-left:2px solid var(--primary);">
+      <div class="sec-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke="#3b9edd" stroke-width="1.5" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="sec-name">Credential Guard</div>
+      <div class="sec-desc">Redaction of environment variables, blocking sensitive files, output scanning</div>
+    </div>
+    <div class="sec-card" style="border-left:2px solid var(--red);">
+      <div class="sec-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18" stroke="#ff6b6b" stroke-width="1.5" stroke-linecap="round"/></svg>
+      </div>
+      <div class="sec-name">Command Guard</div>
+      <div class="sec-desc">Blocks exfiltration, dangerous network patterns, eval and remote access</div>
+    </div>
+    <div class="sec-card" style="border-left:2px solid var(--secondary);">
+      <div class="sec-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" stroke="#f5c842" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="sec-name">Injection Detection</div>
+      <div class="sec-desc">Scanning tool results with risk score, quarantine and automatic redaction</div>
+    </div>
+    <div class="sec-card" style="border-left:2px solid var(--third);">
+      <div class="sec-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" stroke="#4ecdc4" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="sec-name">MCP Hardening</div>
+      <div class="sec-desc">Tool definition validation, drift detection, approval workflows</div>
+    </div>
+    <div class="sec-card" style="border-left:2px solid var(--purple);">
+      <div class="sec-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" stroke="#8b5cf6" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="sec-name">Supply Chain</div>
+      <div class="sec-desc">Frozen lockfile, installation scripts blocked, vulnerability overrides forbidden</div>
+    </div>
+    <div class="sec-card" style="border-left:2px solid var(--dim);">
+      <div class="sec-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" stroke="#6b9cc0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="sec-name">Audit Logging</div>
+      <div class="sec-desc">Complete operation traceability with security event tracking</div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ─────────────────────────────────────────
+  SLIDE 19 — DIVIDER 08
+───────────────────────────────────────────── -->
+<section class="slide slide--divider" style="background-image:linear-gradient(var(--grid-line) 1px,transparent 1px),linear-gradient(90deg,var(--grid-line) 1px,transparent 1px),radial-gradient(ellipse at 70% 30%, rgba(78,205,196,.1) 0%, transparent 45%);background-size:32px 32px,32px 32px,100% 100%;">
+  <span class="slide__number">08</span>
+  <div>
+    <p class="slide__eyebrow teal reveal">— Extensibility</p>
+    <h2 class="slide__heading reveal" style="font-size:clamp(32px,5.5vw,56px);">How to Extend<br>VALORA</h2>
+    <p class="slide__subheading reveal" style="margin-top:10px;">Plugin architecture — everything is overridable</p>
+  </div>
+</section>
+
+
+<!-- ─────────────────────────────────────────
+  SLIDE 20 — EXTENSIBILITY (3 columns)
+───────────────────────────────────────────── -->
+<section class="slide" style="background-image:linear-gradient(var(--grid-line) 1px,transparent 1px),linear-gradient(90deg,var(--grid-line) 1px,transparent 1px),radial-gradient(ellipse at 80% 80%, rgba(78,205,196,.07) 0%, transparent 40%);background-size:32px 32px,32px 32px,100% 100%;padding:clamp(28px,4vh,52px) clamp(28px,4vw,60px);">
+  <p class="slide__eyebrow teal reveal">Extensibility</p>
+  <h2 class="slide__heading reveal" style="font-size:clamp(22px,3.5vw,36px);margin-bottom:0;">Plugin architecture — everything is extensible</h2>
+
+  <div class="ext-grid reveal">
+    <!-- Col 1: Project structure -->
+    <div class="ext-card">
+      <div class="ext-card-head">
+        <p class="slide__eyebrow teal" style="margin-bottom:0;font-size:9px;">Structure .valora/</p>
+        <div class="ext-card-title">Override folder</div>
+      </div>
+      <div class="ext-card-body">
+        <div class="dir-tree">
+<span class="dir">.valora/</span><br>
+├── <span class="file">config.json</span>           <span class="comment"># project config</span><br>
+├── <span class="file">external-mcp.json</span>    <span class="comment"># MCP config</span><br>
+├── <span class="file">hooks.json</span>           <span class="comment"># hooks and enforcement config</span><br>
+├── <span class="dir">agents/</span>              <span class="comment"># custom agents</span><br>
+├── <span class="dir">commands/</span>            <span class="comment"># custom commands</span><br>
+├── <span class="dir">prompts/</span>             <span class="comment"># custom prompts</span><br>
+├── <span class="dir">templates/</span>           <span class="comment"># custom templates</span><br>
+├── <span class="dir">sessions/</span>            <span class="comment"># session state</span><br>
+└── <span class="dir">logs/</span>                <span class="comment"># logs</span>
+        </div>
+      </div>
+    </div>
+    <!-- Col 2: Custom agent -->
+    <div class="ext-card">
+      <div class="ext-card-head">
+        <p class="slide__eyebrow" style="margin-bottom:0;font-size:9px;">Custom Agents</p>
+        <div class="ext-card-title">Redefine an agent</div>
+      </div>
+      <div class="ext-card-body">
+        <div class="dir-tree">
+<span class="comment"># .valora/agents/@lead.md</span><br>
+<span class="file">---</span><br>
+<span class="dir">name:</span> <span class="file">@lead</span><br>
+<span class="dir">model:</span> <span class="file">claude-opus-4-6</span><br>
+<span class="dir">focus:</span> <span class="file">microservices</span><br>
+<span class="file">---</span><br><br>
+<span class="comment"># Your custom prompt</span><br>
+You are a microservices architecture expert for fintech...
+        </div>
+      </div>
+    </div>
+    <!-- Col 3: MCP servers -->
+    <div class="ext-card">
+      <div class="ext-card-head">
+        <p class="slide__eyebrow amber" style="margin-bottom:0;font-size:9px;">External MCP Servers</p>
+        <div class="ext-card-title">15 available integrations</div>
+      </div>
+      <div class="ext-card-body" style="display:flex;flex-direction:column;gap:5px;">
+        <div style="display:flex;gap:5px;flex-wrap:wrap;">
+          <span class="tag tag-blue">Playwright</span>
+          <span class="tag tag-teal">Figma</span>
+          <span class="tag tag-amber">GitHub</span>
+        </div>
+        <div style="display:flex;gap:5px;flex-wrap:wrap;">
+          <span class="tag tag-purple">Terraform</span>
+          <span class="tag tag-blue">Firebase</span>
+          <span class="tag tag-teal">MongoDB</span>
+        </div>
+        <div style="display:flex;gap:5px;flex-wrap:wrap;">
+          <span class="tag tag-amber">Grafana</span>
+          <span class="tag tag-blue">Storybook</span>
+          <span class="tag tag-teal">Elastic</span>
+        </div>
+        <p style="font-size:11px;color:var(--faint);margin-top:4px;line-height:1.4;">
+          Each server activated with user approval.<br>Configuration in <span style="color:var(--third);font-family:var(--font-mono);font-size:10px;">external-mcp.default.json</span>
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ─────────────────────────────────────────
+  SLIDE 21 — COMMANDS (3-column table)
+───────────────────────────────────────────── -->
+<section class="slide" style="background-image:linear-gradient(var(--grid-line) 1px,transparent 1px),linear-gradient(90deg,var(--grid-line) 1px,transparent 1px),radial-gradient(ellipse at 30% 20%, rgba(59,158,221,.07) 0%, transparent 40%);background-size:32px 32px,32px 32px,100% 100%;padding:clamp(28px,4vh,52px) clamp(28px,4vw,60px);">
+  <p class="slide__eyebrow reveal">Quick Reference</p>
+  <h2 class="slide__heading reveal" style="font-size:clamp(22px,3.5vw,36px);margin-bottom:0;">25 commands across 3 phases</h2>
+
+  <div class="cmd-grid reveal" style="--cmd-py:4px;">
+    <div class="cmd-col">
+      <div class="cmd-col-head">Planning · 13</div>
+      <div class="cmd-list">
+        <div class="cmd-item" style="padding-top:var(--cmd-py);padding-bottom:var(--cmd-py);"><span class="cmd-name">refine-specs</span><span class="cmd-desc">Refine specifications</span></div>
+        <div class="cmd-item" style="padding-top:var(--cmd-py);padding-bottom:var(--cmd-py);"><span class="cmd-name">create-prd</span><span class="cmd-desc">Generate PRD document</span></div>
+        <div class="cmd-item" style="padding-top:var(--cmd-py);padding-bottom:var(--cmd-py);"><span class="cmd-name">create-backlog</span><span class="cmd-desc">Break down into tasks</span></div>
+        <div class="cmd-item" style="padding-top:var(--cmd-py);padding-bottom:var(--cmd-py);"><span class="cmd-name">generate-docs</span><span class="cmd-desc">Generate technical documentation</span></div>
+        <div class="cmd-item" style="padding-top:var(--cmd-py);padding-bottom:var(--cmd-py);"><span class="cmd-name">generate-all-documentation</span><span class="cmd-desc">Parallel generation (~6 min faster)</span></div>
+        <div class="cmd-item" style="padding-top:var(--cmd-py);padding-bottom:var(--cmd-py);"><span class="cmd-name">fetch-task</span><span class="cmd-desc">Fetch the next task</span></div>
+        <div class="cmd-item" style="padding-top:var(--cmd-py);padding-bottom:var(--cmd-py);"><span class="cmd-name">refine-task</span><span class="cmd-desc">Clarify requirements</span></div>
+        <div class="cmd-item" style="padding-top:var(--cmd-py);padding-bottom:var(--cmd-py);"><span class="cmd-name">gather-knowledge</span><span class="cmd-desc">Analyse codebase context</span></div>
+        <div class="cmd-item" style="padding-top:var(--cmd-py);padding-bottom:var(--cmd-py);"><span class="cmd-name">plan</span><span class="cmd-desc">Create implementation plan</span></div>
+        <div class="cmd-item" style="padding-top:var(--cmd-py);padding-bottom:var(--cmd-py);"><span class="cmd-name">plan-architecture</span><span class="cmd-desc">High-level architecture plan (Phase 1)</span></div>
+        <div class="cmd-item" style="padding-top:var(--cmd-py);padding-bottom:var(--cmd-py);"><span class="cmd-name">plan-implementation</span><span class="cmd-desc">Detailed implementation plan (Phase 2)</span></div>
+        <div class="cmd-item" style="padding-top:var(--cmd-py);padding-bottom:var(--cmd-py);"><span class="cmd-name">validate-plan</span><span class="cmd-desc">Pre-validation of the plan (60–70% of issues)</span></div>
+        <div class="cmd-item" style="padding-top:var(--cmd-py);padding-bottom:var(--cmd-py);"><span class="cmd-name">review-plan</span><span class="cmd-desc">Validate plan quality</span></div>
+      </div>
+    </div>
+    <div class="cmd-col">
+      <div class="cmd-col-head">Implementation · 8</div>
+      <div class="cmd-list">
+        <div class="cmd-item" style="padding-top:var(--cmd-py);padding-bottom:var(--cmd-py);"><span class="cmd-name">implement</span><span class="cmd-desc">Execute code changes</span></div>
+        <div class="cmd-item" style="padding-top:var(--cmd-py);padding-bottom:var(--cmd-py);"><span class="cmd-name">assert</span><span class="cmd-desc">Validate implementation</span></div>
+        <div class="cmd-item" style="padding-top:var(--cmd-py);padding-bottom:var(--cmd-py);"><span class="cmd-name">test</span><span class="cmd-desc">Run test suites</span></div>
+        <div class="cmd-item" style="padding-top:var(--cmd-py);padding-bottom:var(--cmd-py);"><span class="cmd-name">validate-coverage</span><span class="cmd-desc">Validate test coverage</span></div>
+        <div class="cmd-item" style="padding-top:var(--cmd-py);padding-bottom:var(--cmd-py);"><span class="cmd-name">pre-check</span><span class="cmd-desc">Quality pre-checks before review</span></div>
+        <div class="cmd-item" style="padding-top:var(--cmd-py);padding-bottom:var(--cmd-py);"><span class="cmd-name">validate-parallel</span><span class="cmd-desc">assert + review-code in parallel (~50% faster)</span></div>
+        <div class="cmd-item" style="padding-top:var(--cmd-py);padding-bottom:var(--cmd-py);"><span class="cmd-name">review-code</span><span class="cmd-desc">Code quality review</span></div>
+        <div class="cmd-item" style="padding-top:var(--cmd-py);padding-bottom:var(--cmd-py);"><span class="cmd-name">review-functional</span><span class="cmd-desc">Functional review</span></div>
+      </div>
+    </div>
+    <div class="cmd-col">
+      <div class="cmd-col-head">Delivery · 4</div>
+      <div class="cmd-list">
+        <div class="cmd-item" style="padding-top:var(--cmd-py);padding-bottom:var(--cmd-py);"><span class="cmd-name">commit</span><span class="cmd-desc">Create conventional commits</span></div>
+        <div class="cmd-item" style="padding-top:var(--cmd-py);padding-bottom:var(--cmd-py);"><span class="cmd-name">create-pr</span><span class="cmd-desc">Generate the pull request</span></div>
+        <div class="cmd-item" style="padding-top:var(--cmd-py);padding-bottom:var(--cmd-py);"><span class="cmd-name">feedback</span><span class="cmd-desc">Capture results</span></div>
+        <div class="cmd-item" style="padding-top:var(--cmd-py);padding-bottom:var(--cmd-py);"><span class="cmd-name" style="color:var(--third);">consolidate</span><span class="cmd-desc">Consolidate agent memory</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ─────────────────────────────────────────
+  SLIDE 22 — QUICK START (centred code)
+───────────────────────────────────────────── -->
+<section class="slide" style="align-items:center;background-image:linear-gradient(var(--grid-line) 1px,transparent 1px),linear-gradient(90deg,var(--grid-line) 1px,transparent 1px),radial-gradient(ellipse at 50% 90%, rgba(78,205,196,.09) 0%, transparent 45%);background-size:32px 32px,32px 32px,100% 100%;">
+  <p class="slide__eyebrow reveal" style="align-self:center;text-align:center;">Getting Started</p>
+  <h2 class="slide__heading reveal" style="text-align:center;margin-bottom:clamp(14px,2.5vh,28px);font-size:clamp(22px,3.5vw,36px);">From zero to your first PR in 6 commands</h2>
+
+  <div class="code-block reveal" style="max-width:860px;">
+    <span class="code-filename">terminal</span>
+    <pre><code><span class="cm"># 1. Global installation</span>
+<span class="hl">pnpm</span> add <span class="hl2">-g</span> @windagency/valora
+
+<span class="cm"># 2. Initialise in your project</span>
+<span class="hl">cd</span> my-project <span class="hl2">&amp;&amp;</span> <span class="hl">valora</span> init
+
+<span class="cm"># 3. Create the implementation plan</span>
+<span class="hl">valora</span> plan <span class="str">"Add OAuth authentication"</span>
+
+<span class="cm"># 4. Run the implementation</span>
+<span class="hl">valora</span> implement
+
+<span class="cm"># 5. Review + conventional commit</span>
+<span class="hl">valora</span> review-code <span class="hl2">&amp;&amp;</span> <span class="hl">valora</span> commit
+
+<span class="cm"># 6. Automatic pull request</span>
+<span class="hl">valora</span> create-pr</code></pre>
+  </div>
+
+  <div class="reveal" style="margin-top:clamp(12px,2vh,22px);text-align:center;">
+    <span class="tag tag-teal" style="font-size:11px;padding:4px 12px;">
+      Zero configuration required with your Cursor subscription
+    </span>
+  </div>
+</section>
+
+
+<!-- ─────────────────────────────────────────
+  SLIDE 23 — CONCLUSION / CTA (full-bleed gradient + centred)
+───────────────────────────────────────────── -->
+<section class="slide" style="justify-content:center;align-items:center;text-align:center;background-image:linear-gradient(var(--grid-line) 1px,transparent 1px),linear-gradient(90deg,var(--grid-line) 1px,transparent 1px),radial-gradient(ellipse at 50% 30%, rgba(59,158,221,.16) 0%, transparent 50%),radial-gradient(ellipse at 20% 80%, rgba(139,92,246,.1) 0%, transparent 40%),radial-gradient(ellipse at 80% 70%, rgba(78,205,196,.08) 0%, transparent 40%);background-size:32px 32px,32px 32px,100% 100%,100% 100%,100% 100%;">
+
+  <svg class="slide__decor" style="top:0;right:0;" width="80" height="80" viewBox="0 0 80 80">
+    <line x1="80" y1="0" x2="80" y2="28" stroke="#3b9edd" stroke-width="1.5" opacity=".25"/>
+    <line x1="52" y1="0" x2="80" y2="0" stroke="#3b9edd" stroke-width="1.5" opacity=".25"/>
+  </svg>
+  <svg class="slide__decor" style="bottom:0;left:0;" width="80" height="80" viewBox="0 0 80 80">
+    <line x1="0" y1="52" x2="0" y2="80" stroke="#4ecdc4" stroke-width="1.5" opacity=".25"/>
+    <line x1="0" y1="80" x2="28" y2="80" stroke="#4ecdc4" stroke-width="1.5" opacity=".25"/>
+  </svg>
+
+  <div class="reveal" style="margin-bottom:clamp(16px,2.5vh,28px);">
+    <svg width="160" height="40" viewBox="0 0 480 120" xmlns="http://www.w3.org/2000/svg" style="display:block;margin:0 auto;">
+      <defs>
+        <linearGradient id="vG2" x1="50%" y1="0%" x2="50%" y2="100%">
+          <stop offset="0%" stop-color="#00d4ff"/><stop offset="52%" stop-color="#8b5cf6"/><stop offset="100%" stop-color="#6d28d9"/>
+        </linearGradient>
+        <linearGradient id="hG2" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#00d4ff" stop-opacity="1"/><stop offset="45%" stop-color="#8b5cf6" stop-opacity=".7"/><stop offset="100%" stop-color="#00d4ff" stop-opacity=".45"/>
+        </linearGradient>
+        <linearGradient id="tG2" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stop-color="#c8e4ff"/><stop offset="45%" stop-color="#eef4ff"/><stop offset="80%" stop-color="#a5f3fc"/><stop offset="100%" stop-color="#c4b5fd"/>
+        </linearGradient>
+        <filter id="gl2" x="-80%" y="-80%" width="260%" height="260%">
+          <feGaussianBlur in="SourceGraphic" stdDeviation="3.5" result="b"/>
+          <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+        <filter id="sb2" x="-100%" y="-100%" width="300%" height="300%">
+          <feGaussianBlur in="SourceGraphic" stdDeviation="8"/>
+        </filter>
+      </defs>
+      <g transform="translate(12,7) scale(0.55)">
+        <polygon points="42,55 58,55 100,155 142,55 158,55 100,165" fill="#6d28d9" filter="url(#sb2)" opacity=".5"/>
+        <polygon points="100,8 180,54 180,146 100,192 20,146 20,54" fill="#0b1422"/>
+        <polygon points="100,8 180,54 180,146 100,192 20,146 20,54" fill="none" stroke="url(#hG2)" stroke-width="2" opacity=".9"/>
+        <polygon points="42,55 58,55 100,155 142,55 158,55 100,165" fill="url(#vG2)"/>
+        <circle cx="42" cy="55" r="5" fill="#00d4ff" filter="url(#gl2)"/>
+        <circle cx="158" cy="55" r="5" fill="#00d4ff" filter="url(#gl2)"/>
+        <circle cx="100" cy="160" r="9" fill="#00d4ff" filter="url(#gl2)"/>
+        <circle cx="100" cy="160" r="4" fill="white"/>
+      </g>
+      <line x1="128" y1="22" x2="128" y2="98" stroke="#00d4ff" stroke-width=".5" opacity=".18"/>
+      <text x="146" y="67" font-family="'DM Sans',sans-serif" font-size="40" font-weight="300" letter-spacing="9" fill="url(#tG2)">VALORA</text>
+    </svg>
+  </div>
+
+  <h2 class="reveal" style="font-size:clamp(20px,3vw,32px);font-weight:600;letter-spacing:-.01em;margin-bottom:clamp(14px,2.5vh,28px);color:var(--text);">
+    Multi-agent orchestration in service of developers
+  </h2>
+
+  <div class="reveal" style="display:flex;flex-direction:column;gap:clamp(8px,1.2vh,14px);max-width:600px;margin:0 auto clamp(20px,3vh,36px);text-align:left;">
+    <div style="display:flex;align-items:flex-start;gap:10px;">
+      <span style="color:var(--primary);font-size:18px;flex-shrink:0;margin-top:1px;">→</span>
+      <span style="font-size:clamp(14px,1.8vw,19px);color:var(--dim);line-height:1.45;"><strong style="color:var(--text);">11 specialised agents</strong> automatically coordinated for every task</span>
+    </div>
+    <div style="display:flex;align-items:flex-start;gap:10px;">
+      <span style="color:var(--third);font-size:18px;flex-shrink:0;margin-top:1px;">→</span>
+      <span style="font-size:clamp(14px,1.8vw,19px);color:var(--dim);line-height:1.45;"><strong style="color:var(--text);">Zero configuration</strong> — works immediately with your Cursor subscription</span>
+    </div>
+    <div style="display:flex;align-items:flex-start;gap:10px;">
+      <span style="color:var(--secondary);font-size:18px;flex-shrink:0;margin-top:1px;">→</span>
+      <span style="font-size:clamp(14px,1.8vw,19px);color:var(--dim);line-height:1.45;"><strong style="color:var(--text);">Extensible</strong> by design — agents, commands and prompts overridable per project</span>
+    </div>
+  </div>
+
+  <div class="reveal">
+    <div class="code-block" style="max-width:480px;margin:0 auto;padding:14px 24px;">
+      <code style="font-size:clamp(13px,1.6vw,17px);color:var(--third);">pnpm add -g @windagency/valora</code>
+    </div>
+    <p style="margin-top:clamp(8px,1.2vh,14px);font-family:var(--font-mono);font-size:10px;color:var(--faint);letter-spacing:.12em;text-transform:uppercase;">
+      MIT · Node.js 18+ · TypeScript 5.x
+    </p>
+  </div>
+</section>
+
+
+</div><!-- /deck -->
+
+<!-- ═══════════════════════════════════════════
+  SLIDE ENGINE
+════════════════════════════════════════════ -->
+<script>
+function SlideEngine(){
+  this.deck=document.querySelector('.deck');
+  this.slides=[].slice.call(document.querySelectorAll('.slide'));
+  this.current=0;
+  this.total=this.slides.length;
+  this.buildChrome();
+  this.bindEvents();
+  this.observe();
+  this.update();
+}
+SlideEngine.prototype.buildChrome=function(){
+  var bar=document.createElement('div');bar.className='deck-progress';document.body.appendChild(bar);this.bar=bar;
+  var dots=document.createElement('div');dots.className='deck-dots';var self=this;
+  this.slides.forEach(function(_,i){var d=document.createElement('button');d.className='deck-dot';d.title='Slide '+(i+1);d.onclick=function(){self.goTo(i);};dots.appendChild(d);});
+  document.body.appendChild(dots);this.dots=[].slice.call(dots.children);
+  var ctr=document.createElement('div');ctr.className='deck-counter';document.body.appendChild(ctr);this.counter=ctr;
+  var hints=document.createElement('div');hints.className='deck-hints';hints.textContent='\u2190 \u2192 or scroll to navigate';document.body.appendChild(hints);this.hints=hints;
+  this.hintTimer=setTimeout(function(){hints.classList.add('faded');},4000);
+};
+SlideEngine.prototype.bindEvents=function(){
+  var self=this;
+  document.addEventListener('keydown',function(e){
+    if(e.target.closest('.code-block,input,textarea,[contenteditable]'))return;
+    if(['ArrowDown','ArrowRight',' ','PageDown'].indexOf(e.key)>-1){e.preventDefault();self.next();}
+    else if(['ArrowUp','ArrowLeft','PageUp'].indexOf(e.key)>-1){e.preventDefault();self.prev();}
+    else if(e.key==='Home'){e.preventDefault();self.goTo(0);}
+    else if(e.key==='End'){e.preventDefault();self.goTo(self.total-1);}
+    self.fadeHints();
+  });
+  var tY;
+  this.deck.addEventListener('touchstart',function(e){tY=e.touches[0].clientY;},{passive:true});
+  this.deck.addEventListener('touchend',function(e){var dy=tY-e.changedTouches[0].clientY;if(Math.abs(dy)>50){dy>0?self.next():self.prev();}});
+};
+SlideEngine.prototype.observe=function(){
+  var self=this;
+  var obs=new IntersectionObserver(function(entries){entries.forEach(function(entry){if(entry.isIntersecting){entry.target.classList.add('visible');self.current=self.slides.indexOf(entry.target);self.update();}});},{threshold:0.5});
+  this.slides.forEach(function(s){obs.observe(s);});
+};
+SlideEngine.prototype.goTo=function(i){this.slides[Math.max(0,Math.min(i,this.total-1))].scrollIntoView({behavior:'smooth'});};
+SlideEngine.prototype.next=function(){if(this.current<this.total-1)this.goTo(this.current+1);};
+SlideEngine.prototype.prev=function(){if(this.current>0)this.goTo(this.current-1);};
+SlideEngine.prototype.update=function(){
+  this.bar.style.width=((this.current+1)/this.total*100)+'%';
+  var c=this.current;this.dots.forEach(function(d,i){d.classList.toggle('active',i===c);});
+  this.counter.textContent=(this.current+1)+' / '+this.total;
+};
+SlideEngine.prototype.fadeHints=function(){clearTimeout(this.hintTimer);this.hints.classList.add('faded');};
+
+document.addEventListener('DOMContentLoaded',function(){ new SlideEngine(); });
+</script>
+</body>
+</html>
