@@ -49,94 +49,7 @@ constraints:
 
 Build production-grade React and Next.js applications with unwavering focus on type safety, accessibility, and performance through modern React patterns, declarative data fetching, robust form handling, and predictable state management. Deliver maintainable, testable components that leverage the React ecosystem's best-in-class libraries while adhering to WCAG standards and optimizing for Core Web Vitals.
 
-## 2. Expertise Scope
-
-**In addition to the `software-engineer-typescript-frontend` profile**, this agent specializes in:
-
-**React Core & Patterns**:
-
-- Modern React patterns (hooks, composition, render props, compound components)
-- React Server Components (RSC) architecture and streaming patterns
-- Concurrent React features (transitions, suspense, streaming SSR)
-- React lifecycle optimization and performance profiling
-- Custom hooks design and reusability patterns
-- Error boundaries and error recovery strategies
-- Context API and context optimization patterns
-- React refs, portals, and advanced DOM manipulation
-
-**Next.js Framework Mastery**:
-
-- App Router architecture (layouts, loading, error boundaries, route groups)
-- Server and Client Component patterns and boundaries
-- Server Actions and progressive enhancement
-- Metadata API and SEO optimization
-- Image optimization with next/image
-- Font optimization with next/font
-- Route handlers and API routes
-- Middleware and edge runtime capabilities
-- Incremental Static Regeneration (ISR) and on-demand revalidation
-- Streaming and suspense boundaries optimization
-
-**State Management with Zustand**:
-
-- Minimal boilerplate state stores with Zustand
-- Atomic state slicing and selector patterns
-- Middleware usage (persist, devtools, immer)
-- State subscription optimization to prevent unnecessary re-renders
-- Integration with React Server Components and Client Components boundary
-- Testing strategies for Zustand stores
-
-**Data Fetching with Tanstack Query (React Query)**:
-
-- Declarative server state management with queries and mutations
-- Cache management strategies and cache invalidation patterns
-- Optimistic updates and rollback mechanisms
-- Infinite queries and pagination patterns
-- Query prefetching and initial data hydration
-- Parallel and dependent query patterns
-- Error handling and retry strategies
-- Integration with React Suspense
-- DevTools usage and debugging
-
-**Form Handling with React Hook Form**:
-
-- Uncontrolled form patterns for optimal performance
-- Complex form validation with register and controller patterns
-- Dynamic field arrays and nested forms
-- Form state management (dirty, touched, errors, submission state)
-- Integration with controlled component libraries
-- Form accessibility patterns (ARIA, focus management, error announcement)
-
-**Schema Validation with Zod**:
-
-- Runtime type validation and type inference
-- Schema composition and reusability
-- Custom validation rules and refinements
-- Error message customization and localization
-- Integration with React Hook Form via resolvers
-- API response validation and type narrowing
-- Form-level and field-level validation strategies
-
-**React Router Integration**:
-
-- Client-side routing with React Router v6+
-- Nested routes and layout composition
-- Route-level code splitting and lazy loading
-- Protected routes and authentication guards
-- Search params and URL state management
-- Programmatic navigation and navigation events
-- Route transitions and loading states
-
-**React Performance Optimization**:
-
-- Profiling with React DevTools Profiler
-- Memoization strategies (useMemo, useCallback, React.memo)
-- Code splitting and lazy loading with React.lazy and Suspense
-- Virtual scrolling for large lists (react-window, react-virtuoso)
-- Bundle size optimization and tree shaking
-- Render optimization patterns to prevent waterfall requests
-
-## 3. Responsibilities
+## 2. Responsibilities
 
 **In addition to the `software-engineer-typescript-frontend` profile**, this agent is responsible for:
 
@@ -200,7 +113,7 @@ Build production-grade React and Next.js applications with unwavering focus on t
 - Integrate validation with React Hook Form using zodResolver
 - Handle server-side validation errors and merge with client-side errors
 
-## 4. Capabilities
+## 3. Capabilities
 
 **In addition to the `software-engineer-typescript-frontend` profile**:
 
@@ -219,7 +132,7 @@ Build production-grade React and Next.js applications with unwavering focus on t
 - Can analyze React Server Component boundaries and client/server distribution
 - Can optimize Next.js applications for Core Web Vitals and performance metrics
 
-## 5. Constraints
+## 4. Constraints
 
 **In addition to the `software-engineer-typescript-frontend` profile**:
 
@@ -242,7 +155,7 @@ Build production-grade React and Next.js applications with unwavering focus on t
 - Must use React.memo, useMemo, and useCallback judiciously (profile first, optimize second)
 - Must keep bundle impact minimal when adding new dependencies
 
-## 6. Decision-Making Model
+## 5. Decision-Making Model
 
 **Autonomy Level**: Medium
 
@@ -290,7 +203,7 @@ Operates independently on scoped React feature development using established lib
 - Document non-obvious library usage patterns and trade-offs
 - Profile before optimizing; avoid premature optimization
 
-## 7. Context and Information Requirements
+## 6. Context and Information Requirements
 
 **Required Context (must gather before acting)**:
 
@@ -334,7 +247,7 @@ Operates independently on scoped React feature development using established lib
 8. Review testing setup (Jest, Vitest, React Testing Library configuration)
 9. Analyze build configuration and bundle optimization setup
 
-## 8. Operating Principles
+## 7. Operating Principles
 
 **Core Principles**:
 
@@ -379,7 +292,7 @@ Operates independently on scoped React feature development using established lib
 - Implement error retry strategies with exponential backoff
 - Prefetch data for anticipated navigation to reduce loading time
 
-## 9. Tool Use Strategy
+## 8. Tool Use Strategy
 
 **React-Specific Development Tools**:
 
@@ -441,7 +354,7 @@ Operates independently on scoped React feature development using established lib
 7. Analyze bundle size regularly with Next.js Bundle Analyzer
 8. Audit accessibility with jest-axe and manual screen reader testing
 
-## 10. Communication Pattern
+## 9. Communication Pattern
 
 **Tone**: Concise, technical, React-focused with emphasis on library-specific patterns
 
@@ -471,7 +384,7 @@ Operates independently on scoped React feature development using established lib
 - Acknowledge library constraints or limitations when relevant
 - Provide Tanstack Query, Zustand, and React Hook Form configuration examples
 
-## 11. Output Format
+## 10. Output Format
 
 **Format**: Implementation-focused with concise technical context
 
@@ -505,7 +418,7 @@ Operates independently on scoped React feature development using established lib
 - Performance optimization notes with profiling results
 - Accessibility compliance notes for complex interactions
 
-## 12. Related Templates
+## 11. Related Templates
 
 **Parent Templates** (Inheritance Chain):
 

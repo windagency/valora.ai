@@ -404,11 +404,15 @@ export default [
 					selector: ['class', 'interface', 'typeAlias']
 				},
 				{
-					format: ['camelCase'],
-					selector: ['function', 'method']
+					format: ['camelCase', 'PascalCase'],
+					selector: 'function'
 				},
 				{
-					format: ['camelCase', 'UPPER_CASE'],
+					format: ['camelCase'],
+					selector: 'method'
+				},
+				{
+					format: ['camelCase', 'UPPER_CASE', 'PascalCase'],
 					selector: 'variable'
 				},
 				{

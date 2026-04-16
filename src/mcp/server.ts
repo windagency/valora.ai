@@ -44,12 +44,12 @@ export class MCPOrchestratorServer implements MCPSamplingService {
 	private logger: Logger;
 	private samplingService: MCPSamplingServiceImpl;
 	private toolRegistry: MCPToolRegistry;
-	// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-	// @ts-ignore - Kept for service lifecycle
+
+	// @ts-expect-error — kept for service lifecycle; assigned but only consumed externally
 	private requestHandler: MCPRequestHandler;
 	private systemMonitor: SystemMonitorService;
-	// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-	// @ts-ignore - Planned for future use
+
+	// @ts-expect-error — planned for future use; declared but not yet referenced
 	private shutdownManager: ShutdownManager;
 
 	constructor(logger?: Logger, version?: string) {

@@ -6,32 +6,26 @@
  */
 
 import type { BatchResult, BatchStatusInfo, BatchStatusValue, BatchSubmission } from 'batch/batch.types';
-import type OpenAI from 'openai';
 
-import { File } from 'buffer';
+import { type OpenAI, toFile } from 'openai';
 
 import type { LLMCompletionResult, LLMUsage } from 'types/llm.types';
+
+const OPENAI_STATUS_MAP: Record<string, BatchStatusValue> = {
+	cancelled: 'cancelled',
+	cancelling: 'cancelled',
+	completed: 'completed',
+	expired: 'expired',
+	failed: 'failed',
+	finalizing: 'processing',
+	in_progress: 'processing'
+};
 
 /**
  * Maps OpenAI batch status → BatchStatusValue
  */
 export function mapOpenAIStatus(status: string): BatchStatusValue {
-	switch (status) {
-		case 'cancelled':
-		case 'cancelling':
-			return 'cancelled';
-		case 'completed':
-			return 'completed';
-		case 'expired':
-			return 'expired';
-		case 'failed':
-			return 'failed';
-		case 'finalizing':
-		case 'in_progress':
-			return 'processing';
-		default:
-			return 'queued';
-	}
+	return OPENAI_STATUS_MAP[status] ?? 'queued';
 }
 
 /**
@@ -65,10 +59,9 @@ export async function submitOpenAIBatch(
 	}));
 	const jsonlContent = lines.map((l) => JSON.stringify(l)).join('\n');
 
-	// Upload the JSONL file — cast as any to accommodate OpenAI SDK's Uploadable type
-	const file = new File([jsonlContent], 'batch.jsonl', { type: 'application/jsonl' });
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment
-	const uploaded: OpenAI.FileObject = await client.files.create({ file: file as any, purpose: 'batch' });
+	const file = await toFile(Buffer.from(jsonlContent), 'batch.jsonl', { type: 'application/jsonl' });
+
+	const uploaded: OpenAI.FileObject = await client.files.create({ file, purpose: 'batch' });
 
 	// Create the batch job
 	const batch = await client.batches.create({

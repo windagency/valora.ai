@@ -505,13 +505,14 @@ Resources in `.valora/` take precedence over built-in `data/` resources.
 
 ### Innovation Highlights
 
-| Innovation                    | Impact                                         |
-| ----------------------------- | ---------------------------------------------- |
-| **Multi-Agent Orchestration** | Specialised agents produce expert-level output |
-| **Three-Tier Execution**      | Flexibility from free to fully automated       |
-| **Session Persistence**       | Context flows naturally between commands       |
-| **Dynamic Agent Selection**   | Right expert for every task                    |
-| **Quality Gates**             | Multiple checkpoints prevent technical debt    |
+| Innovation                    | Impact                                                                                                                                                                       |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Multi-Agent Orchestration** | Specialised agents produce expert-level output                                                                                                                               |
+| **Three-Tier Execution**      | Flexibility from free to fully automated                                                                                                                                     |
+| **Session Persistence**       | Context flows naturally between commands                                                                                                                                     |
+| **Dynamic Agent Selection**   | Right expert for every task                                                                                                                                                  |
+| **Quality Gates**             | Multiple checkpoints prevent technical debt                                                                                                                                  |
+| **Token Efficiency**          | Content-aware command filters, proactive history pruning, and tool-result deduplication reduce per-call token costs; savings surface in the `valora dash` Optimisation panel |
 
 ---
 

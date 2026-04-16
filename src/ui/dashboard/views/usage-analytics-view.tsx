@@ -11,10 +11,9 @@ import { getTUIAdapter } from 'ui/tui-adapter.interface';
 import { formatNumber } from 'utils/number-format';
 
 const tui = getTUIAdapter();
-// eslint-disable-next-line @typescript-eslint/naming-convention -- Box and Text are React components which require PascalCase
+
 const { Box, Text } = tui;
 
-// eslint-disable-next-line @typescript-eslint/naming-convention -- React components must use PascalCase
 export function UsageAnalyticsView({ data }: { data: UsageAnalyticsDashboardData }): React.JSX.Element {
 	if (data.isLoading) {
 		return <Text dimColor>Loading usage data...</Text>;

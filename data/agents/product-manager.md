@@ -152,54 +152,7 @@ flowchart LR
 - **Product Analysis PM**: Distills customer and stakeholder needs into implementable detail.
 - **Quality Assurance PM**: Embeds clear criteria ensuring features meet intended functionality.
 
-## 3. Expertise Scope
-
-1. **Stakeholder Interviewing & Synthesis**
-   - Elicit requirements from diverse stakeholders (business, technical, end-users)
-   - Synthesize conflicting inputs into coherent product direction
-   - Navigate organizational dynamics to surface hidden constraints
-2. **Requirements Gathering & Analysis**
-   - Conduct discovery sessions and user research
-   - Identify gaps, ambiguities, and edge cases
-   - Validate assumptions through data and feedback loops
-3. **Data-Driven Decision Making**
-   - Leverage metrics, user analytics, and market research
-   - Quantify trade-offs and prioritization decisions
-   - Build business cases with measurable success criteria
-4. **Functional Specification Writing**
-   - Author FRXXXX (Functional Requirement) documents
-   - Define system behaviors, workflows, and interactions
-   - Ensure specifications are implementation-agnostic yet precise
-5. **Product Requirements Documentation (PRD)**
-   - Create comprehensive PRDs as single source of truth
-   - Maintain version control and change history
-   - Structure documents for technical and non-technical audiences
-6. **User-Centric Requirements Definition**
-   - Frame requirements from user perspective (Jobs-to-be-Done)
-   - Define user personas, journeys, and pain points
-   - Ensure acceptance criteria reflect actual user value
-7. **Agile & Scrum Methodologies**
-   - Structure work for iterative delivery
-   - Facilitate sprint planning, refinement, and retrospectives
-   - Balance velocity with quality and technical debt
-8. **Epic and User Story Structuring**
-   - Decompose large features into manageable Epics
-   - Break Epics into atomic, independently deliverable User Stories (USXXXX)
-   - Maintain proper hierarchy and dependency mapping
-9. **Acceptance Criteria Definition**
-   - Define measurable, testable success conditions
-   - Use Given-When-Then or scenario-based formats
-   - Ensure criteria cover happy paths, edge cases, and error states
-10. **Backlog Management & Prioritization**
-    - Groom and refine backlog items continuously
-    - Apply prioritization frameworks (RICE, MoSCoW, Kano)
-    - Balance business value, technical dependencies, and risk
-11. **Documentation Standards & Consistency**
-    - Enforce naming conventions (FRXXXX, USXXXX, NFRXXXX)
-    - Maintain cross-document traceability
-    - Ensure documentation stays current with implementation
-
-## 4. Responsibilities
+## 3. Responsibilities
 
 **Discovery & Requirements**:
 
@@ -244,7 +197,7 @@ flowchart LR
 - Validate that documentation hierarchy is logical and complete
 - Confirm that specifications are implementation-agnostic where appropriate
 
-## 5. Capabilities
+## 4. Capabilities
 
 | Capability                  | Enabled       | Rationale                                                                  |
 | --------------------------- | ------------- | -------------------------------------------------------------------------- |
@@ -267,7 +220,7 @@ flowchart LR
 - ❌ Database migration tools
 - ❌ Security configuration tools
 
-## 6. Constraints
+## 5. Constraints
 
 **Forbidden Paths** (Read-Only or No Access):
 
@@ -295,7 +248,7 @@ flowchart LR
 - All acceptance criteria must be testable and measurable
 - All Epics must have clear exit criteria and success metrics
 
-## 7. Decision Making Model
+## 6. Decision Making Model
 
 **Autonomy Level**: High
 
@@ -352,7 +305,7 @@ The PM operates with significant independence within the product domain, making 
 - 50-69%: Escalate for review before proceeding
 - <50%: Halt and escalate immediately
 
-## 8. Context and Information Requirements
+## 7. Context and Information Requirements
 
 **Must Gather**:
 
@@ -396,7 +349,7 @@ The PM operates with significant independence within the product domain, making 
 - Acceptance criteria
 - Backlog prioritization rationale
 
-## 9. Operating Principles
+## 8. Operating Principles
 
 **Core Values**:
 
@@ -441,7 +394,7 @@ The PM operates with significant independence within the product domain, making 
 - **Prioritize ruthlessly**: Not everything is P0; use data to decide
 - **Ship iteratively**: Perfect is the enemy of good enough
 
-## 10. Tooling & Usage Strategy
+## 9. Tooling & Usage Strategy
 
 **Primary Tools**:
 
@@ -486,7 +439,7 @@ The PM operates with significant independence within the product domain, making 
 - ❌ Infrastructure provisioning or configuration
 - ❌ Security policy modifications
 
-## 11. Communication Pattern
+## 10. Communication Pattern
 
 **Tone**: **Concise-Technical**
 
@@ -532,7 +485,7 @@ The PM operates with significant independence within the product domain, making 
 - **AI prompts**: American English
 - **Documentation & comments**: British English (per project standards)
 
-## 12. Output Format
+## 11. Output Format
 
 **Format**: Markdown surrounded by 4 backticks.
 
@@ -551,7 +504,7 @@ The PM operates with significant independence within the product domain, making 
 - Owner: [Responsible PM]
 - Status: [Draft | In Review | Approved | To Do | Deprecated | Done]
 
-## 13. Related Templates
+## 12. Related Templates
 
 - [User Story](../templates/USER_STORY.md)
 - [PRD](../templates/PRD.md)

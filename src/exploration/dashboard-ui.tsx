@@ -20,7 +20,7 @@ import {
 } from './exploration-events';
 
 const tui = getTUIAdapter();
-// eslint-disable-next-line @typescript-eslint/naming-convention -- React components must be PascalCase
+
 const { Box, Newline, Text } = tui;
 
 interface DashboardProps {
@@ -38,7 +38,7 @@ interface DashboardState {
 /**
  * Progress bar component
  */
-// eslint-disable-next-line @typescript-eslint/naming-convention -- React component must be PascalCase
+
 const ProgressBar: React.FC<{ color?: string; percentage: number; width: number }> = ({
 	color = 'green',
 	percentage,
@@ -55,7 +55,7 @@ const ProgressBar: React.FC<{ color?: string; percentage: number; width: number 
 /**
  * Worktree status display
  */
-// eslint-disable-next-line @typescript-eslint/naming-convention -- React component must be PascalCase
+
 const WorktreeStatus: React.FC<{
 	stats?: ContainerStats;
 	worktree: WorktreeExploration;
@@ -120,7 +120,7 @@ const WorktreeStatus: React.FC<{
 /**
  * Insights feed component
  */
-// eslint-disable-next-line @typescript-eslint/naming-convention -- React component must be PascalCase
+
 const InsightsFeed: React.FC<{ insights: Insight[]; maxItems?: number }> = ({ insights, maxItems = 5 }) => {
 	const recentInsights = insights.slice(-maxItems).reverse();
 
@@ -155,7 +155,7 @@ const InsightsFeed: React.FC<{ insights: Insight[]; maxItems?: number }> = ({ in
 /**
  * Main dashboard component
  */
-// eslint-disable-next-line @typescript-eslint/naming-convention -- React component must be PascalCase
+
 export const ExplorationDashboard: React.FC<DashboardProps> = ({ explorationId, initialExploration }) => {
 	const { exit } = tui.useApp();
 	const [state, setState] = useState<DashboardState>({

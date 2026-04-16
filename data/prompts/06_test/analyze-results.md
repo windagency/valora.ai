@@ -273,28 +273,52 @@ rg "TypeError:|ReferenceError:|timeout|ECONNREFUSED" test-output.log
 
 ### Step 6: Check for Test Anti-Patterns
 
-**Identify common issues**:
+**Identify the following issues and flag each with file, line, and a concrete fix**:
 
-- Brittle tests (too many implementation details)
-- Test interdependence (tests affecting each other)
-- Over-mocking (mocking everything)
-- Under-assertion (not checking enough)
-- Slow tests (unit tests taking > 1s)
-- Random data in tests (non-deterministic)
+| Anti-pattern                      | What to look for                                                                                     | Why it matters                                                 |
+| --------------------------------- | ---------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| **Tautological assertion**        | Assert only that a mock was called after being set up to succeed — the assertion can never fail      | Proves nothing; hides missing behaviour                        |
+| **Over-mocking**                  | Internal pure functions or utilities mocked away; mock count > 2–3 per test                          | Real code not exercised; tests diverge from production         |
+| **Implementation-detail testing** | Assertions on private/internal methods, internal call order, intermediate state (`_cache`, `_queue`) | Breaks on safe refactors; doesn't verify user-visible contract |
+| **Weak assertion**                | `toBeDefined()`, `toBeTruthy()`, bare `toHaveBeenCalled()` when exact values are available           | Accepts almost anything; real regressions go undetected        |
+| **Brittle snapshot**              | Large serialised snapshot asserting on DOM structure or full objects                                 | One styling change breaks unrelated logic tests                |
+| **Test interdependence**          | Tests relying on execution order or shared mutable state                                             | Failures are unpredictable and hard to reproduce               |
+| **Timing dependency**             | Fixed `setTimeout`/`sleep` instead of polling until condition                                        | Flaky on slow CI; slow on fast machines                        |
+| **Random/non-deterministic data** | `Math.random()`, `Date.now()` without a fixed seed in test input                                     | Different failure on each run                                  |
 
-```json
+````json
 {
 	"anti_patterns": [
 		{
+			"pattern": "tautological_assertion",
+			"file": "src/email/service.test.ts",
+			"line": 45,
+			"issue": "Asserts `expect(mockSend).toHaveBeenCalled()` after setting up mockSend — always passes",
+			"fix": "Assert on the return value of sendVerificationEmail() instead"
+		},
+		{
+			"pattern": "over_mocking",
+			"file": "src/order/processor.test.ts",
+			"line": 12,
+			"issue": "Internal validator and formatter are mocked; no real logic is tested",
+			"fix": "Remove mocks for validator and formatter; mock only the external HTTP client"
+		},
+		{
+			"pattern": "weak_assertion",
+			"file": "src/auth/login.test.ts",
+			"line": 38,
+			"issue": "expect(user).toBeDefined() — passes for any non-null value",
+			"fix": "expect(user).toEqual({ id: '42', email: 'alice@example.com', role: 'admin' })"
+		},
+		{
 			"pattern": "timing_dependency",
 			"file": "tests/e2e/registration.test.ts",
-			"line": 45,
-			"issue": "Test uses fixed timeout instead of waiting for condition",
-			"fix": "Replace setTimeout with waitFor(() => expect(element).toBeVisible())"
+			"line": 67,
+			"issue": "Test uses fixed setTimeout(500) instead of waiting for condition",
+			"fix": "Replace with waitFor(() => expect(element).toBeVisible())"
 		}
 	]
 }
-```
 
 ### Step 7: Evaluate Test Coverage Adequacy
 
@@ -331,7 +355,7 @@ rg "TypeError:|ReferenceError:|timeout|ECONNREFUSED" test-output.log
 		}
 	}
 }
-```
+````
 
 ### Step 8: Generate Recommendations
 
@@ -580,3 +604,5 @@ Decision: Team/lead discretion
 - ❌ Don't provide vague recommendations
 - ❌ Don't overlook flaky tests
 - ❌ Don't approve based on coverage numbers alone
+- ❌ Don't ignore tautological assertions, over-mocked tests, or weak assertions — flag them as medium-priority issues even when all tests pass
+- ❌ Don't confuse "all tests green" with "tests are meaningful" — a suite of tautological tests gives false confidence

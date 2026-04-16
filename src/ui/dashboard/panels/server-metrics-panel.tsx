@@ -9,10 +9,9 @@ import type { MCPDashboardMetrics } from 'types/mcp-client.types';
 import { getTUIAdapter } from 'ui/tui-adapter.interface';
 
 const tui = getTUIAdapter();
-// eslint-disable-next-line @typescript-eslint/naming-convention -- Box and Text are React components which require PascalCase
+
 const { Box, Text } = tui;
 
-// eslint-disable-next-line @typescript-eslint/naming-convention -- React components must use PascalCase
 export function MCPMetricsPanel({ metrics }: { metrics: MCPDashboardMetrics }): React.JSX.Element {
 	const topServers = metrics.servers.slice(0, 3);
 

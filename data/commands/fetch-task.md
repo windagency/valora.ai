@@ -594,26 +594,7 @@ Options:
 3. Assist with BE0002
 ```
 
-### Example 3: Fetch Mode - Task Not Found
-
-**Input**: `/fetch-task --task-id=XYZ9999`
-
-**Output**:
-
-```plaintext
-❌ Task not found: XYZ9999
-
-Similar tasks:
-- XY0001: Setup XY integration
-- XYZ0002: Configure XYZ service
-
-Options:
-1. Verify task ID and retry
-2. Auto-select next task: /fetch-task
-3. Browse backlog: knowledge-base/BACKLOG.md
-```
-
-### Example 4: Auto-Select with Filters
+### Example 3: Auto-Select with Filters
 
 **Input**: `/fetch-task --priority=P0 --domain=Backend`
 

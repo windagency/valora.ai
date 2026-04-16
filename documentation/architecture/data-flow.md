@@ -95,7 +95,19 @@ Prompt caching reduces input token costs across tool-loop iterations. Each provi
 
 Cache metrics are normalised into `LLMUsage.cache_creation_input_tokens` and `LLMUsage.cache_read_input_tokens`. For caching implementation detail, see [Session Optimisation](./session-optimization.md).
 
-### 4. MCP Integration Flow
+### 4. Terminal Output Compression
+
+Before tool results are assembled into the LLM context, `compressTerminalOutput()` in `src/executor/output-compression.service.ts` reduces their token footprint through a three-step pipeline:
+
+| Step                 | Mechanism                                                                                                    | Applied when                                |
+| -------------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------- |
+| ANSI strip           | Removes colour codes and cursor-movement sequences                                                           | Always                                      |
+| Per-command filter   | Content-aware noise reduction keyed on the executable (`git`, `tsc`, `eslint`, `jest`/`vitest`, `pnpm`)      | Output above `OUTPUT_COMPRESSION_THRESHOLD` |
+| Head+tail truncation | Keeps the first 80 % (command context) and last 20 % (errors and summary) within `MAX_TERMINAL_OUTPUT_CHARS` | Always                                      |
+
+Short outputs below `OUTPUT_COMPRESSION_THRESHOLD` pass through after ANSI stripping only. The full filter table is in [Orchestration Components](./components.md#orchestration-components).
+
+### 5. MCP Integration Flow
 
 ```mermaid
 sequenceDiagram
@@ -118,7 +130,7 @@ sequenceDiagram
     MCPServer-->>Cursor: response
 ```
 
-### 5. Interactive Clarification Flow
+### 6. Interactive Clarification Flow
 
 When commands require user input to resolve ambiguities, the pipeline pauses for interactive clarification:
 

@@ -55,12 +55,7 @@ import { promisify } from 'util';
 import type { MCPClientManagerService } from 'mcp/mcp-client-manager.service';
 import type { LLMToolCall, LLMToolDefinition, LLMToolResult } from 'types/llm.types';
 
-import {
-	DEFAULT_TIMEOUT_MS,
-	MAX_LIST_DIR_ENTRIES,
-	MAX_MCP_OUTPUT_CHARS,
-	MAX_TERMINAL_OUTPUT_CHARS
-} from 'config/constants';
+import { DEFAULT_TIMEOUT_MS, MAX_LIST_DIR_ENTRIES, MAX_MCP_OUTPUT_CHARS } from 'config/constants';
 import { type MCPToolHandler } from 'mcp/mcp-tool-handler';
 import { getColorAdapter } from 'output/color-adapter.interface';
 import { getConsoleOutput } from 'output/console-output';
@@ -75,10 +70,11 @@ import { getPromptAdapter } from 'ui/prompt-adapter.interface';
 import { formatErrorMessage } from 'utils/error-utils';
 import { readFile, writeFile } from 'utils/file-utils';
 import { validateNotForbiddenPath } from 'utils/input-validator';
-import { getMetricsCollector } from 'utils/metrics-collector';
+import { getMetricsCollector, observeHistogram } from 'utils/metrics-collector';
 import { getTracer, type Span } from 'utils/tracing';
 
 import { getHookExecutionService } from './hook-execution.service';
+import { compressTerminalOutput, getCompressionStats } from './output-compression.service';
 import {
 	type DryRunToolSimulator,
 	getDryRunSimulator,
@@ -966,6 +962,11 @@ export class ToolExecutionService {
 			span.addEvent('tool_execution_complete');
 			span.setOk();
 
+			// Track character consumption per tool for token budget analysis
+			const inputChars = JSON.stringify(args).length;
+			observeHistogram('tool_input_chars', inputChars, { tool: name });
+			observeHistogram('tool_output_chars', output.length, { tool: name });
+
 			this.logger.debug(`Tool ${name} completed successfully`, {
 				outputLength: output.length
 			});
@@ -1610,7 +1611,15 @@ export class ToolExecutionService {
 			const rawOutput = stdout + (stderr ? `\nStderr: ${stderr}` : '');
 			const output = credentialGuard.scanOutput(rawOutput);
 
-			return truncateTerminalOutput(output) || 'Command completed successfully (no output)';
+			const statsBefore = getCompressionStats();
+			const compressed = compressTerminalOutput(command, output);
+			const statsAfter = getCompressionStats();
+			const filterSavedChars =
+				statsAfter.inputChars - statsBefore.inputChars - (statsAfter.outputChars - statsBefore.outputChars);
+			if (filterSavedChars > 0) {
+				getMetricsCollector().incrementCounter('compression.terminal.saved_chars', filterSavedChars);
+			}
+			return compressed || 'Command completed successfully (no output)';
 		} catch (error) {
 			const execError = error as { code?: number; stderr?: string; stdout?: string };
 			const output = [execError.stdout, execError.stderr].filter(Boolean).join('');
@@ -1618,7 +1627,7 @@ export class ToolExecutionService {
 			const guidance = exitCodeOneGuidance(execError.code, command);
 			if (guidance) return guidance;
 
-			throw new Error(`Command failed: ${truncateTerminalOutput(output) || (error as Error).message}`);
+			throw new Error(`Command failed: ${compressTerminalOutput(command, output) || (error as Error).message}`);
 		}
 	}
 
@@ -1759,10 +1768,6 @@ function truncateMcpOutput(output: unknown): string {
 }
 
 /**
- * Truncate terminal command output to MAX_TERMINAL_OUTPUT_CHARS using head+tail,
- * so the LLM sees both the beginning (command context) and the end (summary/errors).
- */
-/**
  * Returns true if a command is a search tool that exits with code 1 to signal
  * "no matches found" rather than an actual error.
  *
@@ -1809,18 +1814,6 @@ export function isExploratoryExitCode(command: string): boolean {
 	if (/^cd\b/.test(trimmed)) return true;
 
 	return false;
-}
-
-function truncateTerminalOutput(output: string): string {
-	if (output.length <= MAX_TERMINAL_OUTPUT_CHARS) return output;
-	const HEAD = Math.floor(MAX_TERMINAL_OUTPUT_CHARS * 0.8);
-	const TAIL = MAX_TERMINAL_OUTPUT_CHARS - HEAD;
-	const omitted = output.length - HEAD - TAIL;
-	return (
-		output.substring(0, HEAD) +
-		`\n\n[... ${omitted} characters omitted ...]\n\n` +
-		output.substring(output.length - TAIL)
-	);
 }
 
 /**

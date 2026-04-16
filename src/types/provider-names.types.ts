@@ -23,7 +23,7 @@ export enum ProviderName {
  * Commonly used model names as constants
  * Use these for type-safe model comparisons
  */
-// eslint-disable-next-line @typescript-eslint/naming-convention -- PascalCase for const enum object following TypeScript enum pattern
+
 export const ModelName = {
 	// Anthropic models
 	CLAUDE_HAIKU_3_5: 'claude-haiku-3.5',

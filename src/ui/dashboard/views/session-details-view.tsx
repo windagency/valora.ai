@@ -21,7 +21,7 @@ import { WorktreeStatsPanel } from 'ui/dashboard/detail-panels/worktree-stats-pa
 import { getTUIAdapter } from 'ui/tui-adapter.interface';
 
 const tui = getTUIAdapter();
-// eslint-disable-next-line @typescript-eslint/naming-convention -- Box and Text are React components which require PascalCase
+
 const { Box, Text } = tui;
 
 const SUB_TAB_CONFIG: Array<{ label: string; tab: SessionSubTab }> = [
@@ -32,7 +32,6 @@ const SUB_TAB_CONFIG: Array<{ label: string; tab: SessionSubTab }> = [
 	{ label: 'Spending', tab: 'spending' }
 ];
 
-// eslint-disable-next-line @typescript-eslint/naming-convention -- React components must use PascalCase
 export function SessionDetailsView({
 	activeSubTab,
 	onBack,
@@ -99,7 +98,6 @@ export function SessionDetailsView({
 	);
 }
 
-// eslint-disable-next-line @typescript-eslint/naming-convention -- React components must use PascalCase
 function OverviewContent({ session }: { session: Session }): React.JSX.Element {
 	const isRunning = session.status === 'active';
 	const elapsedMs = isRunning ? Date.now() - new Date(session.updated_at).getTime() : 0;
@@ -126,7 +124,6 @@ function OverviewContent({ session }: { session: Session }): React.JSX.Element {
 	);
 }
 
-// eslint-disable-next-line @typescript-eslint/naming-convention -- React components must use PascalCase
 function SubTabContent({
 	activeSubTab,
 	session

@@ -11,10 +11,9 @@ import { formatDurationMs, getExplorationStatusColor } from 'ui/dashboard/utils/
 import { getTUIAdapter } from 'ui/tui-adapter.interface';
 
 const tui = getTUIAdapter();
-// eslint-disable-next-line @typescript-eslint/naming-convention -- Box and Text are React components which require PascalCase
+
 const { Box, Text } = tui;
 
-// eslint-disable-next-line @typescript-eslint/naming-convention -- React components must use PascalCase
 export function ExplorationInfoPanel({
 	explorationId,
 	sessionId
@@ -94,7 +93,6 @@ export function ExplorationInfoPanel({
 	);
 }
 
-// eslint-disable-next-line @typescript-eslint/naming-convention -- React components must use PascalCase
 function ExplorationWorktreeRow({ worktree }: { worktree: Exploration['worktrees'][number] }): React.JSX.Element {
 	return (
 		<Box key={worktree.index}>

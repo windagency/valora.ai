@@ -11,10 +11,9 @@ import { getTUIAdapter } from 'ui/tui-adapter.interface';
 import { formatNumber } from 'utils/number-format';
 
 const tui = getTUIAdapter();
-// eslint-disable-next-line @typescript-eslint/naming-convention -- Box and Text are React components which require PascalCase
+
 const { Box, Text } = tui;
 
-// eslint-disable-next-line @typescript-eslint/naming-convention -- React components must use PascalCase
 export function CommandHistoryPanel({ session }: { session: Session }): React.JSX.Element {
 	const commands = session.commands.slice(-10).reverse();
 

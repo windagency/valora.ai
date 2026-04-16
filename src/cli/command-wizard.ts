@@ -6,7 +6,7 @@
 
 import { getColorAdapter } from 'output/color-adapter.interface';
 import { getHeaderFormatter } from 'output/header-formatter';
-import { getPromptAdapter } from 'ui/prompt-adapter.interface';
+import { getPromptAdapter, type PromptQuestion } from 'ui/prompt-adapter.interface';
 
 import type {
 	BaseWizardAnswers,
@@ -236,8 +236,7 @@ export class CommandWizard {
 				console.log(color.bold(`\n  Step ${index + 1} of ${config.steps.length}: ${step.message}`));
 
 				try {
-					// eslint-disable-next-line @typescript-eslint/no-explicit-any
-					const answer = await prompt.prompt([step as any]);
+					const answer = await prompt.prompt([step as unknown as PromptQuestion]);
 					const answerRecord = answer as Record<string, unknown>;
 					answers[step.name] = answerRecord[step.name];
 					return answers;

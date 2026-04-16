@@ -8,7 +8,7 @@ import type { PromptDefinition, PromptMetadata } from 'types/prompt.types';
 
 import { getLogger } from 'output/logger';
 import { ValidationError } from 'utils/error-handler';
-import { findFiles, readFile } from 'utils/file-utils';
+import { FileNotFoundError, findFiles, readFile } from 'utils/file-utils';
 import { getPackageDataDir } from 'utils/paths';
 import { parseMarkdownWithFrontmatter, validateRequiredFields, YamlParseError } from 'utils/yaml-parser';
 
@@ -61,7 +61,7 @@ export class PromptLoader {
 
 			const prompt: PromptDefinition = {
 				...parsed.metadata,
-				content: parsed.content
+				content: await this.resolveIncludes(parsed.content)
 			};
 
 			// Cache the prompt
@@ -185,6 +185,54 @@ export class PromptLoader {
 		);
 
 		return promptIds.filter((id): id is string => id !== null);
+	}
+
+	/**
+	 * Resolve {{include:path/to/file.md}} directives in prompt content.
+	 *
+	 * Each directive is replaced with the verbatim contents of the referenced
+	 * file under the prompts directory. Resolution is **single-pass**: if an
+	 * included file itself contains `{{include:...}}` directives, those are left
+	 * unexpanded. Missing files produce a warning and are replaced with an empty
+	 * string so the calling prompt still loads cleanly. All other read errors are
+	 * re-thrown as `ValidationError` to preserve full context up the call stack.
+	 */
+	private async resolveIncludes(content: string): Promise<string> {
+		const matches = [...content.matchAll(/\{\{include:([^}]+)\}\}/g)];
+
+		if (matches.length === 0) {
+			return content;
+		}
+
+		const logger = getLogger();
+		let resolved = content;
+
+		for (const match of matches) {
+			const directive = match[0];
+			const relativePath = (match[1] ?? '').trim();
+			const absolutePath = path.join(this.promptsDir, relativePath);
+
+			try {
+				const included = await readFile(absolutePath);
+				resolved = resolved.replace(directive, included);
+			} catch (error) {
+				if (error instanceof FileNotFoundError) {
+					logger.warn(`{{include}} target not found, skipping directive`, {
+						directive,
+						path: absolutePath
+					});
+					resolved = resolved.replace(directive, '');
+				} else {
+					throw new ValidationError(`Failed to resolve include directive`, {
+						directive,
+						error: (error as Error).message,
+						path: absolutePath
+					});
+				}
+			}
+		}
+
+		return resolved;
 	}
 
 	/**

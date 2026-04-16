@@ -39,6 +39,7 @@ import { ResolutionPath } from 'types/provider.types';
 import { formatErrorMessage } from 'utils/error-utils';
 import { readFile } from 'utils/file-utils';
 import { getMetricsCollector } from 'utils/metrics-collector';
+import { getModelPricing } from 'utils/token-estimator';
 
 import type { AgentLoader } from './agent-loader';
 import type { ExecutionContext } from './execution-context';
@@ -47,6 +48,7 @@ import type { PromptLoader } from './prompt-loader';
 import { type EscalationDetectionService, getEscalationDetectionService } from './escalation-detection.service';
 import { type EscalationHandlerService, getEscalationHandlerService } from './escalation-handler.service';
 import { getMessageBuilderService, type MessageBuilderService } from './message-builder.service';
+import { getCompressionStats, stripAnsiCodes } from './output-compression.service';
 import { getOutputParsingService, type OutputParsingService } from './output-parsing.service';
 import { getPipelineEmitter, type PipelineEventEmitter } from './pipeline-events';
 import { loadAvailableAgents, loadProjectGuidance, loadProjectKnowledge } from './project-guidance-loader';
@@ -73,6 +75,46 @@ const MAX_TOOL_FAILURES_BEFORE_HARD_STOP = 5;
  * All other tools are considered *recoverable* (read-only / exploratory).
  */
 const FATAL_TOOLS = new Set(['delete_file', 'search_replace', 'write']);
+
+/**
+ * Iteration at which the tool loop proactively compresses old tool results.
+ * Fires once at 40% of the default 20-iteration maximum to bound message growth
+ * before the LLM is deep into exploration. The reactive path (on provider error)
+ * remains as a second safety net.
+ */
+const PROACTIVE_COMPRESS_AFTER_ITERATIONS = 8;
+
+/**
+ * Simple djb2 hash — used to detect duplicate tool results across iterations.
+ * Pure arithmetic, no imports needed.
+ *
+ * Exported for unit testing.
+ */
+export function djb2(s: string): number {
+	let h = 5381;
+	for (let i = 0; i < s.length; i++) h = ((h << 5) + h) ^ s.charCodeAt(i);
+	return h >>> 0;
+}
+
+/**
+ * Compress a message array in-place by replacing old tool results with a
+ * placeholder, keeping the most recent `keepRecent` messages intact.
+ * Returns the number of messages replaced.
+ *
+ * Extracted from `StageExecutor.compressToolResults` for unit testing.
+ */
+export function compressMessageHistory(messages: LLMMessage[], keepRecent = 4): number {
+	const cutoff = messages.length - keepRecent;
+	let pruned = 0;
+	for (let i = 0; i < cutoff; i++) {
+		const msg = messages[i];
+		if (msg?.role === 'tool' && msg.content !== '[Tool result omitted to reduce context length]') {
+			messages[i] = { ...msg, content: '[Tool result omitted to reduce context length]' };
+			pruned++;
+		}
+	}
+	return pruned;
+}
 
 /**
  * Default failure policy per stage type.
@@ -627,29 +669,15 @@ export class StageExecutor {
 		const projectKnowledge = await loadProjectKnowledge(executionContext.knowledgeFiles ?? []);
 		const agentMemory = await this.loadAgentMemory(executionContext);
 
-		// Filter agents to only load the one matching the current execution context
-		// This avoids loading unnecessary agents (e.g., backend agent for a frontend task)
+		// Filter agents to only load the one matching the current execution context.
+		// Skip entirely when the prompt declares no agents — avoids a redundant I/O call.
 		const promptAgents = prompt.agents ?? [];
 		const filteredAgents = promptAgents.includes(executionContext.agentRole)
 			? [executionContext.agentRole]
 			: promptAgents;
-		const availableAgents = await loadAvailableAgents(filteredAgents);
+		const availableAgents = promptAgents.length > 0 ? await loadAvailableAgents(filteredAgents) : null;
 
-		// Build AST index if not already built, and generate codebase map
-		let codebaseMap: null | string = null;
-		try {
-			const indexService = getASTIndexService();
-			if (!indexService.isBuilt() && !indexService.isBuilding()) {
-				if (!indexService.loadIndex()) {
-					await indexService.buildIndex();
-				}
-			}
-			if (indexService.isBuilt()) {
-				codebaseMap = generateCodebaseMap();
-			}
-		} catch {
-			// Non-fatal: continue without codebase map
-		}
+		const codebaseMap = await this.loadCodebaseMap(stage);
 
 		return {
 			agent,
@@ -661,6 +689,29 @@ export class StageExecutor {
 			projectKnowledge,
 			prompt
 		};
+	}
+
+	/**
+	 * Build AST codebase map for a stage, skipping onboard-category prompts.
+	 * Onboard prompts (requirements analysis, clarification, dependency mapping) operate
+	 * on specification documents — they never inspect code structure, so the AST map
+	 * wastes 2,000-10,000 tokens with no benefit. Non-fatal: returns null on any error.
+	 */
+	private async loadCodebaseMap(stage: PipelineStage): Promise<null | string> {
+		const promptCategory = stage.prompt.split('.')[0] ?? '';
+		if (promptCategory === 'onboard') return null;
+
+		try {
+			const indexService = getASTIndexService();
+			if (!indexService.isBuilt() && !indexService.isBuilding()) {
+				if (!indexService.loadIndex()) {
+					await indexService.buildIndex();
+				}
+			}
+			return indexService.isBuilt() ? generateCodebaseMap() : null;
+		} catch {
+			return null;
+		}
 	}
 
 	/**
@@ -819,6 +870,9 @@ export class StageExecutor {
 			{ content: systemMessage, role: 'system' },
 			{ content: userMessage, role: 'user' }
 		];
+		const toolResultHashes = new Map<string, number>();
+		let dedupHits = 0;
+		let prunedCount = 0;
 
 		for (let iterations = 1; iterations <= maxToolIterations; iterations++) {
 			const completion = await this.executeLLMIteration(
@@ -834,6 +888,7 @@ export class StageExecutor {
 			// No tool calls means we're done
 			if (!completion.tool_calls || completion.tool_calls.length === 0) {
 				logger.debug('LLM completed without tool calls', { iterations, stage: `${stage.stage}.${stage.prompt}` });
+				this.emitCompressionMetrics(prunedCount, dedupHits, modelOverride);
 				return {
 					completion,
 					summary: {
@@ -847,10 +902,16 @@ export class StageExecutor {
 			}
 
 			// Process tool calls and add to conversation
-			await this.processToolCallsInLoop(completion, messages, stage, iterations, logger);
+			dedupHits += await this.processToolCallsInLoop(completion, messages, stage, iterations, logger, toolResultHashes);
+
+			// Proactive history compression at iteration threshold
+			if (iterations === PROACTIVE_COMPRESS_AFTER_ITERATIONS) {
+				prunedCount += this.compressToolResults(messages);
+			}
 		}
 
 		// Exceeded max iterations
+		this.emitCompressionMetrics(prunedCount, dedupHits, modelOverride);
 		return this.handleMaxIterationsExceeded(executionContext, messages, stage, modelOverride, modeOverride, logger);
 	}
 
@@ -887,8 +948,7 @@ export class StageExecutor {
 					iteration,
 					messageCount: messages.length
 				});
-				const compressedMessages = this.compressToolResults(messages);
-				completionOptions.messages = compressedMessages;
+				this.compressToolResults(messages);
 				const completion = await executionContext.provider.complete(completionOptions);
 				this.logLLMResponse(logger, completion);
 				return completion;
@@ -914,16 +974,32 @@ export class StageExecutor {
 	 * Compress message history by replacing old tool results with a placeholder.
 	 * Keeps the system message, first user message, and the most recent 4 messages intact.
 	 */
-	private compressToolResults(messages: LLMMessage[]): LLMMessage[] {
-		const KEEP_RECENT = 4;
-		const cutoff = messages.length - KEEP_RECENT;
+	private compressToolResults(messages: LLMMessage[]): number {
+		return compressMessageHistory(messages);
+	}
 
-		return messages.map((msg, i) => {
-			if (msg.role === 'tool' && i < cutoff) {
-				return { ...msg, content: '[Tool result omitted to reduce context length]' };
-			}
-			return msg;
-		});
+	/**
+	 * Emit compression and deduplication metrics to MetricsCollector.
+	 * Called once per tool loop, at both the normal-exit and max-iterations paths.
+	 */
+	private emitCompressionMetrics(prunedCount: number, dedupHits: number, modelOverride: string | undefined): void {
+		const metrics = getMetricsCollector();
+		if (prunedCount > 0) {
+			metrics.incrementCounter('compression.history.pruned_messages', prunedCount);
+		}
+		if (dedupHits > 0) {
+			metrics.incrementCounter('compression.dedup.hits', dedupHits);
+		}
+		const compressionStats = getCompressionStats();
+		if (compressionStats.inputChars > 0) {
+			metrics.setGauge('compression.terminal.ratio', 1 - compressionStats.outputChars / compressionStats.inputChars);
+			const savedChars = compressionStats.inputChars - compressionStats.outputChars;
+			const savedTokens = Math.ceil(savedChars / 4); // CHARS_PER_TOKEN heuristic
+			const pricing = getModelPricing(modelOverride ?? '');
+			const costPerToken = (pricing?.input ?? 3.0) / 1_000_000; // default $3/M input tokens
+			metrics.setGauge('compression.terminal.estimated_saved_tokens', savedTokens);
+			metrics.setGauge('compression.terminal.estimated_saved_cost_usd', savedTokens * costPerToken);
+		}
 	}
 
 	/**
@@ -985,8 +1061,9 @@ export class StageExecutor {
 		messages: LLMMessage[],
 		stage: PipelineStage,
 		iterations: number,
-		logger: ReturnType<typeof getLogger>
-	): Promise<void> {
+		logger: ReturnType<typeof getLogger>,
+		toolResultHashes: Map<string, number>
+	): Promise<number> {
 		const toolCalls = completion.tool_calls!;
 
 		logger.info('Processing tool calls from LLM', {
@@ -1006,17 +1083,40 @@ export class StageExecutor {
 		// Execute tools and add results (with prompt injection scanning)
 		const toolResults = await this.toolExecutionService.executeTools(toolCalls);
 		const injectionDetector = getPromptInjectionDetector();
-		toolResults.forEach((result) => {
+		let batchDedupHits = 0;
+
+		for (let i = 0; i < toolResults.length; i++) {
+			const result = toolResults[i]!;
+			const toolName = toolCalls[i]?.name ?? result.tool_call_id;
 			const formatted = this.formatToolResult(result);
 			const sanitised = injectionDetector.sanitiseToolResult(result.tool_call_id, formatted);
-			messages.push({
-				content: sanitised,
-				name: result.tool_call_id,
-				role: 'tool'
-			});
-		});
 
-		logger.debug('Tool results added to conversation', { iterations, resultCount: toolResults.length });
+			const hashKey = `${toolName}:${djb2(sanitised)}`;
+			const existingIndex = toolResultHashes.get(hashKey);
+
+			if (existingIndex !== undefined) {
+				messages.push({
+					content: `[Same result as message #${existingIndex} — omitted]`,
+					name: result.tool_call_id,
+					role: 'tool'
+				});
+				batchDedupHits++;
+			} else {
+				toolResultHashes.set(hashKey, messages.length + 1);
+				messages.push({
+					content: sanitised,
+					name: result.tool_call_id,
+					role: 'tool'
+				});
+			}
+		}
+
+		logger.debug('Tool results added to conversation', {
+			dedupHits: batchDedupHits,
+			iterations,
+			resultCount: toolResults.length
+		});
+		return batchDedupHits;
 	}
 
 	/**
@@ -1263,15 +1363,20 @@ Summarize ALL changes you made during tool execution. Output ONLY the JSON code 
 	 * Truncates large results to prevent exceeding LLM context limits
 	 */
 	private formatToolResult(result: LLMToolResult): string {
-		const output = result.output;
 		const MAX_TOOL_RESULT_CHARS = 20_000;
 		const HEAD_CHARS = 15_000;
 		const TAIL_CHARS = 5_000;
 
+		// Strip ANSI codes — MCP tools and read_file results can contain them
+		const stripped = stripAnsiCodes(result.output);
+
+		// Collapse consecutive repeated lines to "<line> (×N)"
+		const output = deduplicateLines(stripped);
+
 		if (output.length > MAX_TOOL_RESULT_CHARS) {
 			const logger = getLogger();
 			logger.warn('Tool result truncated due to length', {
-				originalLength: output.length,
+				originalLength: result.output.length,
 				toolCallId: result.tool_call_id,
 				truncatedLength: MAX_TOOL_RESULT_CHARS
 			});
@@ -1723,4 +1828,35 @@ Summarize ALL changes you made during tool execution. Output ONLY the JSON code 
 			return null;
 		}
 	}
+}
+
+/**
+ * Collapse consecutive repeated lines in tool output to `"<line> (×N)"`.
+ * Only exact-match consecutive duplicates are collapsed — non-adjacent repeats
+ * and blank lines are left untouched to preserve structural context.
+ */
+function deduplicateLines(text: string): string {
+	const lines = text.split('\n');
+	const result: string[] = [];
+	let i = 0;
+
+	while (i < lines.length) {
+		const line = lines[i] ?? '';
+		// Don't collapse blank lines — they carry structural meaning
+		if (!line.trim()) {
+			result.push(line);
+			i++;
+			continue;
+		}
+
+		let count = 1;
+		while (i + count < lines.length && (lines[i + count] ?? '') === line) {
+			count++;
+		}
+
+		result.push(count > 1 ? `${line} (×${count})` : line);
+		i += count;
+	}
+
+	return result.join('\n');
 }

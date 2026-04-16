@@ -397,7 +397,8 @@ export class SessionStore {
 	 */
 	getCleanupScheduler(): null | SessionCleanupScheduler {
 		// Lazy import to break circular dependency: session/store -> cleanup/coordinator -> session/store
-		// eslint-disable-next-line @typescript-eslint/no-require-imports -- lazy import to break circular dependency
+
+		// eslint-disable-next-line @typescript-eslint/no-require-imports
 		const { getSessionCleanupScheduler } = require('cleanup/coordinator') as typeof CleanupCoordinatorModule;
 		return getSessionCleanupScheduler();
 	}

@@ -10,7 +10,7 @@ import { Sparkline } from 'exploration/dashboard-metrics';
 import { getTUIAdapter } from 'ui/tui-adapter.interface';
 
 const tui = getTUIAdapter();
-// eslint-disable-next-line @typescript-eslint/naming-convention -- Box and Text are React components which require PascalCase
+
 const { Box, Text } = tui;
 
 interface QualityAggregates {
@@ -23,7 +23,6 @@ interface QualityAggregates {
 	totalFilesGenerated: number;
 }
 
-// eslint-disable-next-line @typescript-eslint/naming-convention -- React components must use PascalCase
 export function QualityPanel({ session }: { session: Session }): React.JSX.Element {
 	const commandsWithMetrics = session.commands.filter((cmd) => cmd.quality_metrics);
 
@@ -113,7 +112,6 @@ function getTestPassColor(testTotalCount: number, testRate: number): string {
 	return testRate >= 0.9 ? 'green' : 'yellow';
 }
 
-// eslint-disable-next-line @typescript-eslint/naming-convention -- React components must use PascalCase
 function QualityCodeInfo({ m }: { m: QualityMetrics }): React.JSX.Element {
 	return (
 		<Box>
@@ -123,7 +121,6 @@ function QualityCodeInfo({ m }: { m: QualityMetrics }): React.JSX.Element {
 	);
 }
 
-// eslint-disable-next-line @typescript-eslint/naming-convention -- React components must use PascalCase
 function QualityLintInfo({ m }: { m: QualityMetrics }): React.JSX.Element {
 	const lintTotal = (m.lint_errors_assert ?? 0) + (m.lint_errors_realtime ?? 0);
 
@@ -147,7 +144,6 @@ function QualityLintInfo({ m }: { m: QualityMetrics }): React.JSX.Element {
 	);
 }
 
-// eslint-disable-next-line @typescript-eslint/naming-convention -- React components must use PascalCase
 function QualityPlanInfo({ m }: { m: QualityMetrics }): React.JSX.Element {
 	return (
 		<Box>
@@ -173,7 +169,6 @@ function QualityPlanInfo({ m }: { m: QualityMetrics }): React.JSX.Element {
 	);
 }
 
-// eslint-disable-next-line @typescript-eslint/naming-convention -- React components must use PascalCase
 function QualityRow({ cmd, m }: { cmd: SessionCommand; m: QualityMetrics }): React.JSX.Element {
 	return (
 		<Box flexDirection="column" marginBottom={1}>
@@ -187,7 +182,6 @@ function QualityRow({ cmd, m }: { cmd: SessionCommand; m: QualityMetrics }): Rea
 	);
 }
 
-// eslint-disable-next-line @typescript-eslint/naming-convention -- React components must use PascalCase
 function QualitySummary({ agg }: { agg: QualityAggregates }): React.JSX.Element {
 	return (
 		<Box borderColor="cyan" borderStyle="round" flexDirection="column" paddingX={1}>
@@ -212,7 +206,6 @@ function QualitySummary({ agg }: { agg: QualityAggregates }): React.JSX.Element 
 	);
 }
 
-// eslint-disable-next-line @typescript-eslint/naming-convention -- React components must use PascalCase
 function QualityTestInfo({ m }: { m: QualityMetrics }): React.JSX.Element {
 	return (
 		<>

@@ -58,6 +58,84 @@ Write comprehensive, deterministic tests following the AAA pattern (Arrange, Act
 4. **Readable** - Clear intent and assertions
 5. **Maintainable** - Easy to update when code changes
 
+## Test Quality Anti-Patterns (MUST AVOID)
+
+### 1. Tautological Assertions
+
+A tautological assertion is one that cannot possibly fail given the test setup — it proves nothing.
+
+```typescript
+// ❌ BAD: You set up the mock, you know it was called — this proves nothing
+mockEmailService.send.mockResolvedValue({ success: true });
+await sendVerificationEmail('user@example.com');
+expect(mockEmailService.send).toHaveBeenCalled(); // tautological
+
+// ✅ GOOD: Assert the observable outcome produced by the code under test
+const result = await sendVerificationEmail('user@example.com');
+expect(result.status).toBe('sent');
+expect(result.recipient).toBe('user@example.com');
+```
+
+**Rule**: If an assertion cannot fail without deleting the mock setup, it is tautological. Assert on _outputs and observable side effects_, not on the mock itself.
+
+### 2. Over-Mocking
+
+Over-mocking replaces real behaviour so thoroughly that the test stops exercising the code it was meant to test.
+
+```typescript
+// ❌ BAD: Every collaborator is mocked — nothing real is tested
+jest.mock('./validator');
+jest.mock('./formatter');
+jest.mock('./logger');
+const result = processOrder(mockValidator, mockFormatter, mockLogger);
+expect(result).toBeDefined(); // trivially true
+
+// ✅ GOOD: Mock only the I/O boundary; keep real internal logic
+jest.mock('./emailClient'); // external service — mock this
+const result = processOrder(realValidator, realFormatter); // internal — use real
+expect(result).toEqual({ orderId: '123', status: 'processed' });
+```
+
+**Rule**: Mock only external I/O (HTTP calls, database, file system, time). Internal pure functions and utility modules must use their real implementations.
+
+### 3. Implementation-Detail Testing
+
+These tests couple to _how_ the code works rather than _what_ it does. They break on any refactor, even safe ones.
+
+```typescript
+// ❌ BAD: Tests internal call order or private method invocations
+expect(service['_buildPayload']).toHaveBeenCalledBefore(service['_dispatch']);
+
+// ❌ BAD: Asserts on intermediate state not visible to callers
+expect(service['_cache'].size).toBe(1);
+
+// ✅ GOOD: Tests the observable contract — inputs → outputs
+const response = await service.submit(order);
+expect(response).toEqual({ id: expect.any(String), status: 'submitted' });
+```
+
+**Rule**: Test the _public contract_ (return values, thrown errors, observable state). If a refactor that preserves behaviour breaks the test, the test is wrong.
+
+### 4. Weak Assertions
+
+Weak assertions accept almost any value and hide real bugs.
+
+```typescript
+// ❌ BAD: These pass for nearly any non-null/non-undefined value
+expect(result).toBeDefined();
+expect(result).toBeTruthy();
+expect(items).toHaveLength(expect.any(Number));
+expect(mock).toHaveBeenCalled();
+
+// ✅ GOOD: Pin down the exact expected value
+expect(result).toEqual({ id: '42', name: 'Alice', role: 'admin' });
+expect(items).toHaveLength(3);
+expect(mock).toHaveBeenCalledWith('alice@example.com', 'Welcome');
+expect(error.message).toBe('Invalid token');
+```
+
+**Rule**: Every assertion must be as specific as the behaviour it guards. If the code returns a string, assert the exact string. If it returns an array, assert the exact length and key elements.
+
 ## Instructions
 
 ### Step 1: Identify Test Requirements
@@ -164,38 +242,47 @@ describe('sendVerificationEmail', () => {
 
 #### C. Mocking External Dependencies
 
-**Mock external services**:
+Mock **only** external I/O boundaries (network, database, file system, time). Never mock internal modules or pure functions — use their real implementations.
 
 ```typescript
-import { emailService } from './emailService';
+import { sendVerificationEmail } from './emailService';
+import * as emailClient from './emailClient'; // external I/O — mock this
 
-// Mock the module
-jest.mock('./emailService');
-const mockEmailService = emailService as jest.Mocked<typeof emailService>;
+jest.mock('./emailClient');
+const mockSend = emailClient.send as jest.Mock;
 
 describe('sendVerificationEmail', () => {
 	beforeEach(() => {
-		// Reset mocks before each test
 		jest.clearAllMocks();
 	});
 
-	it('should call email service with correct parameters', async () => {
-		// Arrange
-		mockEmailService.send.mockResolvedValue({ success: true });
-		const email = 'user@example.com';
+	it('returns a sent confirmation with the recipient address', async () => {
+		// Arrange: configure the external boundary
+		mockSend.mockResolvedValue({ messageId: 'msg-001' });
 
 		// Act
-		await sendVerificationEmail(email);
+		const result = await sendVerificationEmail('user@example.com');
 
-		// Assert
-		expect(mockEmailService.send).toHaveBeenCalledWith(
-			email,
-			expect.stringContaining('Verify your email'),
-			expect.any(String)
+		// Assert: verify the *output* the caller receives, not that the mock ran
+		expect(result).toEqual({
+			status: 'sent',
+			recipient: 'user@example.com',
+			messageId: 'msg-001'
+		});
+	});
+
+	it('throws a DeliveryError when the email client fails', async () => {
+		mockSend.mockRejectedValue(new Error('SMTP timeout'));
+
+		await expect(sendVerificationEmail('user@example.com')).rejects.toThrow(
+			'DeliveryError: could not deliver to user@example.com'
 		);
 	});
 });
 ```
+
+**What to assert on**: return values, thrown errors, and observable state changes — not on whether a mock was called.
+If interaction verification is necessary (e.g. confirming a payload structure sent to a third-party API), pair it with at least one outcome assertion.
 
 #### D. Test Data Management
 
@@ -653,19 +740,22 @@ See `data/templates/TEST_GENERATION_REQUIREMENTS.md` for detailed examples and p
 
 **DO**:
 
-- ✅ Test behavior, not implementation
-- ✅ Use descriptive test names
-- ✅ Mock external dependencies
-- ✅ Test error conditions
-- ✅ Keep tests simple and focused
+- ✅ Test observable behaviour, not implementation details
+- ✅ Use descriptive test names that state the expected outcome
+- ✅ Mock only external I/O (network, DB, file system, time)
+- ✅ Test error conditions with specific error messages
+- ✅ Keep tests simple and focused on one behaviour
 - ✅ Use setup/teardown for common code
-- ✅ Make assertions specific
+- ✅ Assert the exact expected value — never a vague truthy/defined check
+- ✅ Prefer real internal implementations over mocked ones
 
 **DON'T**:
 
-- ❌ Don't test private methods directly
+- ❌ Don't write tautological assertions (asserting on mocks you set up)
+- ❌ Don't mock internal modules or pure functions unnecessarily
+- ❌ Don't test private methods or internal call sequences directly
+- ❌ Don't use weak matchers (`toBeDefined`, `toBeTruthy`, `toHaveBeenCalled`) when exact values are available
 - ❌ Don't make tests dependent on each other
-- ❌ Don't use real external services in tests
 - ❌ Don't skip writing tests
 - ❌ Don't use random data in tests
 - ❌ Don't test framework code

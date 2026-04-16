@@ -11,10 +11,9 @@ import { formatNumber } from 'utils/number-format';
 import { getSpendingTracker } from 'utils/spending-tracker';
 
 const tui = getTUIAdapter();
-// eslint-disable-next-line @typescript-eslint/naming-convention -- Box and Text are React components which require PascalCase
+
 const { Box, Text } = tui;
 
-// eslint-disable-next-line @typescript-eslint/naming-convention -- React components must use PascalCase
 export function SpendingPanel({ session }: { session: Session }): React.JSX.Element {
 	const tracker = getSpendingTracker();
 	const sessionStart = session.created_at;

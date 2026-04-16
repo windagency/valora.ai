@@ -94,15 +94,7 @@ When executing (not dry-run), use these tools:
 
 If you need to modify a protected file that already exists, use `search_replace` instead of `write`. The `write` tool will reject attempts to overwrite these files.
 
-## Core Principles
-
-Apply these principles consistently:
-
-1. **SOLID** - Single responsibility, Open/Closed, Liskov substitution, Interface segregation, Dependency inversion
-2. **DRY** - Don't Repeat Yourself, extract common logic
-3. **KISS** - Keep It Simple, prefer simple over clever
-4. **YAGNI** - You Aren't Gonna Need It, implement only what's needed
-5. **Clean Code** - Meaningful names, small functions, proper error handling
+{{include:_shared/core-principles.md}}
 
 ## Instructions
 
@@ -678,107 +670,7 @@ Mark items needing future attention:
 
 ## Output Format
 
-### Standard Mode (executed changes)
-
-After using the tools to make changes, report what was done:
-
-```json
-{
-	"execution_mode": "standard",
-	"executed": true,
-	"code_changes": {
-		"files_created": [
-			{
-				"path": "src/services/email.ts",
-				"purpose": "Email verification service",
-				"functions": ["sendVerificationEmail", "validateEmail"],
-				"exports": ["EmailService"],
-				"dependencies": ["nodemailer"],
-				"lines": 85
-			}
-		],
-		"files_modified": [
-			{
-				"path": "src/routes/auth.ts",
-				"purpose": "Add verification endpoint",
-				"changes_made": ["Added verifyEmail endpoint", "Updated register to send verification"],
-				"lines_added": 35,
-				"lines_removed": 5
-			}
-		],
-		"files_deleted": [],
-		"commands_executed": ["npm install nodemailer"]
-	},
-	"files_modified": ["src/services/email.ts", "src/routes/auth.ts", "package.json"],
-	"implementation_notes": {
-		"approach": "Created new EmailService, integrated with auth routes",
-		"decisions": [
-			"Used nodemailer for email sending (well-tested, popular)",
-			"Added token expiration (24 hours) for security"
-		]
-	},
-	"quality_validation": {
-		"eslint": {
-			"total_files_checked": 2,
-			"files_passed": 2,
-			"total_errors": 0,
-			"total_warnings": 0,
-			"auto_fixes_applied": 3
-		},
-		"typescript": {
-			"passed": true,
-			"errors": 0
-		},
-		"validation_time_ms": 1247,
-		"notes": ["Auto-fixed semicolons in email.ts", "Added return type to sendEmail()"]
-	},
-	"breaking_changes": [],
-	"migration_steps": []
-}
-```
-
-### Dry-Run Mode (proposed changes only)
-
-When `mode` is `"dry-run"`, do NOT execute tools. Instead describe what would be done:
-
-```json
-{
-	"execution_mode": "dry-run",
-	"executed": false,
-	"proposed_changes": {
-		"files_to_create": [
-			{
-				"path": "src/services/email.ts",
-				"purpose": "Email verification service",
-				"proposed_content_summary": "EmailService class with sendVerificationEmail() and validateEmail() methods",
-				"estimated_lines": 85
-			}
-		],
-		"files_to_modify": [
-			{
-				"path": "src/routes/auth.ts",
-				"purpose": "Add verification endpoint",
-				"changes_planned": [
-					"Add import for EmailService",
-					"Add POST /verify-email endpoint",
-					"Modify register() to call sendVerificationEmail()"
-				]
-			}
-		],
-		"files_to_delete": [],
-		"commands_to_run": ["npm install nodemailer"]
-	},
-	"implementation_notes": {
-		"approach": "Will create new EmailService, integrate with auth routes",
-		"decisions": [
-			"Will use nodemailer for email sending (well-tested, popular)",
-			"Will add token expiration (24 hours) for security"
-		]
-	},
-	"breaking_changes": [],
-	"migration_steps": []
-}
-```
+The output schema is enforced by the pipeline via `outputs:` frontmatter. Produce a JSON object matching the declared outputs (`code_changes`, `files_modified`, `implementation_notes`, `breaking_changes`). In dry-run mode include `proposed_changes` instead of `code_changes`.
 
 ## Success Criteria
 

@@ -16,7 +16,7 @@ import { ContainerManager } from './container-manager';
 import { ExplorationStateManager } from './exploration-state';
 
 const tui = getTUIAdapter();
-// eslint-disable-next-line @typescript-eslint/naming-convention -- React components must be PascalCase
+
 const { Box, Text } = tui;
 
 const logger = getLogger();
@@ -221,7 +221,7 @@ function handleKeyboardInput(input: string, key: { ctrl?: boolean }, state: Cont
 /**
  * Interactive controls component
  */
-// eslint-disable-next-line @typescript-eslint/naming-convention -- React component must be PascalCase
+
 export const DashboardControls: React.FC<ControlsProps> = ({ exploration, onExit, onExplorationUpdate }) => {
 	const [state, setState] = useState<ControlState>({
 		isPaused: false
@@ -344,7 +344,7 @@ export const DashboardControls: React.FC<ControlsProps> = ({ exploration, onExit
 /**
  * Help panel showing available commands
  */
-// eslint-disable-next-line @typescript-eslint/naming-convention -- React component must be PascalCase
+
 export const HelpPanel: React.FC<{ visible: boolean }> = ({ visible }) => {
 	if (!visible) return null;
 

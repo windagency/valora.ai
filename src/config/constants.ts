@@ -153,6 +153,8 @@ export const MAX_GREP_OUTPUT_LINES = 200;
 export const MAX_TERMINAL_OUTPUT_CHARS = 15_000;
 export const MAX_MCP_OUTPUT_CHARS = 15_000;
 export const MAX_LIST_DIR_ENTRIES = 200;
+/** Minimum output length before per-command compression is attempted. */
+export const OUTPUT_COMPRESSION_THRESHOLD = 500;
 
 /**
  * Display Truncation Constants

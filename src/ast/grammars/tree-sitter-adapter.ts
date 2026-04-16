@@ -11,8 +11,6 @@
  * - Isolates all web-tree-sitter and tree-sitter-wasms dependencies to this file
  */
 
-/* eslint-disable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
-
 import type { ASTLanguage } from 'ast/ast.types';
 
 import { readFile } from 'fs/promises';
@@ -25,8 +23,15 @@ import { getGrammarWasmFile } from './language-map';
 
 const require = createRequire(import.meta.url);
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/naming-convention
-let ParserClass: any = null;
+interface ParserConstructor {
+	init(options?: object): Promise<void>;
+	Language: {
+		load(input: string | Uint8Array): Promise<TreeSitterLanguage>;
+	};
+	new (): TreeSitterParser;
+}
+
+let parserClass: null | ParserConstructor = null;
 let initPromise: null | Promise<void> = null;
 const languageCache = new Map<ASTLanguage, TreeSitterLanguage>();
 
@@ -42,13 +47,13 @@ function resolveWasmDir(): string {
  * Initialise the web-tree-sitter parser (once, concurrency-safe)
  */
 async function ensureParserInitialised(): Promise<void> {
-	if (ParserClass) return;
+	if (parserClass) return;
 
 	initPromise ??= (async () => {
 		const mod = await import('web-tree-sitter');
 		const cls = mod.default ?? mod;
-		await cls.init();
-		ParserClass = cls;
+		await (cls as ParserConstructor).init();
+		parserClass = cls as unknown as ParserConstructor;
 	})();
 
 	await initPromise;
@@ -65,7 +70,7 @@ export class WebTreeSitterAdapter implements TreeSitterAdapter {
 	 */
 	clearCache(): void {
 		languageCache.clear();
-		ParserClass = null;
+		parserClass = null;
 		initPromise = null;
 	}
 
@@ -76,7 +81,7 @@ export class WebTreeSitterAdapter implements TreeSitterAdapter {
 		await ensureParserInitialised();
 
 		const lang = await this.loadLanguage(language);
-		const parser = new ParserClass() as TreeSitterParser;
+		const parser = new parserClass!();
 		parser.setLanguage(lang);
 		return parser;
 	}
@@ -95,7 +100,7 @@ export class WebTreeSitterAdapter implements TreeSitterAdapter {
 		const wasmPath = join(wasmDir, wasmFile);
 
 		const wasmBuffer = await readFile(wasmPath);
-		const lang = (await ParserClass.Language.load(wasmBuffer)) as TreeSitterLanguage;
+		const lang = (await parserClass!.Language.load(wasmBuffer)) as TreeSitterLanguage;
 		languageCache.set(language, lang);
 		return lang;
 	}

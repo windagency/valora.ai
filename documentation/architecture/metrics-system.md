@@ -49,6 +49,28 @@ Tool Failures:  N   ← red if > 0, green if 0
 
 For detailed per-stage and per-tool breakdown, switch to the **Performance** tab.
 
+### Token Compression Metrics (per tool loop)
+
+In-process `MetricsCollector` counters and gauges emitted during tool-loop execution. They accumulate across the process lifetime and are not persisted to session JSON. Visible in the dashboard **Optimisation panel** (Overview tab).
+
+| Metric                                          | Type    | Emitted By                  | Description                                                             |
+| ----------------------------------------------- | ------- | --------------------------- | ----------------------------------------------------------------------- |
+| `compression.terminal.saved_chars`              | Counter | `tool-execution.service.ts` | Chars removed by command filters (above-threshold outputs only)         |
+| `compression.terminal.ratio`                    | Gauge   | `stage-executor.ts`         | `1 − outputChars / inputChars` across all filter-compressed calls       |
+| `compression.terminal.estimated_saved_tokens`   | Gauge   | `stage-executor.ts`         | Approx. tokens saved (`⌈savedChars / 4⌉`, chars-per-token heuristic)    |
+| `compression.terminal.estimated_saved_cost_usd` | Gauge   | `stage-executor.ts`         | Approx. cost saved (estimated tokens × model input price, default $3/M) |
+| `compression.history.pruned_messages`           | Counter | `stage-executor.ts`         | Tool messages replaced by the proactive history pruner                  |
+| `compression.dedup.hits`                        | Counter | `stage-executor.ts`         | Tool results replaced by deduplication back-references                  |
+
+`compression.terminal.ratio` and the two estimated gauges are set once per tool loop in `emitCompressionMetrics`, using accumulated stats from `getCompressionStats()`. They are only set when `inputChars > 0` (i.e. at least one above-threshold compression has occurred), preventing a spurious reading before any filter has fired.
+
+The dashboard Optimisation panel renders these as:
+
+```plaintext
+Output compression: 62% saved  (~14.3k tokens, ~$0.0429)
+History: 8 tool results pruned, 3 deduplicated
+```
+
 ---
 
 ## How to Access Metrics

@@ -10,10 +10,9 @@ import { getExplorationStatusColor, getWorktreeStatusIcon } from 'ui/dashboard/u
 import { getTUIAdapter } from 'ui/tui-adapter.interface';
 
 const tui = getTUIAdapter();
-// eslint-disable-next-line @typescript-eslint/naming-convention -- Box and Text are React components which require PascalCase
+
 const { Box, Text } = tui;
 
-// eslint-disable-next-line @typescript-eslint/naming-convention -- React components must use PascalCase
 export function WorktreeDiagramPanel({ worktrees }: { worktrees: WorktreeDiagramEntry[] }): React.JSX.Element {
 	const mainWorktree = worktrees.find((wt) => wt.isMainWorktree);
 	const childWorktrees = worktrees.filter((wt) => !wt.isMainWorktree);
@@ -56,7 +55,6 @@ export function WorktreeDiagramPanel({ worktrees }: { worktrees: WorktreeDiagram
 	);
 }
 
-// eslint-disable-next-line @typescript-eslint/naming-convention -- React components must use PascalCase
 function WorktreeChildRow({
 	isLast,
 	worktree

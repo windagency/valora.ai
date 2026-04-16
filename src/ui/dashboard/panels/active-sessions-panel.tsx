@@ -11,10 +11,9 @@ import { getTUIAdapter } from 'ui/tui-adapter.interface';
 import { formatNumber } from 'utils/number-format';
 
 const tui = getTUIAdapter();
-// eslint-disable-next-line @typescript-eslint/naming-convention -- Box and Text are React components which require PascalCase
+
 const { Box, Text } = tui;
 
-// eslint-disable-next-line @typescript-eslint/naming-convention -- React components must use PascalCase
 export function ActiveSessionsPanel({
 	selectedIndex,
 	sessions
@@ -45,7 +44,6 @@ export function ActiveSessionsPanel({
 	);
 }
 
-// eslint-disable-next-line @typescript-eslint/naming-convention -- React components must use PascalCase
 function SessionRow({ isSelected, session }: { isSelected: boolean; session: SessionSummary }): React.JSX.Element {
 	const age = formatAge(session.last_active);
 	const tokens = session.total_tokens_used ?? 0;

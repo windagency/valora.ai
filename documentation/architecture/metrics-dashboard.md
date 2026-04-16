@@ -8,19 +8,24 @@ The dashboard (`valora dash`) provides a live view of metrics collected from ses
 
 ### Key Metrics at a Glance
 
-| Metric                        | Where to Find It                  | Source                                         |
-| ----------------------------- | --------------------------------- | ---------------------------------------------- |
-| Average workflow time         | Overview tab — Executive Summary  | Session `duration_ms` aggregation              |
-| Template adoption rate        | Overview tab — Optimization panel | `optimization_metrics.planning_mode`           |
-| Early exit rate               | Overview tab — Optimization panel | `optimization_metrics.early_exit_triggered`    |
-| Loop exhaustions              | Overview tab — Metrics Summary    | `quality_metrics.tool_loop_exhaustions`        |
-| Tool failures                 | Overview tab — Metrics Summary    | `quality_metrics.tool_failures`                |
-| Per-request cost              | Spending tab                      | `.valora/spending.jsonl`                       |
-| Cache savings                 | Spending tab / Usage tab          | `.valora/spending.jsonl`                       |
-| Per-stage execution breakdown | Performance tab                   | `StageOutput.metadata.executionQuality`        |
-| Cross-session cost by model   | Usage tab (key `6`)               | `UsageAnalytics` over `.valora/spending.jsonl` |
-| Cross-session cost by command | Usage tab (key `6`)               | `UsageAnalytics` over `.valora/spending.jsonl` |
-| Daily cost trend (7 days)     | Usage tab (key `6`)               | `UsageAnalytics` — sparkline + table           |
+| Metric                        | Where to Find It                  | Source                                                |
+| ----------------------------- | --------------------------------- | ----------------------------------------------------- |
+| Average workflow time         | Overview tab — Executive Summary  | Session `duration_ms` aggregation                     |
+| Template adoption rate        | Overview tab — Optimisation panel | `optimization_metrics.planning_mode`                  |
+| Early exit rate               | Overview tab — Optimisation panel | `optimization_metrics.early_exit_triggered`           |
+| Output compression ratio      | Overview tab — Optimisation panel | `compression.terminal.ratio` gauge                    |
+| Estimated tokens saved        | Overview tab — Optimisation panel | `compression.terminal.estimated_saved_tokens` gauge   |
+| Estimated cost saved          | Overview tab — Optimisation panel | `compression.terminal.estimated_saved_cost_usd` gauge |
+| Tool results pruned           | Overview tab — Optimisation panel | `compression.history.pruned_messages` counter         |
+| Tool results deduplicated     | Overview tab — Optimisation panel | `compression.dedup.hits` counter                      |
+| Loop exhaustions              | Overview tab — Metrics Summary    | `quality_metrics.tool_loop_exhaustions`               |
+| Tool failures                 | Overview tab — Metrics Summary    | `quality_metrics.tool_failures`                       |
+| Per-request cost              | Spending tab                      | `.valora/spending.jsonl`                              |
+| Cache savings                 | Spending tab / Usage tab          | `.valora/spending.jsonl`                              |
+| Per-stage execution breakdown | Performance tab                   | `StageOutput.metadata.executionQuality`               |
+| Cross-session cost by model   | Usage tab (key `6`)               | `UsageAnalytics` over `.valora/spending.jsonl`        |
+| Cross-session cost by command | Usage tab (key `6`)               | `UsageAnalytics` over `.valora/spending.jsonl`        |
+| Daily cost trend (7 days)     | Usage tab (key `6`)               | `UsageAnalytics` — sparkline + table                  |
 
 ### Dashboard Tabs
 
@@ -68,6 +73,21 @@ The following targets and metrics are tracked for each active optimisation:
 | Express planning           | ≥ 15%           | `optimization_metrics.planning_mode`        | ~11 min saved per plan   |
 | Parallel review validation | 100%            | Auto-enabled                                | ~14 min saved per review |
 | Real-time linting          | 0 assert errors | `quality_metrics.lint_errors_assert`        | ~4 min rework prevented  |
+
+### Automatic Token Compression
+
+The following optimisations activate without configuration and have no adoption targets — their metrics indicate volume of work done, not a usage rate to improve:
+
+| Optimisation               | Tracked Field                                           | Visible In         |
+| -------------------------- | ------------------------------------------------------- | ------------------ |
+| Command-filter compression | `compression.terminal.ratio` (gauge)                    | Optimisation panel |
+| Command chars saved        | `compression.terminal.saved_chars` (counter)            | Optimisation panel |
+| Estimated tokens saved     | `compression.terminal.estimated_saved_tokens` (gauge)   | Optimisation panel |
+| Estimated cost saved       | `compression.terminal.estimated_saved_cost_usd` (gauge) | Optimisation panel |
+| History pruning            | `compression.history.pruned_messages` (counter)         | Optimisation panel |
+| Result deduplication       | `compression.dedup.hits` (counter)                      | Optimisation panel |
+
+See [Session Optimisation — Output Compression](./session-optimization.md#output-compression) for how each mechanism works.
 
 ---
 

@@ -4,20 +4,20 @@
 
 ## Component Overview
 
-| Layer            | Key Components                                                                         | Source Files                                                              |
-| ---------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| CLI              | Command Parser, Resolver, Executor, Wizard, Result Presenter, Error Handler            | `index.ts`, `command-resolver.ts`, `command-executor.ts`                  |
-| Orchestration    | Pipeline, Stage Executor, Execution Context, Stage Scheduler, Variable Resolver        | `pipeline.ts`, `stage-executor.ts`, `variable-resolution.service.ts`      |
-| Agent            | Agent Registry, Loader, Selector, Command Discovery, Prompt Loader                     | `agent-loader.ts`, `command-loader.ts`, `prompt-loader.ts`                |
-| LLM              | Provider Registry, Anthropic/OpenAI/Google/Cursor Providers, Token Estimator           | `providers/`, `utils/token-estimator.ts`, `utils/spending-tracker.ts`     |
-| Exploration      | Orchestrator, Collaboration Coordinator, Worktree Manager, Merge Orchestrator          | `orchestrator.ts`, `worktree-manager.ts`, `merge-orchestrator.ts`         |
-| Session          | Session Service, Repository, Worktree Stats Tracker                                    | `lifecycle.ts`, `store.ts`, `worktree-stats-tracker.ts`                   |
-| MCP              | Server, Tool Handler, Prompt Handler, Discovery Service, Health Service                | `mcp/server.ts`, `tool-handler.ts`, `discovery.ts`                        |
-| Configuration    | Config Loader, Schema Validator (Zod), Provider Config                                 | `config-loader.ts`, `providers.ts`                                        |
-| Context Mgmt     | Flush Manager, Threshold Monitor, Summarisation Service, Checkpoint Service            | `context-flush-manager.ts`, `context-summarization.service.ts`            |
-| Security         | Credential Guard, Command Guard, Injection Detector, Tool Validator, Integrity Monitor | `credential-guard.ts`, `command-guard.ts`, `prompt-injection-detector.ts` |
-| AST Intelligence | AST Parser, Index Service, Query Service, Context Service, AST Tools                   | `ast-parser.service.ts`, `ast-index.service.ts`, `ast-tools.service.ts`   |
-| LSP Integration  | LSP Client, Client Manager, LSP Tools, Result Cache, Context Enricher                  | `lsp-client.ts`, `lsp-client-manager.service.ts`, `lsp-tools.service.ts`  |
+| Layer            | Key Components                                                                                      | Source Files                                                                                          |
+| ---------------- | --------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| CLI              | Command Parser, Resolver, Executor, Wizard, Result Presenter, Error Handler                         | `index.ts`, `command-resolver.ts`, `command-executor.ts`                                              |
+| Orchestration    | Pipeline, Stage Executor, Output Compression, Execution Context, Stage Scheduler, Variable Resolver | `pipeline.ts`, `stage-executor.ts`, `output-compression.service.ts`, `variable-resolution.service.ts` |
+| Agent            | Agent Registry, Loader, Selector, Command Discovery, Prompt Loader                                  | `agent-loader.ts`, `command-loader.ts`, `prompt-loader.ts`                                            |
+| LLM              | Provider Registry, Anthropic/OpenAI/Google/Cursor Providers, Token Estimator                        | `providers/`, `utils/token-estimator.ts`, `utils/spending-tracker.ts`                                 |
+| Exploration      | Orchestrator, Collaboration Coordinator, Worktree Manager, Merge Orchestrator                       | `orchestrator.ts`, `worktree-manager.ts`, `merge-orchestrator.ts`                                     |
+| Session          | Session Service, Repository, Worktree Stats Tracker                                                 | `lifecycle.ts`, `store.ts`, `worktree-stats-tracker.ts`                                               |
+| MCP              | Server, Tool Handler, Prompt Handler, Discovery Service, Health Service                             | `mcp/server.ts`, `tool-handler.ts`, `discovery.ts`                                                    |
+| Configuration    | Config Loader, Schema Validator (Zod), Provider Config                                              | `config-loader.ts`, `providers.ts`                                                                    |
+| Context Mgmt     | Flush Manager, Threshold Monitor, Summarisation Service, Checkpoint Service                         | `context-flush-manager.ts`, `context-summarization.service.ts`                                        |
+| Security         | Credential Guard, Command Guard, Injection Detector, Tool Validator, Integrity Monitor              | `credential-guard.ts`, `command-guard.ts`, `prompt-injection-detector.ts`                             |
+| AST Intelligence | AST Parser, Index Service, Query Service, Context Service, AST Tools                                | `ast-parser.service.ts`, `ast-index.service.ts`, `ast-tools.service.ts`                               |
+| LSP Integration  | LSP Client, Client Manager, LSP Tools, Result Cache, Context Enricher                               | `lsp-client.ts`, `lsp-client-manager.service.ts`, `lsp-tools.service.ts`                              |
 
 ---
 
@@ -99,16 +99,40 @@ stateDiagram-v2
     Failed --> [*]
 ```
 
-| Component          | File                             | Responsibility                  |
-| ------------------ | -------------------------------- | ------------------------------- |
-| Pipeline           | `pipeline.ts`                    | Main orchestration logic        |
-| Stage Executor     | `stage-executor.ts`              | Execute individual stages       |
-| Execution Context  | `execution-context.ts`           | State container                 |
-| Stage Scheduler    | `stage-scheduler.ts`             | Schedule parallel/sequential    |
-| Pipeline Validator | `pipeline-validator.ts`          | Validate pipeline structure     |
-| Variable Resolver  | `variable-resolution.service.ts` | Template variable resolution    |
-| Pipeline Events    | `pipeline-events.ts`             | Event definitions and emission  |
-| Execution Strategy | `execution-strategy.ts`          | Strategy pattern implementation |
+| Component          | File                             | Responsibility                                                        |
+| ------------------ | -------------------------------- | --------------------------------------------------------------------- |
+| Pipeline           | `pipeline.ts`                    | Main orchestration logic                                              |
+| Stage Executor     | `stage-executor.ts`              | Execute individual stages                                             |
+| Output Compression | `output-compression.service.ts`  | Content-aware terminal output compression before LLM context assembly |
+| Execution Context  | `execution-context.ts`           | State container                                                       |
+| Stage Scheduler    | `stage-scheduler.ts`             | Schedule parallel/sequential                                          |
+| Pipeline Validator | `pipeline-validator.ts`          | Validate pipeline structure                                           |
+| Variable Resolver  | `variable-resolution.service.ts` | Template variable resolution                                          |
+| Pipeline Events    | `pipeline-events.ts`             | Event definitions and emission                                        |
+| Execution Strategy | `execution-strategy.ts`          | Strategy pattern implementation                                       |
+
+<details>
+<summary><strong>Output compression pipeline</strong></summary>
+
+Terminal output from tool calls passes through three steps before entering the LLM context:
+
+1. **ANSI stripping** — removes colour codes and cursor-movement sequences unconditionally (zero semantic value; 5–15% overhead on typical terminal output).
+2. **Per-command filter** — applies noise reduction keyed on the executable name. Unknown commands pass through unchanged.
+3. **Head+tail truncation** — final safety net ensuring output never exceeds `MAX_TERMINAL_OUTPUT_CHARS`, preserving the start (command context) and the end (summary and errors).
+
+Short outputs below `OUTPUT_COMPRESSION_THRESHOLD` skip step 2 and pass through after ANSI stripping only.
+
+| Command         | What is collapsed                             | What is preserved                                    |
+| --------------- | --------------------------------------------- | ---------------------------------------------------- |
+| `git log`       | Multi-line commit entries                     | One line per commit, capped at 20 entries            |
+| `git diff`      | `index …` and mode lines                      | Changed lines (`+`/`-`) and hunk headers (`@@`)      |
+| `git status`    | Verbose section prose and blank lines         | Branch line, file-status lines, section headers      |
+| `tsc`           | Duplicate errors for the same diagnostic code | Up to 3 examples per `TSxxxx` code                   |
+| `eslint`        | Duplicate violations for the same rule        | Up to 2 examples per rule                            |
+| `jest`/`vitest` | Passing test-suite lines                      | A `[N test suites passed]` summary plus all failures |
+| `pnpm`          | Progress spinner and `Progress:` lines        | Warnings, errors, and install summary                |
+
+</details>
 
 ---
 

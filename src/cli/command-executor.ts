@@ -3,7 +3,6 @@
  * Refactored to use smaller, focused classes for better maintainability
  */
 
-import type { Logger } from 'output/logger';
 import type { CommandResult, IsolatedExecutionOptions } from 'types/command.types';
 import type { DocumentOutputOptions } from 'types/document.types';
 import type { MCPSamplingService } from 'types/mcp.types';
@@ -18,6 +17,7 @@ import { PromptLoader } from 'executor/prompt-loader';
 import { StageExecutor } from 'executor/stage-executor';
 import { getStageOutputCache } from 'executor/stage-output-cache';
 import { getConsoleOutput } from 'output/console-output';
+import { getLogger, type Logger } from 'output/logger';
 import { getRenderer } from 'output/markdown';
 import { createGitStashProtection, type GitStashProtectionService } from 'services/git-stash-protection.service';
 import {
@@ -135,11 +135,11 @@ export class CommandExecutor {
 	// Planned for future use - keeping for compatibility
 	private analyticsService?: AgentSelectionAnalyticsService;
 	private dynamicAgentResolver?: DynamicAgentResolverService;
-	// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-	// @ts-ignore - Planned for future use
+
+	// @ts-expect-error - Planned for future use
 	private pipelineExecutor!: PipelineExecutor;
-	// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-	// @ts-ignore - Planned for future use
+
+	// @ts-expect-error - Planned for future use
 	private isolationExecutor!: CommandIsolationExecutor;
 	private logger!: Logger;
 	private mcpSampling?: MCPSamplingService;
@@ -198,8 +198,6 @@ export class CommandExecutor {
 	 * Initialize dependencies with default implementations (backwards compatibility)
 	 */
 	private initializeDependencies(): void {
-		// eslint-disable-next-line @typescript-eslint/no-require-imports
-		const { getLogger } = require('output/logger') as { getLogger: () => Logger };
 		this.logger = getLogger();
 		this.commandLoader = new CommandLoader();
 		this.promptLoader = new PromptLoader();
