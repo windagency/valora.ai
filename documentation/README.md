@@ -4,14 +4,14 @@ Valora is a TypeScript CLI tool that orchestrates 11 specialised AI agents acros
 
 ## Navigation
 
-| Guide                                          | Audience     | Contents                                        |
-| ---------------------------------------------- | ------------ | ----------------------------------------------- |
-| [User Guide](./user-guide/README.md)           | Users        | Quick start, workflows, commands, configuration |
-| [Developer Guide](./developer-guide/README.md) | Contributors | Setup, codebase, coding standards, testing      |
-| [Architecture](./architecture/README.md)       | Architects   | C4 diagrams, components, data flow              |
-| [API Reference](./api-reference/README.md)     | Integrators  | CLI flags, MCP tools, TypeScript API            |
-| [Operations](./operations/README.md)           | Operators    | Deployment, monitoring, maintenance             |
-| [ADRs](./adr/README.md)                        | All          | Architecture decisions and rationale            |
+| Guide                                          | Audience     | Contents                                                 |
+| ---------------------------------------------- | ------------ | -------------------------------------------------------- |
+| [User Guide](./user-guide/README.md)           | Users        | Quick start, workflows, commands, plugins, configuration |
+| [Developer Guide](./developer-guide/README.md) | Contributors | Setup, codebase, coding standards, testing               |
+| [Architecture](./architecture/README.md)       | Architects   | C4 diagrams, components, data flow                       |
+| [API Reference](./api-reference/README.md)     | Integrators  | CLI flags, MCP tools, TypeScript API                     |
+| [Operations](./operations/README.md)           | Operators    | Deployment, monitoring, maintenance                      |
+| [ADRs](./adr/README.md)                        | All          | Architecture decisions and rationale                     |
 
 ## Getting Started
 
@@ -140,6 +140,7 @@ documentation/
 │   ├── dry-run-mode.md              # Preview changes
 │   ├── metrics.md                   # Workflow optimisation metrics
 │   ├── metrics-quickstart.md        # 5-minute metrics setup
+│   ├── plugins.md                   # Installing and managing plugins
 │   ├── configuration.md             # Configuration and customisation
 │   ├── best-practices.md            # Recommended usage patterns
 │   └── troubleshooting.md           # Common issues and solutions
@@ -150,7 +151,8 @@ documentation/
 │   ├── contributing.md              # Contribution guidelines
 │   ├── code-quality.md              # Code quality standards
 │   ├── CODE-QUALITY-GUIDELINES.md   # Detailed quality guidelines
-│   └── LANGUAGE_CONVENTION.md       # Language usage conventions
+│   ├── LANGUAGE_CONVENTION.md       # Language usage conventions
+│   └── writing-plugins.md           # Build and distribute plugins
 ├── architecture/
 │   ├── README.md                    # Architecture overview
 │   ├── system-architecture.md       # System-level design

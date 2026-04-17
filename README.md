@@ -122,6 +122,42 @@ Enterprise-grade security controls:
 <tr valign="top">
 <td width="50%">
 
+### 🧩 Plugin System
+
+Extend Valora with **self-contained plugin directories**:
+
+| Contribution    | What it adds                                |
+| --------------- | ------------------------------------------- |
+| `agents`        | New AI personas                             |
+| `commands`      | New CLI verbs (auto-exposed as MCP tools)   |
+| `hooks`         | PreToolUse / PostToolUse shell scripts      |
+| `prompts`       | Reusable pipeline stages                    |
+| `templates`     | PR, PRD, and plan scaffolds                 |
+| `agent-context` | Markdown injected into agent system prompts |
+
+Drop a plugin into `.valora/plugins/` and list it under `plugins.enabled`. No restart required.
+
+</td>
+<td width="50%">
+
+### 🔌 External MCP Integration
+
+Connect to **15 external MCP servers** with user approval:
+
+| Category       | Servers                                   |
+| -------------- | ----------------------------------------- |
+| Browser/Test   | Playwright, Chrome DevTools, BrowserStack |
+| Design         | Figma, Storybook                          |
+| Development    | GitHub, Serena, Context7                  |
+| Infrastructure | Terraform, Firebase, Google Cloud         |
+| Data           | MongoDB, Elastic                          |
+| Observability  | Grafana, DeepResearch                     |
+
+</td>
+</tr>
+<tr valign="top">
+<td width="50%">
+
 ### 🌳 Worktree Dashboard & Statistics
 
 Live visibility into parallel explorations:
@@ -140,22 +176,6 @@ Live visibility into parallel explorations:
 │     ghi9012                  │
 └──────────────────────────────┘
 ```
-
-</td>
-<td width="50%">
-
-### 🔌 External MCP Integration
-
-Connect to **15 external MCP servers** with user approval:
-
-| Category       | Servers                                   |
-| -------------- | ----------------------------------------- |
-| Browser/Test   | Playwright, Chrome DevTools, BrowserStack |
-| Design         | Figma, Storybook                          |
-| Development    | GitHub, Serena, Context7                  |
-| Infrastructure | Terraform, Firebase, Google Cloud         |
-| Data           | MongoDB, Elastic                          |
-| Observability  | Grafana, DeepResearch                     |
 
 </td>
 </tr>

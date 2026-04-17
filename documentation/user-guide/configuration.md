@@ -380,6 +380,28 @@ Reserved for future fallback diagnostics. The schema and environment variable ma
 
 ---
 
+## Plugin Configuration
+
+Plugins are opt-in. List the plugins you want active under `plugins.enabled`.
+
+```json
+{
+	"plugins": {
+		"enabled": ["valora-plugin-rtk", "acme-react-agents"]
+	}
+}
+```
+
+| Key               | Type       | Default | Description                                               |
+| ----------------- | ---------- | ------- | --------------------------------------------------------- |
+| `plugins.enabled` | `string[]` | `[]`    | Plugin names to load; plugins not listed here are skipped |
+
+Run `valora doctor` to see which plugins are loaded, their version, and what they contribute.
+
+See [Plugins](./plugins.md) for installation instructions and `valora-plugin.json` manifest details.
+
+---
+
 ## Hooks Configuration
 
 VALORA supports PreToolUse hooks that intercept tool calls before execution. Built-in defaults are in `data/hooks.default.json`; project overrides go in `.valora/hooks.json`.

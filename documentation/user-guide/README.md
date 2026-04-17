@@ -12,6 +12,7 @@ Getting started with Valora for everyday development tasks.
 | [Dry Run Mode](./dry-run-mode.md)              | Preview changes before execution                      |
 | [Metrics and Optimisation](./metrics.md)       | Track and improve workflow efficiency                 |
 | [Metrics Quick Start](./metrics-quickstart.md) | 5-minute metrics setup                                |
+| [Plugins](./plugins.md)                        | Install and manage plugins                            |
 | [Configuration](./configuration.md)            | Configure providers, agents, and external MCP servers |
 | [Best Practices](./best-practices.md)          | Recommended usage patterns                            |
 | [Troubleshooting](./troubleshooting.md)        | Common issues and solutions                           |
