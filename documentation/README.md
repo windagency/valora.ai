@@ -185,4 +185,4 @@ documentation/
 
 ---
 
-**Version**: 2.4.1 · **Licence**: MIT · [Contributing](./developer-guide/contributing.md)
+**Version**: 2.5.0 · **Licence**: MIT · [Contributing](./developer-guide/contributing.md)
