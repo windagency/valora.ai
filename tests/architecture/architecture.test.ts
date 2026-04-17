@@ -236,7 +236,8 @@ describe('Architecture Tests', () => {
 					'security..',
 					'ast..',
 					'lsp..',
-					'batch..'
+					'batch..',
+					'plugins..'
 				)
 				.because('DI container is the composition root and must wire all layers together')
 				.check(srcProject.allClasses());

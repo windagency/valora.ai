@@ -11,7 +11,7 @@ import type { DocumentCategory, DocumentOutputOptions } from 'types/document.typ
 import { DocumentOutputProcessor } from 'cli/document-output-processor';
 import { getConfigLoader } from 'config/loader';
 import { SetupWizard } from 'config/wizard';
-import { createContainer, SERVICE_IDENTIFIERS } from 'di/container';
+import { createContainer, initializePlugins, SERVICE_IDENTIFIERS } from 'di/container';
 import { getColorAdapter } from 'output/color-adapter.interface';
 import { getLogger } from 'output/logger';
 import { formatError } from 'utils/error-handler';
@@ -152,6 +152,7 @@ export function configureListCommand(program: CommandAdapter): void {
 			const color = getColorAdapter();
 			try {
 				const container = createContainer();
+				initializePlugins(container);
 				const commandLoader = container.resolve(SERVICE_IDENTIFIERS.COMMAND_LOADER) as CommandLoader;
 				const commands = await commandLoader.listCommands();
 
@@ -223,6 +224,7 @@ export function configureExecCommand(program: CommandAdapter): void {
 
 				// Create container and resolve executor
 				const container = createContainer();
+				initializePlugins(container);
 				const executor = container.resolve(SERVICE_IDENTIFIERS.COMMAND_EXECUTOR) as CommandExecutor;
 
 				// Execute command
@@ -615,6 +617,7 @@ export function configureShortcutCommands(program: CommandAdapter): void {
 
 				// Create container and resolve executor
 				const container = createContainer();
+				initializePlugins(container);
 				const executor = container.resolve(SERVICE_IDENTIFIERS.COMMAND_EXECUTOR) as CommandExecutor;
 
 				// Execute command

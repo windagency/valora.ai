@@ -23,11 +23,20 @@ export type ResourceType = 'agents' | 'commands' | 'hooks' | 'prompts' | 'templa
 
 export class ResourceResolver {
 	private readonly packageDataDir: string;
+	private readonly pluginDirs: Set<string> = new Set();
 	private readonly projectConfigDir: null | string;
 
 	constructor() {
 		this.packageDataDir = getPackageDataDir();
 		this.projectConfigDir = getProjectConfigDir();
+	}
+
+	/**
+	 * Register a plugin directory as an allowed resource location.
+	 * Must be called before any loader attempts to use the plugin directory.
+	 */
+	registerPluginDir(dir: string): void {
+		this.pluginDirs.add(path.resolve(dir));
 	}
 
 	/**
@@ -129,7 +138,7 @@ export class ResourceResolver {
 	}
 
 	/**
-	 * Check if a directory is within the package data dir or project config dir.
+	 * Check if a directory is within the package data dir, project config dir, or a registered plugin dir.
 	 * Used for security validation.
 	 */
 	isAllowedDirectory(dirPath: string): boolean {
@@ -143,6 +152,13 @@ export class ResourceResolver {
 		// Allow project config directory
 		if (this.projectConfigDir && resolvedPath.startsWith(path.resolve(this.projectConfigDir))) {
 			return true;
+		}
+
+		// Allow registered plugin directories
+		for (const pluginDir of this.pluginDirs) {
+			if (resolvedPath.startsWith(pluginDir)) {
+				return true;
+			}
 		}
 
 		return false;

@@ -97,3 +97,26 @@ export function getRuntimeDataDir(): string {
 	const projectDir = getProjectConfigDir();
 	return projectDir ?? getGlobalConfigDir();
 }
+
+/**
+ * Get the package's built-in plugins directory.
+ */
+export function getPackagePluginsDir(): string {
+	return path.join(getPackageRoot(), 'data', 'plugins');
+}
+
+/**
+ * Get the global user plugins directory (~/.valora/plugins/).
+ */
+export function getGlobalPluginsDir(): string {
+	return path.join(getGlobalConfigDir(), 'plugins');
+}
+
+/**
+ * Get the project-level plugins directory (.valora/plugins/).
+ * Returns null if not in a project context.
+ */
+export function getProjectPluginsDir(): null | string {
+	const projectDir = getProjectConfigDir();
+	return projectDir ? path.join(projectDir, 'plugins') : null;
+}

@@ -22,6 +22,7 @@ export default defineConfig({
 			mcp: path.resolve(__dirname, './src/mcp'),
 			memory: path.resolve(__dirname, './src/memory'),
 			output: path.resolve(__dirname, './src/output'),
+			plugins: path.resolve(__dirname, './src/plugins'),
 			services: path.resolve(__dirname, './src/services'),
 			session: path.resolve(__dirname, './src/session'),
 			src: path.resolve(__dirname, './src'),

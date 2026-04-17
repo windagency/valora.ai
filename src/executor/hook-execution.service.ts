@@ -39,7 +39,20 @@ export class HookExecutionService {
 	private hooksFileCache: null | { hooks?: HooksConfig } = null;
 	private hooksFileMtime: number = 0;
 	private readonly logger = getLogger();
+	private pluginHooks: HooksConfig[] = [];
+	private readonly registeredPluginHooks = new Set<HooksConfig>();
 	private sessionId?: string;
+
+	/**
+	 * Register hook configuration contributed by a plugin.
+	 * Plugin hooks are merged with lower priority than built-in and config hooks.
+	 */
+	registerPluginHooks(hooks: HooksConfig): void {
+		if (!this.registeredPluginHooks.has(hooks)) {
+			this.registeredPluginHooks.add(hooks);
+			this.pluginHooks.push(hooks);
+		}
+	}
 
 	/**
 	 * Fast check to skip processing when no hooks are configured.
@@ -378,25 +391,30 @@ export class HookExecutionService {
 	}
 
 	/**
-	 * Read hooks config, merging data/hooks.default.json (primary) with config.json (fallback).
-	 * For each event name, hooks.json matchers come first; duplicates by matcher pattern
-	 * are resolved in favour of hooks.json.
+	 * Read hooks config, merging data/hooks.default.json with config.json and any plugin hooks.
+	 * Priority (highest first): config.json → hooks.default.json → plugin hooks.
 	 */
 	private getHooksConfig(): HooksConfig | undefined {
 		const hooksFromFile = this.loadHooksFile()?.hooks;
 
 		let hooksFromConfig: HooksConfig | undefined;
 		try {
-			hooksFromConfig = getConfigLoader().get().hooks as HooksConfig | undefined;
+			hooksFromConfig = getConfigLoader().get().hooks;
 		} catch {
 			// Config not yet loaded
 		}
 
+		let merged: HooksConfig | undefined;
 		if (hooksFromFile && hooksFromConfig) {
-			return this.mergeHooksConfigs(hooksFromFile, hooksFromConfig);
+			merged = this.mergeHooksConfigs(hooksFromFile, hooksFromConfig);
+		} else {
+			merged = hooksFromFile ?? hooksFromConfig;
 		}
 
-		return hooksFromFile ?? hooksFromConfig;
+		return this.pluginHooks.reduce(
+			(acc, pluginHook) => (acc ? (this.mergeHooksConfigs(acc, pluginHook) ?? acc) : pluginHook),
+			merged
+		);
 	}
 
 	/**

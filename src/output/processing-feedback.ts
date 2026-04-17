@@ -5,6 +5,8 @@
  * so users know what's happening while the system is "thinking".
  */
 
+import type { LoadedPlugin } from 'types/plugin.types';
+
 import { CONTEXT_THRESHOLD_WARNING, HIGH_CONFIDENCE_THRESHOLD } from 'config/constants';
 import { getModelContextWindow } from 'config/providers.config';
 import {
@@ -1184,6 +1186,25 @@ export class ProcessingFeedback {
 	 */
 	private isMcpMode(): boolean {
 		return process.env['AI_MCP_ENABLED'] === 'true';
+	}
+
+	/**
+	 * Show loaded plugins at startup — mirrors showMCPStatus layout
+	 */
+	showPluginsStatus(plugins: LoadedPlugin[]): void {
+		if (!this.enabled || plugins.length === 0) return;
+		if (this.isMcpMode()) return;
+
+		const color = getColorAdapter();
+
+		process.stderr.write(`\n${color.bold(color.cyan('Plugins'))}\n`);
+		for (const plugin of plugins) {
+			const contribs = plugin.manifest.contributes?.join(', ') ?? 'none';
+			process.stderr.write(
+				`  ${color.green('✓')} ${plugin.manifest.name}@${plugin.manifest.version} ${color.dim(`(${contribs})`)}\n`
+			);
+		}
+		process.stderr.write('\n');
 	}
 
 	/**

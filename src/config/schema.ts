@@ -161,6 +161,20 @@ export const MEMORY_CONFIG_SCHEMA = z.object({
 	semantic_half_life_days: z.number().min(1).max(365).default(DEFAULT_MEMORY_SEMANTIC_HALF_LIFE_DAYS)
 });
 
+// Plugin source configuration schema
+export const PLUGIN_SOURCE_SCHEMA = z.object({
+	path: z.string().optional(),
+	scope: z.string().optional(),
+	type: z.enum(['git', 'local', 'npm']),
+	url: z.string().url().optional()
+});
+
+// Plugins configuration schema
+export const PLUGINS_CONFIG_SCHEMA = z.object({
+	enabled: z.array(z.string()).optional(),
+	sources: z.array(PLUGIN_SOURCE_SCHEMA).optional()
+});
+
 // Main configuration schema
 export const CONFIG_SCHEMA = z.object({
 	defaults: DEFAULTS_CONFIG_SCHEMA,
@@ -169,6 +183,7 @@ export const CONFIG_SCHEMA = z.object({
 	logging: LOGGING_RETENTION_CONFIG_SCHEMA.optional(),
 	memory: MEMORY_CONFIG_SCHEMA.optional(),
 	paths: PATHS_CONFIG_SCHEMA.optional(),
+	plugins: PLUGINS_CONFIG_SCHEMA.optional(),
 	providers: PROVIDERS_CONFIG_SCHEMA,
 	sessions: SESSION_RETENTION_CONFIG_SCHEMA.optional()
 });
@@ -181,6 +196,7 @@ export type HooksConfigSchema = z.infer<typeof HOOKS_CONFIG_SCHEMA>;
 export type LoggingRetentionConfig = z.infer<typeof LOGGING_RETENTION_CONFIG_SCHEMA>;
 export type MemoryRetentionConfig = z.infer<typeof MEMORY_CONFIG_SCHEMA>;
 export type PathsConfig = z.infer<typeof PATHS_CONFIG_SCHEMA>;
+export type PluginsConfigSchema = z.infer<typeof PLUGINS_CONFIG_SCHEMA>;
 export type ProviderConfig = z.infer<typeof PROVIDER_CONFIG_SCHEMA>;
 export type ProvidersConfig = z.infer<typeof PROVIDERS_CONFIG_SCHEMA>;
 export type SessionRetentionConfig = z.infer<typeof SESSION_RETENTION_CONFIG_SCHEMA>;

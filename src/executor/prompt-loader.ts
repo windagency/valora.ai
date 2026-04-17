@@ -8,16 +8,38 @@ import type { PromptDefinition, PromptMetadata } from 'types/prompt.types';
 
 import { getLogger } from 'output/logger';
 import { ValidationError } from 'utils/error-handler';
-import { FileNotFoundError, findFiles, readFile } from 'utils/file-utils';
+import { fileExists, FileNotFoundError, findFiles, readFile } from 'utils/file-utils';
 import { getPackageDataDir } from 'utils/paths';
 import { parseMarkdownWithFrontmatter, validateRequiredFields, YamlParseError } from 'utils/yaml-parser';
 
 export class PromptLoader {
+	private static readonly CATEGORY_DIR_MAP: Record<string, string> = {
+		code: '04_code',
+		context: '02_context',
+		deployment: '08_deployment',
+		documentation: '07_documentation',
+		maintenance: '10_maintenance',
+		onboard: '01_onboard',
+		plan: '03_plan',
+		refactor: '09_refactor',
+		review: '05_review',
+		test: '06_test'
+	};
+
 	private cache: Map<string, PromptDefinition> = new Map();
+	private pluginPromptsDirs = new Set<string>();
 	private promptsDir: string;
 
 	constructor(promptsDir?: string) {
 		this.promptsDir = promptsDir ?? path.join(getPackageDataDir(), 'prompts');
+	}
+
+	/**
+	 * Register an additional prompts root contributed by a plugin.
+	 * Plugin prompts must use existing categories; new categories are not supported.
+	 */
+	registerPluginPromptsDir(dir: string): void {
+		this.pluginPromptsDirs.add(dir);
 	}
 
 	/**
@@ -80,52 +102,31 @@ export class PromptLoader {
 	}
 
 	/**
-	 * Find prompt file by category and name
+	 * Find prompt file by category and name.
+	 * Checks the primary prompts directory first, then plugin prompt directories.
 	 */
 	private findPromptFile(category: string, name: string): string {
-		// Map category to directory prefix
-		const categoryMap: Record<string, string> = {
-			code: '04_code',
-			context: '02_context',
-			deployment: '08_deployment',
-			documentation: '07_documentation',
-			maintenance: '10_maintenance',
-			onboard: '01_onboard',
-			plan: '03_plan',
-			refactor: '09_refactor',
-			review: '05_review',
-			test: '06_test'
-		};
-
-		const dirPrefix = categoryMap[category];
+		const dirPrefix = PromptLoader.CATEGORY_DIR_MAP[category];
 		if (!dirPrefix) {
 			throw new ValidationError(`Unknown prompt category: ${category}`);
 		}
 
-		const categoryDir = path.join(this.promptsDir, dirPrefix);
-		const promptFile = path.join(categoryDir, `${name}.md`);
+		const primaryFile = path.join(this.promptsDir, dirPrefix, `${name}.md`);
+		if (fileExists(primaryFile)) return primaryFile;
 
-		return promptFile;
+		for (const pluginDir of this.pluginPromptsDirs) {
+			const candidate = path.join(pluginDir, dirPrefix, `${name}.md`);
+			if (fileExists(candidate)) return candidate;
+		}
+
+		return primaryFile; // Preserve existing error path when prompt is not found
 	}
 
 	/**
 	 * Load all prompts in a category
 	 */
 	async loadCategoryPrompts(category: string): Promise<Map<string, PromptDefinition>> {
-		const categoryMap: Record<string, string> = {
-			code: '04_code',
-			context: '02_context',
-			deployment: '08_deployment',
-			documentation: '07_documentation',
-			maintenance: '10_maintenance',
-			onboard: '01_onboard',
-			plan: '03_plan',
-			refactor: '09_refactor',
-			review: '05_review',
-			test: '06_test'
-		};
-
-		const dirPrefix = categoryMap[category];
+		const dirPrefix = PromptLoader.CATEGORY_DIR_MAP[category];
 		if (!dirPrefix) {
 			throw new ValidationError(`Unknown prompt category: ${category}`);
 		}

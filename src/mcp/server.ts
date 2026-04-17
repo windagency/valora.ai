@@ -12,7 +12,13 @@ import type { CommandLoader } from 'executor/command-loader';
 import type { MCPSamplingOptions, MCPSamplingResult, MCPSamplingService } from 'types/mcp.types';
 
 import { getConfigLoader, setGlobalCliOverrides } from 'config/loader';
-import { createContainer, type DIContainer, SERVICE_IDENTIFIERS, setupMCPServices } from 'di/container';
+import {
+	createContainer,
+	type DIContainer,
+	initializePlugins,
+	SERVICE_IDENTIFIERS,
+	setupMCPServices
+} from 'di/container';
 import { getLogger, type Logger } from 'output/logger';
 import { readJSON } from 'utils/file-utils';
 import { getPackageRoot } from 'utils/paths';
@@ -107,6 +113,9 @@ export class MCPOrchestratorServer implements MCPSamplingService {
 	async start(mode: 'sse' | 'stdio' = 'sse', port: number = 3000): Promise<void> {
 		// Use logger exclusively - it already uses stderr with proper formatting
 		this.logger.info('MCP Orchestrator Server starting', { mode, port });
+
+		// Load plugins before any commands are registered
+		initializePlugins(this.container);
 
 		// Start system monitoring
 		this.systemMonitor.startMonitoring();

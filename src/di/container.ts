@@ -7,6 +7,10 @@
 
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
+import { PluginLoaderService } from 'plugins/plugin-loader.service';
+
+import type { LoadedPlugin, PluginsConfig } from 'types/plugin.types';
+
 import { CommandExecutor } from 'cli/command-executor';
 import { DocumentApprovalWorkflow } from 'cli/document-approval';
 import { DocumentOutputProcessor } from 'cli/document-output-processor';
@@ -16,6 +20,7 @@ import { getConfigLoader } from 'config/loader';
 import { AgentLoader } from 'executor/agent-loader';
 import { CommandIsolationExecutor } from 'executor/command-isolation.executor';
 import { CommandLoader } from 'executor/command-loader';
+import { getHookExecutionService } from 'executor/hook-execution.service';
 import { PipelineExecutor } from 'executor/pipeline';
 import { PromptLoader } from 'executor/prompt-loader';
 import { StageExecutor } from 'executor/stage-executor';
@@ -43,6 +48,7 @@ import { type ConsoleOutput, getConsoleOutput } from 'output/console-output';
 import { getHeaderFormatter } from 'output/header-formatter';
 import { getLogger } from 'output/logger';
 import { getRenderer, type MarkdownRenderer } from 'output/markdown';
+import { getProcessingFeedback } from 'output/processing-feedback';
 import { getProgress } from 'output/progress';
 import {
 	AgentCapabilityMatcherService,
@@ -123,7 +129,10 @@ export const SERVICE_IDENTIFIERS = {
 	// Dynamic Agent Selection Services
 	TASK_CLASSIFIER: Symbol('TaskClassifierService'),
 	// MCP services
-	TOOL_REGISTRY: Symbol('MCPToolRegistry')
+	TOOL_REGISTRY: Symbol('MCPToolRegistry'),
+
+	// Plugin system
+	PLUGIN_LOADER: Symbol('PluginLoaderService')
 } as const;
 
 /**
@@ -203,6 +212,46 @@ export function createContainer(): DIContainer {
 }
 
 /**
+ * Discover and load plugins, registering their contributions with the active loaders.
+ * Must be called after createContainer() and before any commands are executed.
+ */
+let loadedPlugins: LoadedPlugin[] = [];
+
+export function getLoadedPlugins(): LoadedPlugin[] {
+	return loadedPlugins;
+}
+
+export function initializePlugins(container: DIContainer): void {
+	const pluginLoader = container.resolve<PluginLoaderService>(SERVICE_IDENTIFIERS.PLUGIN_LOADER);
+
+	let pluginsConfig: PluginsConfig | undefined;
+	try {
+		pluginsConfig = getConfigLoader().get().plugins;
+	} catch {
+		// Config not yet loaded — proceed with defaults (all discovered plugins enabled)
+	}
+
+	const plugins = pluginLoader.loadAll(pluginsConfig);
+	loadedPlugins = plugins;
+
+	getProcessingFeedback().showPluginsStatus(plugins);
+
+	if (plugins.length === 0) return;
+
+	const agentLoader = container.resolve<AgentLoader>(SERVICE_IDENTIFIERS.AGENT_LOADER);
+	const commandLoader = container.resolve<CommandLoader>(SERVICE_IDENTIFIERS.COMMAND_LOADER);
+	const promptLoader = container.resolve<PromptLoader>(SERVICE_IDENTIFIERS.PROMPT_LOADER);
+	const hookService = getHookExecutionService();
+
+	for (const plugin of plugins) {
+		if (plugin.agentsDir) agentLoader.registerPluginDir(plugin.agentsDir);
+		if (plugin.commandsDir) commandLoader.registerPluginDir(plugin.commandsDir);
+		if (plugin.promptsDir) promptLoader.registerPluginPromptsDir(plugin.promptsDir);
+		if (plugin.hooks) hookService.registerPluginHooks(plugin.hooks);
+	}
+}
+
+/**
  * Setup default services in the container
  */
 function setupDefaultServices(container: DIContainer): void {
@@ -210,6 +259,9 @@ function setupDefaultServices(container: DIContainer): void {
 	container.registerFactory(SERVICE_IDENTIFIERS.COMMAND_LOADER, () => new CommandLoader());
 	container.registerFactory(SERVICE_IDENTIFIERS.PROMPT_LOADER, () => new PromptLoader());
 	container.registerFactory(SERVICE_IDENTIFIERS.AGENT_LOADER, () => new AgentLoader());
+
+	// Plugin system
+	container.registerFactory(SERVICE_IDENTIFIERS.PLUGIN_LOADER, () => new PluginLoaderService());
 
 	// Executors depend on loaders
 	container.registerFactory(SERVICE_IDENTIFIERS.PIPELINE_EXECUTOR, () => {

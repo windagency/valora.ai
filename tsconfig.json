@@ -40,6 +40,7 @@
 			"mcp/*": ["./src/mcp/*"],
 			"memory/*": ["./src/memory/*"],
 			"output/*": ["./src/output/*"],
+			"plugins/*": ["./src/plugins/*"],
 			"services/*": ["./src/services/*"],
 			"session/*": ["./src/session/*"],
 			"src/*": ["./src/*"],
