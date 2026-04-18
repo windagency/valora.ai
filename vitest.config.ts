@@ -8,6 +8,7 @@ const __dirname = dirname(__filename);
 export default defineConfig({
 	resolve: {
 		alias: {
+			analysis: path.resolve(__dirname, './src/analysis'),
 			ast: path.resolve(__dirname, './src/ast'),
 			batch: path.resolve(__dirname, './src/batch'),
 			security: path.resolve(__dirname, './src/security'),

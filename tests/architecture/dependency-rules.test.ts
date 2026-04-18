@@ -141,24 +141,25 @@ describe('Dependency Rules', () => {
 				});
 
 			const allowedPackages = [
+				'analysis',
+				'ast',
+				'batch',
 				'cli',
-				'mcp',
-				'types',
-				'executor',
-				'utils',
-				'output',
 				'config',
 				'di',
-				'session',
-				'memory',
-				'services',
-				'llm',
+				'executor',
 				'exploration',
-				'ui',
-				'batch',
+				'llm',
+				'lsp',
+				'mcp',
+				'memory',
+				'output',
 				'security',
-				'ast',
-				'lsp'
+				'services',
+				'session',
+				'types',
+				'ui',
+				'utils'
 			];
 
 			presentationClasses.forEach((presClass) => {

@@ -33,6 +33,7 @@ import {
 import { configureExploreCommand } from './commands/explore';
 import { configureHelpCommand } from './commands/help';
 import { configureInitCommand } from './commands/init';
+import { configureMapCommand } from './commands/map';
 import { configureMonitoringCommand } from './commands/monitoring';
 import { configureSessionCommand } from './commands/session';
 import { CliConfigBuilder } from './config-builder';
@@ -125,6 +126,7 @@ configureCompletionCommand(program);
 configureTemplateCommand(program);
 configureInitCommand(program);
 configureBatchCommand(program);
+configureMapCommand(program);
 
 /**
  * Initialize cleanup schedulers if not in test/MCP mode

@@ -4,8 +4,6 @@
  * MAINT-002: Large Files Need Splitting - Extracted from pipeline.ts
  */
 
-import { getASTIndexService } from 'ast/ast-index.service';
-import { generateCodebaseMap } from 'ast/ast-query.service';
 import { isEligible } from 'batch/batch-eligibility';
 import { getBatchOrchestrator } from 'batch/batch-orchestrator';
 import { isBatchableProvider } from 'batch/batch-provider.interface';
@@ -26,6 +24,8 @@ import type {
 } from 'types/llm.types';
 import type { PromptDefinition } from 'types/prompt.types';
 
+import { getASTIndexService } from 'ast/ast-index.service';
+import { generateCodebaseMap } from 'ast/ast-query.service';
 import { DEFAULT_MAX_TOKENS, DEFAULT_TEMPERATURE } from 'config/constants';
 import { ProviderName } from 'config/providers.config';
 import { MCPApprovalCacheService } from 'mcp/mcp-approval-cache.service';

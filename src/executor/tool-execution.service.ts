@@ -42,7 +42,6 @@
  * not when the LLM is working through normal search/navigation patterns.
  */
 
-import { type ASTToolsService, getASTToolsService } from 'ast/ast-tools.service';
 import { exec } from 'child_process';
 import { existsSync, readdirSync, rmSync, statSync } from 'fs';
 import { getLSPToolsService, type LSPToolsService } from 'lsp/lsp-tools.service';
@@ -55,6 +54,7 @@ import { promisify } from 'util';
 import type { MCPClientManagerService } from 'mcp/mcp-client-manager.service';
 import type { LLMToolCall, LLMToolDefinition, LLMToolResult } from 'types/llm.types';
 
+import { type ASTToolsService, getASTToolsService } from 'ast/ast-tools.service';
 import { DEFAULT_TIMEOUT_MS, MAX_LIST_DIR_ENTRIES, MAX_MCP_OUTPUT_CHARS } from 'config/constants';
 import { type MCPToolHandler } from 'mcp/mcp-tool-handler';
 import { getColorAdapter } from 'output/color-adapter.interface';

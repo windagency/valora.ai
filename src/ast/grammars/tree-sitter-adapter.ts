@@ -11,11 +11,11 @@
  * - Isolates all web-tree-sitter and tree-sitter-wasms dependencies to this file
  */
 
-import type { ASTLanguage } from 'ast/ast.types';
-
 import { readFile } from 'fs/promises';
 import { createRequire } from 'module';
 import { join } from 'path';
+
+import type { ASTLanguage } from 'ast/ast.types';
 
 import type { TreeSitterAdapter, TreeSitterLanguage, TreeSitterParser } from './tree-sitter-adapter.interface';
 

@@ -215,7 +215,7 @@ export default [
 					],
 					ignoreCase: true,
 					internalPattern: [
-						'^(?:cleanup|cli|config|di|executor|exploration|llm|mcp|output|services|session|src|types|ui|utils)/.+'
+						'^(?:analysis|ast|cleanup|cli|config|di|executor|exploration|llm|mcp|output|services|session|src|types|ui|utils)/.+'
 					],
 					maxLineLength: undefined,
 					newlinesBetween: 'always',

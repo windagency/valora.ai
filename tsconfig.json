@@ -26,6 +26,7 @@
 		"noUnusedParameters": true,
 		"outDir": "./dist",
 		"paths": {
+			"analysis/*": ["./src/analysis/*"],
 			"ast/*": ["./src/ast/*"],
 			"batch/*": ["./src/batch/*"],
 			"security/*": ["./src/security/*"],

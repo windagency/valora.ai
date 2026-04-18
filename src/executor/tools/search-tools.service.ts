@@ -10,13 +10,13 @@
  * - Codebase semantic search
  */
 
-import { getASTIndexService } from 'ast/ast-index.service';
-import { searchSymbols } from 'ast/ast-query.service';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 
 import type { getLogger } from 'output/logger';
 
+import { getASTIndexService } from 'ast/ast-index.service';
+import { searchSymbols } from 'ast/ast-query.service';
 import { DEFAULT_TIMEOUT_MS, MAX_GREP_OUTPUT_LINES } from 'config/constants';
 
 const execAsync = promisify(exec);
