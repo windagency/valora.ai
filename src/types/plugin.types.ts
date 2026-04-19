@@ -2,6 +2,7 @@ import type { HooksConfig } from './hook.types';
 
 export interface LoadedPlugin {
 	agentsDir?: string;
+	codeEntrypoint?: string;
 	commandsDir?: string;
 	hooks?: HooksConfig;
 	manifest: PluginManifest;
@@ -21,6 +22,7 @@ export interface PluginBinaryRequirement {
 export type PluginContributionType =
 	| 'agent-context'
 	| 'agents'
+	| 'code'
 	| 'commands'
 	| 'hooks'
 	| 'mcps'
@@ -28,6 +30,7 @@ export type PluginContributionType =
 	| 'templates';
 
 export interface PluginManifest {
+	codeEntrypoint?: string;
 	contributes?: PluginContributionType[];
 	description?: string;
 	engines?: { valora?: string };
@@ -39,7 +42,7 @@ export interface PluginManifest {
 	version: string;
 }
 
-export type PluginPermission = 'fs-read' | 'fs-write' | 'mcp-connect' | 'network' | 'shell-hooks';
+export type PluginPermission = 'code-exec' | 'fs-read' | 'fs-write' | 'mcp-connect' | 'network' | 'shell-hooks';
 
 export interface PluginsConfig {
 	enabled?: string[];

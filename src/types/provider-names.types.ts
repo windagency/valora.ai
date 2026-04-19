@@ -15,6 +15,7 @@ export enum ProviderName {
 	GOOGLE = 'google',
 	LOCAL = 'local',
 	MOONSHOT = 'moonshot',
+	OLLAMA = 'ollama',
 	OPENAI = 'openai',
 	XAI = 'xai'
 }

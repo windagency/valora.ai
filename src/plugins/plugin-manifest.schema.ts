@@ -9,6 +9,7 @@ export const PLUGIN_MCPS_FILE = 'mcps.json';
 export const PLUGIN_CONTRIBUTION_TYPE_SCHEMA = z.enum([
 	'agent-context',
 	'agents',
+	'code',
 	'commands',
 	'hooks',
 	'mcps',
@@ -16,7 +17,14 @@ export const PLUGIN_CONTRIBUTION_TYPE_SCHEMA = z.enum([
 	'templates'
 ]);
 
-export const PLUGIN_PERMISSION_SCHEMA = z.enum(['fs-read', 'fs-write', 'mcp-connect', 'network', 'shell-hooks']);
+export const PLUGIN_PERMISSION_SCHEMA = z.enum([
+	'code-exec',
+	'fs-read',
+	'fs-write',
+	'mcp-connect',
+	'network',
+	'shell-hooks'
+]);
 
 export const PLUGIN_BINARY_REQUIREMENT_SCHEMA = z.object({
 	install: z.string().optional(),
@@ -25,6 +33,7 @@ export const PLUGIN_BINARY_REQUIREMENT_SCHEMA = z.object({
 });
 
 export const PLUGIN_MANIFEST_SCHEMA = z.object({
+	codeEntrypoint: z.string().optional(),
 	contributes: z.array(PLUGIN_CONTRIBUTION_TYPE_SCHEMA).optional(),
 	description: z.string().optional(),
 	engines: z.object({ valora: z.string().optional() }).optional(),
