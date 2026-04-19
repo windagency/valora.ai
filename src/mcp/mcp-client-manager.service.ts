@@ -33,6 +33,16 @@ import type { MCPAuditLoggerService } from './mcp-audit-logger.service';
  */
 const DEFAULT_REGISTRY_PATH = join(getPackageDataDir(), 'external-mcp.default.json');
 
+let pendingPluginServers: ExternalMCPServerConfig[] = [];
+
+export function registerGlobalPluginMcpServers(servers: ExternalMCPServerConfig[]): void {
+	pendingPluginServers.push(...servers);
+}
+
+export function resetGlobalPluginMcpServers(): void {
+	pendingPluginServers = [];
+}
+
 /**
  * MCP Client Manager Service
  *
@@ -72,27 +82,37 @@ export class MCPClientManagerService {
 			logger.warn(`External MCP registry not found at ${fullPath}`);
 			this.registry = { schema_version: '1.0.0', servers: [] };
 			this.registryLoaded = true;
-			return this.registry;
+		} else {
+			try {
+				const content = await readFile(fullPath);
+				this.registry = JSON.parse(content) as ExternalMCPRegistry;
+				this.registryLoaded = true;
+
+				logger.debug('Loaded external MCP registry', {
+					path: fullPath,
+					schemaVersion: this.registry.schema_version,
+					serverCount: this.registry.servers.length
+				});
+			} catch (error) {
+				logger.error('Failed to load external MCP registry', error as Error, { path: fullPath });
+				this.registry = { schema_version: '1.0.0', servers: [] };
+				this.registryLoaded = true;
+			}
 		}
 
-		try {
-			const content = await readFile(fullPath);
-			this.registry = JSON.parse(content) as ExternalMCPRegistry;
-			this.registryLoaded = true;
+		// registry is guaranteed set by the branches above
+		const registry = this.registry!;
 
-			logger.debug('Loaded external MCP registry', {
-				path: fullPath,
-				schemaVersion: this.registry.schema_version,
-				serverCount: this.registry.servers.length
-			});
-
-			return this.registry;
-		} catch (error) {
-			logger.error('Failed to load external MCP registry', error as Error, { path: fullPath });
-			this.registry = { schema_version: '1.0.0', servers: [] };
-			this.registryLoaded = true;
-			return this.registry;
+		if (pendingPluginServers.length > 0) {
+			const existingIds = new Set(registry.servers.map((s) => s.id));
+			for (const server of pendingPluginServers) {
+				if (!existingIds.has(server.id)) {
+					registry.servers.push(server);
+				}
+			}
 		}
+
+		return registry;
 	}
 
 	/**

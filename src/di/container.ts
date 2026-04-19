@@ -7,6 +7,7 @@
 
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
+import * as fs from 'fs';
 import { PluginLoaderService } from 'plugins/plugin-loader.service';
 
 import type { LoadedPlugin, PluginsConfig } from 'types/plugin.types';
@@ -40,7 +41,7 @@ import { getProviderRegistry } from 'llm/registry';
 import { ExternalMCPToolProxy } from 'mcp/external-client/tool-proxy';
 import { MCPApprovalCacheService } from 'mcp/mcp-approval-cache.service';
 import { MCPAuditLoggerService } from 'mcp/mcp-audit-logger.service';
-import { MCPClientManagerService } from 'mcp/mcp-client-manager.service';
+import { MCPClientManagerService, registerGlobalPluginMcpServers } from 'mcp/mcp-client-manager.service';
 import { MCPRequestHandler } from 'mcp/request-handler';
 import { MCPSamplingServiceImpl } from 'mcp/sampling-service';
 import { MCPToolRegistry } from 'mcp/tool-registry';
@@ -248,6 +249,17 @@ export function initializePlugins(container: DIContainer): void {
 		if (plugin.commandsDir) commandLoader.registerPluginDir(plugin.commandsDir);
 		if (plugin.promptsDir) promptLoader.registerPluginPromptsDir(plugin.promptsDir);
 		if (plugin.hooks) hookService.registerPluginHooks(plugin.hooks);
+		if (plugin.mcpsFile) registerPluginMcpsFile(plugin.mcpsFile);
+	}
+}
+
+function registerPluginMcpsFile(mcpsFile: string): void {
+	try {
+		const raw = fs.readFileSync(mcpsFile, 'utf-8');
+		const data = JSON.parse(raw) as { servers?: Array<{ id: string }> };
+		registerGlobalPluginMcpServers((data.servers ?? []) as Parameters<typeof registerGlobalPluginMcpServers>[0]);
+	} catch {
+		// Invalid mcps.json — skip silently
 	}
 }
 
