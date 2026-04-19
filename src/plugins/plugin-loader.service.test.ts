@@ -226,4 +226,31 @@ describe('PluginLoaderService — mcps bundle', () => {
 		expect(plugins).toHaveLength(1);
 		expect(plugins[0].mcpsFile).toBeUndefined();
 	});
+
+	it('does NOT expose mcpsFile when mcps is not in contributes (even with mcp-connect permission)', () => {
+		writeJson(path.join(tmpDir, 'valora-plugin.json'), {
+			name: 'valora-wrong-contrib',
+			version: '1.0.0',
+			contributes: ['agents'],
+			permissions: ['mcp-connect']
+		});
+		fs.writeFileSync(path.join(tmpDir, 'mcps.json'), JSON.stringify({ schema_version: '1.0.0', servers: [] }));
+
+		const plugins = loader.loadAll();
+
+		expect(plugins[0].mcpsFile).toBeUndefined();
+	});
+
+	it('does NOT expose mcpsFile when mcps.json is absent', () => {
+		writeJson(path.join(tmpDir, 'valora-plugin.json'), {
+			name: 'valora-no-file',
+			version: '1.0.0',
+			contributes: ['mcps'],
+			permissions: ['mcp-connect']
+		});
+
+		const plugins = loader.loadAll();
+
+		expect(plugins[0].mcpsFile).toBeUndefined();
+	});
 });
