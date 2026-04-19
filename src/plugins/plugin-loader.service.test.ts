@@ -92,3 +92,38 @@ describe('PluginLoaderService — agent-only bundles', () => {
 		expect(plugins).toHaveLength(0);
 	});
 });
+
+describe('PluginLoaderService — prompts bundle', () => {
+	let tmpDir: string;
+	let loader: PluginLoaderService;
+
+	beforeEach(() => {
+		tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'valora-plugin-test-'));
+		loader = new PluginLoaderService({
+			discoverPluginDirs: () => [tmpDir]
+		} as never);
+	});
+
+	afterEach(() => {
+		fs.rmSync(tmpDir, { recursive: true, force: true });
+	});
+
+	it('loads a prompts-only plugin and exposes promptsDir', () => {
+		writeJson(path.join(tmpDir, 'valora-plugin.json'), {
+			name: 'valora-core-generators',
+			version: '1.0.0',
+			contributes: ['prompts']
+		});
+		fs.mkdirSync(path.join(tmpDir, 'prompts', '00_generator'), { recursive: true });
+		fs.writeFileSync(
+			path.join(tmpDir, 'prompts', '00_generator', 'create_agent.md'),
+			'---\nid: generator.agent_definition\n---'
+		);
+
+		const plugins = loader.loadAll();
+
+		expect(plugins).toHaveLength(1);
+		expect(plugins[0].promptsDir).toBe(path.join(tmpDir, 'prompts'));
+		expect(plugins[0].agentsDir).toBeUndefined();
+	});
+});
