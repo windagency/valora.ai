@@ -392,7 +392,7 @@ export class HookExecutionService {
 
 	/**
 	 * Read hooks config, merging the legacy hooks.default.json (if present) with config.json and any plugin hooks.
-	 * Priority (highest first): config.json → hooks.default.json → plugin hooks.
+	 * Priority (highest first): hooks.default.json → config.json → plugin hooks.
 	 */
 	private getHooksConfig(): HooksConfig | undefined {
 		const hooksFromFile = this.loadHooksFile()?.hooks;

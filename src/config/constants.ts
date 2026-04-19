@@ -223,7 +223,7 @@ export const MAX_SEQUENCE_ATTEMPTS = 1000;
 export const IDEMPOTENCY_CLEANUP_INTERVAL_MS = MS_PER_HOUR;
 
 /**
- * Hooks Configuration File (legacy — migrated to valora-defaults plugin; file no longer shipped)
+ * Hooks Configuration File — resolved by HookExecutionService; returns null gracefully if absent (default hooks contributed by valora-defaults plugin instead).
  */
 export const HOOKS_CONFIG_FILE = 'hooks.default.json';
 
