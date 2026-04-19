@@ -100,15 +100,29 @@ export class PluginLoaderService {
 		}
 	}
 
+	private resolveCodeEntrypoint(pluginDir: string, manifest: PluginManifest): string | undefined {
+		if (!manifest.permissions?.includes('code-exec')) return undefined;
+		if (!manifest.codeEntrypoint) return undefined;
+
+		const entrypoint = path.join(pluginDir, manifest.codeEntrypoint);
+		return fs.existsSync(entrypoint) ? entrypoint : undefined;
+	}
+
 	private resolveContribDirs(
 		pluginDir: string,
 		manifest: PluginManifest
-	): Partial<Pick<LoadedPlugin, 'agentsDir' | 'commandsDir' | 'hooks' | 'mcpsFile' | 'promptsDir' | 'templatesDir'>> {
+	): Partial<
+		Pick<
+			LoadedPlugin,
+			'agentsDir' | 'codeEntrypoint' | 'commandsDir' | 'hooks' | 'mcpsFile' | 'promptsDir' | 'templatesDir'
+		>
+	> {
 		const contrib = manifest.contributes ?? [];
 		const has = (type: PluginContributionType): boolean => contrib.includes(type);
 
 		return {
 			...(has('agents') && { agentsDir: this.resolveSubdir(pluginDir, 'agents') }),
+			...(has('code') && { codeEntrypoint: this.resolveCodeEntrypoint(pluginDir, manifest) }),
 			...(has('commands') && { commandsDir: this.resolveSubdir(pluginDir, 'commands') }),
 			...(has('prompts') && { promptsDir: this.resolveSubdir(pluginDir, 'prompts') }),
 			...(has('templates') && { templatesDir: this.resolveSubdir(pluginDir, 'templates') }),

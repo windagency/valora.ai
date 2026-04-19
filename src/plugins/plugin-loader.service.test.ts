@@ -254,3 +254,64 @@ describe('PluginLoaderService — mcps bundle', () => {
 		expect(plugins[0].mcpsFile).toBeUndefined();
 	});
 });
+
+describe('PluginLoaderService — code plugin bundle', () => {
+	let tmpDir: string;
+	let loader: PluginLoaderService;
+
+	beforeEach(() => {
+		tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'valora-code-plugin-test-'));
+		loader = new PluginLoaderService({
+			discoverPluginDirs: () => [tmpDir]
+		} as never);
+	});
+
+	afterEach(() => {
+		fs.rmSync(tmpDir, { recursive: true, force: true });
+	});
+
+	it('resolves codeEntrypoint when contributes code and has code-exec permission', () => {
+		writeJson(path.join(tmpDir, 'valora-plugin.json'), {
+			name: 'my-code-plugin',
+			version: '1.0.0',
+			contributes: ['code'],
+			permissions: ['code-exec'],
+			codeEntrypoint: 'index.js'
+		});
+		writeFile(path.join(tmpDir, 'index.js'), 'export function register(api) {}');
+
+		const plugins = loader.loadAll(undefined);
+
+		expect(plugins).toHaveLength(1);
+		expect(plugins[0]?.codeEntrypoint).toBe(path.join(tmpDir, 'index.js'));
+	});
+
+	it('does not resolve codeEntrypoint when code-exec permission is absent', () => {
+		writeJson(path.join(tmpDir, 'valora-plugin.json'), {
+			name: 'my-code-plugin-no-perm',
+			version: '1.0.0',
+			contributes: ['code'],
+			codeEntrypoint: 'index.js'
+		});
+		writeFile(path.join(tmpDir, 'index.js'), 'export function register(api) {}');
+
+		const plugins = loader.loadAll(undefined);
+
+		expect(plugins[0]?.codeEntrypoint).toBeUndefined();
+	});
+
+	it('does not resolve codeEntrypoint when the file does not exist', () => {
+		writeJson(path.join(tmpDir, 'valora-plugin.json'), {
+			name: 'my-code-plugin-missing',
+			version: '1.0.0',
+			contributes: ['code'],
+			permissions: ['code-exec'],
+			codeEntrypoint: 'index.js'
+		});
+		// Note: index.js is not created
+
+		const plugins = loader.loadAll(undefined);
+
+		expect(plugins[0]?.codeEntrypoint).toBeUndefined();
+	});
+});
