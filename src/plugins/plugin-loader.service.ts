@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 import type { HooksConfig } from 'types/hook.types';
-import type { LoadedPlugin, PluginManifest, PluginsConfig } from 'types/plugin.types';
+import type { LoadedPlugin, PluginContributionType, PluginManifest, PluginsConfig } from 'types/plugin.types';
 
 import { getLogger } from 'output/logger';
 import { getResourceResolver } from 'utils/resource-resolver';
@@ -12,7 +12,8 @@ import {
 	PLUGIN_HOOKS_FILE,
 	PLUGIN_HOOKS_FILE_SCHEMA,
 	PLUGIN_MANIFEST_FILE,
-	PLUGIN_MANIFEST_SCHEMA
+	PLUGIN_MANIFEST_SCHEMA,
+	PLUGIN_MCPS_FILE
 } from './plugin-manifest.schema';
 
 export class PluginLoaderService {
@@ -102,22 +103,34 @@ export class PluginLoaderService {
 	private resolveContribDirs(
 		pluginDir: string,
 		manifest: PluginManifest
-	): Partial<Pick<LoadedPlugin, 'agentsDir' | 'commandsDir' | 'hooks' | 'promptsDir' | 'templatesDir'>> {
+	): Partial<Pick<LoadedPlugin, 'agentsDir' | 'commandsDir' | 'hooks' | 'mcpsFile' | 'promptsDir' | 'templatesDir'>> {
 		const contrib = manifest.contributes ?? [];
-
-		const subdir = (name: string): string | undefined => {
-			const full = path.join(pluginDir, name);
-			return fs.existsSync(full) ? full : undefined;
-		};
-
-		const hasShellHooksPermission = manifest.permissions?.includes('shell-hooks') ?? false;
+		const has = (type: PluginContributionType): boolean => contrib.includes(type);
 
 		return {
-			...(contrib.includes('agents') && { agentsDir: subdir('agents') }),
-			...(contrib.includes('commands') && { commandsDir: subdir('commands') }),
-			...(contrib.includes('prompts') && { promptsDir: subdir('prompts') }),
-			...(contrib.includes('templates') && { templatesDir: subdir('templates') }),
-			...(contrib.includes('hooks') && hasShellHooksPermission && { hooks: this.loadHooksFile(pluginDir) })
+			...(has('agents') && { agentsDir: this.resolveSubdir(pluginDir, 'agents') }),
+			...(has('commands') && { commandsDir: this.resolveSubdir(pluginDir, 'commands') }),
+			...(has('prompts') && { promptsDir: this.resolveSubdir(pluginDir, 'prompts') }),
+			...(has('templates') && { templatesDir: this.resolveSubdir(pluginDir, 'templates') }),
+			...(has('hooks') && { hooks: this.resolveHooks(pluginDir, manifest) }),
+			...(has('mcps') && { mcpsFile: this.resolveMcpsFile(pluginDir, manifest) })
 		};
+	}
+
+	private resolveHooks(pluginDir: string, manifest: PluginManifest): HooksConfig | undefined {
+		if (!manifest.permissions?.includes('shell-hooks')) return undefined;
+		return this.loadHooksFile(pluginDir);
+	}
+
+	private resolveMcpsFile(pluginDir: string, manifest: PluginManifest): string | undefined {
+		if (!manifest.permissions?.includes('mcp-connect')) return undefined;
+
+		const mcpsPath = path.join(pluginDir, PLUGIN_MCPS_FILE);
+		return fs.existsSync(mcpsPath) ? mcpsPath : undefined;
+	}
+
+	private resolveSubdir(pluginDir: string, name: string): string | undefined {
+		const full = path.join(pluginDir, name);
+		return fs.existsSync(full) ? full : undefined;
 	}
 }

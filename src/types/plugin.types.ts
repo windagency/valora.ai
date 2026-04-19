@@ -5,6 +5,7 @@ export interface LoadedPlugin {
 	commandsDir?: string;
 	hooks?: HooksConfig;
 	manifest: PluginManifest;
+	mcpsFile?: string;
 	pluginDir: string;
 	promptsDir?: string;
 	status: PluginStatus;

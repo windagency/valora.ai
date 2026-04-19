@@ -182,3 +182,48 @@ describe('PluginLoaderService — command + agent bundles', () => {
 		expect(plugins[0].agentsDir).toBeUndefined();
 	});
 });
+
+describe('PluginLoaderService — mcps bundle', () => {
+	let tmpDir: string;
+	let loader: PluginLoaderService;
+
+	beforeEach(() => {
+		tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'valora-plugin-test-'));
+		loader = new PluginLoaderService({
+			discoverPluginDirs: () => [tmpDir]
+		} as never);
+	});
+
+	afterEach(() => {
+		fs.rmSync(tmpDir, { recursive: true, force: true });
+	});
+
+	it('exposes mcpsFile when plugin contributes mcps with mcp-connect permission', () => {
+		writeJson(path.join(tmpDir, 'valora-plugin.json'), {
+			name: 'valora-defaults',
+			version: '1.0.0',
+			contributes: ['mcps'],
+			permissions: ['mcp-connect']
+		});
+		fs.writeFileSync(path.join(tmpDir, 'mcps.json'), JSON.stringify({ schema_version: '1.0.0', servers: [] }));
+
+		const plugins = loader.loadAll();
+
+		expect(plugins).toHaveLength(1);
+		expect(plugins[0].mcpsFile).toBe(path.join(tmpDir, 'mcps.json'));
+	});
+
+	it('does NOT expose mcpsFile when mcp-connect permission is missing', () => {
+		writeJson(path.join(tmpDir, 'valora-plugin.json'), {
+			name: 'valora-no-perm',
+			version: '1.0.0',
+			contributes: ['mcps']
+		});
+		fs.writeFileSync(path.join(tmpDir, 'mcps.json'), JSON.stringify({ schema_version: '1.0.0', servers: [] }));
+
+		const plugins = loader.loadAll();
+
+		expect(plugins).toHaveLength(1);
+		expect(plugins[0].mcpsFile).toBeUndefined();
+	});
+});

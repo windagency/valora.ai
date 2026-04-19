@@ -4,6 +4,7 @@ import { HOOKS_CONFIG_SCHEMA } from 'config/schema';
 
 export const PLUGIN_MANIFEST_FILE = 'valora-plugin.json';
 export const PLUGIN_HOOKS_FILE = 'hooks.json';
+export const PLUGIN_MCPS_FILE = 'mcps.json';
 
 export const PLUGIN_CONTRIBUTION_TYPE_SCHEMA = z.enum([
 	'agent-context',
