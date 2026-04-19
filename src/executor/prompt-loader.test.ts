@@ -253,6 +253,50 @@ describe('PromptLoader', () => {
 		});
 	});
 
+	describe('generator category support', () => {
+		it('resolves generator category to 00_generator directory', () => {
+			const map = (PromptLoader as unknown as { CATEGORY_DIR_MAP: Record<string, string> }).CATEGORY_DIR_MAP;
+			expect(map['generator']).toBe('00_generator');
+		});
+	});
+
+	describe('loadCategoryPrompts with plugin dirs', () => {
+		it('returns prompts from registered plugin dirs when primary dir has none', async () => {
+			const primaryDir = '/mock/prompts';
+			const pluginDir = '/mock/plugin/prompts';
+			loader = new PromptLoader(primaryDir);
+			loader.registerPluginPromptsDir(pluginDir);
+
+			const { findFiles: mockFindFiles } = await import('utils/file-utils');
+			vi.mocked(mockFindFiles).mockImplementation(async (dir: string) => {
+				if (dir === path.join(primaryDir, '00_generator')) return [];
+				if (dir === path.join(pluginDir, '00_generator'))
+					return [path.join(pluginDir, '00_generator', 'create_agent.md')];
+				return [];
+			});
+
+			vi.mocked(mockReadFile).mockResolvedValue(
+				'---\nid: generator.agent_definition\nversion: 1.0.0\ncategory: generator\nname: Test\ndescription: Test prompt\n---\ncontent'
+			);
+			vi.mocked(mockParseMarkdown).mockReturnValue({
+				metadata: {
+					id: 'generator.agent_definition',
+					version: '1.0.0',
+					category: 'generator',
+					name: 'Test',
+					description: 'Test prompt'
+				} as never,
+				content: 'content'
+			});
+			vi.mocked(mockValidateRequired).mockReturnValue(undefined);
+
+			const result = await loader.loadCategoryPrompts('generator');
+
+			expect(result.size).toBe(1);
+			expect(result.has('generator.agent_definition')).toBe(true);
+		});
+	});
+
 	describe('loadPrompt caching with includes', () => {
 		it('caches the resolved content so readFile is not called again on second load', async () => {
 			const sharedContent = '## Core Principles\n\n1. SOLID\n';

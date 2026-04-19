@@ -18,6 +18,7 @@ export class PromptLoader {
 		context: '02_context',
 		deployment: '08_deployment',
 		documentation: '07_documentation',
+		generator: '00_generator',
 		maintenance: '10_maintenance',
 		onboard: '01_onboard',
 		plan: '03_plan',
@@ -131,10 +132,15 @@ export class PromptLoader {
 			throw new ValidationError(`Unknown prompt category: ${category}`);
 		}
 
-		const categoryDir = path.join(this.promptsDir, dirPrefix);
-		const files = await findFiles(categoryDir, /\.md$/);
+		const dirsToSearch = [
+			path.join(this.promptsDir, dirPrefix),
+			...[...this.pluginPromptsDirs].map((d) => path.join(d, dirPrefix))
+		];
 
 		const logger = getLogger();
+
+		const fileLists = await Promise.all(dirsToSearch.map((dir) => findFiles(dir, /\.md$/).catch(() => [] as string[])));
+		const files = [...new Set(fileLists.flat())];
 
 		const promptEntries = await Promise.all(
 			files.map(async (file) => {
