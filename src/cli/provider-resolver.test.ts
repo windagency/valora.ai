@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 
 import { ModelName, ProviderName } from 'config/providers.config';
 import { DEFAULT_MODELS } from 'config/validation-helpers';
-import { MODEL_PROVIDER_SUGGESTIONS } from './provider-resolver';
+import { CLIProviderResolver, MODEL_PROVIDER_SUGGESTIONS } from './provider-resolver';
 
 describe('provider-resolver', () => {
 	describe('MODEL_PROVIDER_SUGGESTIONS alignment', () => {
@@ -64,6 +64,29 @@ describe('provider-resolver', () => {
 			expect(cursorProvider.provider).toBe(ProviderName.CURSOR);
 			expect(cursorProvider.modelModes.length).toBeGreaterThan(0);
 			expect(cursorProvider.modelModes.every((mm) => mm.model && mm.mode)).toBe(true);
+		});
+	});
+
+	describe('getProviderForModel — ollama routing', () => {
+		it('routes "ollama:llama3.1" to OLLAMA provider', () => {
+			const resolver = new CLIProviderResolver();
+			expect(
+				(resolver as never as { getProviderForModel(m: string): string })['getProviderForModel']('ollama:llama3.1')
+			).toBe('ollama');
+		});
+
+		it('routes "ollama:mistral" to OLLAMA provider', () => {
+			const resolver = new CLIProviderResolver();
+			expect(
+				(resolver as never as { getProviderForModel(m: string): string })['getProviderForModel']('ollama:mistral')
+			).toBe('ollama');
+		});
+
+		it('does not route "mistral" to OLLAMA (still goes to LOCAL)', () => {
+			const resolver = new CLIProviderResolver();
+			expect((resolver as never as { getProviderForModel(m: string): string })['getProviderForModel']('mistral')).toBe(
+				'local'
+			);
 		});
 	});
 });

@@ -179,6 +179,10 @@ export class CLIProviderResolver {
 	 * Get provider name for a given model
 	 */
 	private getProviderForModel(model: string): string {
+		if (model.startsWith('ollama:')) {
+			return ProviderName.OLLAMA;
+		}
+
 		// Model-based provider inference mapping
 		const providerKeywords: Record<string, string[]> = {
 			[ProviderName.ANTHROPIC]: ['claude', 'anthropic'],
