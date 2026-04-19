@@ -228,9 +228,31 @@ describe('CommandExecutor', () => {
 
 ## Adding New Commands
 
-### 1. Create the command specification
+Built-in commands (shipped with Valora) must live inside a plugin bundle under `data/plugins/<plugin-name>/commands/`. For project-level overrides that only apply to one repository, use `.valora/commands/` instead.
 
-Add a Markdown file with YAML frontmatter in `data/commands/` (built-in) or `.valora/commands/` (project-level override):
+### 1. Choose or create the plugin bundle
+
+If your command belongs to an existing bundle (e.g., `valora-core-engineering`), add your file there. Otherwise, create a new bundle:
+
+```bash
+mkdir -p data/plugins/my-bundle/commands
+```
+
+Create `data/plugins/my-bundle/valora-plugin.json`:
+
+```json
+{
+	"name": "my-bundle",
+	"version": "1.0.0",
+	"description": "Short description of what this bundle contributes.",
+	"engines": { "valora": ">=0.1.0" },
+	"contributes": ["commands"]
+}
+```
+
+### 2. Create the command specification
+
+Add a Markdown file with YAML frontmatter in the bundle's `commands/` directory:
 
 ```markdown
 ---
@@ -260,23 +282,6 @@ Describe expected outputs.
 Define execution stages.
 ```
 
-### 2. Register the command
-
-Update `data/commands/registry.json`:
-
-```json
-{
-	"commands": {
-		"my-command": {
-			"name": "my-command",
-			"description": "...",
-			"agent": "lead",
-			"model": "claude-sonnet-4.6"
-		}
-	}
-}
-```
-
 ### 3. Add tests
 
 ```typescript
@@ -291,9 +296,15 @@ describe('my-command', () => {
 
 ## Adding New Agents
 
-### 1. Create the agent definition
+Built-in agents (shipped with Valora) must live inside a plugin bundle under `data/plugins/<plugin-name>/agents/`. For project-level overrides that only apply to one repository, use `.valora/agents/` instead.
 
-Add a Markdown file with YAML frontmatter in `data/agents/` (built-in) or `.valora/agents/` (project-level override):
+### 1. Choose or create the plugin bundle
+
+If your agent belongs to an existing bundle, add your file there. Otherwise, create a new bundle (see "Adding New Commands" for the manifest structure; set `"contributes": ["agents"]` or `["agents", "commands"]` as appropriate).
+
+### 2. Create the agent definition
+
+Add a Markdown file with YAML frontmatter in the bundle's `agents/` directory:
 
 ```markdown
 ---
@@ -320,9 +331,9 @@ Detail specific expertise areas.
 Define operational constraints and boundaries.
 ```
 
-### 2. Register the agent
+### 3. Register the agent's capabilities
 
-Update `data/agents/registry.json` with capabilities and selection criteria.
+Update `data/agents/registry.json` with the agent's domains, expertise, selection criteria, and priority. This file drives dynamic agent selection — it is read at runtime by `AgentCapabilityRegistryService` and must stay in sync with the agent's `.md` definition.
 
 ---
 
