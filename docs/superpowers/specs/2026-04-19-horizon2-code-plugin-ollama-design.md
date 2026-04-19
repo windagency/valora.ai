@@ -123,7 +123,7 @@ return {
 import type { ZodTypeAny } from 'zod';
 import type { Logger } from 'output/logger';
 
-export type ProviderFactory = (config: Record<string, unknown>) => import('llm/provider.interface').LLMProvider;
+export type PluginProviderClass = new (config: Record<string, unknown>) => import('llm/provider.interface').LLMProvider;
 
 export interface PluginLifecycleHooks {
 	onActivate: (fn: () => Promise<void>) => void;
@@ -132,7 +132,7 @@ export interface PluginLifecycleHooks {
 
 export interface PluginAPI {
 	providers: {
-		register(name: string, factory: ProviderFactory): void;
+		register(name: string, providerClass: PluginProviderClass): void;
 	};
 	config: {
 		extend(schema: ZodTypeAny): void;
@@ -174,8 +174,8 @@ export function createPluginAPI(
 
 	return {
 		providers: {
-			register(name, factory) {
-				getProviderRegistry().registerProvider(name, factory);
+			register(name, providerClass) {
+				getProviderRegistry().registerProvider(name, providerClass);
 			}
 		},
 		config: {
@@ -226,6 +226,7 @@ for (const plugin of plugins) {
 }
 
 // Store registries on container for teardown
+// NOTE: requires SERVICE_IDENTIFIERS.PLUGIN_LIFECYCLE_REGISTRIES to be added to src/di/service-identifiers.ts
 container.register(SERVICE_IDENTIFIERS.PLUGIN_LIFECYCLE_REGISTRIES, lifecycleRegistries);
 ```
 
@@ -331,7 +332,7 @@ export async function register(api: PluginAPI): Promise<void> {
 	const processManager = new OllamaProcessManager(binaryManager, api.logger);
 	const modelManager = new OllamaModelManager(api.logger);
 
-	api.providers.register('ollama', (config) => new OllamaProvider(config, binaryManager, processManager, modelManager));
+	api.providers.register('ollama', OllamaProvider);
 
 	api.lifecycle.onDeactivate(async () => {
 		await processManager.stop();
@@ -361,17 +362,17 @@ Default model: `llama3.1`. Default `auto_pull`: `true` (model is pulled automati
 
 **File:** `src/cli/provider-resolver.ts`
 
-Add to `getProviderForModel()`:
+Add to `getProviderForModel()`, before the existing `llama`/`mistral` → `local` check:
 
 ```typescript
-if (model.includes('ollama') || model.includes('llama') || model.includes('mistral')) {
+if (model.startsWith('ollama:')) {
 	return ProviderName.OLLAMA;
 }
 ```
 
 Add `OLLAMA = 'ollama'` to the `ProviderName` enum in `src/types/provider-names.types.ts`.
 
-Note: The existing `LOCAL = 'local'` provider (which also targets Ollama) remains unchanged. `OllamaProvider` is a distinct, self-managing alternative — users choose it explicitly via `--provider ollama` or by setting the model to one of the Ollama keywords.
+Users select the self-managed provider via `--provider ollama` (explicit flag) or a model name prefixed with `ollama:` (e.g. `ollama:llama3.1`). The existing `LOCAL = 'local'` provider and its `llama`/`mistral` keyword routing are unchanged — `OllamaProvider` is a distinct opt-in alternative.
 
 ---
 
@@ -420,7 +421,7 @@ data/plugins/valora-provider-ollama/index.js.map
 ## Data Flow
 
 ```
-valora run --provider ollama --model llama3.1
+valora run --provider ollama --model llama3.1   (or --model ollama:llama3.1)
   │
   ├─ CLIProviderResolver → ProviderName.OLLAMA
   ├─ LLMProviderRegistry.createProvider('ollama', config)
