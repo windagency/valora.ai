@@ -6,12 +6,11 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "bash \"$VALORA_DATA_DIR/hooks/enforce-modern-cli.sh\"",
+						"command": "bash \"$VALORA_DATA_DIR/plugins/valora-defaults/hooks/enforce-modern-cli.sh\"",
 						"timeout": 5000
 					}
 				]
 			}
 		]
-	},
-	"enforcement": {}
+	}
 }

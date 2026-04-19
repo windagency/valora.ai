@@ -5,7 +5,7 @@
  * running user-configured shell commands that can validate, block, modify, or
  * observe tool operations.
  *
- * Hooks are configured in data/hooks.default.json (built-in) or .valora/hooks.json (project-level override).
+ * Hooks are contributed by plugins (e.g. valora-defaults) or .valora/hooks.json (project-level override).
  * Hook commands receive tool call info via stdin JSON and control execution
  * via exit codes (0=allow, 2=deny for PreToolUse; PostToolUse is non-blocking).
  */
@@ -367,7 +367,7 @@ export class HookExecutionService {
 
 	/**
 	 * Load hooks from data/hooks.default.json with mtime-based caching.
-	 * Returns null if the file doesn't exist or can't be parsed.
+	 * Returns null if the file doesn't exist (e.g. after migration to valora-defaults plugin) or can't be parsed.
 	 */
 	private loadHooksFile(): null | { hooks?: HooksConfig } {
 		try {
@@ -391,7 +391,7 @@ export class HookExecutionService {
 	}
 
 	/**
-	 * Read hooks config, merging data/hooks.default.json with config.json and any plugin hooks.
+	 * Read hooks config, merging the legacy hooks.default.json (if present) with config.json and any plugin hooks.
 	 * Priority (highest first): config.json → hooks.default.json → plugin hooks.
 	 */
 	private getHooksConfig(): HooksConfig | undefined {
