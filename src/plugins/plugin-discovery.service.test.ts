@@ -1,0 +1,111 @@
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
+
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { PluginDiscoveryService } from './plugin-discovery.service';
+
+vi.mock('output/logger', () => ({
+	getLogger: vi.fn(() => ({
+		debug: vi.fn(),
+		error: vi.fn(),
+		info: vi.fn(),
+		warn: vi.fn()
+	}))
+}));
+
+// Silence the built-in / global / project root scanning — they don't exist in test tmpDirs
+vi.mock('utils/paths', () => ({
+	getGlobalPluginsDir: vi.fn(() => '/nonexistent/global'),
+	getPackagePluginsDir: vi.fn(() => '/nonexistent/builtin'),
+	getProjectPluginsDir: vi.fn(() => undefined)
+}));
+
+function writeJson(filePath: string, data: unknown): void {
+	fs.mkdirSync(path.dirname(filePath), { recursive: true });
+	fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
+}
+
+describe('PluginDiscoveryService — npm plugin discovery', () => {
+	let tmpDir: string;
+	let discovery: PluginDiscoveryService;
+
+	beforeEach(() => {
+		tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'valora-discovery-test-'));
+		discovery = new PluginDiscoveryService(tmpDir);
+	});
+
+	afterEach(() => {
+		fs.rmSync(tmpDir, { recursive: true, force: true });
+	});
+
+	it('discovers a valid plugin from node_modules/@windagency/valora-plugin-*', () => {
+		const pluginDir = path.join(tmpDir, 'node_modules', '@windagency', 'valora-plugin-engineering');
+		writeJson(path.join(pluginDir, 'valora-plugin.json'), {
+			name: 'valora-core-engineering',
+			version: '1.0.0'
+		});
+
+		const dirs = discovery.discoverPluginDirs();
+
+		expect(dirs).toContain(pluginDir);
+	});
+
+	it('ignores packages in the scope that lack valora-plugin.json', () => {
+		const nonPluginDir = path.join(tmpDir, 'node_modules', '@windagency', 'valora-plugin-empty');
+		fs.mkdirSync(nonPluginDir, { recursive: true });
+		// No valora-plugin.json written
+
+		const dirs = discovery.discoverPluginDirs();
+
+		expect(dirs).not.toContain(nonPluginDir);
+	});
+
+	it('ignores packages in the scope not prefixed with valora-plugin-', () => {
+		const nonPluginDir = path.join(tmpDir, 'node_modules', '@windagency', 'some-other-package');
+		writeJson(path.join(nonPluginDir, 'valora-plugin.json'), {
+			name: 'some-other-package',
+			version: '1.0.0'
+		});
+
+		const dirs = discovery.discoverPluginDirs();
+
+		expect(dirs).not.toContain(nonPluginDir);
+	});
+
+	it('returns empty array (not throws) when node_modules/@windagency does not exist', () => {
+		// tmpDir has no node_modules at all
+		expect(() => discovery.discoverPluginDirs()).not.toThrow();
+	});
+
+	it('discovers multiple plugins from the same scope directory', () => {
+		const pluginDirA = path.join(tmpDir, 'node_modules', '@windagency', 'valora-plugin-engineering');
+		const pluginDirB = path.join(tmpDir, 'node_modules', '@windagency', 'valora-plugin-qa');
+		writeJson(path.join(pluginDirA, 'valora-plugin.json'), { name: 'valora-core-engineering', version: '1.0.0' });
+		writeJson(path.join(pluginDirB, 'valora-plugin.json'), { name: 'valora-core-qa', version: '1.0.0' });
+
+		const dirs = discovery.discoverPluginDirs();
+
+		expect(dirs).toContain(pluginDirA);
+		expect(dirs).toContain(pluginDirB);
+	});
+
+	it('returns standard root plugins before npm plugins', async () => {
+		const { getPackagePluginsDir } = await import('utils/paths');
+
+		// Create a real standard plugin root
+		const builtinDir = path.join(tmpDir, 'builtin-plugins');
+		const builtinPluginDir = path.join(builtinDir, 'my-builtin-plugin');
+		writeJson(path.join(builtinPluginDir, 'valora-plugin.json'), { name: 'my-builtin', version: '1.0.0' });
+		vi.mocked(getPackagePluginsDir).mockReturnValueOnce(builtinDir);
+
+		// Create an npm plugin
+		const npmPluginDir = path.join(tmpDir, 'node_modules', '@windagency', 'valora-plugin-npm');
+		writeJson(path.join(npmPluginDir, 'valora-plugin.json'), { name: 'my-npm-plugin', version: '1.0.0' });
+
+		const dirs = discovery.discoverPluginDirs();
+
+		expect(dirs.indexOf(builtinPluginDir)).toBeLessThan(dirs.indexOf(npmPluginDir));
+	});
+});

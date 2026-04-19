@@ -315,3 +315,85 @@ describe('PluginLoaderService — code plugin bundle', () => {
 		expect(plugins[0]?.codeEntrypoint).toBeUndefined();
 	});
 });
+
+describe('PluginLoaderService — requires dependency ordering', () => {
+	let tmpDirA: string;
+	let tmpDirB: string;
+	let loader: PluginLoaderService;
+
+	beforeEach(() => {
+		tmpDirA = fs.mkdtempSync(path.join(os.tmpdir(), 'valora-req-test-a-'));
+		tmpDirB = fs.mkdtempSync(path.join(os.tmpdir(), 'valora-req-test-b-'));
+		loader = new PluginLoaderService({
+			discoverPluginDirs: () => [tmpDirA, tmpDirB]
+		} as never);
+	});
+
+	afterEach(() => {
+		fs.rmSync(tmpDirA, { recursive: true, force: true });
+		fs.rmSync(tmpDirB, { recursive: true, force: true });
+	});
+
+	it('loads dependency before dependent when requires is declared', () => {
+		// tmpDirA is discovered first but requires tmpDirB — must be reordered
+		writeJson(path.join(tmpDirA, 'valora-plugin.json'), {
+			name: 'plugin-a',
+			version: '1.0.0',
+			requires: ['plugin-b']
+		});
+		writeJson(path.join(tmpDirB, 'valora-plugin.json'), {
+			name: 'plugin-b',
+			version: '1.0.0'
+		});
+
+		const plugins = loader.loadAll();
+		const names = plugins.map((p) => p.manifest.name);
+
+		expect(names.indexOf('plugin-b')).toBeLessThan(names.indexOf('plugin-a'));
+	});
+
+	it('loads all plugins when requires is satisfied', () => {
+		writeJson(path.join(tmpDirA, 'valora-plugin.json'), {
+			name: 'plugin-a',
+			version: '1.0.0',
+			requires: ['plugin-b']
+		});
+		writeJson(path.join(tmpDirB, 'valora-plugin.json'), {
+			name: 'plugin-b',
+			version: '1.0.0'
+		});
+
+		const plugins = loader.loadAll();
+		expect(plugins).toHaveLength(2);
+	});
+
+	it('still loads the dependent plugin when required plugin is absent (with warning)', () => {
+		writeJson(path.join(tmpDirA, 'valora-plugin.json'), {
+			name: 'plugin-a',
+			version: '1.0.0',
+			requires: ['plugin-missing']
+		});
+
+		const plugins = loader.loadAll();
+
+		// plugin-a still loads despite missing dep
+		expect(plugins).toHaveLength(1);
+		expect(plugins[0]?.manifest.name).toBe('plugin-a');
+	});
+
+	it('does not throw on a dependency cycle and still returns all plugins', () => {
+		writeJson(path.join(tmpDirA, 'valora-plugin.json'), {
+			name: 'plugin-a',
+			version: '1.0.0',
+			requires: ['plugin-b']
+		});
+		writeJson(path.join(tmpDirB, 'valora-plugin.json'), {
+			name: 'plugin-b',
+			version: '1.0.0',
+			requires: ['plugin-a']
+		});
+
+		const plugins = loader.loadAll();
+		expect(plugins).toHaveLength(2);
+	});
+});

@@ -30,10 +30,11 @@ export class PluginLoaderService {
 	 * security checks in command-discovery continue to pass for plugin resources.
 	 */
 	loadAll(config?: PluginsConfig): LoadedPlugin[] {
-		return this.discovery
+		const loaded = this.discovery
 			.discoverPluginDirs()
 			.map((pluginDir) => this.loadPlugin(pluginDir, config))
 			.filter((plugin): plugin is LoadedPlugin => plugin !== null);
+		return this.sortByDependencies(loaded);
 	}
 
 	private isEnabled(name: string, config?: PluginsConfig): boolean {
@@ -146,5 +147,45 @@ export class PluginLoaderService {
 	private resolveSubdir(pluginDir: string, name: string): string | undefined {
 		const full = path.join(pluginDir, name);
 		return fs.existsSync(full) ? full : undefined;
+	}
+
+	private sortByDependencies(plugins: LoadedPlugin[]): LoadedPlugin[] {
+		const byName = new Map(plugins.map((p) => [p.manifest.name, p]));
+
+		for (const plugin of plugins) {
+			for (const dep of plugin.manifest.requires ?? []) {
+				if (!byName.has(dep)) {
+					this.logger.warn(`Plugin "${plugin.manifest.name}" requires "${dep}" which is not loaded`);
+				}
+			}
+		}
+
+		const sorted: LoadedPlugin[] = [];
+		const visited = new Set<string>();
+		const inStack = new Set<string>();
+
+		const visit = (name: string): void => {
+			if (visited.has(name)) return;
+			if (inStack.has(name)) {
+				this.logger.warn(`Plugin dependency cycle detected at: ${name}`);
+				return;
+			}
+			inStack.add(name);
+			const plugin = byName.get(name);
+			if (plugin) {
+				for (const dep of plugin.manifest.requires ?? []) {
+					visit(dep);
+				}
+				sorted.push(plugin);
+			}
+			inStack.delete(name);
+			visited.add(name);
+		};
+
+		for (const plugin of plugins) {
+			visit(plugin.manifest.name);
+		}
+
+		return sorted;
 	}
 }
