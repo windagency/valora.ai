@@ -134,6 +134,7 @@ export const SERVICE_IDENTIFIERS = {
 	TOOL_REGISTRY: Symbol('MCPToolRegistry'),
 
 	// Plugin system
+	PLUGIN_LIFECYCLE_REGISTRIES: Symbol('PluginLifecycleRegistries'),
 	PLUGIN_LOADER: Symbol('PluginLoaderService')
 } as const;
 
