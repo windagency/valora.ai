@@ -250,6 +250,10 @@ Create `data/plugins/my-bundle/valora-plugin.json`:
 }
 ```
 
+If your plugin's agents or commands depend on resources contributed by another plugin (for example, using an agent defined in `valora-core-engineering`), add a `"requires": ["valora-core-engineering"]` field to declare the dependency.
+
+Valid `contributes` values are: `"agents"`, `"commands"`, `"hooks"`, `"mcps"`, `"prompts"`, `"templates"`, `"agent-context"`.
+
 ### 2. Create the command specification
 
 Add a Markdown file with YAML frontmatter in the bundle's `commands/` directory:
@@ -308,7 +312,9 @@ Add a Markdown file with YAML frontmatter in the bundle's `agents/` directory:
 
 ```markdown
 ---
-name: my-agent
+role: my-agent
+version: '1.0.0'
+description: "Brief description of the agent's role."
 expertise:
   - Area 1
   - Area 2
