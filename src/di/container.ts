@@ -241,14 +241,15 @@ export async function initializePlugins(container: DIContainer): Promise<void> {
 
 	getProcessingFeedback().showPluginsStatus(plugins);
 
+	const lifecycleRegistries = new Map<string, PluginLifecycleRegistry>();
+	container.register(SERVICE_IDENTIFIERS.PLUGIN_LIFECYCLE_REGISTRIES, lifecycleRegistries);
+
 	if (plugins.length === 0) return;
 
 	const agentLoader = container.resolve<AgentLoader>(SERVICE_IDENTIFIERS.AGENT_LOADER);
 	const commandLoader = container.resolve<CommandLoader>(SERVICE_IDENTIFIERS.COMMAND_LOADER);
 	const promptLoader = container.resolve<PromptLoader>(SERVICE_IDENTIFIERS.PROMPT_LOADER);
 	const hookService = getHookExecutionService();
-
-	const lifecycleRegistries = new Map<string, PluginLifecycleRegistry>();
 
 	for (const plugin of plugins) {
 		if (plugin.agentsDir) agentLoader.registerPluginDir(plugin.agentsDir);
@@ -258,8 +259,6 @@ export async function initializePlugins(container: DIContainer): Promise<void> {
 		if (plugin.mcpsFile) registerPluginMcpsFile(plugin.mcpsFile);
 		if (plugin.codeEntrypoint) await loadCodePlugin(container, plugin, lifecycleRegistries);
 	}
-
-	container.register(SERVICE_IDENTIFIERS.PLUGIN_LIFECYCLE_REGISTRIES, lifecycleRegistries);
 }
 
 async function loadCodePlugin(

@@ -82,7 +82,7 @@ describe('initializePlugins — code plugin dynamic import', () => {
 		expect(getProviderRegistry().hasProvider('integration-test-provider')).toBe(true);
 	});
 
-	it('continues loading other plugins when a code plugin fails to load', async () => {
+	it('does not throw and logs a warning when a code plugin fails to import', async () => {
 		const { PluginLoaderService } = await import('plugins/plugin-loader.service');
 		vi.mocked(PluginLoaderService).mockImplementation(
 			() =>
@@ -98,10 +98,17 @@ describe('initializePlugins — code plugin dynamic import', () => {
 				}) as never
 		);
 
+		const { getLogger } = await import('output/logger');
+		const mockWarn = vi.fn();
+		vi.mocked(getLogger).mockReturnValue({ warn: mockWarn, info: vi.fn(), debug: vi.fn(), error: vi.fn() } as never);
+
 		const { createContainer, initializePlugins } = await import('di/container');
 
 		const container = createContainer();
-		// Should not throw
 		await expect(initializePlugins(container)).resolves.toBeUndefined();
+		expect(mockWarn).toHaveBeenCalledWith(
+			'Failed to load code plugin',
+			expect.objectContaining({ plugin: 'broken-plugin' })
+		);
 	});
 });
