@@ -61,7 +61,7 @@ Hooks from plugins are validated by `PLUGIN_HOOKS_FILE_SCHEMA` (a wrapper schema
 
 ### 4. Wiring (`src/di/container.ts`)
 
-`initializePlugins(container)` is called synchronously after `createContainer()`. It feeds plugin resource directories into `AgentLoader`, `CommandLoader`, and `HookExecutionService` via their `registerPluginDir()` / `addPluginHooks()` methods. Plugin lifecycle events are emitted via `PipelineEmitter` (`PLUGIN_LOADED`, `PLUGIN_FAILED`).
+`initializePlugins(container)` is called synchronously after `createContainer()`. It feeds plugin resource directories into `AgentLoader`, `CommandLoader`, `PromptLoader`, and `HookExecutionService` via their `registerPluginDir()` / `registerPluginPromptsDir()` / `registerPluginHooks()` methods.
 
 ### Resolution Precedence
 
@@ -83,6 +83,7 @@ This mirrors the existing `data/` → `~/.valora/` → `.valora/` override prece
 - **Permission gating** — the `shell-hooks` permission creates an explicit contract; a misconfigured plugin that omits the permission simply won't have its hooks registered.
 - **Graceful degradation** — manifest validation failures and missing binaries produce warnings, never hard failures.
 - **Reuses existing extension points** — `AgentLoader`, `CommandLoader`, `HookExecutionService` already support multiple directories; the plugin system feeds into these without new loading logic.
+- **Horizon 1 migration complete** — As of April 2026, all embedded built-in resources have been packaged into 10 named plugins under `data/plugins/`: `valora-core-secops`, `valora-core-design`, `valora-core-platform`, `valora-core-generators`, `valora-core-product`, `valora-core-qa`, `valora-core-quality-gate`, `valora-core-docs`, `valora-core-engineering`, `valora-core-implement`. The directories `data/agents/` and `data/commands/` now contain only scaffolding (templates, schemas).
 
 ### Negative
 
