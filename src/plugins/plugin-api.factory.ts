@@ -13,9 +13,11 @@ export interface PluginLifecycleRegistry {
 
 export function createPluginAPI(
 	_container: DIContainer,
-	_plugin: LoadedPlugin,
+	plugin: LoadedPlugin,
 	lifecycleRegistry: PluginLifecycleRegistry
 ): PluginAPI {
+	// TODO: use logger.child({ plugin: plugin.manifest.name }) once Logger gains a child() method
+	void plugin;
 	const logger = getLogger();
 
 	return {
