@@ -83,7 +83,7 @@ This mirrors the existing `data/` → `~/.valora/` → `.valora/` override prece
 - **Permission gating** — the `shell-hooks` permission creates an explicit contract; a misconfigured plugin that omits the permission simply won't have its hooks registered.
 - **Graceful degradation** — manifest validation failures and missing binaries produce warnings, never hard failures.
 - **Reuses existing extension points** — `AgentLoader`, `CommandLoader`, `HookExecutionService` already support multiple directories; the plugin system feeds into these without new loading logic.
-- **Horizon 1 migration complete** — As of April 2026, all embedded built-in resources have been packaged into 10 named plugins under `data/plugins/`: `valora-core-secops`, `valora-core-design`, `valora-core-platform`, `valora-core-generators`, `valora-core-product`, `valora-core-qa`, `valora-core-quality-gate`, `valora-core-docs`, `valora-core-engineering`, `valora-core-implement`. The directories `data/agents/` and `data/commands/` now contain only scaffolding (templates, schemas).
+- **Horizon 1 migration complete** — As of April 2026, all embedded built-in resources have been packaged into 10 named plugins under `data/plugins/`: `valora-core-secops`, `valora-core-design`, `valora-core-platform`, `valora-core-generators`, `valora-core-product`, `valora-core-qa`, `valora-core-quality-gate`, `valora-core-docs`, `valora-core-engineering`, `valora-core-implement`. The directory `data/commands/` is now docs-only (empty `{"commands":{}}`). `data/agents/` retains `registry.json`, which drives dynamic agent selection at runtime and is not a plugin contribution.
 
 ### Negative
 

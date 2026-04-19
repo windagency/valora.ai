@@ -162,7 +162,7 @@ Fragments in `agent-context/` are concatenated into the agent's system prompt af
 3. A path traversal guard (`path.resolve()` + `startsWith(root + sep)`) ensures symlinks cannot escape the plugin root.
 4. `PluginLoaderService` (`src/plugins/plugin-loader.service.ts`) validates each manifest with `PLUGIN_MANIFEST_SCHEMA` (Zod, in `src/plugins/plugin-manifest.schema.ts`).
 5. `initializePlugins()` in `src/di/container.ts` wires loaded plugins into the DI container after `createContainer()`.
-6. Plugin resource directories are fed into `AgentLoader`, `CommandLoader`, and `HookExecutionService` via `registerPluginDir()` / `addPluginHooks()`.
+6. Plugin resource directories are fed into `AgentLoader`, `CommandLoader`, `PromptLoader`, and `HookExecutionService` via `registerPluginDir()` / `registerPluginPromptsDir()` / `registerPluginHooks()`.
 
 Arch-unit rule: the `plugins` module may only import from `['plugins', 'types', 'config', 'utils', 'output']`. It must not import executor or service modules.
 
