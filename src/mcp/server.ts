@@ -115,7 +115,7 @@ export class MCPOrchestratorServer implements MCPSamplingService {
 		this.logger.info('MCP Orchestrator Server starting', { mode, port });
 
 		// Load plugins before any commands are registered
-		initializePlugins(this.container);
+		await initializePlugins(this.container);
 
 		// Start system monitoring
 		this.systemMonitor.startMonitoring();

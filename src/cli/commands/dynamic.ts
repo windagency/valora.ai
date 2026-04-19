@@ -152,7 +152,7 @@ export function configureListCommand(program: CommandAdapter): void {
 			const color = getColorAdapter();
 			try {
 				const container = createContainer();
-				initializePlugins(container);
+				await initializePlugins(container);
 				const commandLoader = container.resolve(SERVICE_IDENTIFIERS.COMMAND_LOADER) as CommandLoader;
 				const commands = await commandLoader.listCommands();
 
@@ -224,7 +224,7 @@ export function configureExecCommand(program: CommandAdapter): void {
 
 				// Create container and resolve executor
 				const container = createContainer();
-				initializePlugins(container);
+				await initializePlugins(container);
 				const executor = container.resolve(SERVICE_IDENTIFIERS.COMMAND_EXECUTOR) as CommandExecutor;
 
 				// Execute command
@@ -617,7 +617,7 @@ export function configureShortcutCommands(program: CommandAdapter): void {
 
 				// Create container and resolve executor
 				const container = createContainer();
-				initializePlugins(container);
+				await initializePlugins(container);
 				const executor = container.resolve(SERVICE_IDENTIFIERS.COMMAND_EXECUTOR) as CommandExecutor;
 
 				// Execute command

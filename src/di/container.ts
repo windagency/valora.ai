@@ -6,8 +6,10 @@
  */
 
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { CodePluginModule } from 'plugins/plugin-api.types';
 
 import { readFileSync } from 'fs';
+import { createPluginAPI, type PluginLifecycleRegistry } from 'plugins/plugin-api.factory';
 import { PluginLoaderService } from 'plugins/plugin-loader.service';
 
 import type { LoadedPlugin, PluginsConfig } from 'types/plugin.types';
@@ -224,7 +226,7 @@ export function getLoadedPlugins(): LoadedPlugin[] {
 	return loadedPlugins;
 }
 
-export function initializePlugins(container: DIContainer): void {
+export async function initializePlugins(container: DIContainer): Promise<void> {
 	const pluginLoader = container.resolve<PluginLoaderService>(SERVICE_IDENTIFIERS.PLUGIN_LOADER);
 
 	let pluginsConfig: PluginsConfig | undefined;
@@ -246,12 +248,36 @@ export function initializePlugins(container: DIContainer): void {
 	const promptLoader = container.resolve<PromptLoader>(SERVICE_IDENTIFIERS.PROMPT_LOADER);
 	const hookService = getHookExecutionService();
 
+	const lifecycleRegistries = new Map<string, PluginLifecycleRegistry>();
+
 	for (const plugin of plugins) {
 		if (plugin.agentsDir) agentLoader.registerPluginDir(plugin.agentsDir);
 		if (plugin.commandsDir) commandLoader.registerPluginDir(plugin.commandsDir);
 		if (plugin.promptsDir) promptLoader.registerPluginPromptsDir(plugin.promptsDir);
 		if (plugin.hooks) hookService.registerPluginHooks(plugin.hooks);
 		if (plugin.mcpsFile) registerPluginMcpsFile(plugin.mcpsFile);
+		if (plugin.codeEntrypoint) await loadCodePlugin(container, plugin, lifecycleRegistries);
+	}
+
+	container.register(SERVICE_IDENTIFIERS.PLUGIN_LIFECYCLE_REGISTRIES, lifecycleRegistries);
+}
+
+async function loadCodePlugin(
+	container: DIContainer,
+	plugin: LoadedPlugin,
+	lifecycleRegistries: Map<string, PluginLifecycleRegistry>
+): Promise<void> {
+	const registry: PluginLifecycleRegistry = { activateHooks: [], deactivateHooks: [] };
+	lifecycleRegistries.set(plugin.manifest.name, registry);
+	try {
+		const mod = (await import(plugin.codeEntrypoint!)) as CodePluginModule;
+		const api = createPluginAPI(container, plugin, registry);
+		await mod.register(api);
+	} catch (error) {
+		getLogger().warn('Failed to load code plugin', {
+			error: (error as Error).message,
+			plugin: plugin.manifest.name
+		});
 	}
 }
 
