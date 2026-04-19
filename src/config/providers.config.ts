@@ -172,6 +172,15 @@ export const PROVIDER_REGISTRY: Record<string, ProviderMetadata> = {
 		modelModes: [{ mode: 'default', model: ModelName.KIMI_K2 }],
 		requiresApiKey: true
 	},
+	[ProviderName.OLLAMA]: {
+		defaultModel: 'llama3.1',
+		description: 'Self-managed Ollama provider — runs models locally via the Ollama binary',
+		helpText: 'Use any model available via ollama pull, e.g. ollama:llama3.1 or ollama:mistral. No API key required.',
+		key: ProviderName.OLLAMA,
+		label: 'Ollama',
+		modelModes: [{ mode: 'default', model: 'llama3.1' }],
+		requiresApiKey: false
+	},
 	[ProviderName.OPENAI]: {
 		defaultModel: ModelName.GPT_5,
 		description: 'GPT models from OpenAI',
@@ -203,15 +212,6 @@ export const PROVIDER_REGISTRY: Record<string, ProviderMetadata> = {
 			{ mode: 'high reasoning', model: ModelName.O4_MINI }
 		],
 		requiresApiKey: true
-	},
-	[ProviderName.OLLAMA]: {
-		defaultModel: 'llama3.1',
-		description: 'Self-managed Ollama provider — runs models locally via the Ollama binary',
-		helpText: 'Use any model available via ollama pull, e.g. ollama:llama3.1 or ollama:mistral. No API key required.',
-		key: ProviderName.OLLAMA,
-		label: 'Ollama',
-		modelModes: [{ mode: 'default', model: 'llama3.1' }],
-		requiresApiKey: false
 	},
 	[ProviderName.XAI]: {
 		defaultModel: ModelName.GROK_CODE,
