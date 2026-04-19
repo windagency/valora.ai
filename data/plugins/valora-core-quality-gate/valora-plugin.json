@@ -1,0 +1,7 @@
+{
+	"name": "valora-core-quality-gate",
+	"version": "1.0.0",
+	"description": "Asserter agent and the assert command — static pre-testing quality gate (completeness, standards, type safety, security, architecture).",
+	"engines": { "valora": ">=0.1.0" },
+	"contributes": ["agents", "commands"]
+}
