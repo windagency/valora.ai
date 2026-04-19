@@ -7,7 +7,7 @@
 
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
-import * as fs from 'fs';
+import { readFileSync } from 'fs';
 import { PluginLoaderService } from 'plugins/plugin-loader.service';
 
 import type { LoadedPlugin, PluginsConfig } from 'types/plugin.types';
@@ -35,6 +35,7 @@ import { getPromptInjectionDetector } from 'security/prompt-injection-detector';
 import { getToolDefinitionValidator } from 'security/tool-definition-validator';
 import { getToolIntegrityMonitor } from 'security/tool-integrity-monitor';
 
+import type { ExternalMCPServerConfig } from 'types/mcp-client.types';
 import type { ToolCallArgs } from 'types/mcp.types';
 
 import { getProviderRegistry } from 'llm/registry';
@@ -255,11 +256,15 @@ export function initializePlugins(container: DIContainer): void {
 
 function registerPluginMcpsFile(mcpsFile: string): void {
 	try {
-		const raw = fs.readFileSync(mcpsFile, 'utf-8');
-		const data = JSON.parse(raw) as { servers?: Array<{ id: string }> };
-		registerGlobalPluginMcpServers((data.servers ?? []) as Parameters<typeof registerGlobalPluginMcpServers>[0]);
-	} catch {
-		// Invalid mcps.json — skip silently
+		const raw = readFileSync(mcpsFile, 'utf-8');
+		const data = JSON.parse(raw) as { servers?: unknown[] };
+		const validServers = (data.servers ?? []).filter(
+			(s): s is ExternalMCPServerConfig =>
+				typeof s === 'object' && s !== null && typeof (s as Record<string, unknown>)['id'] === 'string'
+		);
+		registerGlobalPluginMcpServers(validServers);
+	} catch (error) {
+		getLogger().warn('Failed to load mcps.json from plugin', { error: (error as Error).message, path: mcpsFile });
 	}
 }
 

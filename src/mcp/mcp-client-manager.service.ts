@@ -110,6 +110,7 @@ export class MCPClientManagerService {
 					registry.servers.push(server);
 				}
 			}
+			pendingPluginServers = [];
 		}
 
 		return registry;
