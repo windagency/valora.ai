@@ -127,3 +127,58 @@ describe('PluginLoaderService — prompts bundle', () => {
 		expect(plugins[0].agentsDir).toBeUndefined();
 	});
 });
+
+describe('PluginLoaderService — command + agent bundles', () => {
+	let tmpDir: string;
+	let loader: PluginLoaderService;
+
+	beforeEach(() => {
+		tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'valora-plugin-test-'));
+		loader = new PluginLoaderService({
+			discoverPluginDirs: () => [tmpDir]
+		} as never);
+	});
+
+	afterEach(() => {
+		fs.rmSync(tmpDir, { recursive: true, force: true });
+	});
+
+	it('exposes both commandsDir and agentsDir for a command+agent bundle', () => {
+		writeJson(path.join(tmpDir, 'valora-plugin.json'), {
+			name: 'valora-core-product',
+			version: '1.0.0',
+			description: 'Product Manager agent and product workflow commands.',
+			contributes: ['agents', 'commands']
+		});
+		writeFile(path.join(tmpDir, 'agents', 'product-manager.md'), '---\nrole: product-manager\n---\ntest');
+		writeFile(
+			path.join(tmpDir, 'commands', 'create-prd.md'),
+			'---\nname: create-prd\nagent: product-manager\n---\ntest'
+		);
+
+		const plugins = loader.loadAll();
+
+		expect(plugins).toHaveLength(1);
+		expect(plugins[0].manifest.name).toBe('valora-core-product');
+		expect(plugins[0].agentsDir).toBe(path.join(tmpDir, 'agents'));
+		expect(plugins[0].commandsDir).toBe(path.join(tmpDir, 'commands'));
+		expect(plugins[0].promptsDir).toBeUndefined();
+		expect(plugins[0].hooks).toBeUndefined();
+	});
+
+	it('exposes only commandsDir for a commands-only bundle (no agent in manifest)', () => {
+		writeJson(path.join(tmpDir, 'valora-plugin.json'), {
+			name: 'valora-core-docs',
+			version: '1.0.0',
+			description: 'Documentation generation commands (lead agent is core).',
+			contributes: ['commands']
+		});
+		writeFile(path.join(tmpDir, 'commands', 'generate-docs.md'), '---\nname: generate-docs\nagent: lead\n---\ntest');
+
+		const plugins = loader.loadAll();
+
+		expect(plugins).toHaveLength(1);
+		expect(plugins[0].commandsDir).toBe(path.join(tmpDir, 'commands'));
+		expect(plugins[0].agentsDir).toBeUndefined();
+	});
+});
