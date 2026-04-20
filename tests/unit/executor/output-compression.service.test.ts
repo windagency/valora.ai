@@ -181,8 +181,8 @@ describe('compression stats', () => {
 	});
 
 	it('increments on a compressible input', () => {
-		const output = ['⠋ spinning...', 'Done in 1s'].join('\n') + pad('x', 600);
-		compressTerminalOutput('pnpm install', output);
+		const output = pad('x', 600);
+		compressTerminalOutput('sometool --run', output);
 		const stats = getCompressionStats();
 		expect(stats.calls).toBe(1);
 		expect(stats.inputChars).toBeGreaterThan(0);
@@ -191,29 +191,29 @@ describe('compression stats', () => {
 	});
 
 	it('does NOT increment for short-circuit path (output below threshold)', () => {
-		compressTerminalOutput('pnpm install', 'short output');
+		compressTerminalOutput('sometool --run', 'short output');
 		const stats = getCompressionStats();
 		expect(stats.calls).toBe(0);
 	});
 
 	it('accumulates across multiple calls', () => {
-		const output = ['⠋ loading', 'Done in 1s'].join('\n') + pad('x', 600);
-		compressTerminalOutput('pnpm install', output);
-		compressTerminalOutput('pnpm add foo', output);
+		const output = pad('x', 600);
+		compressTerminalOutput('sometool --run', output);
+		compressTerminalOutput('sometool --check', output);
 		expect(getCompressionStats().calls).toBe(2);
 	});
 
 	it('returns a snapshot — mutating the returned object does not affect stats', () => {
-		const output = ['⠋ loading', 'Done in 1s'].join('\n') + pad('x', 600);
-		compressTerminalOutput('pnpm install', output);
+		const output = pad('x', 600);
+		compressTerminalOutput('sometool --run', output);
 		const snapshot = getCompressionStats() as { calls: number };
 		snapshot.calls = 999;
 		expect(getCompressionStats().calls).toBe(1);
 	});
 
 	it('resetCompressionStats zeroes all fields', () => {
-		const output = ['⠋ loading', 'Done in 1s'].join('\n') + pad('x', 600);
-		compressTerminalOutput('pnpm install', output);
+		const output = pad('x', 600);
+		compressTerminalOutput('sometool --run', output);
 		resetCompressionStats();
 		const stats = getCompressionStats();
 		expect(stats.calls).toBe(0);
