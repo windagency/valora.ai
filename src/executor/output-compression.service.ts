@@ -15,6 +15,7 @@
  */
 
 import { MAX_GREP_OUTPUT_LINES, MAX_TERMINAL_OUTPUT_CHARS, OUTPUT_COMPRESSION_THRESHOLD } from 'config/constants';
+import { getLogger } from 'output/logger';
 
 /** Maximum git log entries to retain when compressing `git log` output. */
 const GIT_LOG_MAX_ENTRIES = 20;
@@ -39,7 +40,10 @@ export function getStrategy(tool: string): CompressionStrategy | undefined {
 }
 
 export function registerStrategy(tool: string, fn: CompressionStrategy): void {
-	if (registry.has(tool)) return;
+	if (registry.has(tool)) {
+		getLogger().warn(`Compression strategy for tool "${tool}" already registered; ignoring duplicate`);
+		return;
+	}
 	registry.set(tool, fn);
 }
 
@@ -124,15 +128,16 @@ export function compressTerminalOutput(command: string, output: string): string 
 
 	const tool = firstToken(command);
 	const strategy = registry.get(tool);
-	const compressed = strategy
-		? (() => {
-				try {
-					return strategy(clean, command);
-				} catch {
-					return clean;
-				}
-			})()
-		: applyFilter(tool, clean, command);
+	let compressed: string;
+	if (strategy) {
+		try {
+			compressed = strategy(clean, command);
+		} catch {
+			compressed = clean;
+		}
+	} else {
+		compressed = applyFilter(tool, clean, command);
+	}
 
 	const result = truncateTerminalOutput(compressed);
 	recordCompression(clean.length, result.length);

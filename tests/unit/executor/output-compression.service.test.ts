@@ -598,6 +598,10 @@ describe('compression stats', () => {
 });
 
 describe('compression registry', () => {
+	beforeEach(() => {
+		resetRegistry();
+	});
+
 	afterEach(() => {
 		resetRegistry();
 	});
@@ -632,7 +636,7 @@ describe('compression registry', () => {
 		expect(compressTerminalOutput('mytool --flag', longInput)).toBe('compressed-result');
 	});
 
-	it('compressTerminalOutput catches strategy errors and returns uncompressed output', () => {
+	it('compressTerminalOutput falls back to clean output when strategy throws', () => {
 		registerStrategy('mytool', () => {
 			throw new Error('strategy failed');
 		});
