@@ -65,7 +65,7 @@
 		"postinstall": "node scripts/postinstall.mjs || true",
 		"prepare": "husky || true && pnpm build",
 		"clean": "rm -rf dist/",
-		"clean:build": "rm -rf ./dist/* && rm -f tsconfig.tsbuildinfo",
+		"clean:build": "rm -rf ./dist/* && rm -f tsconfig.tsbuildinfo && find src -name '*.js' -delete 2>/dev/null; true",
 		"clean:coverage": "rm -rf ./coverage",
 		"clear": "pnpm \"/clean:/\" && rm -rf ./node_modules",
 		"lint": "eslint --color",
