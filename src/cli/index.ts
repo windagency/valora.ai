@@ -11,14 +11,22 @@
 
 import { createRequire } from 'node:module';
 
-import { setGlobalCliOverrides } from 'config/loader';
+import { getConfigLoader, setGlobalCliOverrides } from 'config/loader';
+import {
+	printUpdateBanner,
+	scheduleUpdateCheck,
+	settleUpdateCheck,
+	shouldShowReminder,
+	writeUpdateState
+} from 'updater/index';
+import { getGlobalConfigDir } from 'utils/paths';
 import { handlePromptCancellation, isPromptCancellation } from 'utils/prompt-handler';
 
 import type { CliOptions } from './types/cli-options.types';
 
 import { configureCompletionCommand } from './autocomplete';
 import { configureTemplateCommand } from './command-templates';
-import { createCommand } from './commander-adapter';
+import { createCommand, type CommanderCommandContract } from './commander-adapter';
 import { configureBatchCommand } from './commands/batch.command';
 import { configureConfigCommand } from './commands/config';
 import { configureDashboardCommand } from './commands/dashboard';
@@ -36,6 +44,7 @@ import { configureInitCommand } from './commands/init';
 import { configureMapCommand } from './commands/map';
 import { configureMonitoringCommand } from './commands/monitoring';
 import { configureSessionCommand } from './commands/session';
+import { configureUpdateCommand } from './commands/update.command';
 import { CliConfigBuilder } from './config-builder';
 import { checkAndRunFirstTimeSetup, shouldTriggerFirstRun } from './first-run-setup';
 import { globalFlags } from './flags';
@@ -128,6 +137,43 @@ configureInitCommand(program);
 configureBatchCommand(program);
 configureMapCommand(program);
 
+const rawProgram = (program as CommanderCommandContract).getUnderlyingCommand();
+configureUpdateCommand(rawProgram);
+
+const isUpdateCommand = rawArgs[0] === 'update';
+
+function shouldSkipUpdateCheck(): boolean {
+	return (
+		process.env['VALORA_DISABLE_AUTO_UPDATE'] === '1' ||
+		process.env['CI'] === 'true' ||
+		process.env['NODE_ENV'] === 'test' ||
+		process.env['AI_TEST_MODE'] === 'true' ||
+		process.env['AI_MCP_ENABLED'] === 'true' ||
+		!process.stderr.isTTY
+	);
+}
+
+rawProgram.hook('postAction', async () => {
+	if (shouldSkipUpdateCheck()) return;
+	if (isUpdateCommand) return;
+
+	const config = await getConfigLoader().load();
+	const mode = config.autoUpdate?.mode ?? 'reminder';
+	if (mode === 'disabled') return;
+
+	const state = await settleUpdateCheck(200);
+	if (!state) return;
+
+	if (shouldShowReminder(state, packageJson.version, mode)) {
+		printUpdateBanner(state, packageJson.version);
+		const stateDir = getGlobalConfigDir();
+		await writeUpdateState(stateDir, {
+			...state,
+			remindedForVersion: state.latestVersion
+		});
+	}
+});
+
 /**
  * Initialize cleanup schedulers if not in test/MCP mode
  */
@@ -200,6 +246,13 @@ void (async () => {
 
 		// Initialize unified cleanup schedulers (log and session)
 		await initializeCleanupIfNeeded();
+
+		// Schedule background update check (non-blocking, fire-and-forget)
+		if (!shouldSkipUpdateCheck() && !isUpdateCommand) {
+			const config = await getConfigLoader().load();
+			const frequencyDays = config.autoUpdate?.frequencyDays ?? 1;
+			scheduleUpdateCheck(getGlobalConfigDir(), packageJson.version, frequencyDays);
+		}
 
 		// Parse arguments
 		program.parse();

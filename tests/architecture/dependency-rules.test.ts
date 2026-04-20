@@ -159,6 +159,7 @@ describe('Dependency Rules', () => {
 				'session',
 				'types',
 				'ui',
+				'updater',
 				'utils'
 			];
 

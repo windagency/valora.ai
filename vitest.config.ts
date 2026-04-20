@@ -29,6 +29,7 @@ export default defineConfig({
 			src: path.resolve(__dirname, './src'),
 			types: path.resolve(__dirname, './src/types'),
 			ui: path.resolve(__dirname, './src/ui'),
+			updater: path.resolve(__dirname, './src/updater'),
 			utils: path.resolve(__dirname, './src/utils')
 		}
 	},
