@@ -37,7 +37,8 @@
 
 **VALORA (Versatile Agent Logic for Orchestrated Response Architecture)** is a next-generation TypeScript-based platform designed to orchestrate a sophisticated network of AI agents to automate the complete software development lifecycle. By moving beyond simple "code generation", VALORA manages the delicate interplay between requirements, architecture, and deployment. VALORA provides intelligent automation while maintaining human oversight.
 
-### Why VALORA?
+<details>
+<summary><strong>Why VALORA?</strong> — design rationale</summary>
 
 **Intelligent Orchestration**: VALORA coordinates **11 specialised AI agents**, from **@lead** technical oversight to **@secops-engineer** compliance, ensuring the right expert is assigned to every task.
 
@@ -48,6 +49,8 @@
 **Strategic Optimisation**: To balance depth and speed, VALORA assigns specific LLMs (like **GPT-5** for planning or **Claude Haiku** for validation) based on the task's complexity.
 
 > VALORA is not a replacement for the developer; it is the high-fidelity instrument through which the developer conducts a full symphony of AI agents.
+
+</details>
 
 ## ✨ Features
 
@@ -136,9 +139,9 @@ Extend Valora with **self-contained plugin directories**:
 | `agent-context` | Markdown injected into agent system prompts         |
 | `code`          | TypeScript modules registered via `PluginAPI` hooks |
 
-Drop a plugin into `.valora/plugins/` and list it under `plugins.enabled`. No restart required.
+Plugins are discovered from three locations (later takes precedence): `data/plugins/` (built-in), `~/.valora/plugins/` (global), `.valora/plugins/` (project). npm packages named `@windagency/valora-plugin-*` are auto-discovered from `node_modules/` — install with npm/pnpm/yarn and add to `plugins.enabled`. No restart required.
 
-Built-in compression strategies (git, tsc, eslint, pnpm, pytest, …) ship as **code plugins** and are the canonical example of the `code` contribution type.
+17 built-in compression strategies (git, tsc, eslint, vitest, pytest, docker, …) ship as three **code plugins** and are the canonical example of the `code` contribution type.
 
 </td>
 <td width="50%">
@@ -166,7 +169,7 @@ Connect to **15 external MCP servers** with user approval:
 Live visibility into parallel explorations:
 
 - **Worktree Diagram Panel** — Real-time tree view of git worktrees in the `valora dash` dashboard
-- **Exploration Status** — Color-coded branches with status icons (▶ running, ✓ completed, ✗ failed)
+- **Exploration Status** — Colour-coded branches with status icons (▶ running, ✓ completed, ✗ failed)
 - **Session-Exploration Linking** — Explorations create linked sessions; the dashboard shows exploration details (task, worktrees, status) in the session details view
 - **Worktree Usage Stats** — Per-session tracking of worktree creation, concurrency, and duration
 

@@ -6,7 +6,30 @@
 
 Accepted
 
-## Context
+## Consequences
+
+### Positive
+
+- **Seamless Workflows**: Commands naturally build on each other
+- **Reduced User Effort**: No manual context management
+- **Consistent Context**: All commands share the same understanding
+- **Audit Trail**: Complete history of commands and outputs
+- **Resumability**: Sessions can be resumed after interruption
+
+### Negative
+
+- **Storage Overhead**: Sessions accumulate data over time
+- **Stale Context**: Old sessions may have outdated context
+- **Complexity**: Session management adds code complexity
+- **Cleanup Required**: Sessions need periodic cleanup
+
+### Neutral
+
+- **File-Based Storage**: Simple but not suitable for multi-user scenarios
+- **Session Selection**: Users may need to manage multiple sessions
+
+<details>
+<summary><strong>Context</strong></summary>
 
 Software development workflows involve multiple sequential commands that build upon each other:
 
@@ -21,6 +44,8 @@ Without state management, each command would require users to manually provide c
 - Loss of context
 - Inconsistent results
 - Manual context assembly errors
+
+</details>
 
 ## Decision
 
@@ -87,27 +112,50 @@ When a command executes:
 5. Update session context
 6. Persist session
 
-## Consequences
+<details>
+<summary><strong>Alternatives considered</strong></summary>
 
-### Positive
+### Alternative 1: Stateless Commands
 
-- **Seamless Workflows**: Commands naturally build on each other
-- **Reduced User Effort**: No manual context management
-- **Consistent Context**: All commands share the same understanding
-- **Audit Trail**: Complete history of commands and outputs
-- **Resumability**: Sessions can be resumed after interruption
+Each command operates independently.
 
-### Negative
+**Rejected because**:
 
-- **Storage Overhead**: Sessions accumulate data over time
-- **Stale Context**: Old sessions may have outdated context
-- **Complexity**: Session management adds code complexity
-- **Cleanup Required**: Sessions need periodic cleanup
+- Poor user experience
+- Manual context management required
+- No workflow continuity
 
-### Neutral
+### Alternative 2: Database Storage
 
-- **File-Based Storage**: Simple but not suitable for multi-user scenarios
-- **Session Selection**: Users may need to manage multiple sessions
+Use SQLite or similar for session storage.
+
+**Rejected because**:
+
+- Added dependency
+- Overcomplicated for single-user scenario
+- File-based is sufficient for v1
+
+### Alternative 3: Memory-Only State
+
+Keep state only in memory during CLI execution.
+
+**Rejected because**:
+
+- Lost on process exit
+- Can't resume interrupted workflows
+- No persistence across terminal sessions
+
+### Alternative 4: Git-Based State
+
+Store state in git branches or notes.
+
+**Considered for future** but deferred because:
+
+- Added complexity
+- Git may not always be available
+- Mixing concerns (state vs. source control)
+
+</details>
 
 ## Implementation Details
 
@@ -152,48 +200,6 @@ function injectContext(prompt: string, session: Session): string {
 	return `${context.join('\n\n')}\n\n${prompt}`;
 }
 ```
-
-## Alternatives Considered
-
-### Alternative 1: Stateless Commands
-
-Each command operates independently.
-
-**Rejected because**:
-
-- Poor user experience
-- Manual context management required
-- No workflow continuity
-
-### Alternative 2: Database Storage
-
-Use SQLite or similar for session storage.
-
-**Rejected because**:
-
-- Added dependency
-- Overcomplicated for single-user scenario
-- File-based is sufficient for v1
-
-### Alternative 3: Memory-Only State
-
-Keep state only in memory during CLI execution.
-
-**Rejected because**:
-
-- Lost on process exit
-- Can't resume interrupted workflows
-- No persistence across terminal sessions
-
-### Alternative 4: Git-Based State
-
-Store state in git branches or notes.
-
-**Considered for future** but deferred because:
-
-- Added complexity
-- Git may not always be available
-- Mixing concerns (state vs. source control)
 
 ## Session Management Commands
 

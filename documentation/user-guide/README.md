@@ -16,6 +16,7 @@ Getting started with Valora for everyday development tasks.
 | [Configuration](./configuration.md)            | Configure providers, agents, and external MCP servers |
 | [Best Practices](./best-practices.md)          | Recommended usage patterns                            |
 | [Troubleshooting](./troubleshooting.md)        | Common issues and solutions                           |
+| [Auto-update](./auto-update.md)                | Automatic update checks and `valora update` command   |
 
 **New to Valora?** Start with [Quick Start](./quick-start.md).
 

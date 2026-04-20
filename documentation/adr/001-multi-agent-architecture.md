@@ -6,7 +6,31 @@
 
 Accepted
 
-## Context
+## Consequences
+
+### Positive
+
+- **Better Quality**: Specialised agents produce higher-quality, domain-specific output
+- **Clearer Responsibilities**: Each agent has well-defined boundaries
+- **Easier Extension**: New agents can be added without modifying existing ones
+- **Optimised Prompting**: Each agent can have tailored system prompts
+- **Context Relevance**: Agents only receive context relevant to their domain
+
+### Negative
+
+- **Complexity**: More components to maintain and test
+- **Selection Overhead**: Agent selection adds latency and potential for errors
+- **Coordination**: Multi-agent tasks require coordination logic
+- **Redundancy**: Some expertise overlaps between agents
+
+### Neutral
+
+- **Configuration Management**: Agent definitions stored as separate files
+- **Registry Maintenance**: Selection criteria need ongoing refinement
+- **Documentation**: Each agent requires its own documentation
+
+<details>
+<summary><strong>Context</strong></summary>
 
 VALORA needs to handle a wide variety of software development tasks, from product management and planning to implementation, testing, and security analysis. A single AI agent cannot effectively handle all these domains with the depth and expertise required for production-quality output.
 
@@ -16,6 +40,8 @@ Key challenges:
 2. **Context Management**: A generalist agent struggles to maintain relevant context for specialised tasks
 3. **Quality Optimisation**: Different tasks benefit from different prompting strategies and focus areas
 4. **Scalability**: Adding new capabilities should not require modifying a monolithic agent
+
+</details>
 
 ## Decision
 
@@ -54,30 +80,8 @@ selectionCriteria: [pattern1, pattern2, ...]
 priority: 0-100
 ```
 
-## Consequences
-
-### Positive
-
-- **Better Quality**: Specialised agents produce higher-quality, domain-specific output
-- **Clearer Responsibilities**: Each agent has well-defined boundaries
-- **Easier Extension**: New agents can be added without modifying existing ones
-- **Optimised Prompting**: Each agent can have tailored system prompts
-- **Context Relevance**: Agents only receive context relevant to their domain
-
-### Negative
-
-- **Complexity**: More components to maintain and test
-- **Selection Overhead**: Agent selection adds latency and potential for errors
-- **Coordination**: Multi-agent tasks require coordination logic
-- **Redundancy**: Some expertise overlaps between agents
-
-### Neutral
-
-- **Configuration Management**: Agent definitions stored as separate files
-- **Registry Maintenance**: Selection criteria need ongoing refinement
-- **Documentation**: Each agent requires its own documentation
-
-## Alternatives Considered
+<details>
+<summary><strong>Alternatives considered</strong></summary>
 
 ### Alternative 1: Single Generalist Agent
 
@@ -110,6 +114,8 @@ Manager agent delegates to worker agents.
 - Adds latency
 - Complex coordination
 - Current approach sufficient for v1
+
+</details>
 
 ## Implementation Notes
 

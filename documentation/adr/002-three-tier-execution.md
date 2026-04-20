@@ -6,7 +6,30 @@
 
 Accepted
 
-## Context
+## Consequences
+
+### Positive
+
+- **Zero-Configuration Start**: Users can begin immediately without API keys
+- **Cost Flexibility**: Users choose their cost model
+- **Learning Mode**: Guided completion helps users understand workflows
+- **Future-Proof**: Ready for MCP sampling when available
+- **IDE Integration**: Tight Cursor integration without custom protocols
+
+### Negative
+
+- **Complexity**: Three execution paths to maintain
+- **User Confusion**: Different behaviours may confuse users
+- **Testing Burden**: All three tiers need testing
+- **Documentation**: Must explain all three modes
+
+### Neutral
+
+- **Provider Configuration**: Centralised in config files
+- **Fallback Detection**: Automatic based on available configuration
+
+<details>
+<summary><strong>Context</strong></summary>
 
 VALORA needs to support multiple execution environments:
 
@@ -15,6 +38,8 @@ VALORA needs to support multiple execution environments:
 3. **Future Integration**: Need to support native MCP sampling when available
 
 Additionally, the engine should work with **zero configuration** for new users, while offering advanced options for experienced users.
+
+</details>
 
 ## Decision
 
@@ -69,29 +94,8 @@ flowchart TD
     H --> I[User Applies]
 ```
 
-## Consequences
-
-### Positive
-
-- **Zero-Configuration Start**: Users can begin immediately without API keys
-- **Cost Flexibility**: Users choose their cost model
-- **Learning Mode**: Guided completion helps users understand workflows
-- **Future-Proof**: Ready for MCP sampling when available
-- **IDE Integration**: Tight Cursor integration without custom protocols
-
-### Negative
-
-- **Complexity**: Three execution paths to maintain
-- **User Confusion**: Different behaviours may confuse users
-- **Testing Burden**: All three tiers need testing
-- **Documentation**: Must explain all three modes
-
-### Neutral
-
-- **Provider Configuration**: Centralised in config files
-- **Fallback Detection**: Automatic based on available configuration
-
-## Alternatives Considered
+<details>
+<summary><strong>Alternatives considered</strong></summary>
 
 ### Alternative 1: API-Only
 
@@ -122,6 +126,8 @@ Different tools for different execution modes.
 - Poor user experience
 - Maintenance burden
 - Fragmented ecosystem
+
+</details>
 
 ## Implementation Notes
 

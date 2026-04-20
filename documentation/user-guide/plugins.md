@@ -17,13 +17,14 @@
 
 ## Installing a Plugin
 
-Drop a plugin directory (containing `valora-plugin.json`) into any of the three discovery locations:
+Plugins are discovered from four locations on every startup. Later locations take precedence over earlier ones for conflicting contributions (last wins):
 
-| Location             | Scope                          |
-| -------------------- | ------------------------------ |
-| `data/plugins/`      | Shipped with Valora (built-in) |
-| `~/.valora/plugins/` | Personal — all projects        |
-| `.valora/plugins/`   | Project-specific               |
+| Location                    | Scope                          | Install method    |
+| --------------------------- | ------------------------------ | ----------------- |
+| `data/plugins/`             | Shipped with Valora (built-in) | n/a               |
+| `~/.valora/plugins/`        | Personal — all your projects   | copy directory    |
+| `.valora/plugins/`          | This project only              | copy directory    |
+| `node_modules/@windagency/` | This project — npm packages    | npm / pnpm / yarn |
 
 ```bash
 # Install a plugin for this project only
@@ -31,9 +32,14 @@ cp -r my-plugin .valora/plugins/
 
 # Install a plugin for all your projects
 cp -r my-plugin ~/.valora/plugins/
+
+# Install an official plugin via npm (auto-discovered, no copy needed)
+pnpm add @windagency/valora-plugin-ollama
 ```
 
-Valora scans all three locations on every startup. No restart or rebuild required.
+Any npm package under `@windagency/` whose name starts with `valora-plugin-` and contains a valid `valora-plugin.json` is discovered automatically from `node_modules/`. You still need to add its name to `plugins.enabled` to activate it.
+
+No restart or rebuild required after adding a plugin.
 
 ## Code Plugins
 
@@ -63,7 +69,37 @@ export function register(api) {
 }
 ```
 
-The built-in compression strategies for git, tsc, eslint, pnpm, pytest, and others ship as code plugins under `data/plugins/` and are the reference implementation.
+Three built-in compression plugins ship under `data/plugins/` and register 17 tool strategies. They are the reference implementation for the `code` contribution type:
+
+| Plugin                                 | Strategies covered                                              |
+| -------------------------------------- | --------------------------------------------------------------- |
+| `valora-plugin-compression-typescript` | `tsc`, `eslint`, `jest`, `vitest`, `pnpm`, `npm`, `npx`, `yarn` |
+| `valora-plugin-compression-universal`  | `git`, `grep`, `rg`, `docker`, `make`                           |
+| `valora-plugin-compression-python`     | `python`, `pytest`                                              |
+
+These are enabled by default and require no configuration.
+
+## Official Plugins
+
+The following plugins are published as npm packages under `@windagency/`:
+
+| Package                      | What it adds                                                    |
+| ---------------------------- | --------------------------------------------------------------- |
+| `valora-plugin-engineering`  | Engineering commands: `plan`, `implement`, `review-code`, …     |
+| `valora-plugin-product`      | Product commands: `refine-specs`, `create-prd`, `fetch-task`, … |
+| `valora-plugin-implement`    | Implementation agents (TypeScript, backend, frontend, React)    |
+| `valora-plugin-qa`           | QA agent and commands: `test`, `validate-coverage`, `pre-check` |
+| `valora-plugin-quality-gate` | Asserter agent and `assert` command                             |
+| `valora-plugin-secops`       | SecOps agent for security and compliance tasks                  |
+| `valora-plugin-platform`     | Platform-engineer agent for infrastructure tasks                |
+| `valora-plugin-design`       | UI/UX designer agent                                            |
+| `valora-plugin-docs`         | Documentation generation commands                               |
+| `valora-plugin-ollama`       | Self-managed Ollama LLM provider (code plugin)                  |
+
+```bash
+pnpm add @windagency/valora-plugin-ollama
+# then add "valora-plugin-ollama" to plugins.enabled in .valora/config.json
+```
 
 ## Enabling and Disabling Plugins
 
@@ -117,8 +153,36 @@ Valora resolves contribution conflicts in this precedence order (later wins):
 1. `data/plugins/` (built-in)
 2. `~/.valora/plugins/` (global user)
 3. `.valora/plugins/` (project)
+4. `node_modules/@windagency/valora-plugin-*` (npm packages, project-scoped)
 
 A project-level plugin can therefore override any agent, command, or prompt shipped by a built-in plugin.
+
+## Plugin Dependencies (`requires`)
+
+If your plugin depends on another plugin being loaded first, declare it in the manifest:
+
+```json
+{
+	"name": "my-advanced-plugin",
+	"version": "1.0.0",
+	"requires": ["valora-plugin-ollama"],
+	"contributes": ["commands"]
+}
+```
+
+Valora loads `requires` entries before the declaring plugin. If a required plugin is not found or not enabled, the dependent plugin is skipped with a warning.
+
+## `overrides`
+
+To explicitly signal that a plugin supersedes a named built-in resource (agent, command, prompt), declare it:
+
+```json
+{
+	"overrides": ["gather-knowledge"]
+}
+```
+
+This is informational — Valora logs a notice rather than silently shadowing. The last-wins resolution still applies regardless of whether `overrides` is declared.
 
 ## Permission Declarations
 

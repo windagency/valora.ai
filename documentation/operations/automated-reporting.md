@@ -1,6 +1,6 @@
 # Automated Metrics Reporting
 
-Weekly workflow metrics are collected automatically and compiled into a dashboard report. This document explains how to run reports, what they contain, and how they are scheduled.
+> How to run, schedule, and interpret the weekly workflow metrics reports generated from Valora session data.
 
 ## How to Run Reports
 
@@ -300,7 +300,3 @@ See `scripts/README.md` for a comprehensive troubleshooting guide.
 - Scripts documentation: `scripts/README.md`
 - Optimisation details: `documentation/user-guide/workflow-optimisations.md`
 - Workflow configuration: `.github/workflows/metrics-dashboard.yml`
-
----
-
-_Last updated: 2026-02-02_

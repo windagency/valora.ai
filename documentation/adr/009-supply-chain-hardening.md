@@ -6,7 +6,29 @@
 
 Accepted
 
-## Context
+## Consequences
+
+### Positive
+
+- **Reproducible installs** — frozen lockfile prevents "works on my machine" issues from dependency drift
+- **Attack surface reduction** — blocking install scripts eliminates the most common supply chain attack vector
+- **Zero known high/critical vulnerabilities** — `pnpm audit --prod --audit-level=high` returns clean
+- **Proactive dependency updates** — Dependabot ensures vulnerabilities are patched promptly
+- **Developer workflow preserved** — root scripts still work, `pnpm build` and `pnpm test` unaffected
+
+### Negative
+
+- **Extra step for dependency updates** — developers must use `--config.frozen-lockfile=false` or `pnpm update` instead of just `pnpm install`
+- **Override maintenance** — `pnpm.overrides` must be reviewed periodically and removed when upstream fixes are released
+- **Native dependency friction** — packages requiring build scripts need explicit allowlisting
+
+### Neutral
+
+- **Dependabot PR volume** — 2 grouped PRs per week is manageable but adds review overhead
+- **No CI enforcement yet** — these measures lay groundwork for CI audit checks (separate task)
+
+<details>
+<summary><strong>Context</strong></summary>
 
 The project has basic supply chain hygiene — a lockfile with SHA-512 hashes, pinned Node/pnpm versions via Volta, and pre-commit hooks via Husky. However, it lacks active defences against dependency-based attacks:
 
@@ -17,6 +39,8 @@ The project has basic supply chain hygiene — a lockfile with SHA-512 hashes, p
 5. **Known transitive vulnerabilities** — multiple high-severity `minimatch` ReDoS vulnerabilities via `archiver`, plus moderate/low issues in `ajv`, `tmp`, and `qs`
 
 These gaps are standard in early-stage projects but become increasingly risky as the dependency tree grows. Supply chain attacks are now the most common vector for compromising Node.js projects.
+
+</details>
 
 ## Decision
 
@@ -59,28 +83,8 @@ Add `.github/dependabot.yml` with weekly grouped updates:
 
 This reduces PR noise (2 grouped PRs vs 30+ individual ones) while ensuring dependencies stay current.
 
-## Consequences
-
-### Positive
-
-- **Reproducible installs** — frozen lockfile prevents "works on my machine" issues from dependency drift
-- **Attack surface reduction** — blocking install scripts eliminates the most common supply chain attack vector
-- **Zero known high/critical vulnerabilities** — `pnpm audit --prod --audit-level=high` returns clean
-- **Proactive dependency updates** — Dependabot ensures vulnerabilities are patched promptly
-- **Developer workflow preserved** — root scripts still work, `pnpm build` and `pnpm test` unaffected
-
-### Negative
-
-- **Extra step for dependency updates** — developers must use `--config.frozen-lockfile=false` or `pnpm update` instead of just `pnpm install`
-- **Override maintenance** — `pnpm.overrides` must be reviewed periodically and removed when upstream fixes are released
-- **Native dependency friction** — packages requiring build scripts need explicit allowlisting
-
-### Neutral
-
-- **Dependabot PR volume** — 2 grouped PRs per week is manageable but adds review overhead
-- **No CI enforcement yet** — these measures lay groundwork for CI audit checks (separate task)
-
-## Alternatives Considered
+<details>
+<summary><strong>Alternatives considered</strong></summary>
 
 ### Alternative 1: Audit in Pre-Commit Hook
 
@@ -121,6 +125,8 @@ Require GPG-signed commits to prevent tampering.
 - High setup burden for a small team
 - Low threat relevance for this project's risk profile
 - GitHub provides built-in secret scanning as an alternative
+
+</details>
 
 ## References
 

@@ -6,7 +6,32 @@
 
 Accepted
 
-## Context
+## Consequences
+
+### Positive
+
+- **2-3 minutes saved** per context loading stage when source documents unchanged
+- **Reduced token consumption** by eliminating redundant LLM calls
+- **No workflow changes required** - caching is transparent to users
+- **Automatic invalidation** when source files change
+- **Configurable per stage** - can enable/disable for specific stages
+- **Works without session management** - benefits all command executions
+
+### Negative
+
+- **Additional disk I/O** for cache reads/writes (mitigated by async operations)
+- **Cache management overhead** - eviction, TTL checks, file monitoring
+- **Potential stale data** if file monitoring misses an update (mitigated by TTL)
+- **Cache directory growth** - requires periodic cleanup (automatic eviction handles this)
+
+### Neutral
+
+- **Cache location** (`.valora/cache/stages/`) is project-specific, not shared across projects
+- **TTL default of 1 hour** balances freshness with performance
+- **File dependency monitoring** relies on content hashing, not filesystem events
+
+<details>
+<summary><strong>Context</strong></summary>
 
 Context loading stages (such as `context.load-specifications`, `context.load-prd`, and `context.load-documentation-context`) are expensive LLM operations that:
 
@@ -28,6 +53,8 @@ We need a more robust caching mechanism that:
 - Persists across command executions without explicit session management
 - Invalidates automatically when source documents change
 - Integrates seamlessly with the existing pipeline execution model
+
+</details>
 
 ## Decision
 
@@ -76,31 +103,8 @@ The stage executor checks the cache before LLM execution:
 - On cache hit: Returns cached outputs immediately (0ms execution)
 - On cache miss: Executes stage normally, then caches the result
 
-## Consequences
-
-### Positive
-
-- **2-3 minutes saved** per context loading stage when source documents unchanged
-- **Reduced token consumption** by eliminating redundant LLM calls
-- **No workflow changes required** - caching is transparent to users
-- **Automatic invalidation** when source files change
-- **Configurable per stage** - can enable/disable for specific stages
-- **Works without session management** - benefits all command executions
-
-### Negative
-
-- **Additional disk I/O** for cache reads/writes (mitigated by async operations)
-- **Cache management overhead** - eviction, TTL checks, file monitoring
-- **Potential stale data** if file monitoring misses an update (mitigated by TTL)
-- **Cache directory growth** - requires periodic cleanup (automatic eviction handles this)
-
-### Neutral
-
-- **Cache location** (`.valora/cache/stages/`) is project-specific, not shared across projects
-- **TTL default of 1 hour** balances freshness with performance
-- **File dependency monitoring** relies on content hashing, not filesystem events
-
-## Alternatives Considered
+<details>
+<summary><strong>Alternatives considered</strong></summary>
 
 ### Alternative 1: In-Memory LRU Cache
 
@@ -141,6 +145,8 @@ Use Redis or another external cache service.
 - Requires external infrastructure
 - Overkill for single-developer CLI tool
 - Adds deployment complexity
+
+</details>
 
 ## Implementation Details
 

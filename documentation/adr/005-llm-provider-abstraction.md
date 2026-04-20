@@ -6,7 +6,31 @@
 
 Accepted
 
-## Context
+## Consequences
+
+### Positive
+
+- **Vendor Independence**: Not locked to any provider
+- **Easy Switching**: Change providers via configuration
+- **Consistent Interface**: Same code works with all providers
+- **Extensibility**: New providers easily added
+- **Optimisation**: Use best provider for each task
+- **Cost Reduction**: Prompt caching reduces input token costs by up to 90%
+
+### Negative
+
+- **Lowest Common Denominator**: Can't use provider-specific features
+- **Abstraction Leakage**: Some provider differences leak through
+- **Maintenance**: Each provider needs updates
+- **Testing**: More combinations to test
+
+### Neutral
+
+- **Configuration Complexity**: Users must understand providers
+- **Error Mapping**: Provider errors need normalisation
+
+<details>
+<summary><strong>Context</strong></summary>
 
 VALORA needs to support multiple LLM providers:
 
@@ -29,6 +53,8 @@ The engine should be **vendor-agnostic** and allow users to:
 - Switch providers without code changes
 - Use different providers for different commands
 - Add new providers without modifying core code
+
+</details>
 
 ## Decision
 
@@ -161,29 +187,6 @@ The `isBatchableProvider()` type guard performs a runtime check so the stage exe
 
 Batch results include `batch_discount_applied: true` on the `LLMUsage` object so cost reporting can distinguish batch from real-time calls.
 
-## Consequences
-
-### Positive
-
-- **Vendor Independence**: Not locked to any provider
-- **Easy Switching**: Change providers via configuration
-- **Consistent Interface**: Same code works with all providers
-- **Extensibility**: New providers easily added
-- **Optimisation**: Use best provider for each task
-- **Cost Reduction**: Prompt caching reduces input token costs by up to 90%
-
-### Negative
-
-- **Lowest Common Denominator**: Can't use provider-specific features
-- **Abstraction Leakage**: Some provider differences leak through
-- **Maintenance**: Each provider needs updates
-- **Testing**: More combinations to test
-
-### Neutral
-
-- **Configuration Complexity**: Users must understand providers
-- **Error Mapping**: Provider errors need normalisation
-
 ## Provider Implementations
 
 ### Anthropic Provider
@@ -282,7 +285,8 @@ Model tiers optimise cost and quality:
 | Execution | Claude Sonnet 4.5   | Implementation, reviews |
 | Fast      | Claude Haiku 4.5    | Quick tasks, validation |
 
-## Alternatives Considered
+<details>
+<summary><strong>Alternatives considered</strong></summary>
 
 ### Alternative 1: Direct SDK Usage
 
@@ -313,6 +317,8 @@ Only support OpenAI-compatible APIs.
 - Excludes Anthropic native API
 - Limits provider choice
 - Feature limitations
+
+</details>
 
 ## Configuration
 

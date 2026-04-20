@@ -1,6 +1,6 @@
 # Development Workflows
 
-Common patterns for using VALORA effectively.
+Common patterns for using Valora effectively.
 
 ## The Complete Development Lifecycle
 

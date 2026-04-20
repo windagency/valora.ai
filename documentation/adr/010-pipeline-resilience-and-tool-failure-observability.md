@@ -6,7 +6,43 @@
 
 Accepted
 
-## Context
+## Consequences
+
+### Positive
+
+- **Measurable failures** — tool failures and loop exhaustions are now counted, emitted as
+  events, shown in the dashboard, and persisted in session history.
+- **Trustworthy forced output** — the exhaustion prompt is grounded in verified filesystem
+  state rather than LLM memory.
+- **Controlled degradation** — stages with too many failures hard-stop instead of silently
+  producing invalid output.
+- **Recoverable stages** — command authors can configure per-stage retry for transient
+  failures (e.g. shell commands that fail due to race conditions or network timeouts).
+- **Cross-session visibility** — engineers can query past sessions to see which stages
+  routinely exhaust their iteration budget or accumulate tool failures.
+
+### Negative
+
+- **Hard-stop can be surprising** — a stage that previously limped through 6 failures and
+  produced degraded output will now hard-stop. Commands that relied on this behaviour
+  must either reduce the failure root cause or raise the threshold.
+- **Retry can mask problems** — retrying a stage that consistently fails due to a
+  prompt or configuration bug delays diagnosis. The retry log warning must be monitored.
+- **Memory overhead** — `extractExecutionSummary` scans the full conversation history at
+  exhaustion time (O(n) over messages). For a 20-iteration loop with multiple tools per
+  iteration this is at most a few hundred messages, which is negligible.
+
+### Neutral
+
+- The `MAX_TOOL_FAILURES_BEFORE_HARD_STOP` constant is defined in `stage-executor.ts` and
+  applies globally. Override per stage via `PipelineStage.max_tool_failures` in the command
+  YAML (see Amendment 2026-03-09 below).
+- The forced-output JSON template is hardcoded to the `code_changes` shape, which suits
+  `code` stages but may not match other stage types. The verified-files injection still
+  improves accuracy regardless of the template shape.
+
+<details>
+<summary><strong>Context</strong></summary>
 
 The pipeline executor runs each stage through an LLM tool loop (up to 20 iterations).
 Two failure modes were identified where the system continued silently in a degraded state:
@@ -24,6 +60,8 @@ Two failure modes were identified where the system continued silently in a degra
 
 Neither failure mode was measurable (no counters, no events, no persistent record) and
 neither was represented in the dashboard or session history.
+
+</details>
 
 ## Decision
 
@@ -123,41 +161,6 @@ after each command and persists them into `SessionCommand.quality_metrics`.
 
 The dashboard's `buildMetricsSummary` combines in-memory counters (current session) with
 the persisted session totals (historical) so both panels reflect cross-session history.
-
-## Consequences
-
-### Positive
-
-- **Measurable failures** — tool failures and loop exhaustions are now counted, emitted as
-  events, shown in the dashboard, and persisted in session history.
-- **Trustworthy forced output** — the exhaustion prompt is grounded in verified filesystem
-  state rather than LLM memory.
-- **Controlled degradation** — stages with too many failures hard-stop instead of silently
-  producing invalid output.
-- **Recoverable stages** — command authors can configure per-stage retry for transient
-  failures (e.g. shell commands that fail due to race conditions or network timeouts).
-- **Cross-session visibility** — engineers can query past sessions to see which stages
-  routinely exhaust their iteration budget or accumulate tool failures.
-
-### Negative
-
-- **Hard-stop can be surprising** — a stage that previously limped through 6 failures and
-  produced degraded output will now hard-stop. Commands that relied on this behaviour
-  must either reduce the failure root cause or raise the threshold.
-- **Retry can mask problems** — retrying a stage that consistently fails due to a
-  prompt or configuration bug delays diagnosis. The retry log warning must be monitored.
-- **Memory overhead** — `extractExecutionSummary` scans the full conversation history at
-  exhaustion time (O(n) over messages). For a 20-iteration loop with multiple tools per
-  iteration this is at most a few hundred messages, which is negligible.
-
-### Neutral
-
-- The `MAX_TOOL_FAILURES_BEFORE_HARD_STOP` constant is defined in `stage-executor.ts` and
-  applies globally. Override per stage via `PipelineStage.max_tool_failures` in the command
-  YAML (see Amendment 2026-03-09 below).
-- The forced-output JSON template is hardcoded to the `code_changes` shape, which suits
-  `code` stages but may not match other stage types. The verified-files injection still
-  improves accuracy regardless of the template shape.
 
 ## Configuration
 

@@ -6,11 +6,37 @@
 
 Accepted
 
-## Context
+## Consequences
+
+### Positive
+
+- **~50% token cost reduction** for batch-eligible stages on Anthropic and OpenAI.
+- **Zero behavioural change** for stages that do not opt in or do not pass `--batch`.
+- **Resilient** — batch state survives process restarts via file persistence.
+- **Graceful fallback** — ineligible stages silently use real-time execution.
+- **Additive** — no existing provider interfaces or command definitions changed (only new optional fields added).
+
+### Negative
+
+- **Async UX**: Results are not available immediately; users must poll or wait.
+- **24-hour window**: Expired batches cannot be retrieved.
+- **Google batch not implemented**: Vertex AI `BatchPredictionJob` requires `@google-cloud/aiplatform` and GCS setup; deferred.
+- **Anthropic Vertex AI limitation**: The Anthropic Message Batches API is unavailable on Vertex AI; `submitBatch()` throws if a Vertex-hosted Anthropic configuration is detected.
+
+### Neutral
+
+- One new `batch?: boolean` field on `PipelineStage` — purely additive.
+- One new `batch_discount_applied?: boolean` field on `LLMUsage` — purely additive.
+- New `src/batch/` module with its own alias in tsconfig and vitest configs.
+
+<details>
+<summary><strong>Context</strong></summary>
 
 LLM provider batch APIs (Anthropic Message Batches, OpenAI Batch API) offer approximately 50% token cost reduction in exchange for asynchronous processing with a 24-hour completion window. For pipeline stages that complete in a single LLM call without tool loops — analysis, review, documentation, summarisation — this is pure savings with no behavioural difference.
 
 VALORA processes many such stages. Without batch support, every execution pays full real-time token prices even when the user does not need an immediate response.
+
+</details>
 
 ## Decision
 
@@ -85,30 +111,8 @@ When a stage is eligible, `executeStage()` bypasses the tool loop:
 | **Google**    | Vertex AI `BatchPredictionJob` — stub, not yet implemented          | `false`           |
 | **Cursor**    | MCP sampling only — no batch API                                    | N/A               |
 
-## Consequences
-
-### Positive
-
-- **~50% token cost reduction** for batch-eligible stages on Anthropic and OpenAI.
-- **Zero behavioural change** for stages that do not opt in or do not pass `--batch`.
-- **Resilient** — batch state survives process restarts via file persistence.
-- **Graceful fallback** — ineligible stages silently use real-time execution.
-- **Additive** — no existing provider interfaces or command definitions changed (only new optional fields added).
-
-### Negative
-
-- **Async UX**: Results are not available immediately; users must poll or wait.
-- **24-hour window**: Expired batches cannot be retrieved.
-- **Google batch not implemented**: Vertex AI `BatchPredictionJob` requires `@google-cloud/aiplatform` and GCS setup; deferred.
-- **Anthropic Vertex AI limitation**: The Anthropic Message Batches API is unavailable on Vertex AI; `submitBatch()` throws if a Vertex-hosted Anthropic configuration is detected.
-
-### Neutral
-
-- One new `batch?: boolean` field on `PipelineStage` — purely additive.
-- One new `batch_discount_applied?: boolean` field on `LLMUsage` — purely additive.
-- New `src/batch/` module with its own alias in tsconfig and vitest configs.
-
-## Alternatives Considered
+<details>
+<summary><strong>Alternatives considered</strong></summary>
 
 ### Alternative 1: Polling wrapper around real-time calls
 
@@ -127,6 +131,8 @@ Create duplicate commands (e.g., `review-code-batch`) that always use batch mode
 Automatically submit any single-call stage to the batch API when `--batch` is passed.
 
 **Rejected because** some stages that appear single-call may grow tool loops in future; explicit opt-in prevents surprises and makes intent clear in command definitions.
+
+</details>
 
 ## References
 

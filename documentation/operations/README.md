@@ -1,6 +1,6 @@
 # Operations Guide
 
-Deployment, monitoring, and operational procedures for Valora.
+> Operational procedures for deploying, monitoring, and maintaining Valora in a project environment.
 
 ## Quick Reference
 
@@ -472,7 +472,3 @@ valora plan --provider openai "task"
 - [User Guide: Troubleshooting](../user-guide/troubleshooting.md)
 - [Architecture: System Architecture](../architecture/system-architecture.md)
 - [Automated Reporting](./automated-reporting.md)
-
----
-
-_For production deployment assistance, consult the operations team._

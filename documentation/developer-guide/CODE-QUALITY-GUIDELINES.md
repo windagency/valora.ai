@@ -1,11 +1,21 @@
-# Typescript Code Quality Standards & Enforcement Guide
+# TypeScript Code Quality Standards & Enforcement Guide
 
-> Comprehensive coding standards  
-> Version: 1.0.0
+> Consolidated TypeScript coding standards enforced through automated tooling, code reviews, and architectural testing in Valora.
 
-## Executive Summary
+## Quick Reference
 
-This document consolidates all coding considerations into a unified **code quality standard** that can be enforced through automated tooling, code reviews, and architectural testing.
+| Area               | Rule                                                                 | Enforcement                            |
+| ------------------ | -------------------------------------------------------------------- | -------------------------------------- |
+| Naming — classes   | PascalCase nouns; no `I` prefix                                      | `@typescript-eslint/naming-convention` |
+| Naming — functions | camelCase verbs                                                      | ESLint                                 |
+| Naming — files     | kebab-case                                                           | `eslint-plugin-check-file`             |
+| Imports            | Absolute path aliases only                                           | `import/no-relative-parent-imports`    |
+| Types              | `interface` for extensible objects; `type` for unions/primitives     | ESLint                                 |
+| `any`              | Forbidden without comment justification                              | `@typescript-eslint/no-explicit-any`   |
+| Conditionals       | Object literal lookups over `switch`/`if-else` for value mappings    | Code review                            |
+| Architecture       | All dependency rules validated with `arch-unit-ts`                   | `tests/architecture/`                  |
+| API versioning     | URI path versioning; shared business logic, versioned controllers    | Code review                            |
+| Security           | Zod validation on all external input; no direct third-party coupling | Code review                            |
 
 ## 1. Core Programming Principles
 
@@ -1671,7 +1681,7 @@ describe('API Versioning Architecture', () => {
 
 **MUST follow RESTful principles and use semantic, resource-oriented URLs:**
 
-RESTful APIs organize endpoints around resources (nouns) rather than actions (verbs), using HTTP methods to define operations.
+RESTful APIs organise endpoints around resources (nouns) rather than actions (verbs), using HTTP methods to define operations.
 
 #### Resource-Oriented URL Design
 

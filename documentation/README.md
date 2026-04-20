@@ -143,7 +143,8 @@ documentation/
 │   ├── plugins.md                   # Installing and managing plugins
 │   ├── configuration.md             # Configuration and customisation
 │   ├── best-practices.md            # Recommended usage patterns
-│   └── troubleshooting.md           # Common issues and solutions
+│   ├── troubleshooting.md           # Common issues and solutions
+│   └── auto-update.md               # Automatic update checks and valora update command
 ├── developer-guide/
 │   ├── README.md                    # Developer guide overview
 │   ├── setup.md                     # Development environment setup

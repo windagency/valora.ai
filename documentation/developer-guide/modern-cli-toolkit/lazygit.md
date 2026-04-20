@@ -1,5 +1,7 @@
 # lazygit reference
 
+> When to use lazygit versus direct Git commands, and structured alternatives for non-interactive agent workflows.
+
 ## When to use lazygit vs direct Git
 
 lazygit is a terminal UI for Git. For agents, its primary value is reducing multi-command Git workflows to fewer operations. However, being a TUI (terminal user interface), it is most useful in interactive contexts. For non-interactive agent workflows, lazygit's CLI flags and direct Git commands with structured output are often more practical.

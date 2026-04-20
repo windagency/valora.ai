@@ -1,5 +1,19 @@
 # Pipeline Resilience — Operations Guide
 
+> How to observe, diagnose, and tune pipeline failure behaviour — covering tool execution failures, loop exhaustion, hard stops, and retry configuration.
+
+## Quick Reference
+
+| Task                        | Where to Look                                   |
+| --------------------------- | ----------------------------------------------- |
+| Check loop exhaustion count | Dashboard Overview → Metrics Summary            |
+| See per-tool failure counts | Dashboard Performance tab                       |
+| Adjust iteration limit      | `max_tool_iterations` on the stage definition   |
+| Adjust failure tolerance    | `max_tool_failures` + `failure_policy` on stage |
+| Enable retry on a stage     | `retry.maxAttempts` + `retry.delay_ms` on stage |
+
+---
+
 This guide covers the observable failure modes in the pipeline executor, how the system responds to each, and how to diagnose and tune the behaviour.
 
 ## Failure Scenarios at a Glance

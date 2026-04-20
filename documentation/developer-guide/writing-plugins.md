@@ -153,15 +153,19 @@ Hook scripts receive the tool call JSON on stdin and respond by:
 
 Validated by `PLUGIN_MANIFEST_SCHEMA` in `src/plugins/plugin-manifest.schema.ts`.
 
-| Field            | Type       | Required | Description                                                |
-| ---------------- | ---------- | -------- | ---------------------------------------------------------- |
-| `name`           | `string`   | Yes      | Unique plugin identifier (kebab-case recommended)          |
-| `version`        | `string`   | Yes      | SemVer: `MAJOR.MINOR.PATCH`                                |
-| `description`    | `string`   | No       | Human-readable description                                 |
-| `engines.valora` | `string`   | No       | SemVer range declaring minimum Valora compatibility        |
-| `contributes`    | `string[]` | Yes      | List of contribution types (see table above)               |
-| `permissions`    | `string[]` | No       | Required permissions; must include `shell-hooks` for hooks |
-| `requiresBinary` | `object[]` | No       | External binaries the plugin depends on                    |
+| Field            | Type       | Required | Description                                                            |
+| ---------------- | ---------- | -------- | ---------------------------------------------------------------------- |
+| `name`           | `string`   | Yes      | Unique plugin identifier (kebab-case recommended)                      |
+| `version`        | `string`   | Yes      | SemVer: `MAJOR.MINOR.PATCH`                                            |
+| `description`    | `string`   | No       | Human-readable description                                             |
+| `homepage`       | `string`   | No       | URL to the plugin's homepage or repository                             |
+| `engines.valora` | `string`   | No       | SemVer range declaring minimum Valora compatibility                    |
+| `contributes`    | `string[]` | No       | List of contribution types (see table above)                           |
+| `permissions`    | `string[]` | No       | Required permissions; must include `shell-hooks` for hooks             |
+| `requires`       | `string[]` | No       | Plugin names that must be loaded before this one                       |
+| `requiresBinary` | `object[]` | No       | External binaries the plugin depends on                                |
+| `overrides`      | `string[]` | No       | Built-in resource names this plugin supersedes (informational)         |
+| `codeEntrypoint` | `string`   | No       | Relative path to compiled JS entry point (required for `code` plugins) |
 
 `requiresBinary` entries:
 
@@ -237,6 +241,18 @@ Fragments in `agent-context/` are concatenated into the agent's system prompt af
 6. Plugin resource directories are fed into `AgentLoader`, `CommandLoader`, `PromptLoader`, and `HookExecutionService` via `registerPluginDir()` / `registerPluginPromptsDir()` / `registerPluginHooks()`.
 
 Arch-unit rule: the `plugins` module may only import from `['plugins', 'types', 'config', 'utils', 'output']`. It must not import executor or service modules.
+
+## Distributing a Plugin
+
+Three distribution methods are supported:
+
+| Method                | How to install                            | Discovery            |
+| --------------------- | ----------------------------------------- | -------------------- |
+| Directory copy        | `cp -r my-plugin .valora/plugins/`        | Filesystem scan      |
+| Global directory copy | `cp -r my-plugin ~/.valora/plugins/`      | Filesystem scan      |
+| npm package           | `pnpm add @windagency/valora-plugin-name` | `node_modules/` scan |
+
+To publish as an npm package, set `name` in `package.json` to `@windagency/valora-plugin-<name>` and include `valora-plugin.json` in the published files. Valora automatically discovers any `@windagency/valora-plugin-*` package that exists in `node_modules/` and contains a valid manifest.
 
 ## Testing a Plugin Locally
 

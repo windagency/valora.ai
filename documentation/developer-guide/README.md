@@ -1,6 +1,6 @@
 # Developer Guide
 
-Technical documentation for developers contributing to or extending Valora.
+> Technical documentation for contributors to and extenders of Valora.
 
 ## Contents
 
