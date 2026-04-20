@@ -14,11 +14,8 @@
  *   never skipped so the MAX_TERMINAL_OUTPUT_CHARS cap always holds
  */
 
-import { MAX_GREP_OUTPUT_LINES, MAX_TERMINAL_OUTPUT_CHARS, OUTPUT_COMPRESSION_THRESHOLD } from 'config/constants';
+import { MAX_TERMINAL_OUTPUT_CHARS, OUTPUT_COMPRESSION_THRESHOLD } from 'config/constants';
 import { getLogger } from 'output/logger';
-
-/** Maximum git log entries to retain when compressing `git log` output. */
-const GIT_LOG_MAX_ENTRIES = 20;
 
 /** Maximum examples per diagnostic code when compressing `tsc` output. */
 const TSC_MAX_EXAMPLES_PER_CODE = 3;
@@ -148,18 +145,13 @@ export function compressTerminalOutput(command: string, output: string): string 
 
 const TOOL_FILTERS: Record<string, (output: string, command: string) => string> = {
 	cargo: filterCargo,
-	docker: filterDocker,
 	eslint: filterEslint,
-	git: (output, command) => filterGit(command, output),
-	grep: filterRg,
 	jest: filterTestRunner,
-	make: filterMake,
 	npm: filterPackageManager,
 	npx: filterPackageManager,
 	pnpm: filterPackageManager,
 	pytest: filterPython,
 	python: filterPython,
-	rg: filterRg,
 	tsc: filterTsc,
 	vitest: filterTestRunner,
 	yarn: filterPackageManager
@@ -171,102 +163,6 @@ function applyFilter(tool: string, output: string, command: string): string {
 
 function firstToken(command: string): string {
 	return command.trimStart().split(/\s+/)[0] ?? '';
-}
-
-// ── Git filters ───────────────────────────────────────────────────────────────
-
-const GIT_SUBCOMMAND_FILTERS: Record<string, (output: string) => string> = {
-	diff: filterGitDiff,
-	log: filterGitLog,
-	status: filterGitStatus
-};
-
-function filterGit(command: string, output: string): string {
-	const subMatch = command.match(/git\s+(\w+)/);
-	const sub = subMatch?.[1] ?? '';
-	return (GIT_SUBCOMMAND_FILTERS[sub] ?? ((o: string) => o))(output);
-}
-
-/**
- * Compress `git diff` output by removing internal metadata lines.
- * Changed lines (+/-) and hunk headers (@@ ... @@) are always preserved.
- */
-function extractCommitSubject(line: string): string {
-	const trimmed = line.trim();
-	return trimmed && !/^(Author:|Date:|Merge:)/.test(trimmed) ? trimmed : '';
-}
-
-function filterGitDiff(output: string): string {
-	return output
-		.split('\n')
-		.filter((line) => !isGitDiffMetaLine(line))
-		.join('\n');
-}
-
-function isGitDiffMetaLine(line: string): boolean {
-	// "index a3f8c2e..9d4b1f7 100644"
-	if (/^index [0-9a-f]+\.\.[0-9a-f]+/.test(line)) return true;
-	// "old mode 100644" / "new mode 100644"
-	if (/^(old|new) mode \d+$/.test(line)) return true;
-	return false;
-}
-
-/**
- * Compress `git log` output by converting multi-line commit entries to a
- * one-line-per-commit format, capped at GIT_LOG_MAX_ENTRIES.
- */
-function filterGitLog(output: string): string {
-	const lines = output.split('\n');
-	const entries: string[] = [];
-	let currentHash = '';
-	let currentSubject = '';
-
-	for (const line of lines) {
-		const commitMatch = line.match(/^commit ([0-9a-f]{7,40})/);
-		if (commitMatch) {
-			if (currentHash) entries.push(`${currentHash.slice(0, 7)} ${currentSubject}`);
-			if (entries.length >= GIT_LOG_MAX_ENTRIES) break;
-			currentHash = commitMatch[1] ?? '';
-			currentSubject = '';
-		} else if (currentHash && !currentSubject) {
-			currentSubject = extractCommitSubject(line);
-		}
-	}
-
-	if (currentHash && entries.length < GIT_LOG_MAX_ENTRIES) {
-		entries.push(`${currentHash.slice(0, 7)} ${currentSubject}`);
-	}
-
-	return entries.join('\n');
-}
-
-/**
- * Compress `git status` by keeping only the branch line and per-file entries,
- * discarding verbose section prose and blank lines.
- */
-function filterGitStatus(output: string): string {
-	const lines = output.split('\n').filter((l) => l.trim());
-
-	const kept: string[] = [];
-	for (const line of lines) {
-		// "On branch ..." / "HEAD detached ..." / "No commits yet"
-		if (/^(On branch|HEAD detached|No commits)/.test(line)) {
-			kept.push(line);
-			continue;
-		}
-		// File status lines — indented with a tab + status word
-		if (/^\t(modified|new file|deleted|renamed|copied|both|Untracked)/.test(line)) {
-			kept.push(line.trim());
-			continue;
-		}
-		// Section headers ("Changes to be committed:", "Untracked files:", etc.)
-		if (/^(Changes|Untracked|nothing|Your branch)/.test(line)) {
-			kept.push(line);
-			continue;
-		}
-	}
-
-	return kept.join('\n');
 }
 
 // ── Test runner filter ────────────────────────────────────────────────────────
@@ -403,62 +299,6 @@ function filterEslint(output: string): string {
 	}
 
 	return [...other, ...[...byRule.values()].flat()].join('\n');
-}
-
-// ── rg / grep filter ──────────────────────────────────────────────────────────
-
-/**
- * Compress rg/grep output by deduplicating identical lines and capping at
- * MAX_GREP_OUTPUT_LINES to prevent overwhelming the context window.
- */
-function filterRg(output: string): string {
-	const lines = output.split('\n');
-	const seen = new Set<string>();
-	const deduped: string[] = [];
-	for (const line of lines) {
-		if (!seen.has(line)) {
-			seen.add(line);
-			deduped.push(line);
-		}
-	}
-	return deduped.slice(0, MAX_GREP_OUTPUT_LINES).join('\n');
-}
-
-// ── Docker filter ─────────────────────────────────────────────────────────────
-
-/**
- * Compress docker output by removing layer-pull progress lines, keeping errors
- * and the final digest/completion line.
- */
-function filterDocker(output: string): string {
-	return output
-		.split('\n')
-		.filter((line) => !isDockerProgressLine(line))
-		.join('\n');
-}
-
-function isDockerProgressLine(line: string): boolean {
-	if (/^Pulling from /.test(line)) return true;
-	if (/^Pulling fs layer/.test(line)) return true;
-	if (/^Waiting$/.test(line.trim())) return true;
-	if (/^Downloading/.test(line)) return true;
-	if (/^Extracting/.test(line)) return true;
-	if (/^Pull complete/.test(line)) return true;
-	if (/^Already exists/.test(line)) return true;
-	return false;
-}
-
-// ── Make filter ───────────────────────────────────────────────────────────────
-
-/**
- * Compress make output by removing directory-entry chatter, keeping recipe
- * lines and errors.
- */
-function filterMake(output: string): string {
-	return output
-		.split('\n')
-		.filter((line) => !/^make\[\d+\]: (Entering|Leaving) directory/.test(line))
-		.join('\n');
 }
 
 // ── Cargo filter ──────────────────────────────────────────────────────────────
