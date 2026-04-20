@@ -127,7 +127,7 @@ export function compressTerminalOutput(command: string, output: string): string 
 			compressed = clean;
 		}
 	} else {
-		compressed = applyFilter(tool, clean, command);
+		compressed = clean;
 	}
 
 	const result = truncateTerminalOutput(compressed);
@@ -137,84 +137,6 @@ export function compressTerminalOutput(command: string, output: string): string 
 
 // ── Internal helpers ──────────────────────────────────────────────────────────
 
-const TOOL_FILTERS: Record<string, (output: string, command: string) => string> = {
-	cargo: filterCargo,
-	pytest: filterPython,
-	python: filterPython
-};
-
-function applyFilter(tool: string, output: string, command: string): string {
-	return (TOOL_FILTERS[tool] ?? ((o: string) => o))(output, command);
-}
-
 function firstToken(command: string): string {
 	return command.trimStart().split(/\s+/)[0] ?? '';
-}
-
-// ── Cargo filter ──────────────────────────────────────────────────────────────
-
-/**
- * Compress cargo output by collapsing consecutive Compiling lines to a count
- * summary, keeping warnings and errors intact.
- */
-function filterCargo(output: string): string {
-	const lines = output.split('\n');
-	const kept: string[] = [];
-	let compilingCount = 0;
-
-	const flushCompiling = (): void => {
-		if (compilingCount > 0) {
-			kept.push(`[${compilingCount} package${compilingCount === 1 ? '' : 's'} compiled]`);
-			compilingCount = 0;
-		}
-	};
-
-	for (const line of lines) {
-		if (/^\s*Compiling\s+\S+\s+v\d/.test(line)) {
-			compilingCount++;
-		} else {
-			flushCompiling();
-			kept.push(line);
-		}
-	}
-	flushCompiling();
-	return kept.join('\n');
-}
-
-// ── Python / pytest filter ────────────────────────────────────────────────────
-
-/**
- * Compress python/pytest output by collapsing passing tests to a count summary,
- * keeping failures and tracebacks. Mirrors filterTestRunner for consistency.
- */
-function filterPython(output: string): string {
-	const lines = output.split('\n');
-	const kept: string[] = [];
-	let passCount = 0;
-
-	const flushPassCount = (count: number): void => {
-		if (count > 0) kept.push(`[${count} test${count === 1 ? '' : 's'} passed]`);
-	};
-
-	for (const line of lines) {
-		const isPassLine = /^\s*(PASSED|\.)\s*$/.test(line) || /\s+PASSED$/.test(line);
-		const isFailLine = /^\s*(FAILED|F\s|ERROR)/.test(line);
-		const isSummaryLine = /^(=+|FAILED|ERROR|passed|failed|error|warnings summary|short test)/.test(line);
-
-		if (isFailLine) {
-			flushPassCount(passCount);
-			passCount = 0;
-			kept.push(line);
-		} else if (isPassLine) {
-			passCount++;
-		} else if (isSummaryLine) {
-			flushPassCount(passCount);
-			passCount = 0;
-			kept.push(line);
-		} else {
-			kept.push(line);
-		}
-	}
-	flushPassCount(passCount);
-	return kept.join('\n');
 }
