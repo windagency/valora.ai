@@ -296,3 +296,19 @@ vendor/
 
 # valora-plugin-ollama compiled output (published from dist/, not committed)
 packages/valora-plugin-ollama/dist/
+
+# Compiled in-tree plugin output
+data/plugins/valora-plugin-compression-universal/
+data/plugins/valora-plugin-compression-typescript/
+data/plugins/valora-plugin-compression-python/
+# Leaked core compilation artefacts produced by tsconfig.plugins.json
+data/plugins/cleanup/
+data/plugins/config/
+data/plugins/executor/
+data/plugins/output/
+data/plugins/plugins/
+data/plugins/plugins-src/
+data/plugins/services/
+data/plugins/session/
+data/plugins/types/
+data/plugins/utils/

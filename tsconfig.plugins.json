@@ -2,10 +2,10 @@
 	"extends": "./tsconfig.json",
 	"compilerOptions": {
 		"declaration": false,
+		"declarationMap": false,
 		"module": "ESNext",
 		"moduleResolution": "bundler",
 		"outDir": "data/plugins",
-		"rootDir": "src/plugins-src",
 		"sourceMap": false
 	},
 	"exclude": ["node_modules", "dist", "**/*.test.ts", "**/*.spec.ts"],
