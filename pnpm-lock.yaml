@@ -233,6 +233,16 @@ importers:
         specifier: '>=0.1.0'
         version: 2.4.0(ws@8.19.0)
 
+  packages/valora-plugin-ollama:
+    dependencies:
+      '@windagency/valora':
+        specifier: '>=0.1.0'
+        version: 2.4.0(ws@8.19.0)
+    devDependencies:
+      openai:
+        specifier: ^4.67.0
+        version: 4.104.0(ws@8.19.0)(zod@3.25.76)
+
   packages/valora-plugin-platform:
     dependencies:
       '@windagency/valora':

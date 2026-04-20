@@ -1,0 +1,27 @@
+{
+	"name": "@windagency/valora-plugin-ollama",
+	"version": "1.0.0",
+	"description": "Self-managed Ollama provider plugin for Valora — manages the Ollama binary and server process, supports any model available via ollama pull.",
+	"keywords": [
+		"valora-plugin"
+	],
+	"license": "UNLICENSED",
+	"scripts": {
+		"build": "tsc -p tsconfig.json",
+		"prepublishOnly": "pnpm build"
+	},
+	"files": [
+		"valora-plugin.json",
+		"dist"
+	],
+	"engines": {
+		"node": ">=22.0.0"
+	},
+	"peerDependencies": {
+		"@windagency/valora": ">=0.1.0",
+		"openai": ">=4.0.0"
+	},
+	"devDependencies": {
+		"openai": "^4.67.0"
+	}
+}
