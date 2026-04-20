@@ -126,16 +126,19 @@ Enterprise-grade security controls:
 
 Extend Valora with **self-contained plugin directories**:
 
-| Contribution    | What it adds                                |
-| --------------- | ------------------------------------------- |
-| `agents`        | New AI personas                             |
-| `commands`      | New CLI verbs (auto-exposed as MCP tools)   |
-| `hooks`         | PreToolUse / PostToolUse shell scripts      |
-| `prompts`       | Reusable pipeline stages                    |
-| `templates`     | PR, PRD, and plan scaffolds                 |
-| `agent-context` | Markdown injected into agent system prompts |
+| Contribution    | What it adds                                        |
+| --------------- | --------------------------------------------------- |
+| `agents`        | New AI personas                                     |
+| `commands`      | New CLI verbs (auto-exposed as MCP tools)           |
+| `hooks`         | PreToolUse / PostToolUse shell scripts              |
+| `prompts`       | Reusable pipeline stages                            |
+| `templates`     | PR, PRD, and plan scaffolds                         |
+| `agent-context` | Markdown injected into agent system prompts         |
+| `code`          | TypeScript modules registered via `PluginAPI` hooks |
 
 Drop a plugin into `.valora/plugins/` and list it under `plugins.enabled`. No restart required.
+
+Built-in compression strategies (git, tsc, eslint, pnpm, pytest, …) ship as **code plugins** and are the canonical example of the `code` contribution type.
 
 </td>
 <td width="50%">

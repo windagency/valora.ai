@@ -1,6 +1,6 @@
 # Writing Plugins
 
-> Package agents, commands, hooks, prompts, templates, and MCP bundles as a self-contained Valora plugin.
+> Package agents, commands, hooks, prompts, templates, MCP bundles, and code modules as a self-contained Valora plugin.
 
 ## Minimal Plugin Layout
 
@@ -14,7 +14,8 @@ my-plugin/
 ├── prompts/              # Optional — prompt markdown files
 ├── templates/            # Optional — template markdown files
 ├── mcps.json             # Optional — external MCP server declarations
-└── agent-context/        # Optional — markdown fragments injected into system prompts
+├── agent-context/        # Optional — markdown fragments injected into system prompts
+└── dist/index.js         # Optional — compiled code module (requires code-exec permission)
 ```
 
 ## `valora-plugin.json` Template
@@ -32,15 +33,86 @@ my-plugin/
 
 ## Contribution Types
 
-| Type            | Directory / File        | Format                       | Permission needed |
-| --------------- | ----------------------- | ---------------------------- | ----------------- |
-| `agents`        | `agents/`               | Markdown + YAML front matter | —                 |
-| `commands`      | `commands/`             | Markdown + YAML front matter | —                 |
-| `hooks`         | `hooks/` + `hooks.json` | Shell scripts + JSON config  | `shell-hooks`     |
-| `prompts`       | `prompts/`              | Markdown + YAML front matter | —                 |
-| `templates`     | `templates/`            | Markdown files               | —                 |
-| `mcps`          | `mcps.json`             | External MCP server JSON     | —                 |
-| `agent-context` | `agent-context/`        | Plain markdown fragments     | —                 |
+| Type            | Directory / File                | Format                         | Permission needed |
+| --------------- | ------------------------------- | ------------------------------ | ----------------- |
+| `agents`        | `agents/`                       | Markdown + YAML front matter   | —                 |
+| `commands`      | `commands/`                     | Markdown + YAML front matter   | —                 |
+| `hooks`         | `hooks/` + `hooks.json`         | Shell scripts + JSON config    | `shell-hooks`     |
+| `prompts`       | `prompts/`                      | Markdown + YAML front matter   | —                 |
+| `templates`     | `templates/`                    | Markdown files                 | —                 |
+| `mcps`          | `mcps.json`                     | External MCP server JSON       | —                 |
+| `agent-context` | `agent-context/`                | Plain markdown fragments       | —                 |
+| `code`          | Compiled JS at `codeEntrypoint` | ES module exporting `register` | `code-exec`       |
+
+## Code Plugins
+
+Code plugins contribute a compiled JavaScript module that Valora dynamically imports. They are the mechanism for registering **compression strategies**, and the intended path for future LLM providers and custom presenters once the security model is finalised.
+
+### Manifest
+
+```json
+{
+	"name": "my-compression-plugin",
+	"version": "1.0.0",
+	"description": "Cargo build output compression for Valora",
+	"engines": { "valora": ">=2.5.0" },
+	"contributes": ["code"],
+	"permissions": ["code-exec"],
+	"codeEntrypoint": "dist/index.js"
+}
+```
+
+### `register()` contract
+
+The entry point must export a named `register` function. The function receives a `PluginAPI` object and returns `void` (synchronous) or `Promise<void>` (for plugins that need async initialisation).
+
+```typescript
+// src/index.ts
+import type { PluginAPI } from 'plugins/plugin-api.types';
+
+export function register(api: PluginAPI): void {
+	api.compression.registerStrategy('cargo', (output, _command) => {
+		return output
+			.split('\n')
+			.filter((l) => !l.startsWith('   Compiling'))
+			.join('\n');
+	});
+
+	api.logger.info('cargo compression strategy registered');
+}
+```
+
+### `PluginAPI` surface
+
+| Namespace     | Method                        | Description                                                                                                                                      |
+| ------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `compression` | `registerStrategy(tool, fn)`  | Register an output compression strategy for an executable name. First registration wins; subsequent calls for the same key are silently ignored. |
+| `logger`      | `debug / info / warn / error` | Structured logger scoped to the plugin name.                                                                                                     |
+| `providers`   | `register(name, class)`       | _(Reserved — not yet active)_ Register an LLM provider.                                                                                          |
+| `config`      | `extend(schema)`              | _(Reserved — not yet active)_ Extend Valora's config schema.                                                                                     |
+| `lifecycle`   | `onActivate / onDeactivate`   | _(Reserved — not yet active)_ Plugin lifecycle hooks.                                                                                            |
+
+`CompressionStrategy` signature: `(output: string, command: string) => string`
+
+- `output` — raw terminal output (ANSI already stripped)
+- `command` — full command string including flags (e.g. `cargo build --release`)
+- Return the compressed string. Throwing is safe — core catches errors and falls back to the uncompressed output.
+
+### Building and layout
+
+Code plugins compile TypeScript to a single `dist/index.js` ES module. The `tsconfig.json` must set `"module": "ESNext"` and `"moduleResolution": "bundler"`. Path aliases to Valora core (`executor/*`, `config/*`, etc.) are **not resolvable at runtime** inside `dist/` — inline any constants you need.
+
+Reference layout (`src/plugins-src/valora-plugin-compression-universal/`):
+
+```
+src/plugins-src/valora-plugin-compression-universal/
+├── index.ts          # register() entry point — only calls api.compression.registerStrategy
+└── strategies.ts     # Pure filter functions, no core imports
+```
+
+Compiled output lands in `data/plugins/valora-plugin-compression-universal/` via `tsconfig.plugins.json`.
+
+---
 
 ## Shell Hooks
 

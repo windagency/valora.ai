@@ -1,18 +1,19 @@
 # Plugins
 
-> Extend Valora with additional agents, commands, hooks, prompts, and templates — packaged as self-contained plugin directories.
+> Extend Valora with additional agents, commands, hooks, prompts, templates, and compression strategies — packaged as self-contained plugin directories.
 
 ## What Plugins Can Contribute
 
-| Contribution type | What it adds                                          | Example                                     |
-| ----------------- | ----------------------------------------------------- | ------------------------------------------- |
-| `agents`          | New AI personas loaded alongside built-in agents      | Rust specialist, Kubernetes SRE             |
-| `commands`        | New CLI verbs (also exposed as MCP tools)             | `valora gain`, `valora lint-report`         |
-| `hooks`           | PreToolUse / PostToolUse shell scripts                | RTK token-filter, custom linters            |
-| `prompts`         | Reusable prompt stages for pipelines                  | Custom validators, context loaders          |
-| `templates`       | PR, PRD, plan, and standards scaffolds                | Team PR template, house-style plan          |
-| `mcps`            | Bundled external MCP server declarations              | Packaged Playwright config                  |
-| `agent-context`   | Markdown fragments injected into agent system prompts | Tool-specific docs (e.g. RTK output shapes) |
+| Contribution type | What it adds                                          | Example                                      |
+| ----------------- | ----------------------------------------------------- | -------------------------------------------- |
+| `agents`          | New AI personas loaded alongside built-in agents      | Rust specialist, Kubernetes SRE              |
+| `commands`        | New CLI verbs (also exposed as MCP tools)             | `valora gain`, `valora lint-report`          |
+| `hooks`           | PreToolUse / PostToolUse shell scripts                | RTK token-filter, custom linters             |
+| `prompts`         | Reusable prompt stages for pipelines                  | Custom validators, context loaders           |
+| `templates`       | PR, PRD, plan, and standards scaffolds                | Team PR template, house-style plan           |
+| `mcps`            | Bundled external MCP server declarations              | Packaged Playwright config                   |
+| `agent-context`   | Markdown fragments injected into agent system prompts | Tool-specific docs (e.g. RTK output shapes)  |
+| `code`            | TypeScript modules registered via `PluginAPI`         | Custom compression strategies, LLM providers |
 
 ## Installing a Plugin
 
@@ -33,6 +34,36 @@ cp -r my-plugin ~/.valora/plugins/
 ```
 
 Valora scans all three locations on every startup. No restart or rebuild required.
+
+## Code Plugins
+
+Code plugins contribute a compiled JavaScript module (`dist/index.js`) that Valora dynamically imports and passes a `PluginAPI` object to. Use them to register **compression strategies**, future LLM providers, and other runtime extensions.
+
+```json
+{
+	"name": "my-compression-plugin",
+	"version": "1.0.0",
+	"contributes": ["code"],
+	"permissions": ["code-exec"],
+	"codeEntrypoint": "dist/index.js"
+}
+```
+
+The module must export a `register(api)` function:
+
+```javascript
+// dist/index.js (compiled output)
+export function register(api) {
+	api.compression.registerStrategy('cargo', (output, _command) => {
+		return output
+			.split('\n')
+			.filter((l) => !l.startsWith('   Compiling'))
+			.join('\n');
+	});
+}
+```
+
+The built-in compression strategies for git, tsc, eslint, pnpm, pytest, and others ship as code plugins under `data/plugins/` and are the reference implementation.
 
 ## Enabling and Disabling Plugins
 
@@ -104,11 +135,12 @@ A plugin that contributes hooks must declare the `shell-hooks` permission in its
 
 Available permissions:
 
-| Permission    | Required for          |
-| ------------- | --------------------- |
-| `shell-hooks` | `hooks` contributions |
+| Permission    | Required for                              |
+| ------------- | ----------------------------------------- |
+| `shell-hooks` | `hooks` contributions                     |
+| `code-exec`   | `code` contributions (TypeScript modules) |
 
-Future permissions (`network`, `fs-write`, `mcp-connect`) are reserved for code-contribution types not yet released.
+Future permissions (`network`, `fs-write`, `mcp-connect`) are reserved for additional code-contribution surfaces not yet released.
 
 ## `requiresBinary`
 

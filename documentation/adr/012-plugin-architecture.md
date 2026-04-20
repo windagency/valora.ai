@@ -37,9 +37,9 @@ All plugin-related Zod schemas live in the schema adapter file. The manifest is 
 }
 ```
 
-Contribution types: `agents`, `commands`, `hooks`, `prompts`, `templates`, `mcps`, `agent-context`.
+Contribution types: `agents`, `commands`, `hooks`, `prompts`, `templates`, `mcps`, `agent-context`, `code`.
 
-Permissions: `shell-hooks` (required to register hook contributions). Future permissions (`network`, `fs-write`, `mcp-connect`) are declared in the schema but gated on not-yet-built code surfaces.
+Permissions: `shell-hooks` (required to register hook contributions); `code-exec` (required for `code` contributions). Future permissions (`network`, `fs-write`, `mcp-connect`) are declared in the schema but gated on not-yet-built code surfaces.
 
 ### 2. Discovery (`src/plugins/plugin-discovery.service.ts`)
 
@@ -77,19 +77,20 @@ This mirrors the existing `data/` → `~/.valora/` → `.valora/` override prece
 
 ### Positive
 
-- **Zero new code-execution surface** — plugins are data only; no dynamic `import()` of plugin code. Consistent with ADR-009 supply chain hardening.
 - **Composable integrations** — tools that already use shell hooks (RTK, pre-commit linters, custom formatters) can ship a Valora plugin with no Valora core changes.
 - **Versioned, distributable customisation** — teams can package and share agent sets, command libraries, and hook bundles as directories or tarballs with a manifest.
-- **Permission gating** — the `shell-hooks` permission creates an explicit contract; a misconfigured plugin that omits the permission simply won't have its hooks registered.
-- **Graceful degradation** — manifest validation failures and missing binaries produce warnings, never hard failures.
+- **Permission gating** — the `shell-hooks` and `code-exec` permissions create explicit contracts; a misconfigured plugin that omits a permission simply won't have the corresponding surface registered.
+- **Graceful degradation** — manifest validation failures, missing binaries, and code-module import errors produce warnings, never hard failures. A failing strategy falls back to uncompressed output rather than crashing the pipeline.
 - **Reuses existing extension points** — `AgentLoader`, `CommandLoader`, `HookExecutionService` already support multiple directories; the plugin system feeds into these without new loading logic.
-- **Horizon 1 migration complete** — As of April 2026, all embedded built-in resources have been packaged into 10 named plugins under `data/plugins/`: `valora-core-secops`, `valora-core-design`, `valora-core-platform`, `valora-core-generators`, `valora-core-product`, `valora-core-qa`, `valora-core-quality-gate`, `valora-core-docs`, `valora-core-engineering`, `valora-core-implement`. The directory `data/commands/` is now docs-only (empty `{"commands":{}}`). `data/agents/` retains `registry.json`, which drives dynamic agent selection at runtime and is not a plugin contribution.
+- **Code plugins implemented (Approach C, partial)** — As of April 2026, the `code` contribution type is active. Three built-in compression plugins (`valora-plugin-compression-universal`, `-typescript`, `-python`) register 13 tool strategies via `api.compression.registerStrategy()`. They are the reference implementation for the `PluginAPI` contract.
+- **Horizon 1 migration complete** — As of April 2026, all embedded built-in resources have been packaged into 10 named plugins under `packages/` and `data/plugins/`: `valora-core-secops`, `valora-core-design`, `valora-core-platform`, `valora-core-generators`, `valora-core-product`, `valora-core-qa`, `valora-core-quality-gate`, `valora-core-docs`, `valora-core-engineering`, `valora-core-implement`. The directory `data/commands/` is now docs-only. `data/agents/` retains `registry.json` for dynamic agent selection at runtime.
 
 ### Negative
 
-- **No code contributions** — LLM providers, custom presenters, and quality scorers cannot be shipped as plugins. These require Approach C from the exploration doc (dynamic `import()` with signing and capability gating), which is deferred.
-- **No versioned resolution algorithm** — when two plugins contribute the same agent name, the last-wins precedence is simple but may surprise authors of built-in plugins.
+- **`code-exec` scope is limited** — `PluginAPI` currently exposes only `compression`, `logger`, `providers` (reserved), `config` (reserved), and `lifecycle` (reserved). LLM providers, custom presenters, and quality scorers require the `providers` surface to be activated, which is deferred pending the full signing and capability-gating story.
+- **No versioned resolution algorithm** — when two plugins contribute the same agent name or compression strategy key, last-wins (data) or first-wins (code registry) precedence is simple but may surprise plugin authors.
 - **`requiresBinary` version is informational** — the version range in `requiresBinary` is not currently enforced (only presence on `$PATH` is checked).
+- **Code plugin constants must be inlined** — path aliases to Valora core (`config/*`, `executor/*`, etc.) are not resolvable in compiled plugin output. Plugins must inline any shared constants (e.g. `MAX_GREP_OUTPUT_LINES`).
 
 ### Neutral
 
@@ -112,9 +113,9 @@ Plugins are npm packages that export a `register(ctx: PluginContext)` function, 
 
 ### Alternative C: Hybrid (resource overlay + code contributions behind interface gate)
 
-A plugin directory can optionally contain a `contributions/` subdirectory with TypeScript files that must implement specific registered interfaces (`LLMProvider`, `QualityScorer`, etc.). Dynamic `import()` is used only for these files, gated on manifest declarations and signing.
+A plugin directory can optionally contain a compiled module at `codeEntrypoint` that must implement the `register(api: PluginAPI)` contract. Dynamic `import()` is used only for this file, gated on `contributes: ["code"]` and `permissions: ["code-exec"]` manifest declarations.
 
-**Deferred, not rejected.** This is the target end state. It is deliberately out of scope for this milestone to avoid blocking the resource-overlay foundation on unresolved security questions. An ADR amendment or ADR-013 should cover code contributions once the security model is ready.
+**Partially implemented.** The `code` contribution type and `PluginAPI` are active as of April 2026. The `compression` namespace is the first production surface. The `providers`, `config`, and `lifecycle` namespaces are declared but gated pending the signing and capability-gating story (ADR-013). The three built-in compression plugins (`valora-plugin-compression-universal`, `-typescript`, `-python`) are the reference implementation.
 
 ## References
 

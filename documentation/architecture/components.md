@@ -99,38 +99,62 @@ stateDiagram-v2
     Failed --> [*]
 ```
 
-| Component          | File                             | Responsibility                                                        |
-| ------------------ | -------------------------------- | --------------------------------------------------------------------- |
-| Pipeline           | `pipeline.ts`                    | Main orchestration logic                                              |
-| Stage Executor     | `stage-executor.ts`              | Execute individual stages                                             |
-| Output Compression | `output-compression.service.ts`  | Content-aware terminal output compression before LLM context assembly |
-| Execution Context  | `execution-context.ts`           | State container                                                       |
-| Stage Scheduler    | `stage-scheduler.ts`             | Schedule parallel/sequential                                          |
-| Pipeline Validator | `pipeline-validator.ts`          | Validate pipeline structure                                           |
-| Variable Resolver  | `variable-resolution.service.ts` | Template variable resolution                                          |
-| Pipeline Events    | `pipeline-events.ts`             | Event definitions and emission                                        |
-| Execution Strategy | `execution-strategy.ts`          | Strategy pattern implementation                                       |
+| Component          | File                             | Responsibility                                                                     |
+| ------------------ | -------------------------------- | ---------------------------------------------------------------------------------- |
+| Pipeline           | `pipeline.ts`                    | Main orchestration logic                                                           |
+| Stage Executor     | `stage-executor.ts`              | Execute individual stages                                                          |
+| Output Compression | `output-compression.service.ts`  | Content-aware terminal output compression with plugin-extensible strategy registry |
+| Execution Context  | `execution-context.ts`           | State container                                                                    |
+| Stage Scheduler    | `stage-scheduler.ts`             | Schedule parallel/sequential                                                       |
+| Pipeline Validator | `pipeline-validator.ts`          | Validate pipeline structure                                                        |
+| Variable Resolver  | `variable-resolution.service.ts` | Template variable resolution                                                       |
+| Pipeline Events    | `pipeline-events.ts`             | Event definitions and emission                                                     |
+| Execution Strategy | `execution-strategy.ts`          | Strategy pattern implementation                                                    |
 
 <details>
-<summary><strong>Output compression pipeline</strong></summary>
+<summary><strong>Output compression pipeline and plugin-contributed strategies</strong></summary>
 
 Terminal output from tool calls passes through three steps before entering the LLM context:
 
 1. **ANSI stripping** — removes colour codes and cursor-movement sequences unconditionally (zero semantic value; 5–15% overhead on typical terminal output).
-2. **Per-command filter** — applies noise reduction keyed on the executable name. Unknown commands pass through unchanged.
+2. **Strategy dispatch** — looks up the executable name in the strategy registry. If a strategy is registered, it is called; if not, output passes through unchanged. Strategies are contributed by plugins via `api.compression.registerStrategy()`.
 3. **Head+tail truncation** — final safety net ensuring output never exceeds `MAX_TERMINAL_OUTPUT_CHARS`, preserving the start (command context) and the end (summary and errors).
 
-Short outputs below `OUTPUT_COMPRESSION_THRESHOLD` skip step 2 and pass through after ANSI stripping only.
+Short outputs below `OUTPUT_COMPRESSION_THRESHOLD` skip step 2 and pass through after ANSI stripping only. If a strategy throws, the core catches the error and returns the uncompressed (but ANSI-stripped) output — strategies cannot crash the pipeline.
 
-| Command         | What is collapsed                             | What is preserved                                    |
-| --------------- | --------------------------------------------- | ---------------------------------------------------- |
-| `git log`       | Multi-line commit entries                     | One line per commit, capped at 20 entries            |
-| `git diff`      | `index …` and mode lines                      | Changed lines (`+`/`-`) and hunk headers (`@@`)      |
-| `git status`    | Verbose section prose and blank lines         | Branch line, file-status lines, section headers      |
-| `tsc`           | Duplicate errors for the same diagnostic code | Up to 3 examples per `TSxxxx` code                   |
-| `eslint`        | Duplicate violations for the same rule        | Up to 2 examples per rule                            |
-| `jest`/`vitest` | Passing test-suite lines                      | A `[N test suites passed]` summary plus all failures |
-| `pnpm`          | Progress spinner and `Progress:` lines        | Warnings, errors, and install summary                |
+### Built-in strategies (shipped as `data/plugins/`)
+
+| Plugin                                 | Commands                        | What is collapsed                             | What is preserved                               |
+| -------------------------------------- | ------------------------------- | --------------------------------------------- | ----------------------------------------------- |
+| `valora-plugin-compression-universal`  | `git log`                       | Multi-line commit entries                     | One line per commit, capped at 20 entries       |
+|                                        | `git diff`                      | `index …` and mode lines                      | Changed lines (`+`/`-`) and hunk headers (`@@`) |
+|                                        | `git status`                    | Verbose section prose and blank lines         | Branch line, file-status lines, section headers |
+|                                        | `grep` / `rg`                   | Excess match lines                            | Up to 200 result lines                          |
+|                                        | `docker`                        | Non-error build layers                        | Error layers and final summary                  |
+|                                        | `make`                          | Entering/leaving directory lines              | Errors and final output                         |
+| `valora-plugin-compression-typescript` | `tsc`                           | Duplicate errors for the same diagnostic code | Up to 3 examples per `TSxxxx` code              |
+|                                        | `eslint`                        | Duplicate violations for the same rule        | Up to 2 examples per rule                       |
+|                                        | `jest` / `vitest`               | Passing test-suite lines                      | A `[N suites passed]` summary plus all failures |
+|                                        | `pnpm` / `npm` / `npx` / `yarn` | Progress spinner and `Progress:` lines        | Warnings, errors, and install summary           |
+| `valora-plugin-compression-python`     | `python`                        | `>>>` REPL lines                              | Errors and final output                         |
+|                                        | `pytest`                        | Passing test lines                            | Failed tests, errors, and summary               |
+
+### Registering a custom strategy
+
+```typescript
+// In your plugin's index.ts / register() function
+export function register(api: PluginAPI): void {
+	api.compression.registerStrategy('cargo', (output, _command) => {
+		// Collapse "Compiling …" lines, keep errors and the final summary
+		return output
+			.split('\n')
+			.filter((l) => !l.startsWith('   Compiling'))
+			.join('\n');
+	});
+}
+```
+
+Registration is first-wins: if two plugins register for the same tool name, the first one loaded (built-in `data/plugins/` wins over user and project plugins).
 
 </details>
 
