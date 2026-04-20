@@ -1,0 +1,23 @@
+{
+	"name": "@windagency/valora-plugin-docs",
+	"version": "1.0.0",
+	"description": "Documentation generation commands for Valora (generate-docs, generate-all-documentation). Requires valora-plugin-engineering for the lead agent.",
+	"keywords": [
+		"valora-plugin"
+	],
+	"license": "UNLICENSED",
+	"files": [
+		"valora-plugin.json",
+		"commands"
+	],
+	"engines": {
+		"node": ">=22.0.0"
+	},
+	"peerDependencies": {
+		"@windagency/valora": ">=0.1.0",
+		"@windagency/valora-plugin-engineering": ">=1.0.0"
+	},
+	"devDependencies": {
+		"@windagency/valora-plugin-engineering": "workspace:*"
+	}
+}

@@ -1,0 +1,7 @@
+{
+	"name": "valora-core-docs",
+	"version": "1.0.0",
+	"description": "Documentation generation commands (generate-docs, generate-all-documentation). Requires the lead agent (contributed by valora-core-engineering).",
+	"engines": { "valora": ">=0.1.0" },
+	"contributes": ["commands"]
+}

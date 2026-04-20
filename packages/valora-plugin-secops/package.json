@@ -1,0 +1,23 @@
+{
+	"name": "@windagency/valora-plugin-secops",
+	"version": "1.0.0",
+	"description": "Security Operations Engineer agent for Valora (threat detection, vulnerability management, incident response). Requires valora-plugin-platform.",
+	"keywords": [
+		"valora-plugin"
+	],
+	"license": "UNLICENSED",
+	"files": [
+		"valora-plugin.json",
+		"agents"
+	],
+	"engines": {
+		"node": ">=22.0.0"
+	},
+	"peerDependencies": {
+		"@windagency/valora": ">=0.1.0",
+		"@windagency/valora-plugin-platform": ">=1.0.0"
+	},
+	"devDependencies": {
+		"@windagency/valora-plugin-platform": "workspace:*"
+	}
+}

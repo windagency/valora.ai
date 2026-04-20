@@ -1,0 +1,19 @@
+{
+	"name": "@windagency/valora-plugin-design",
+	"version": "1.0.0",
+	"description": "UI/UX designer agent for Valora (interface design, accessibility, user experience advisory).",
+	"keywords": [
+		"valora-plugin"
+	],
+	"license": "UNLICENSED",
+	"files": [
+		"valora-plugin.json",
+		"agents"
+	],
+	"engines": {
+		"node": ">=22.0.0"
+	},
+	"peerDependencies": {
+		"@windagency/valora": ">=0.1.0"
+	}
+}

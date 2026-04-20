@@ -205,6 +205,68 @@ importers:
         specifier: ^1.0.0
         version: 1.6.1(@types/node@20.19.30)
 
+  packages/valora-plugin-design:
+    dependencies:
+      '@windagency/valora':
+        specifier: '>=0.1.0'
+        version: 2.4.0(ws@8.19.0)
+
+  packages/valora-plugin-docs:
+    dependencies:
+      '@windagency/valora':
+        specifier: '>=0.1.0'
+        version: 2.4.0(ws@8.19.0)
+    devDependencies:
+      '@windagency/valora-plugin-engineering':
+        specifier: workspace:*
+        version: link:../valora-plugin-engineering
+
+  packages/valora-plugin-engineering:
+    dependencies:
+      '@windagency/valora':
+        specifier: '>=0.1.0'
+        version: 2.4.0(ws@8.19.0)
+
+  packages/valora-plugin-implement:
+    dependencies:
+      '@windagency/valora':
+        specifier: '>=0.1.0'
+        version: 2.4.0(ws@8.19.0)
+
+  packages/valora-plugin-platform:
+    dependencies:
+      '@windagency/valora':
+        specifier: '>=0.1.0'
+        version: 2.4.0(ws@8.19.0)
+
+  packages/valora-plugin-product:
+    dependencies:
+      '@windagency/valora':
+        specifier: '>=0.1.0'
+        version: 2.4.0(ws@8.19.0)
+
+  packages/valora-plugin-qa:
+    dependencies:
+      '@windagency/valora':
+        specifier: '>=0.1.0'
+        version: 2.4.0(ws@8.19.0)
+
+  packages/valora-plugin-quality-gate:
+    dependencies:
+      '@windagency/valora':
+        specifier: '>=0.1.0'
+        version: 2.4.0(ws@8.19.0)
+
+  packages/valora-plugin-secops:
+    dependencies:
+      '@windagency/valora':
+        specifier: '>=0.1.0'
+        version: 2.4.0(ws@8.19.0)
+    devDependencies:
+      '@windagency/valora-plugin-platform':
+        specifier: workspace:*
+        version: link:../valora-plugin-platform
+
 packages:
   '@alcalzone/ansi-tokenize@0.2.4':
     resolution:
@@ -1751,6 +1813,12 @@ packages:
   '@vitest/utils@1.6.1':
     resolution:
       { integrity: sha512-jOrrUvXM4Av9ZWiG1EajNto0u96kWAhJ1LmPmJhXXQx/32MecEKd10pOLYgS2BQx1TgkGhloPU1ArDW2vvaY6g== }
+
+  '@windagency/valora@2.4.0':
+    resolution:
+      { integrity: sha512-k9uJIbldyRpmrQCEq2AkQMchZ34PUB3tCMD+gvBiw539J98ciFbbEcXqyrikXSZFAhOG1GbDrbLlloitxk8/Ww== }
+    engines: { node: '>=18.0.0' }
+    hasBin: true
 
   abort-controller@3.0.0:
     resolution:
@@ -6652,6 +6720,44 @@ snapshots:
       estree-walker: 3.0.3
       loupe: 2.3.7
       pretty-format: 29.7.0
+
+  '@windagency/valora@2.4.0(ws@8.19.0)':
+    dependencies:
+      '@anthropic-ai/sdk': 0.69.0(zod@3.25.76)
+      '@anthropic-ai/vertex-sdk': 0.14.2(zod@3.25.76)
+      '@fastify/cors': 11.2.0
+      '@fastify/helmet': 13.0.2
+      '@google/generative-ai': 0.21.0
+      '@modelcontextprotocol/sdk': 1.27.1(zod@3.25.76)
+      '@types/react': 19.2.10
+      archiver: 7.0.1
+      chalk: 5.6.2
+      commander: 12.1.0
+      fastify: 5.7.4
+      gray-matter: 4.0.3
+      ink: 6.6.0(@types/react@19.2.10)(react@19.2.4)
+      inquirer: 10.2.2
+      nanoid: 5.1.6
+      openai: 4.104.0(ws@8.19.0)(zod@3.25.76)
+      ora: 8.2.0
+      react: 19.2.4
+      tree-sitter-wasms: 0.1.11
+      undici: 7.19.2
+      unzipper: 0.12.3
+      vscode-languageserver-protocol: 3.17.5
+      web-tree-sitter: 0.24.7
+      yaml: 2.8.2
+      zod: 3.25.76
+    transitivePeerDependencies:
+      - '@cfworker/json-schema'
+      - bare-abort-controller
+      - bufferutil
+      - encoding
+      - react-devtools-core
+      - react-native-b4a
+      - supports-color
+      - utf-8-validate
+      - ws
 
   abort-controller@3.0.0:
     dependencies:

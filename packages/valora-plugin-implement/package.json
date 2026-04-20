@@ -1,0 +1,20 @@
+{
+	"name": "@windagency/valora-plugin-implement",
+	"version": "1.0.0",
+	"description": "TypeScript software-engineer agent family for Valora (software-engineer-typescript, -backend, -frontend, -frontend-react) and the implement command with dynamic agent selection.",
+	"keywords": [
+		"valora-plugin"
+	],
+	"license": "UNLICENSED",
+	"files": [
+		"valora-plugin.json",
+		"agents",
+		"commands"
+	],
+	"engines": {
+		"node": ">=22.0.0"
+	},
+	"peerDependencies": {
+		"@windagency/valora": ">=0.1.0"
+	}
+}

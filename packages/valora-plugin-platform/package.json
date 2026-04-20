@@ -1,0 +1,19 @@
+{
+	"name": "@windagency/valora-plugin-platform",
+	"version": "1.0.0",
+	"description": "Platform Engineer agent for Valora (cloud-native architecture, Kubernetes, CI/CD, infrastructure reliability).",
+	"keywords": [
+		"valora-plugin"
+	],
+	"license": "UNLICENSED",
+	"files": [
+		"valora-plugin.json",
+		"agents"
+	],
+	"engines": {
+		"node": ">=22.0.0"
+	},
+	"peerDependencies": {
+		"@windagency/valora": ">=0.1.0"
+	}
+}

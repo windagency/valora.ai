@@ -1,0 +1,20 @@
+{
+	"name": "@windagency/valora-plugin-qa",
+	"version": "1.0.0",
+	"description": "QA agent and testing workflow commands for Valora (test, validate-coverage, pre-check).",
+	"keywords": [
+		"valora-plugin"
+	],
+	"license": "UNLICENSED",
+	"files": [
+		"valora-plugin.json",
+		"agents",
+		"commands"
+	],
+	"engines": {
+		"node": ">=22.0.0"
+	},
+	"peerDependencies": {
+		"@windagency/valora": ">=0.1.0"
+	}
+}

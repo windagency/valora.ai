@@ -1,0 +1,20 @@
+{
+	"name": "@windagency/valora-plugin-quality-gate",
+	"version": "1.0.0",
+	"description": "Asserter agent and pre-testing static-assertion commands for Valora (assert).",
+	"keywords": [
+		"valora-plugin"
+	],
+	"license": "UNLICENSED",
+	"files": [
+		"valora-plugin.json",
+		"agents",
+		"commands"
+	],
+	"engines": {
+		"node": ">=22.0.0"
+	},
+	"peerDependencies": {
+		"@windagency/valora": ">=0.1.0"
+	}
+}

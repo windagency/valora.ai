@@ -1,0 +1,20 @@
+{
+	"name": "@windagency/valora-plugin-engineering",
+	"version": "1.0.0",
+	"description": "Lead engineer agent and core engineering workflow commands for Valora (commit, create-pr, plan, plan-architecture, plan-implementation, review-code, review-functional, review-plan, validate-parallel, validate-plan, gather-knowledge).",
+	"keywords": [
+		"valora-plugin"
+	],
+	"license": "UNLICENSED",
+	"files": [
+		"valora-plugin.json",
+		"agents",
+		"commands"
+	],
+	"engines": {
+		"node": ">=22.0.0"
+	},
+	"peerDependencies": {
+		"@windagency/valora": ">=0.1.0"
+	}
+}
