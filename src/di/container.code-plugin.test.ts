@@ -112,3 +112,55 @@ describe('initializePlugins — code plugin dynamic import', () => {
 		);
 	});
 });
+
+describe('initializePlugins — compression strategy registration', () => {
+	let tmpDir: string;
+
+	beforeEach(() => {
+		tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'valora-compression-test-'));
+	});
+
+	afterEach(() => {
+		fs.rmSync(tmpDir, { recursive: true, force: true });
+		vi.resetModules();
+	});
+
+	it('registers a compression strategy via api.compression.registerStrategy()', async () => {
+		const entrypointPath = path.join(tmpDir, 'compression-plugin.mjs');
+		fs.writeFileSync(
+			entrypointPath,
+			[
+				'export async function register(api) {',
+				'  api.compression.registerStrategy("mytesttool", (output) => "compressed:" + output.slice(0, 5));',
+				'}'
+			].join('\n')
+		);
+
+		const { PluginLoaderService } = await import('plugins/plugin-loader.service');
+		vi.mocked(PluginLoaderService).mockImplementation(
+			() =>
+				({
+					loadAll: vi.fn().mockReturnValue([
+						{
+							codeEntrypoint: entrypointPath,
+							manifest: { name: 'compression-integration-plugin', version: '1.0.0' },
+							pluginDir: tmpDir,
+							status: 'enabled'
+						}
+					])
+				}) as never
+		);
+
+		const { createContainer, initializePlugins } = await import('di/container');
+		const { getStrategy, resetRegistry } = await import('executor/output-compression.service');
+
+		const container = createContainer();
+		await initializePlugins(container);
+
+		const strategy = getStrategy('mytesttool');
+		expect(strategy).toBeDefined();
+		expect(strategy?.('hello world', 'mytesttool run')).toBe('compressed:hello');
+
+		resetRegistry();
+	});
+});
