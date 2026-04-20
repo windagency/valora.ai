@@ -128,6 +128,19 @@ describe('valora update command', () => {
 		expect(logged()).toContain('already up to date');
 	});
 
+	it('--force causes install to run even when on latest version', async () => {
+		// Same version as current (0.0.1), but --force should override the check
+		fetchLatestVersionMock.mockResolvedValue('0.0.1');
+		detectPackageManagerMock.mockReturnValue('npm');
+		spawnMock.mockImplementation(() => makeChild(0));
+
+		const program = makeProgram();
+		await program.parseAsync(['node', 'valora', 'update', '--force']);
+
+		expect(spawnMock).toHaveBeenCalledTimes(1);
+		expect(writeUpdateStateMock).toHaveBeenCalledTimes(1);
+	});
+
 	it('prints "Unable to check" when the registry is unreachable, with no spawn', async () => {
 		fetchLatestVersionMock.mockResolvedValue(null);
 
