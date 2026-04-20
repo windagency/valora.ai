@@ -1,0 +1,39 @@
+/**
+ * Throttle logic for the auto-update check.
+ */
+
+export interface UpdateCheckState {
+	schemaVersion: 1;
+	lastCheckAt: string;
+	lastSuccessAt: string | null;
+	latestVersion: string | null;
+	latestVersionFetchedAt: string | null;
+	remindedForVersion: string | null;
+	installedVersionAtCheck: string | null;
+}
+
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+/**
+ * Returns true when a new update check should run.
+ *
+ * - First run (lastCheckAt = epoch): yes
+ * - lastCheckAt in the future (clock skew): yes
+ * - lastCheckAt + frequencyDays <= now: yes
+ * - Otherwise: no
+ */
+export function shouldCheckNow(state: UpdateCheckState, frequencyDays: number, now: Date): boolean {
+	const lastMs = Date.parse(state.lastCheckAt);
+	if (!Number.isFinite(lastMs)) return true;
+
+	const nowMs = now.getTime();
+
+	// Epoch means never checked
+	if (lastMs === 0) return true;
+
+	// Clock skew — force a recheck
+	if (lastMs > nowMs) return true;
+
+	const threshold = lastMs + frequencyDays * MS_PER_DAY;
+	return threshold <= nowMs;
+}

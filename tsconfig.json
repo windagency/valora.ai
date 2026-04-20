@@ -45,6 +45,7 @@
 			"src/*": ["./src/*"],
 			"types/*": ["./src/types/*"],
 			"ui/*": ["./src/ui/*"],
+			"updater/*": ["./src/updater/*"],
 			"utils/*": ["./src/utils/*"]
 		},
 		"removeComments": false,
