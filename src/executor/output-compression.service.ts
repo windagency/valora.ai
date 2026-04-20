@@ -28,6 +28,25 @@ const ESLINT_MAX_EXAMPLES_PER_RULE = 2;
 /** ANSI CSI escape sequence — matches colour codes, cursor movement, etc. */
 const ANSI_ESCAPE_RE = new RegExp(String.fromCharCode(0x1b) + '\\[[0-9;]*[a-zA-Z]', 'g');
 
+// ── Compression strategy registry ─────────────────────────────────────────────
+
+export type CompressionStrategy = (output: string, command: string) => string;
+
+const registry = new Map<string, CompressionStrategy>();
+
+export function getStrategy(tool: string): CompressionStrategy | undefined {
+	return registry.get(tool);
+}
+
+export function registerStrategy(tool: string, fn: CompressionStrategy): void {
+	if (registry.has(tool)) return;
+	registry.set(tool, fn);
+}
+
+export function resetRegistry(): void {
+	registry.clear();
+}
+
 // ── Compression stats accumulator ─────────────────────────────────────────────
 
 interface CompressionStats {
@@ -104,11 +123,19 @@ export function compressTerminalOutput(command: string, output: string): string 
 	}
 
 	const tool = firstToken(command);
-	const compressed = applyFilter(tool, clean, command);
+	const strategy = registry.get(tool);
+	const compressed = strategy
+		? (() => {
+				try {
+					return strategy(clean, command);
+				} catch {
+					return clean;
+				}
+			})()
+		: applyFilter(tool, clean, command);
+
 	const result = truncateTerminalOutput(compressed);
-
 	recordCompression(clean.length, result.length);
-
 	return result;
 }
 

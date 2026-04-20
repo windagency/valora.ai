@@ -16,8 +16,12 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import {
 	compressTerminalOutput,
+	type CompressionStrategy,
 	getCompressionStats,
+	getStrategy,
+	registerStrategy,
 	resetCompressionStats,
+	resetRegistry,
 	stripAnsiCodes,
 	truncateTerminalOutput
 } from 'executor/output-compression.service';
@@ -590,5 +594,49 @@ describe('compression stats', () => {
 		expect(stats.calls).toBe(0);
 		expect(stats.inputChars).toBe(0);
 		expect(stats.outputChars).toBe(0);
+	});
+});
+
+describe('compression registry', () => {
+	afterEach(() => {
+		resetRegistry();
+	});
+
+	it('getStrategy returns undefined for an unregistered tool', () => {
+		expect(getStrategy('bazel')).toBeUndefined();
+	});
+
+	it('registerStrategy + getStrategy round-trip', () => {
+		const fn: CompressionStrategy = (output) => output.toUpperCase();
+		registerStrategy('mytool', fn);
+		expect(getStrategy('mytool')).toBe(fn);
+	});
+
+	it('first-wins: second registerStrategy call for the same key is a no-op', () => {
+		const first: CompressionStrategy = () => 'first';
+		const second: CompressionStrategy = () => 'second';
+		registerStrategy('mytool', first);
+		registerStrategy('mytool', second);
+		expect(getStrategy('mytool')).toBe(first);
+	});
+
+	it('resetRegistry clears all registered strategies', () => {
+		registerStrategy('mytool', (o) => o);
+		resetRegistry();
+		expect(getStrategy('mytool')).toBeUndefined();
+	});
+
+	it('compressTerminalOutput uses registered strategy when available', () => {
+		registerStrategy('mytool', () => 'compressed-result');
+		const longInput = pad('x', 5_000);
+		expect(compressTerminalOutput('mytool --flag', longInput)).toBe('compressed-result');
+	});
+
+	it('compressTerminalOutput catches strategy errors and returns uncompressed output', () => {
+		registerStrategy('mytool', () => {
+			throw new Error('strategy failed');
+		});
+		const longInput = pad('x', 5_000);
+		expect(compressTerminalOutput('mytool --flag', longInput)).toBe(longInput);
 	});
 });
