@@ -1,6 +1,7 @@
 import type { DIContainer } from 'di/container';
 import type { LoadedPlugin } from 'types/plugin.types';
 
+import { registerStrategy } from 'executor/output-compression.service';
 import { getProviderRegistry } from 'llm/registry';
 import { getLogger } from 'output/logger';
 
@@ -20,6 +21,11 @@ export function createPluginAPI(
 	const logger = getLogger();
 
 	return {
+		compression: {
+			registerStrategy(tool, fn) {
+				registerStrategy(tool, fn);
+			}
+		},
 		config: {
 			extend(_schema) {
 				// Stubbed: config schema extension is defined in the interface for future use

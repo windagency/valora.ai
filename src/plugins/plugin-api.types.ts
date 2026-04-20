@@ -1,13 +1,19 @@
 import type { ZodTypeAny } from 'zod';
 
+import type { CompressionStrategy } from 'executor/output-compression.service';
 import type { Logger } from 'output/logger';
 import type { LLMProvider } from 'types/llm.types';
+
+export type { CompressionStrategy };
 
 export interface CodePluginModule {
 	register(api: PluginAPI): Promise<void> | void;
 }
 
 export interface PluginAPI {
+	compression: {
+		registerStrategy(tool: string, fn: CompressionStrategy): void;
+	};
 	config: {
 		extend(schema: ZodTypeAny): void;
 	};

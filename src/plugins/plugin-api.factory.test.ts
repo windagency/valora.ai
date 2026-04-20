@@ -99,4 +99,16 @@ describe('createPluginAPI', () => {
 
 		expect(registry.deactivateHooks).toContain(hook);
 	});
+
+	it('registers a compression strategy via api.compression.registerStrategy()', async () => {
+		const { getStrategy, resetRegistry } = await import('executor/output-compression.service');
+
+		const fn = (output: string) => output.slice(0, 10);
+		const api = createPluginAPI({} as never, makePlugin(), makeRegistry());
+
+		api.compression.registerStrategy('mytool', fn);
+
+		expect(getStrategy('mytool')).toBe(fn);
+		resetRegistry();
+	});
 });
