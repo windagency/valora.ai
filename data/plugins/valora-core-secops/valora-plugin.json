@@ -1,8 +1,0 @@
-{
-	"name": "valora-core-secops",
-	"version": "1.0.0",
-	"description": "Security Operations Engineer agent for threat detection, vulnerability management, and incident response.",
-	"engines": { "valora": ">=0.1.0" },
-	"contributes": ["agents"],
-	"requires": ["valora-core-platform"]
-}

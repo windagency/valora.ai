@@ -1,7 +1,0 @@
-{
-	"name": "valora-core-design",
-	"version": "1.0.0",
-	"description": "UI/UX Designer agent for user experience, accessibility, and interface design workflows.",
-	"engines": { "valora": ">=0.1.0" },
-	"contributes": ["agents"]
-}

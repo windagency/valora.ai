@@ -294,9 +294,5 @@ vendor/
 # Git worktrees
 .worktrees/
 
-# Compiled plugin output
-data/plugins/valora-provider-ollama/index.js
-data/plugins/valora-provider-ollama/*.js.map
-
 # valora-plugin-ollama compiled output (published from dist/, not committed)
 packages/valora-plugin-ollama/dist/

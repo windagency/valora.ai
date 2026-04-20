@@ -1,9 +1,0 @@
-{
-	"name": "valora-provider-ollama",
-	"version": "1.0.0",
-	"description": "Self-managed Ollama provider — downloads the Ollama binary on first use and runs it locally. Supports any model available via ollama pull.",
-	"engines": { "valora": ">=0.1.0" },
-	"contributes": ["code"],
-	"permissions": ["code-exec", "fs-write", "network"],
-	"codeEntrypoint": "index.js"
-}
