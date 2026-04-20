@@ -15,6 +15,7 @@
 			"output/*": ["./output/*"],
 			"session/*": ["./session/*"],
 			"types/*": ["./types/*"],
+			"updater/*": ["./updater/*"],
 			"utils/*": ["./utils/*"]
 		}
 	}

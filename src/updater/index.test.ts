@@ -6,8 +6,7 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { scheduleUpdateCheck, settleUpdateCheck } from './index';
-import { readUpdateState, writeUpdateState } from './state';
-import { DEFAULT_STATE } from './state';
+import { DEFAULT_STATE, readUpdateState, writeUpdateState } from './state';
 import type { UpdateCheckState } from './throttle';
 
 let tmpDir: string;
@@ -16,6 +15,8 @@ let fetchSpy: ReturnType<typeof vi.spyOn>;
 beforeEach(async () => {
 	tmpDir = path.join(os.tmpdir(), `valora-updater-idx-${randomUUID()}`);
 	await fs.mkdir(tmpDir, { recursive: true });
+	// drain any pending from a previous test before starting the next
+	await settleUpdateCheck(0);
 	fetchSpy = vi.spyOn(globalThis, 'fetch');
 });
 
