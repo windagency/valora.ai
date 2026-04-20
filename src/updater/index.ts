@@ -21,10 +21,10 @@ export { readUpdateState, writeUpdateState } from './state';
 export { shouldCheckNow, type UpdateCheckState } from './throttle';
 
 interface PendingContext {
-	promise: Promise<string | null>;
+	promise: Promise<string | null | '__skipped__'>;
 	stateDir: string;
 	currentVersion: string;
-	existingState: UpdateCheckState;
+	statePromise: Promise<UpdateCheckState>;
 	now: Date;
 }
 
@@ -40,25 +40,20 @@ export function scheduleUpdateCheck(
 	frequencyDays: number,
 	now: Date = new Date()
 ): void {
-	// Kick off async work without awaiting.
-	void (async () => {
-		try {
-			const state = await readUpdateState(stateDir);
-			if (!shouldCheckNow(state, frequencyDays, now)) {
-				return;
-			}
-			const promise = fetchLatestVersion(currentVersion);
-			pending = {
-				promise,
-				stateDir,
-				currentVersion,
-				existingState: state,
-				now,
-			};
-		} catch {
-			// Never let the background work throw.
-		}
-	})();
+	const statePromise = readUpdateState(stateDir);
+	const fetchPromise: Promise<string | null | '__skipped__'> = statePromise.then((state) => {
+		if (!shouldCheckNow(state, frequencyDays, now)) return '__skipped__';
+		return fetchLatestVersion(currentVersion);
+	}).catch(() => null);
+
+	// Store synchronously so settleUpdateCheck always sees it
+	pending = {
+		promise: fetchPromise,
+		stateDir,
+		currentVersion,
+		statePromise,
+		now,
+	};
 }
 
 /**
@@ -76,18 +71,27 @@ export async function settleUpdateCheck(timeoutMs: number = 200): Promise<Update
 	});
 
 	const result = await Promise.race([ctx.promise, timeoutPromise]);
-	if (result === '__timeout__') {
+	if (result === '__timeout__' || result === '__skipped__') {
+		return null;
+	}
+
+	// Await the state promise to get the resolved state
+	let existingState: UpdateCheckState;
+	try {
+		existingState = await ctx.statePromise;
+	} catch {
+		// If state read failed, we cannot proceed
 		return null;
 	}
 
 	const latestVersion = result;
 	const nowIso = ctx.now.toISOString();
 	const updated: UpdateCheckState = {
-		...ctx.existingState,
+		...existingState,
 		lastCheckAt: nowIso,
-		lastSuccessAt: latestVersion !== null ? nowIso : ctx.existingState.lastSuccessAt,
-		latestVersion: latestVersion ?? ctx.existingState.latestVersion,
-		latestVersionFetchedAt: latestVersion !== null ? nowIso : ctx.existingState.latestVersionFetchedAt,
+		lastSuccessAt: latestVersion !== null ? nowIso : existingState.lastSuccessAt,
+		latestVersion: latestVersion ?? existingState.latestVersion,
+		latestVersionFetchedAt: latestVersion !== null ? nowIso : existingState.latestVersionFetchedAt,
 		installedVersionAtCheck: ctx.currentVersion,
 	};
 
