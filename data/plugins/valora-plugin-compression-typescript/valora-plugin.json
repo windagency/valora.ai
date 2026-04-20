@@ -1,0 +1,10 @@
+{
+	"name": "valora-plugin-compression-typescript",
+	"version": "1.0.0",
+	"description": "Compression strategies for the TypeScript/JavaScript ecosystem: tsc, eslint, jest, vitest, pnpm, npm, npx, yarn.",
+	"engines": { "valora": ">=0.1.0" },
+	"contributes": ["code"],
+	"permissions": ["code-exec"],
+	"requires": ["valora-plugin-compression-universal"],
+	"codeEntrypoint": "index.js"
+}

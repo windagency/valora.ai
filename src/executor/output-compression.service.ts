@@ -17,12 +17,6 @@
 import { MAX_TERMINAL_OUTPUT_CHARS, OUTPUT_COMPRESSION_THRESHOLD } from 'config/constants';
 import { getLogger } from 'output/logger';
 
-/** Maximum examples per diagnostic code when compressing `tsc` output. */
-const TSC_MAX_EXAMPLES_PER_CODE = 3;
-
-/** Maximum examples per lint rule when compressing `eslint` output. */
-const ESLINT_MAX_EXAMPLES_PER_RULE = 2;
-
 /** ANSI CSI escape sequence — matches colour codes, cursor movement, etc. */
 const ANSI_ESCAPE_RE = new RegExp(String.fromCharCode(0x1b) + '\\[[0-9;]*[a-zA-Z]', 'g');
 
@@ -145,16 +139,8 @@ export function compressTerminalOutput(command: string, output: string): string 
 
 const TOOL_FILTERS: Record<string, (output: string, command: string) => string> = {
 	cargo: filterCargo,
-	eslint: filterEslint,
-	jest: filterTestRunner,
-	npm: filterPackageManager,
-	npx: filterPackageManager,
-	pnpm: filterPackageManager,
 	pytest: filterPython,
-	python: filterPython,
-	tsc: filterTsc,
-	vitest: filterTestRunner,
-	yarn: filterPackageManager
+	python: filterPython
 };
 
 function applyFilter(tool: string, output: string, command: string): string {
@@ -163,142 +149,6 @@ function applyFilter(tool: string, output: string, command: string): string {
 
 function firstToken(command: string): string {
 	return command.trimStart().split(/\s+/)[0] ?? '';
-}
-
-// ── Test runner filter ────────────────────────────────────────────────────────
-
-function flushPassCount(kept: string[], passCount: number): void {
-	if (passCount > 0) kept.push(formatPassSummary(passCount));
-}
-
-function formatPassSummary(passCount: number): string {
-	return `[${passCount} test suite${passCount === 1 ? '' : 's'} passed]`;
-}
-
-/**
- * Compress vitest/jest output by collapsing passing suites to a count summary
- * and preserving all failing suites with their error traces.
- */
-function filterTestRunner(output: string): string {
-	const lines = output.split('\n');
-	const kept: string[] = [];
-	let passCount = 0;
-
-	for (const line of lines) {
-		const isPassLine = /^\s*(✓|PASS\b|passed\b)/.test(line);
-		const isFailLine = /^\s*(✗|✕|FAIL\b|×)/.test(line);
-		const isSummaryLine = /^(Tests?|Test Files?|Suites?|Duration|Time|Ran all)/.test(line);
-
-		if (isFailLine) {
-			flushPassCount(kept, passCount);
-			passCount = 0;
-			kept.push(line);
-		} else if (isPassLine) {
-			passCount++;
-		} else if (isSummaryLine) {
-			flushPassCount(kept, passCount);
-			passCount = 0;
-			kept.push(line);
-		} else {
-			kept.push(line);
-		}
-	}
-
-	flushPassCount(kept, passCount);
-	return kept.join('\n');
-}
-
-// ── Package manager filter ────────────────────────────────────────────────────
-
-/**
- * Compress npm/npx/pnpm/yarn output by removing progress spinners, deprecation
- * warnings, and advisory noise while keeping errors and the final install summary.
- */
-function filterPackageManager(output: string): string {
-	return output
-		.split('\n')
-		.filter((line) => !isPackageManagerNoise(line))
-		.join('\n');
-}
-
-function isPackageManagerNoise(line: string): boolean {
-	// pnpm braille spinner
-	if (/^[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏]/.test(line)) return true;
-	// pnpm Progress line
-	if (/^Progress:/.test(line)) return true;
-	// npm/yarn warn lines
-	if (/^npm warn/i.test(line)) return true;
-	if (/^warning /i.test(line)) return true;
-	// Peer-dep deprecation lines
-	if (/^npm warn deprecated/i.test(line)) return true;
-	if (/^warning ".+ >/.test(line)) return true;
-	// Audit advisory prose
-	if (/^found \d+ vulnerabilit/i.test(line)) return true;
-	return false;
-}
-
-// ── TypeScript filter ─────────────────────────────────────────────────────────
-
-/**
- * Compress `tsc` output by grouping diagnostics by error code, showing up to
- * TSC_MAX_EXAMPLES_PER_CODE occurrences of each code with a trailing ellipsis.
- */
-function filterTsc(output: string): string {
-	const lines = output.split('\n');
-	const errorsByCode = new Map<string, string[]>();
-	const other: string[] = [];
-
-	for (const line of lines) {
-		// TypeScript diagnostic format: "path(line,col): error TS1234: message"
-		const match = line.match(/: (error|warning) (TS\d+):/);
-		if (match) {
-			const code = match[2] ?? '';
-			const bucket = errorsByCode.get(code);
-			if (!bucket) {
-				errorsByCode.set(code, [line]);
-			} else if (bucket.length < TSC_MAX_EXAMPLES_PER_CODE) {
-				bucket.push(line);
-			} else if (bucket.length === TSC_MAX_EXAMPLES_PER_CODE) {
-				bucket.push(`  ... (more ${code} errors)`);
-			}
-		} else {
-			other.push(line);
-		}
-	}
-
-	return [...other, ...[...errorsByCode.values()].flat()].join('\n');
-}
-
-// ── ESLint filter ─────────────────────────────────────────────────────────────
-
-/**
- * Compress ESLint output by grouping violations by rule, showing up to
- * ESLINT_MAX_EXAMPLES_PER_RULE occurrences with a trailing ellipsis.
- */
-function filterEslint(output: string): string {
-	const lines = output.split('\n');
-	const byRule = new Map<string, string[]>();
-	const other: string[] = [];
-
-	for (const line of lines) {
-		// ESLint line format: "  10:5  error  no-unused-vars  message text"
-		const match = line.match(/^\s+\d+:\d+\s+(error|warning)\s+(\S+)/);
-		if (match) {
-			const rule = match[2] ?? '';
-			const bucket = byRule.get(rule);
-			if (!bucket) {
-				byRule.set(rule, [line]);
-			} else if (bucket.length < ESLINT_MAX_EXAMPLES_PER_RULE) {
-				bucket.push(line);
-			} else if (bucket.length === ESLINT_MAX_EXAMPLES_PER_RULE) {
-				bucket.push(`  ... (more ${rule} violations)`);
-			}
-		} else {
-			other.push(line);
-		}
-	}
-
-	return [...other, ...[...byRule.values()].flat()].join('\n');
 }
 
 // ── Cargo filter ──────────────────────────────────────────────────────────────

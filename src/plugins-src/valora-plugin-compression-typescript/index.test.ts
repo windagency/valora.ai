@@ -14,12 +14,12 @@ function makeApi(): PluginAPI {
 	};
 }
 
-describe('valora-plugin-compression-universal register()', () => {
-	it('registers all five tool keys', async () => {
+describe('valora-plugin-compression-typescript register()', () => {
+	it('registers all eight tool keys', () => {
 		const api = makeApi();
 		register(api);
 		const calls = vi.mocked(api.compression.registerStrategy).mock.calls.map(([tool]) => tool);
-		expect(calls).toEqual(expect.arrayContaining(['git', 'grep', 'rg', 'docker', 'make']));
-		expect(calls).toHaveLength(5);
+		expect(calls).toEqual(expect.arrayContaining(['tsc', 'eslint', 'jest', 'vitest', 'pnpm', 'npm', 'npx', 'yarn']));
+		expect(calls).toHaveLength(8);
 	});
 });
