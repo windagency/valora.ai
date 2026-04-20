@@ -32,8 +32,11 @@
 	"scripts": {
 		"build": "tsc -p tsconfig.json",
 		"clean": "rm -rf ./dist",
-		"lint": "eslint src/",
-		"format": "prettier --write \"src/**/*.ts\"",
+		"lint": "eslint --color",
+		"lint:fix": "eslint --color --fix",
+		"beautify": "prettier --check \"**/*.+(js|jsx|ts|tsx|json|md|yml|yaml)\"",
+		"beautify:fix": "prettier --write \"**/*.+(js|jsx|ts|tsx|json|md|yml|yaml)\"",
+		"format": "pnpm beautify:fix && pnpm lint:fix",
 		"test": "vitest run",
 		"prepublishOnly": "pnpm clean && pnpm build"
 	},

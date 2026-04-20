@@ -33,8 +33,9 @@
 	"scripts": {
 		"build": "true",
 		"clean": "true",
-		"lint": "prettier --check \".\"",
-		"format": "prettier --write \".\"",
+		"beautify": "prettier --check \"**/*.+(js|jsx|ts|tsx|json|md|yml|yaml)\"",
+		"beautify:fix": "prettier --write \"**/*.+(js|jsx|ts|tsx|json|md|yml|yaml)\"",
+		"format": "pnpm beautify:fix",
 		"test": "true"
 	},
 	"files": [

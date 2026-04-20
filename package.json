@@ -72,6 +72,7 @@
 		"lint:fix": "eslint --color --fix",
 		"beautify": "prettier --check \"**/*.+(js|jsx|ts|tsx|json|md|yml|yaml)\"",
 		"beautify:fix": "prettier --write \"**/*.+(js|jsx|ts|tsx|json|md|yml|yaml)\"",
+		"preformat": "pnpm packages:format",
 		"format": "pnpm beautify:fix && pnpm lint:fix",
 		"mcp:validate-types": "pnpm exec tsx scripts/generate-mcp-types.ts",
 		"mcp:fix-types": "pnpm exec tsx scripts/generate-mcp-types.ts --fix",
@@ -113,7 +114,6 @@
 		"audit:fix": "pnpm audit --fix",
 		"packages:build": "pnpm -r --filter './packages/*' build",
 		"packages:clean": "pnpm -r --filter './packages/*' clean",
-		"packages:lint": "pnpm -r --filter './packages/*' lint",
 		"packages:format": "pnpm -r --filter './packages/*' format",
 		"packages:test": "pnpm -r --filter './packages/*' test"
 	},
