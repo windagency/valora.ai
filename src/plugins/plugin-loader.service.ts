@@ -132,9 +132,29 @@ export class PluginLoaderService {
 		};
 	}
 
+	private resolveHookCommandPaths(hooks: HooksConfig, pluginDir: string): HooksConfig {
+		// Single-quote the path so the shell never interprets $ ` \ or ! inside it,
+		// regardless of where npm installs the package.
+		const safe = `'${pluginDir.replace(/'/g, "'\\''")}'`;
+		const result: HooksConfig = {};
+
+		for (const key of Object.keys(hooks) as Array<keyof HooksConfig>) {
+			const matchers = hooks[key];
+			if (matchers) {
+				result[key] = matchers.map((m) => ({
+					...m,
+					hooks: m.hooks.map((h) => ({ ...h, command: h.command.replaceAll('{pluginDir}', safe) }))
+				}));
+			}
+		}
+
+		return result;
+	}
+
 	private resolveHooks(pluginDir: string, manifest: PluginManifest): HooksConfig | undefined {
 		if (!manifest.permissions?.includes('shell-hooks')) return undefined;
-		return this.loadHooksFile(pluginDir);
+		const hooks = this.loadHooksFile(pluginDir);
+		return hooks ? this.resolveHookCommandPaths(hooks, pluginDir) : undefined;
 	}
 
 	private resolveMcpsFile(pluginDir: string, manifest: PluginManifest): string | undefined {
