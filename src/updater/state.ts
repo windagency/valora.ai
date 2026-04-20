@@ -10,13 +10,13 @@ import type { UpdateCheckState } from './throttle';
 const STATE_FILENAME = 'update-check.json';
 
 export const DEFAULT_STATE: UpdateCheckState = {
-	schemaVersion: 1,
+	installedVersionAtCheck: null,
 	lastCheckAt: new Date(0).toISOString(),
 	lastSuccessAt: null,
 	latestVersion: null,
 	latestVersionFetchedAt: null,
 	remindedForVersion: null,
-	installedVersionAtCheck: null,
+	schemaVersion: 1
 };
 
 function cloneDefault(): UpdateCheckState {
@@ -31,11 +31,7 @@ export async function readUpdateState(stateDir: string): Promise<UpdateCheckStat
 	try {
 		const raw = await fs.readFile(filePath, 'utf-8');
 		const parsed = JSON.parse(raw) as unknown;
-		if (
-			parsed === null ||
-			typeof parsed !== 'object' ||
-			(parsed as { schemaVersion?: unknown }).schemaVersion !== 1
-		) {
+		if (parsed === null || typeof parsed !== 'object' || (parsed as { schemaVersion?: unknown }).schemaVersion !== 1) {
 			return cloneDefault();
 		}
 		return parsed as UpdateCheckState;

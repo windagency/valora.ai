@@ -12,7 +12,7 @@ function makeState(overrides: Partial<UpdateCheckState> = {}): UpdateCheckState 
 		latestVersionFetchedAt: null,
 		remindedForVersion: null,
 		installedVersionAtCheck: null,
-		...overrides,
+		...overrides
 	};
 }
 

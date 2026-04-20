@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { configureUpdateCommand } from './update.command';
 
 vi.mock('updater/registry', () => ({
-	fetchLatestVersion: vi.fn(),
+	fetchLatestVersion: vi.fn()
 }));
 
 vi.mock('updater/detect-package-manager', () => ({
@@ -24,20 +24,20 @@ vi.mock('updater/detect-package-manager', () => ({
 			default:
 				return [];
 		}
-	}),
+	})
 }));
 
 vi.mock('updater/state', () => ({
 	readUpdateState: vi.fn(),
-	writeUpdateState: vi.fn(),
+	writeUpdateState: vi.fn()
 }));
 
 vi.mock('utils/paths', () => ({
-	getGlobalConfigDir: vi.fn(() => '/tmp/valora-test-state'),
+	getGlobalConfigDir: vi.fn(() => '/tmp/valora-test-state')
 }));
 
 vi.mock('node:child_process', () => ({
-	spawn: vi.fn(),
+	spawn: vi.fn()
 }));
 
 // Imports for mock access (must come after vi.mock declarations)
@@ -89,7 +89,7 @@ beforeEach(() => {
 		latestVersion: null,
 		latestVersionFetchedAt: null,
 		remindedForVersion: null,
-		installedVersionAtCheck: null,
+		installedVersionAtCheck: null
 	});
 	writeUpdateStateMock.mockResolvedValue(undefined);
 });

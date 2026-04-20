@@ -1,0 +1,46 @@
+/**
+ * Updater Module Boundary Tests
+ *
+ * These tests enforce that `src/updater/` is a private implementation detail
+ * of the CLI entry point. No module outside `src/cli/` (or `src/updater/`
+ * itself) may import from `src/updater/`.
+ */
+
+import { TypeScriptProject } from 'arch-unit-ts/dist/arch-unit/core/domain/TypeScriptProject';
+import { RelativePath } from 'arch-unit-ts/dist/arch-unit/core/domain/RelativePath';
+import { describe, it } from 'vitest';
+
+const srcProject = new TypeScriptProject(RelativePath.of('src'));
+
+describe('Updater Module Boundaries', () => {
+	describe('Updater access restriction', () => {
+		it('only cli/ modules may import from updater/', () => {
+			// Collect all classes that live outside cli/ and outside updater/ itself
+			const nonCliNonUpdaterClasses = srcProject
+				.allClasses()
+				.get()
+				.filter((c) => {
+					const pkgPath = c.packagePath.get();
+					return !pkgPath.includes('cli') && !pkgPath.includes('updater');
+				});
+
+			nonCliNonUpdaterClasses.forEach((outsideClass) => {
+				const violatingDeps = outsideClass.dependencies.filter((dep) => {
+					const depPath = dep.typeScriptClass.packagePath.get();
+					// Ignore external node_modules
+					if (depPath.includes('node_modules')) return false;
+					// Flag any dependency that resolves into the updater package
+					return depPath.includes('updater');
+				});
+
+				if (violatingDeps.length > 0) {
+					const violations = violatingDeps.map((d) => d.typeScriptClass.packagePath.get()).join(', ');
+					throw new Error(
+						`Module "${outsideClass.getSimpleName()}" (${outsideClass.packagePath.get()}) imports from updater/: ${violations}. ` +
+							`Only cli/ modules are permitted to import from updater/.`
+					);
+				}
+			});
+		});
+	});
+});

@@ -10,7 +10,7 @@ const PACKAGE = '@windagency/valora@latest';
  * Inspects process.execPath to determine which package manager owns the
  * global install. Returns null when the path matches no known signature.
  */
-export function detectPackageManager(): PackageManager | null {
+export function detectPackageManager(): null | PackageManager {
 	const execPath = process.execPath.toLowerCase();
 
 	if (execPath.includes('.local/share/pnpm') || execPath.includes('/pnpm/')) {
@@ -33,13 +33,13 @@ export function detectPackageManager(): PackageManager | null {
  */
 export function getInstallCommand(pm: PackageManager): string[] {
 	switch (pm) {
+		case 'bun':
+			return ['bun', 'install', '-g', PACKAGE];
 		case 'npm':
 			return ['npm', 'install', '-g', PACKAGE];
 		case 'pnpm':
 			return ['pnpm', 'add', '-g', PACKAGE];
 		case 'yarn':
 			return ['yarn', 'global', 'add', PACKAGE];
-		case 'bun':
-			return ['bun', 'install', '-g', PACKAGE];
 	}
 }

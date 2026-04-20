@@ -7,7 +7,7 @@ function makeResponse(bodyText: string, init?: { ok?: boolean; status?: number }
 	const status = init?.status ?? 200;
 	return new Response(bodyText, {
 		status,
-		statusText: ok ? 'OK' : 'Error',
+		statusText: ok ? 'OK' : 'Error'
 	});
 }
 
@@ -34,9 +34,7 @@ describe('fetchLatestVersion', () => {
 	});
 
 	it('returns null when response is not ok', async () => {
-		fetchSpy.mockResolvedValue(
-			new Response('Not Found', { status: 404, statusText: 'Not Found' })
-		);
+		fetchSpy.mockResolvedValue(new Response('Not Found', { status: 404, statusText: 'Not Found' }));
 		expect(await fetchLatestVersion('2.5.0')).toBeNull();
 	});
 

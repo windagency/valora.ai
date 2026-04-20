@@ -10,25 +10,21 @@ import { readUpdateState, writeUpdateState } from './state';
 import { shouldCheckNow, type UpdateCheckState } from './throttle';
 
 export { isNewerVersion } from './compare';
-export {
-	detectPackageManager,
-	getInstallCommand,
-	type PackageManager,
-} from './detect-package-manager';
+export { detectPackageManager, getInstallCommand, type PackageManager } from './detect-package-manager';
 export { printUpdateBanner, shouldShowReminder } from './notifier';
 export { fetchLatestVersion } from './registry';
 export { readUpdateState, writeUpdateState } from './state';
 export { shouldCheckNow, type UpdateCheckState } from './throttle';
 
 interface PendingContext {
-	promise: Promise<string | null | '__skipped__'>;
-	stateDir: string;
 	currentVersion: string;
-	statePromise: Promise<UpdateCheckState>;
 	now: Date;
+	promise: Promise<'__skipped__' | null | string>;
+	stateDir: string;
+	statePromise: Promise<UpdateCheckState>;
 }
 
-let pending: PendingContext | null = null;
+let pending: null | PendingContext = null;
 
 /**
  * Schedule a background update check. Fire-and-forget — does not await.
@@ -41,18 +37,20 @@ export function scheduleUpdateCheck(
 	now: Date = new Date()
 ): void {
 	const statePromise = readUpdateState(stateDir);
-	const fetchPromise: Promise<string | null | '__skipped__'> = statePromise.then((state) => {
-		if (!shouldCheckNow(state, frequencyDays, now)) return '__skipped__';
-		return fetchLatestVersion(currentVersion);
-	}).catch(() => null);
+	const fetchPromise: Promise<'__skipped__' | null | string> = statePromise
+		.then((state) => {
+			if (!shouldCheckNow(state, frequencyDays, now)) return '__skipped__';
+			return fetchLatestVersion(currentVersion);
+		})
+		.catch(() => null);
 
 	// Store synchronously so settleUpdateCheck always sees it
 	pending = {
+		currentVersion,
+		now,
 		promise: fetchPromise,
 		stateDir,
-		currentVersion,
-		statePromise,
-		now,
+		statePromise
 	};
 }
 
@@ -61,7 +59,7 @@ export function scheduleUpdateCheck(
  * Returns the updated UpdateCheckState if the fetch completed in time,
  * otherwise null.
  */
-export async function settleUpdateCheck(timeoutMs: number = 200): Promise<UpdateCheckState | null> {
+export async function settleUpdateCheck(timeoutMs: number = 200): Promise<null | UpdateCheckState> {
 	const ctx = pending;
 	if (!ctx) return null;
 	pending = null;
@@ -88,11 +86,11 @@ export async function settleUpdateCheck(timeoutMs: number = 200): Promise<Update
 	const nowIso = ctx.now.toISOString();
 	const updated: UpdateCheckState = {
 		...existingState,
+		installedVersionAtCheck: ctx.currentVersion,
 		lastCheckAt: nowIso,
 		lastSuccessAt: latestVersion !== null ? nowIso : existingState.lastSuccessAt,
 		latestVersion: latestVersion ?? existingState.latestVersion,
-		latestVersionFetchedAt: latestVersion !== null ? nowIso : existingState.latestVersionFetchedAt,
-		installedVersionAtCheck: ctx.currentVersion,
+		latestVersionFetchedAt: latestVersion !== null ? nowIso : existingState.latestVersionFetchedAt
 	};
 
 	try {

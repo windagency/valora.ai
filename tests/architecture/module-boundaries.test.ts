@@ -241,7 +241,8 @@ describe('Module Boundaries', () => {
 				'llm',
 				'exploration',
 				'services',
-				'ui'
+				'ui',
+				'updater'
 			];
 
 			cliClasses.forEach((cliClass) => {

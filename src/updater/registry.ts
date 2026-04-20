@@ -11,14 +11,14 @@ const VERSION_REGEX = /^\d+\.\d+\.\d+(-[\w.]+)?(\+[\w.]+)?$/;
  * Fetches the latest published version of @windagency/valora from the npm
  * registry. Returns null on any failure — never throws.
  */
-export async function fetchLatestVersion(currentVersion: string): Promise<string | null> {
+export async function fetchLatestVersion(currentVersion: string): Promise<null | string> {
 	try {
 		const response = await fetch(REGISTRY_URL, {
 			headers: {
 				Accept: 'application/vnd.npm.install-v1+json',
-				'User-Agent': `valora-cli/${currentVersion} (+https://github.com/windagency/valora.ai)`,
+				'User-Agent': `valora-cli/${currentVersion} (+https://github.com/windagency/valora.ai)`
 			},
-			signal: AbortSignal.timeout(TIMEOUT_MS),
+			signal: AbortSignal.timeout(TIMEOUT_MS)
 		});
 
 		if (!response.ok) return null;
@@ -29,7 +29,7 @@ export async function fetchLatestVersion(currentVersion: string): Promise<string
 		const reader = body.getReader();
 		const chunks: Uint8Array[] = [];
 		let total = 0;
-		// eslint-disable-next-line no-constant-condition
+
 		while (true) {
 			const { done, value } = await reader.read();
 			if (done) break;

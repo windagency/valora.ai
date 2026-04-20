@@ -10,10 +10,10 @@ interface ParsedVersion {
 	major: number;
 	minor: number;
 	patch: number;
-	prerelease: string[] | null;
+	prerelease: null | string[];
 }
 
-function parse(version: string): ParsedVersion | null {
+function parse(version: string): null | ParsedVersion {
 	if (typeof version !== 'string' || version.length === 0) return null;
 
 	// Strip build metadata
@@ -36,7 +36,7 @@ function parse(version: string): ParsedVersion | null {
 		major,
 		minor,
 		patch,
-		prerelease: pre ? pre.split('.') : null,
+		prerelease: pre ? pre.split('.') : null
 	};
 }
 
@@ -45,7 +45,7 @@ function parse(version: string): ParsedVersion | null {
  * Per semver: a release version has higher precedence than a prerelease;
  * numeric identifiers have lower precedence than alphanumeric ones.
  */
-function comparePrerelease(a: string[] | null, b: string[] | null): number {
+function comparePrerelease(a: null | string[], b: null | string[]): number {
 	if (a === null && b === null) return 0;
 	if (a === null) return -1; // a is release, b is prerelease → a > b → return negative
 	if (b === null) return 1; // a is prerelease, b is release → b > a → return positive

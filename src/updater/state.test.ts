@@ -33,7 +33,7 @@ describe('readUpdateState', () => {
 			latestVersion: '2.6.0',
 			latestVersionFetchedAt: '2026-04-20T00:00:00.000Z',
 			remindedForVersion: null,
-			installedVersionAtCheck: '2.5.0',
+			installedVersionAtCheck: '2.5.0'
 		};
 		await fs.writeFile(path.join(tmpDir, 'update-check.json'), JSON.stringify(fixture));
 		expect(await readUpdateState(tmpDir)).toEqual(fixture);
@@ -45,10 +45,7 @@ describe('readUpdateState', () => {
 	});
 
 	it('returns DEFAULT_STATE when schemaVersion is wrong', async () => {
-		await fs.writeFile(
-			path.join(tmpDir, 'update-check.json'),
-			JSON.stringify({ schemaVersion: 2, lastCheckAt: 'x' })
-		);
+		await fs.writeFile(path.join(tmpDir, 'update-check.json'), JSON.stringify({ schemaVersion: 2, lastCheckAt: 'x' }));
 		expect(await readUpdateState(tmpDir)).toEqual(DEFAULT_STATE);
 	});
 });
@@ -57,7 +54,7 @@ describe('writeUpdateState', () => {
 	it('writes the file with correct JSON content', async () => {
 		const state: UpdateCheckState = {
 			...DEFAULT_STATE,
-			latestVersion: '2.6.0',
+			latestVersion: '2.6.0'
 		};
 		await writeUpdateState(tmpDir, state);
 		const raw = await fs.readFile(path.join(tmpDir, 'update-check.json'), 'utf-8');
@@ -79,7 +76,7 @@ describe('writeUpdateState', () => {
 			latestVersion: '2.7.0',
 			latestVersionFetchedAt: '2026-04-20T10:00:00.000Z',
 			remindedForVersion: '2.7.0',
-			installedVersionAtCheck: '2.5.0',
+			installedVersionAtCheck: '2.5.0'
 		};
 		await writeUpdateState(tmpDir, state);
 		const read = await readUpdateState(tmpDir);

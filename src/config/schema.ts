@@ -118,8 +118,8 @@ export const FEATURE_FLAGS_SCHEMA = z.object({
 
 // Auto-update configuration schema
 export const AUTO_UPDATE_CONFIG_SCHEMA = z.object({
-	mode: z.enum(['auto', 'reminder', 'disabled']).default('reminder'),
-	frequencyDays: z.number().int().min(1).max(365).default(1)
+	frequencyDays: z.number().int().min(1).max(365).default(1),
+	mode: z.enum(['auto', 'reminder', 'disabled']).default('reminder')
 });
 
 // Hook command configuration schema
@@ -212,8 +212,8 @@ export type SessionRetentionConfig = z.infer<typeof SESSION_RETENTION_CONFIG_SCH
 // Default configuration
 export const DEFAULT_CONFIG: Config = {
 	autoUpdate: {
-		mode: 'reminder',
-		frequencyDays: 1
+		frequencyDays: 1,
+		mode: 'reminder'
 	},
 	defaults: {
 		default_provider: undefined, // Will be set during setup or auto-configured in MCP context

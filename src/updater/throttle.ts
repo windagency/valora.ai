@@ -3,13 +3,13 @@
  */
 
 export interface UpdateCheckState {
-	schemaVersion: 1;
+	installedVersionAtCheck: null | string;
 	lastCheckAt: string;
-	lastSuccessAt: string | null;
-	latestVersion: string | null;
-	latestVersionFetchedAt: string | null;
-	remindedForVersion: string | null;
-	installedVersionAtCheck: string | null;
+	lastSuccessAt: null | string;
+	latestVersion: null | string;
+	latestVersionFetchedAt: null | string;
+	remindedForVersion: null | string;
+	schemaVersion: 1;
 }
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;

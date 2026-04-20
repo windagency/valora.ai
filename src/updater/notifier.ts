@@ -4,8 +4,9 @@
 
 import { getBoxFormatter } from 'output/box-formatter';
 
-import { isNewerVersion } from './compare';
 import type { UpdateCheckState } from './throttle';
+
+import { isNewerVersion } from './compare';
 
 /**
  * Determines whether an update banner should be rendered for the given
@@ -38,7 +39,7 @@ export function printUpdateBanner(state: UpdateCheckState, currentVersion: strin
 		[
 			`  ${currentVersion}  \u2192  ${state.latestVersion}`,
 			`  Run: valora update`,
-			`  Disable: set autoUpdate.mode=disabled in ~/.valora/config.json`,
+			`  Disable: set autoUpdate.mode=disabled in ~/.valora/config.json`
 		],
 		{ color: 'yellow', style: 'single' }
 	);

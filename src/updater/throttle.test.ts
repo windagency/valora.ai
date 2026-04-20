@@ -12,7 +12,7 @@ function baseState(lastCheckAt: string): UpdateCheckState {
 		latestVersion: null,
 		latestVersionFetchedAt: null,
 		remindedForVersion: null,
-		installedVersionAtCheck: null,
+		installedVersionAtCheck: null
 	};
 }
 

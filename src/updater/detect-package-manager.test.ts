@@ -21,43 +21,43 @@ describe('detectPackageManager', () => {
 		{
 			label: 'pnpm global share',
 			execPath: '/home/user/.local/share/pnpm/node',
-			expected: 'pnpm',
+			expected: 'pnpm'
 		},
 		{
 			label: 'pnpm in path segment',
 			execPath: '/opt/pnpm/bin/node',
-			expected: 'pnpm',
+			expected: 'pnpm'
 		},
 		{
 			label: 'bun global install',
 			execPath: '/home/user/.bun/install/global/node',
-			expected: 'bun',
+			expected: 'bun'
 		},
 		{
 			label: 'yarn global path segment',
 			execPath: '/opt/yarn/global/bin/node',
-			expected: 'yarn',
+			expected: 'yarn'
 		},
 		{
 			label: 'yarn config global',
 			execPath: '/home/user/.config/yarn/global/node',
-			expected: 'yarn',
+			expected: 'yarn'
 		},
 		{
 			label: 'npm global lib',
 			execPath: '/usr/local/lib/node_modules/@windagency/valora/node',
-			expected: 'npm',
+			expected: 'npm'
 		},
 		{
 			label: 'generic node_modules',
 			execPath: '/some/where/node_modules/.bin/node',
-			expected: 'npm',
+			expected: 'npm'
 		},
 		{
 			label: 'unknown path',
 			execPath: '/usr/bin/node',
-			expected: null,
-		},
+			expected: null
+		}
 	];
 
 	for (const c of cases) {
