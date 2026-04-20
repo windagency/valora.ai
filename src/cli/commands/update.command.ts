@@ -2,19 +2,15 @@
  * `valora update` command — check for, and install, a newer CLI version.
  */
 
-import { spawn } from 'node:child_process';
-import { createRequire } from 'node:module';
-
 import type { Command } from 'commander';
 
-import {
-	detectPackageManager,
-	getInstallCommand,
-	type PackageManager,
-} from 'updater/detect-package-manager';
+import { spawn } from 'node:child_process';
+import { createRequire } from 'node:module';
 import { isNewerVersion } from 'updater/compare';
+import { detectPackageManager, getInstallCommand, type PackageManager } from 'updater/detect-package-manager';
 import { fetchLatestVersion } from 'updater/registry';
 import { readUpdateState, writeUpdateState } from 'updater/state';
+
 import { getGlobalConfigDir } from 'utils/paths';
 
 interface UpdateOptions {
@@ -23,6 +19,73 @@ interface UpdateOptions {
 }
 
 const PACKAGE_MANAGERS: PackageManager[] = ['npm', 'pnpm', 'yarn', 'bun'];
+
+export function configureUpdateCommand(program: Command): void {
+	program
+		.command('update')
+		.description('Check for and install the latest Valora release')
+		.option('--check', 'Check for updates without installing')
+		.option('--force', 'Reinstall even if already on latest')
+		.action(async (options: UpdateOptions) => {
+			const currentVersion = getCurrentVersion();
+
+			process.stdout.write('Checking for updates...\r');
+			const latestVersion = await fetchLatestVersion(currentVersion);
+			// Clear the spinner line
+			process.stdout.write(' '.repeat('Checking for updates...'.length) + '\r');
+
+			if (latestVersion === null) {
+				console.log('Unable to check for updates. Check your connection or try again later.');
+				return;
+			}
+
+			const hasUpdate = isNewerVersion(currentVersion, latestVersion);
+			if (!hasUpdate && !options.force) {
+				console.log(`Valora is already up to date (v${currentVersion}).`);
+				return;
+			}
+
+			if (options.check) {
+				if (hasUpdate) {
+					console.log(`Update available: v${currentVersion} → v${latestVersion}`);
+					console.log('Run: valora update');
+				} else {
+					console.log(`Valora is already up to date (v${currentVersion}).`);
+				}
+				return;
+			}
+
+			const pm = detectPackageManager();
+			if (pm === null) {
+				printAmbiguousPackageManager();
+				return;
+			}
+
+			const installArgv = getInstallCommand(pm);
+			const exitCode = await runInstall(installArgv);
+
+			if (exitCode === 0) {
+				const stateDir = getGlobalConfigDir();
+				const state = await readUpdateState(stateDir);
+				const nowIso = new Date().toISOString();
+				await writeUpdateState(stateDir, {
+					...state,
+					installedVersionAtCheck: currentVersion,
+					lastCheckAt: nowIso,
+					lastSuccessAt: nowIso,
+					latestVersion,
+					latestVersionFetchedAt: nowIso,
+					remindedForVersion: latestVersion
+				});
+				console.log(`✓ Updated to v${latestVersion}`);
+				return;
+			}
+
+			console.log('Update failed. Retry manually:');
+			console.log(`  ${installArgv.join(' ')}`);
+			process.exit(exitCode);
+		});
+}
 
 function getCurrentVersion(): string {
 	const require = createRequire(import.meta.url);
@@ -52,64 +115,4 @@ function runInstall(argv: string[]): Promise<number> {
 			resolve(1);
 		});
 	});
-}
-
-export function configureUpdateCommand(program: Command): void {
-	program
-		.command('update')
-		.description('Check for and install the latest Valora release')
-		.option('--check', 'Check for updates without installing')
-		.option('--force', 'Reinstall even if already on latest')
-		.action(async (options: UpdateOptions) => {
-			const currentVersion = getCurrentVersion();
-
-			process.stdout.write('Checking for updates...\r');
-			const latestVersion = await fetchLatestVersion(currentVersion);
-			// Clear the spinner line
-			process.stdout.write(' '.repeat('Checking for updates...'.length) + '\r');
-
-			if (latestVersion === null) {
-				console.log('Unable to check for updates. Check your connection or try again later.');
-				return;
-			}
-
-			const hasUpdate = isNewerVersion(currentVersion, latestVersion);
-			if (!hasUpdate && !options.force) {
-				console.log(`Valora is already up to date (v${currentVersion}).`);
-				return;
-			}
-
-			if (options.check) {
-				console.log(`Update available: v${currentVersion} → v${latestVersion}`);
-				console.log('Run: valora update');
-				return;
-			}
-
-			const pm = detectPackageManager();
-			if (pm === null) {
-				printAmbiguousPackageManager();
-				return;
-			}
-
-			const installArgv = getInstallCommand(pm);
-			const exitCode = await runInstall(installArgv);
-
-			if (exitCode === 0) {
-				const stateDir = getGlobalConfigDir();
-				const state = await readUpdateState(stateDir);
-				await writeUpdateState(stateDir, {
-					...state,
-					latestVersion,
-					lastSuccessAt: new Date().toISOString(),
-					remindedForVersion: latestVersion,
-					installedVersionAtCheck: currentVersion,
-				});
-				console.log(`✓ Updated to v${latestVersion}`);
-				return;
-			}
-
-			console.log('Update failed. Retry manually:');
-			console.log(`  ${installArgv.join(' ')}`);
-			process.exit(exitCode);
-		});
 }
