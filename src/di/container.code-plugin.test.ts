@@ -120,8 +120,10 @@ describe('initializePlugins — compression strategy registration', () => {
 		tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'valora-compression-test-'));
 	});
 
-	afterEach(() => {
+	afterEach(async () => {
 		fs.rmSync(tmpDir, { recursive: true, force: true });
+		const { resetRegistry } = await import('executor/output-compression.service');
+		resetRegistry();
 		vi.resetModules();
 	});
 
@@ -152,7 +154,7 @@ describe('initializePlugins — compression strategy registration', () => {
 		);
 
 		const { createContainer, initializePlugins } = await import('di/container');
-		const { getStrategy, resetRegistry } = await import('executor/output-compression.service');
+		const { getStrategy } = await import('executor/output-compression.service');
 
 		const container = createContainer();
 		await initializePlugins(container);
@@ -160,7 +162,5 @@ describe('initializePlugins — compression strategy registration', () => {
 		const strategy = getStrategy('mytesttool');
 		expect(strategy).toBeDefined();
 		expect(strategy?.('hello world', 'mytesttool run')).toBe('compressed:hello');
-
-		resetRegistry();
 	});
 });
