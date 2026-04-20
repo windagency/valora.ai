@@ -136,7 +136,9 @@ configureTemplateCommand(program);
 configureInitCommand(program);
 configureBatchCommand(program);
 configureMapCommand(program);
-configureUpdateCommand((program as CommanderCommandContract).getUnderlyingCommand());
+
+const rawProgram = (program as CommanderCommandContract).getUnderlyingCommand();
+configureUpdateCommand(rawProgram);
 
 const isUpdateCommand = rawArgs[0] === 'update';
 
@@ -147,11 +149,11 @@ function shouldSkipUpdateCheck(): boolean {
 		process.env['NODE_ENV'] === 'test' ||
 		process.env['AI_TEST_MODE'] === 'true' ||
 		process.env['AI_MCP_ENABLED'] === 'true' ||
-		!process.stdout.isTTY
+		!process.stderr.isTTY
 	);
 }
 
-(program as CommanderCommandContract).getUnderlyingCommand().hook('postAction', async () => {
+rawProgram.hook('postAction', async () => {
 	if (shouldSkipUpdateCheck()) return;
 	if (isUpdateCommand) return;
 
