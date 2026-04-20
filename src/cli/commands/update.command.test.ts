@@ -141,6 +141,16 @@ describe('valora update command', () => {
 		expect(writeUpdateStateMock).toHaveBeenCalledTimes(1);
 	});
 
+	it('--check --force shows "already up to date" when no update exists', async () => {
+		fetchLatestVersionMock.mockResolvedValue('0.0.1');
+
+		const program = makeProgram();
+		await program.parseAsync(['node', 'valora', 'update', '--check', '--force']);
+
+		expect(spawnMock).not.toHaveBeenCalled();
+		expect(logged()).toContain('already up to date');
+	});
+
 	it('prints "Unable to check" when the registry is unreachable, with no spawn', async () => {
 		fetchLatestVersionMock.mockResolvedValue(null);
 

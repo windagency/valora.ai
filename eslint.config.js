@@ -45,9 +45,13 @@ export default [
 				global: 'readonly',
 				NodeJS: 'readonly',
 				process: 'readonly',
+				AbortSignal: 'readonly',
+				fetch: 'readonly',
+				Response: 'readonly',
 				require: 'readonly',
 				setInterval: 'readonly',
 				setTimeout: 'readonly',
+				TextDecoder: 'readonly',
 				vi: 'readonly'
 			},
 			parser: tsparser,

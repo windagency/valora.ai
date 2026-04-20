@@ -7,6 +7,26 @@ const TIMEOUT_MS = 3000;
 const MAX_BYTES = 64 * 1024; // 64 KiB
 const VERSION_REGEX = /^\d+\.\d+\.\d+(-[\w.]+)?(\+[\w.]+)?$/;
 
+function exceedsMaxSize(response: Response): boolean {
+	const contentLength = response.headers.get('content-length');
+	if (contentLength !== null && Number(contentLength) > MAX_BYTES) return true;
+	return false;
+}
+
+function extractVersion(text: string): null | string {
+	let parsed: unknown;
+	try {
+		parsed = JSON.parse(text);
+	} catch {
+		return null;
+	}
+	if (parsed === null || typeof parsed !== 'object') return null;
+	const version = (parsed as Record<string, unknown>)['version'];
+	if (typeof version !== 'string') return null;
+	if (!VERSION_REGEX.test(version)) return null;
+	return version;
+}
+
 /**
  * Fetches the latest published version of @windagency/valora from the npm
  * registry. Returns null on any failure — never throws.
@@ -22,52 +42,12 @@ export async function fetchLatestVersion(currentVersion: string): Promise<null |
 		});
 
 		if (!response.ok) return null;
+		if (exceedsMaxSize(response)) return null;
 
-		const body = response.body;
-		if (!body) return null;
+		const text = await response.text();
+		if (text.length > MAX_BYTES) return null;
 
-		const reader = body.getReader();
-		const chunks: Uint8Array[] = [];
-		let total = 0;
-
-		while (true) {
-			const { done, value } = await reader.read();
-			if (done) break;
-			if (value) {
-				total += value.byteLength;
-				if (total > MAX_BYTES) {
-					try {
-						await reader.cancel();
-					} catch {
-						// ignore
-					}
-					return null;
-				}
-				chunks.push(value);
-			}
-		}
-
-		const merged = new Uint8Array(total);
-		let offset = 0;
-		for (const chunk of chunks) {
-			merged.set(chunk, offset);
-			offset += chunk.byteLength;
-		}
-		const text = new TextDecoder('utf-8').decode(merged);
-
-		let parsed: unknown;
-		try {
-			parsed = JSON.parse(text);
-		} catch {
-			return null;
-		}
-
-		if (parsed === null || typeof parsed !== 'object') return null;
-		const version = (parsed as { version?: unknown }).version;
-		if (typeof version !== 'string') return null;
-		if (!VERSION_REGEX.test(version)) return null;
-
-		return version;
+		return extractVersion(text);
 	} catch {
 		return null;
 	}

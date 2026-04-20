@@ -11,7 +11,8 @@ import { shouldCheckNow, type UpdateCheckState } from './throttle';
 
 export { isNewerVersion } from './compare';
 export { detectPackageManager, getInstallCommand, type PackageManager } from './detect-package-manager';
-export { printUpdateBanner, shouldShowReminder } from './notifier';
+export { runAutoInstall } from './installer';
+export { printUpdateBanner, shouldAutoUpdate, shouldShowReminder } from './notifier';
 export { fetchLatestVersion } from './registry';
 export { readUpdateState, writeUpdateState } from './state';
 export { shouldCheckNow, type UpdateCheckState } from './throttle';
@@ -64,11 +65,13 @@ export async function settleUpdateCheck(timeoutMs: number = 200): Promise<null |
 	if (!ctx) return null;
 	pending = null;
 
+	let timeoutId: ReturnType<typeof setTimeout>;
 	const timeoutPromise = new Promise<'__timeout__'>((resolve) => {
-		setTimeout(() => resolve('__timeout__'), timeoutMs);
+		timeoutId = setTimeout(() => resolve('__timeout__'), timeoutMs);
 	});
 
 	const result = await Promise.race([ctx.promise, timeoutPromise]);
+	clearTimeout(timeoutId!);
 	if (result === '__timeout__' || result === '__skipped__') {
 		return null;
 	}

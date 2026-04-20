@@ -18,12 +18,22 @@ export function shouldShowReminder(
 	currentVersion: string,
 	mode: 'auto' | 'disabled' | 'reminder'
 ): boolean {
+	// 'auto' is reserved for future silent install; for now it falls through to false like 'disabled'
 	if (mode !== 'reminder') return false;
 	if (state.latestVersion === null) return false;
 	if (!isNewerVersion(currentVersion, state.latestVersion)) return false;
 	if (state.remindedForVersion === state.latestVersion) return false;
 	if (!process.stderr.isTTY) return false;
 	return true;
+}
+
+/**
+ * Returns true when auto-install should run: a newer version is known.
+ * Mode and TTY checks are the caller's responsibility.
+ */
+export function shouldAutoUpdate(state: UpdateCheckState, currentVersion: string): boolean {
+	if (state.latestVersion === null) return false;
+	return isNewerVersion(currentVersion, state.latestVersion);
 }
 
 /**

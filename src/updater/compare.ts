@@ -40,6 +40,19 @@ function parse(version: string): null | ParsedVersion {
 	};
 }
 
+// Returns positive when b-identifier > a-identifier, negative when a > b, 0 when equal.
+function compareIdentifier(av: string, bv: string): number {
+	const aIsNum = /^\d+$/.test(av);
+	const bIsNum = /^\d+$/.test(bv);
+	if (aIsNum && bIsNum) {
+		const diff = Number(bv) - Number(av);
+		return diff === 0 ? 0 : diff > 0 ? 1 : -1;
+	}
+	if (aIsNum) return 1; // numeric < alphanumeric per semver
+	if (bIsNum) return -1;
+	return av < bv ? 1 : av > bv ? -1 : 0;
+}
+
 /**
  * Returns positive when b > a, negative when a > b, zero when equal.
  * Per semver: a release version has higher precedence than a prerelease;
@@ -47,30 +60,17 @@ function parse(version: string): null | ParsedVersion {
  */
 function comparePrerelease(a: null | string[], b: null | string[]): number {
 	if (a === null && b === null) return 0;
-	if (a === null) return -1; // a is release, b is prerelease → a > b → return negative
-	if (b === null) return 1; // a is prerelease, b is release → b > a → return positive
+	if (a === null) return -1; // a is release, b is prerelease → a > b
+	if (b === null) return 1; // b is release, a is prerelease → b > a
 
 	const len = Math.max(a.length, b.length);
 	for (let i = 0; i < len; i++) {
 		const av = a[i];
 		const bv = b[i];
-		// Longer identifier chain wins when prefixes are equal
-		if (av === undefined) return 1; // b has more → b > a
-		if (bv === undefined) return -1; // a has more → a > b
-
-		const aNum = /^\d+$/.test(av) ? Number(av) : null;
-		const bNum = /^\d+$/.test(bv) ? Number(bv) : null;
-
-		if (aNum !== null && bNum !== null) {
-			if (aNum !== bNum) return aNum < bNum ? 1 : -1;
-		} else if (aNum !== null) {
-			// numeric < alphanumeric → a is lower → b > a
-			return 1;
-		} else if (bNum !== null) {
-			return -1;
-		} else if (av !== bv) {
-			return av < bv ? 1 : -1;
-		}
+		if (av === undefined) return 1; // b has more identifiers → b > a
+		if (bv === undefined) return -1; // a has more identifiers → a > b
+		const cmp = compareIdentifier(av, bv);
+		if (cmp !== 0) return cmp;
 	}
 	return 0;
 }

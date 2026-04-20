@@ -10,15 +10,17 @@
  */
 
 import { createRequire } from 'node:module';
-
-import { getConfigLoader, setGlobalCliOverrides } from 'config/loader';
 import {
 	printUpdateBanner,
+	runAutoInstall,
 	scheduleUpdateCheck,
 	settleUpdateCheck,
+	shouldAutoUpdate,
 	shouldShowReminder,
 	writeUpdateState
 } from 'updater/index';
+
+import { getConfigLoader, setGlobalCliOverrides } from 'config/loader';
 import { getGlobalConfigDir } from 'utils/paths';
 import { handlePromptCancellation, isPromptCancellation } from 'utils/prompt-handler';
 
@@ -26,7 +28,7 @@ import type { CliOptions } from './types/cli-options.types';
 
 import { configureCompletionCommand } from './autocomplete';
 import { configureTemplateCommand } from './command-templates';
-import { createCommand, type CommanderCommandContract } from './commander-adapter';
+import { type CommanderCommandContract, createCommand } from './commander-adapter';
 import { configureBatchCommand } from './commands/batch.command';
 import { configureConfigCommand } from './commands/config';
 import { configureDashboardCommand } from './commands/dashboard';
@@ -142,6 +144,21 @@ configureUpdateCommand(rawProgram);
 
 const isUpdateCommand = rawArgs[0] === 'update';
 
+async function handleAutoInstall(state: Awaited<ReturnType<typeof settleUpdateCheck>>): Promise<void> {
+	if (!state) return;
+	if (!shouldAutoUpdate(state, packageJson.version)) return;
+	process.stderr.write(`Updating Valora to v${state.latestVersion}…\n`);
+	const result = await runAutoInstall();
+	if (result === 'success') {
+		process.stderr.write(`✓ Updated to v${state.latestVersion}.\n`);
+		await writeUpdateState(getGlobalConfigDir(), {
+			...state,
+			installedVersionAtCheck: state.latestVersion,
+			remindedForVersion: state.latestVersion
+		});
+	}
+}
+
 function shouldSkipUpdateCheck(): boolean {
 	return (
 		process.env['VALORA_DISABLE_AUTO_UPDATE'] === '1' ||
@@ -166,11 +183,9 @@ rawProgram.hook('postAction', async () => {
 
 	if (shouldShowReminder(state, packageJson.version, mode)) {
 		printUpdateBanner(state, packageJson.version);
-		const stateDir = getGlobalConfigDir();
-		await writeUpdateState(stateDir, {
-			...state,
-			remindedForVersion: state.latestVersion
-		});
+		await writeUpdateState(getGlobalConfigDir(), { ...state, remindedForVersion: state.latestVersion });
+	} else if (mode === 'auto') {
+		await handleAutoInstall(state);
 	}
 });
 
@@ -247,15 +262,18 @@ void (async () => {
 		// Initialize unified cleanup schedulers (log and session)
 		await initializeCleanupIfNeeded();
 
-		// Schedule background update check (non-blocking, fire-and-forget)
-		if (!shouldSkipUpdateCheck() && !isUpdateCommand) {
-			const config = await getConfigLoader().load();
-			const frequencyDays = config.autoUpdate?.frequencyDays ?? 1;
-			scheduleUpdateCheck(getGlobalConfigDir(), packageJson.version, frequencyDays);
-		}
-
 		// Parse arguments
 		program.parse();
+
+		// Schedule background update check after parse — fire-and-forget, never blocks the command
+		if (!shouldSkipUpdateCheck() && !isUpdateCommand) {
+			void (async () => {
+				const config = await getConfigLoader().load();
+				const mode = config.autoUpdate?.mode ?? 'reminder';
+				if (mode === 'disabled') return;
+				scheduleUpdateCheck(getGlobalConfigDir(), packageJson.version, config.autoUpdate?.frequencyDays ?? 1);
+			})();
+		}
 
 		// Build CLI configuration from options
 		const options = program.opts() as CliOptions;

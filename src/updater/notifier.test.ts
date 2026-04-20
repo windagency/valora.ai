@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { printUpdateBanner, shouldShowReminder } from './notifier';
+import { printUpdateBanner, shouldAutoUpdate, shouldShowReminder } from './notifier';
 import type { UpdateCheckState } from './throttle';
 
 function makeState(overrides: Partial<UpdateCheckState> = {}): UpdateCheckState {
@@ -63,6 +63,21 @@ describe('shouldShowReminder', () => {
 	it('returns false when stderr is not a TTY', () => {
 		Object.defineProperty(process.stderr, 'isTTY', { value: false, configurable: true });
 		expect(shouldShowReminder(makeState(), '2.5.0', 'reminder')).toBe(false);
+	});
+});
+
+describe('shouldAutoUpdate', () => {
+	it('returns true when a newer version is available', () => {
+		expect(shouldAutoUpdate(makeState({ latestVersion: '2.6.0' }), '2.5.0')).toBe(true);
+	});
+
+	it('returns false when latestVersion is null', () => {
+		expect(shouldAutoUpdate(makeState({ latestVersion: null }), '2.5.0')).toBe(false);
+	});
+
+	it('returns false when latest is not newer than current', () => {
+		expect(shouldAutoUpdate(makeState({ latestVersion: '2.5.0' }), '2.5.0')).toBe(false);
+		expect(shouldAutoUpdate(makeState({ latestVersion: '2.4.0' }), '2.5.0')).toBe(false);
 	});
 });
 
