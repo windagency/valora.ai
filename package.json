@@ -21,7 +21,7 @@
 	"author": "Damien TIVELET <damien@wind-agency.com>",
 	"repository": {
 		"type": "git",
-		"url": ""
+		"url": "https://github.com/windagency/valora.ai"
 	},
 	"license": "MIT",
 	"type": "module",
@@ -64,7 +64,7 @@
 	"scripts": {
 		"postinstall": "node scripts/postinstall.mjs || true",
 		"prepare": "husky || true && pnpm build",
-		"clean": "rm -rf dist/",
+		"clean": "pnpm \"/clean:/\"",
 		"clean:build": "rm -rf ./dist/* && rm -f tsconfig.tsbuildinfo && find src -name '*.js' -delete 2>/dev/null; true",
 		"clean:coverage": "rm -rf ./coverage",
 		"clear": "pnpm \"/clean:/\" && rm -rf ./node_modules",
@@ -87,7 +87,7 @@
 		"start": "node dist/cli/index.js",
 		"start:mcp": "node dist/mcp/server.js",
 		"tsc:check": "tsc --noEmit",
-		"prepublishOnly": "pnpm clean && pnpm build && pnpm test:suite:unit",
+		"prepublishOnly": "pnpm clean:build && pnpm build && pnpm test:suite:unit",
 		"pretest:dev": "pnpm format && pnpm tsc:check",
 		"test:dev": "vitest run",
 		"test:dev:watch": "vitest",
@@ -110,7 +110,12 @@
 		"test:smoke": "pnpm test:suite:unit --run --reporter=verbose",
 		"audit": "pnpm audit",
 		"audit:prod": "pnpm audit --prod",
-		"audit:fix": "pnpm audit --fix"
+		"audit:fix": "pnpm audit --fix",
+		"packages:build": "pnpm -r --filter './packages/*' build",
+		"packages:clean": "pnpm -r --filter './packages/*' clean",
+		"packages:lint": "pnpm -r --filter './packages/*' lint",
+		"packages:format": "pnpm -r --filter './packages/*' format",
+		"packages:test": "pnpm -r --filter './packages/*' test"
 	},
 	"pnpm": {
 		"onlyBuiltDependencies": [],

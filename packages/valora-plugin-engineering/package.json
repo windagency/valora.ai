@@ -3,17 +3,45 @@
 	"version": "1.0.0",
 	"description": "Lead engineer agent and core engineering workflow commands for Valora (commit, create-pr, plan, plan-architecture, plan-implementation, review-code, review-functional, review-plan, validate-parallel, validate-plan, gather-knowledge).",
 	"keywords": [
-		"valora-plugin"
+		"valora",
+		"valora-plugin",
+		"ai",
+		"agent",
+		"engineering",
+		"code-review",
+		"planning",
+		"git",
+		"workflow",
+		"automation",
+		"typescript"
 	],
-	"license": "UNLICENSED",
+	"author": "Damien TIVELET <damien@wind-agency.com>",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/windagency/valora.ai"
+	},
+	"license": "MIT",
+	"type": "module",
+	"engines": {
+		"node": ">=22.0.0"
+	},
+	"packageManager": "pnpm@10.19.0",
+	"volta": {
+		"node": "22.21.0",
+		"pnpm": "10.19.0"
+	},
+	"scripts": {
+		"build": "true",
+		"clean": "true",
+		"lint": "prettier --check \".\"",
+		"format": "prettier --write \".\"",
+		"test": "true"
+	},
 	"files": [
 		"valora-plugin.json",
 		"agents",
 		"commands"
 	],
-	"engines": {
-		"node": ">=22.0.0"
-	},
 	"peerDependencies": {
 		"@windagency/valora": ">=0.1.0"
 	}

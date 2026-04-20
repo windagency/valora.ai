@@ -3,16 +3,43 @@
 	"version": "1.0.0",
 	"description": "Security Operations Engineer agent for Valora (threat detection, vulnerability management, incident response). Requires valora-plugin-platform.",
 	"keywords": [
-		"valora-plugin"
+		"valora",
+		"valora-plugin",
+		"ai",
+		"agent",
+		"security",
+		"secops",
+		"vulnerability",
+		"threat-detection",
+		"incident-response",
+		"workflow"
 	],
-	"license": "UNLICENSED",
+	"author": "Damien TIVELET <damien@wind-agency.com>",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/windagency/valora.ai"
+	},
+	"license": "MIT",
+	"type": "module",
+	"engines": {
+		"node": ">=22.0.0"
+	},
+	"packageManager": "pnpm@10.19.0",
+	"volta": {
+		"node": "22.21.0",
+		"pnpm": "10.19.0"
+	},
+	"scripts": {
+		"build": "true",
+		"clean": "true",
+		"lint": "prettier --check \".\"",
+		"format": "prettier --write \".\"",
+		"test": "true"
+	},
 	"files": [
 		"valora-plugin.json",
 		"agents"
 	],
-	"engines": {
-		"node": ">=22.0.0"
-	},
 	"peerDependencies": {
 		"@windagency/valora": ">=0.1.0",
 		"@windagency/valora-plugin-platform": ">=1.0.0"

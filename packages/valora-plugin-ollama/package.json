@@ -3,20 +3,44 @@
 	"version": "1.0.0",
 	"description": "Self-managed Ollama provider plugin for Valora — manages the Ollama binary and server process, supports any model available via ollama pull.",
 	"keywords": [
-		"valora-plugin"
+		"valora",
+		"valora-plugin",
+		"ai",
+		"llm",
+		"ollama",
+		"local-llm",
+		"provider",
+		"self-hosted",
+		"open-source",
+		"typescript"
 	],
-	"license": "UNLICENSED",
+	"author": "Damien TIVELET <damien@wind-agency.com>",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/windagency/valora.ai"
+	},
+	"license": "MIT",
+	"type": "module",
+	"engines": {
+		"node": ">=22.0.0"
+	},
+	"packageManager": "pnpm@10.19.0",
+	"volta": {
+		"node": "22.21.0",
+		"pnpm": "10.19.0"
+	},
 	"scripts": {
 		"build": "tsc -p tsconfig.json",
-		"prepublishOnly": "pnpm build"
+		"clean": "rm -rf ./dist",
+		"lint": "eslint src/",
+		"format": "prettier --write \"src/**/*.ts\"",
+		"test": "vitest run",
+		"prepublishOnly": "pnpm clean && pnpm build"
 	},
 	"files": [
 		"valora-plugin.json",
 		"dist"
 	],
-	"engines": {
-		"node": ">=22.0.0"
-	},
 	"peerDependencies": {
 		"@windagency/valora": ">=0.1.0",
 		"openai": ">=4.0.0"

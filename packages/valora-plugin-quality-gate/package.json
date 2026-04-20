@@ -3,17 +3,44 @@
 	"version": "1.0.0",
 	"description": "Asserter agent and pre-testing static-assertion commands for Valora (assert).",
 	"keywords": [
-		"valora-plugin"
+		"valora",
+		"valora-plugin",
+		"ai",
+		"agent",
+		"quality",
+		"assertion",
+		"static-analysis",
+		"validation",
+		"pre-testing",
+		"workflow"
 	],
-	"license": "UNLICENSED",
+	"author": "Damien TIVELET <damien@wind-agency.com>",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/windagency/valora.ai"
+	},
+	"license": "MIT",
+	"type": "module",
+	"engines": {
+		"node": ">=22.0.0"
+	},
+	"packageManager": "pnpm@10.19.0",
+	"volta": {
+		"node": "22.21.0",
+		"pnpm": "10.19.0"
+	},
+	"scripts": {
+		"build": "true",
+		"clean": "true",
+		"lint": "prettier --check \".\"",
+		"format": "prettier --write \".\"",
+		"test": "true"
+	},
 	"files": [
 		"valora-plugin.json",
 		"agents",
 		"commands"
 	],
-	"engines": {
-		"node": ">=22.0.0"
-	},
 	"peerDependencies": {
 		"@windagency/valora": ">=0.1.0"
 	}
