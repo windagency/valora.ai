@@ -343,6 +343,7 @@ export class ConfigLoader {
 	 */
 	private mergeConfigs(...configs: Array<Partial<Config>>): Config {
 		const merged: Config = {
+			autoUpdate: { ...DEFAULT_CONFIG.autoUpdate! },
 			defaults: { ...DEFAULT_CONFIG.defaults },
 			features: { ...DEFAULT_CONFIG.features! },
 			paths: { ...DEFAULT_CONFIG.paths },
@@ -356,6 +357,9 @@ export class ConfigLoader {
 	 * Merge a single config into the result
 	 */
 	private mergeSingleConfig(result: Config, config: Partial<Config>): Config {
+		if (config.autoUpdate) {
+			result.autoUpdate = { ...result.autoUpdate, ...config.autoUpdate };
+		}
 		if (config.providers) {
 			result.providers = this.mergeProviderConfigs(result.providers, config.providers);
 		}

@@ -116,6 +116,12 @@ export const FEATURE_FLAGS_SCHEMA = z.object({
 	dynamic_agent_selection_implement_only: z.boolean().default(true)
 });
 
+// Auto-update configuration schema
+export const AUTO_UPDATE_CONFIG_SCHEMA = z.object({
+	mode: z.enum(['auto', 'reminder', 'disabled']).default('reminder'),
+	frequencyDays: z.number().int().min(1).max(365).default(1)
+});
+
 // Hook command configuration schema
 export const HOOK_COMMAND_SCHEMA = z.object({
 	async: z.boolean().optional(),
@@ -177,6 +183,7 @@ export const PLUGINS_CONFIG_SCHEMA = z.object({
 
 // Main configuration schema
 export const CONFIG_SCHEMA = z.object({
+	autoUpdate: AUTO_UPDATE_CONFIG_SCHEMA.optional(),
 	defaults: DEFAULTS_CONFIG_SCHEMA,
 	features: FEATURE_FLAGS_SCHEMA.optional(),
 	hooks: HOOKS_CONFIG_SCHEMA.optional(),
@@ -189,6 +196,7 @@ export const CONFIG_SCHEMA = z.object({
 });
 
 // Type inference from schemas
+export type AutoUpdateConfig = z.infer<typeof AUTO_UPDATE_CONFIG_SCHEMA>;
 export type Config = z.infer<typeof CONFIG_SCHEMA>;
 export type DefaultsConfig = z.infer<typeof DEFAULTS_CONFIG_SCHEMA>;
 export type FeatureFlags = z.infer<typeof FEATURE_FLAGS_SCHEMA>;
@@ -203,6 +211,10 @@ export type SessionRetentionConfig = z.infer<typeof SESSION_RETENTION_CONFIG_SCH
 
 // Default configuration
 export const DEFAULT_CONFIG: Config = {
+	autoUpdate: {
+		mode: 'reminder',
+		frequencyDays: 1
+	},
 	defaults: {
 		default_provider: undefined, // Will be set during setup or auto-configured in MCP context
 		dry_run: false,
