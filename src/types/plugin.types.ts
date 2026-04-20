@@ -36,6 +36,7 @@ export interface PluginManifest {
 	engines?: { valora?: string };
 	homepage?: string;
 	name: string;
+	overrides?: string[];
 	permissions?: PluginPermission[];
 	requires?: string[];
 	requiresBinary?: PluginBinaryRequirement[];

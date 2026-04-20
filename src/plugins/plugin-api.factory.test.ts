@@ -34,16 +34,50 @@ function makeRegistry(): PluginLifecycleRegistry {
 }
 
 describe('createPluginAPI', () => {
-	it('registers providers via api.providers.register()', async () => {
+	it('passes plugin name as owner when registering a provider', async () => {
 		const { getProviderRegistry } = await import('llm/registry');
 		const mockRegister = vi.fn();
 		vi.mocked(getProviderRegistry).mockReturnValue({ registerProvider: mockRegister } as never);
 
-		const api = createPluginAPI({} as never, makePlugin(), makeRegistry());
+		const api = createPluginAPI(
+			{} as never,
+			makePlugin({ manifest: { name: 'my-plugin', version: '1.0.0' } }),
+			makeRegistry()
+		);
 		const FakeProvider = class {};
 		api.providers.register('fake', FakeProvider as never);
 
-		expect(mockRegister).toHaveBeenCalledWith('fake', FakeProvider);
+		expect(mockRegister).toHaveBeenCalledWith('fake', FakeProvider, { owner: 'my-plugin', override: false });
+	});
+
+	it('sets override: true when the key appears in manifest.overrides', async () => {
+		const { getProviderRegistry } = await import('llm/registry');
+		const mockRegister = vi.fn();
+		vi.mocked(getProviderRegistry).mockReturnValue({ registerProvider: mockRegister } as never);
+
+		const plugin = makePlugin({
+			manifest: { name: 'override-plugin', version: '1.0.0', overrides: ['ollama'] }
+		});
+		const api = createPluginAPI({} as never, plugin, makeRegistry());
+		const FakeProvider = class {};
+		api.providers.register('ollama', FakeProvider as never);
+
+		expect(mockRegister).toHaveBeenCalledWith('ollama', FakeProvider, { owner: 'override-plugin', override: true });
+	});
+
+	it('sets override: false when the key does not appear in manifest.overrides', async () => {
+		const { getProviderRegistry } = await import('llm/registry');
+		const mockRegister = vi.fn();
+		vi.mocked(getProviderRegistry).mockReturnValue({ registerProvider: mockRegister } as never);
+
+		const plugin = makePlugin({
+			manifest: { name: 'plugin-a', version: '1.0.0', overrides: ['other-key'] }
+		});
+		const api = createPluginAPI({} as never, plugin, makeRegistry());
+		const FakeProvider = class {};
+		api.providers.register('anthropic', FakeProvider as never);
+
+		expect(mockRegister).toHaveBeenCalledWith('anthropic', FakeProvider, { owner: 'plugin-a', override: false });
 	});
 
 	it('accumulates activate hooks via api.lifecycle.onActivate()', () => {

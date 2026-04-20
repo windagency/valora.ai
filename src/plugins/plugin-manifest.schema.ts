@@ -42,6 +42,7 @@ export const PLUGIN_MANIFEST_SCHEMA = z.object({
 		.string()
 		.min(1)
 		.regex(/^[a-z0-9][a-z0-9-]*$/, 'Plugin name must be lowercase kebab-case'),
+	overrides: z.array(z.string()).optional(),
 	permissions: z.array(PLUGIN_PERMISSION_SCHEMA).optional(),
 	requires: z.array(z.string()).optional(),
 	requiresBinary: z.array(PLUGIN_BINARY_REQUIREMENT_SCHEMA).optional(),

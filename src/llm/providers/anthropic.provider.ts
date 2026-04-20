@@ -754,4 +754,4 @@ export class AnthropicProvider extends BaseLLMProvider implements BatchableProvi
 }
 
 // Self-register this provider with the registry when module is loaded
-getProviderRegistry().registerProvider(ProviderName.ANTHROPIC, AnthropicProvider);
+getProviderRegistry().registerProvider(ProviderName.ANTHROPIC, AnthropicProvider, { owner: 'core' });

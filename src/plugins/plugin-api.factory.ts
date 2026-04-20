@@ -14,10 +14,9 @@ export interface PluginLifecycleRegistry {
 export function createPluginAPI(
 	_container: DIContainer,
 	plugin: LoadedPlugin,
-	lifecycleRegistry: PluginLifecycleRegistry
+	lifecycleRegistry: PluginLifecycleRegistry,
+	resolvedOverrides: ReadonlySet<string> = new Set()
 ): PluginAPI {
-	// TODO: use logger.child({ plugin: plugin.manifest.name }) once Logger gains a child() method
-	void plugin;
 	const logger = getLogger();
 
 	return {
@@ -37,7 +36,11 @@ export function createPluginAPI(
 		logger,
 		providers: {
 			register(name, providerClass) {
-				getProviderRegistry().registerProvider(name, providerClass);
+				const override = resolvedOverrides.has(name) || (plugin.manifest.overrides?.includes(name) ?? false);
+				getProviderRegistry().registerProvider(name, providerClass, {
+					override,
+					owner: plugin.manifest.name
+				});
 			}
 		}
 	};

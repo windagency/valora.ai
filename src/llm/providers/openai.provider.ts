@@ -317,4 +317,4 @@ export class OpenAIProvider extends BaseLLMProvider implements BatchableProvider
 }
 
 // Self-register this provider with the registry when module is loaded
-getProviderRegistry().registerProvider(ProviderName.OPENAI, OpenAIProvider);
+getProviderRegistry().registerProvider(ProviderName.OPENAI, OpenAIProvider, { owner: 'core' });

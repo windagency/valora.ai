@@ -1,40 +1,26 @@
-/**
- * LLM Provider Registry - Factory for creating providers
- *
- * Uses dependency inversion principle:
- * - Registry depends on interfaces (LLMProvider), not concrete implementations
- * - Providers register themselves when their modules are loaded
- * - No direct imports of concrete provider classes
- */
-
 import type { LLMProvider, ProviderFactory } from 'types/llm.types';
 import type { MCPSamplingService } from 'types/mcp.types';
 
 import { ProviderName } from 'config/providers.config';
+import { getLogger } from 'output/logger';
 import { ProviderError } from 'utils/error-handler';
 
+export interface RegisterProviderOptions {
+	override?: boolean;
+	owner?: string;
+}
+
+type ProviderClass = new (config: Record<string, unknown>) => LLMProvider;
+
 export class LLMProviderRegistry implements ProviderFactory {
-	private providers: Map<string, new (config: Record<string, unknown>) => LLMProvider>;
+	private providerOwners: Map<string, string>;
+	private providers: Map<string, ProviderClass>;
 
 	constructor() {
 		this.providers = new Map();
+		this.providerOwners = new Map();
 	}
 
-	/**
-	 * Register a provider
-	 */
-	registerProvider(name: string, providerClass: new (config: Record<string, unknown>) => LLMProvider): void {
-		this.providers.set(name, providerClass);
-	}
-
-	/**
-	 * Create a provider instance
-	 *
-	 * @param providerName - Name of the provider to create
-	 * @param config - Provider configuration
-	 * @param mcpSampling - Optional MCP sampling service for CursorProvider (dependency injection)
-	 *                     Required for CursorProvider to function properly.
-	 */
 	createProvider(providerName: string, config: Record<string, unknown>, mcpSampling?: MCPSamplingService): LLMProvider {
 		const providerClass = this.providers.get(providerName);
 
@@ -45,12 +31,8 @@ export class LLMProviderRegistry implements ProviderFactory {
 			});
 		}
 
-		// For CursorProvider, use dependency injection
-		// CursorProvider has a special constructor signature: (config, mcpSampling?)
 		let provider: LLMProvider;
 		if (providerName === ProviderName.CURSOR) {
-			// Type assertion needed because providerClass is generic, but we know
-			// CursorProvider accepts mcpSampling as second parameter
 			type CursorProviderConstructor = new (
 				config: Record<string, unknown>,
 				mcpSampling?: MCPSamplingService
@@ -62,7 +44,6 @@ export class LLMProviderRegistry implements ProviderFactory {
 		}
 
 		if (!provider.isConfigured()) {
-			// Special handling for cursor provider - gives more helpful error
 			if (providerName === ProviderName.CURSOR) {
 				throw new ProviderError(
 					`Cursor provider requires MCP context (must run in Cursor via MCP).\n\n` +
@@ -84,29 +65,68 @@ export class LLMProviderRegistry implements ProviderFactory {
 		return provider;
 	}
 
-	/**
-	 * Get list of available providers
-	 */
 	getAvailableProviders(): string[] {
 		return Array.from(this.providers.keys());
 	}
 
-	/**
-	 * Check if a provider is registered
-	 */
+	getOwner(name: string): string | undefined {
+		return this.providerOwners.get(name);
+	}
+
 	hasProvider(name: string): boolean {
 		return this.providers.has(name);
 	}
+
+	registerProvider(name: string, providerClass: ProviderClass, options: RegisterProviderOptions = {}): void {
+		const { override = false, owner = 'core' } = options;
+
+		if (this.providers.has(name)) {
+			const existingOwner = this.providerOwners.get(name) ?? 'unknown';
+
+			if (existingOwner === owner) {
+				return;
+			}
+
+			if (!override) {
+				throw new ProviderConflictError(name, existingOwner, owner);
+			}
+
+			getLogger().warn(`Provider "${name}" overridden by "${owner}" (was "${existingOwner}")`, {
+				incomingOwner: owner,
+				previousOwner: existingOwner,
+				provider: name
+			});
+		}
+
+		this.providers.set(name, providerClass);
+		this.providerOwners.set(name, owner);
+	}
 }
 
-// Singleton instance
+export class ProviderConflictError extends ProviderError {
+	readonly existingOwner: string;
+	readonly incomingOwner: string;
+	readonly providerKey: string;
+
+	constructor(key: string, existingOwner: string, incomingOwner: string) {
+		super(
+			`Provider key "${key}" is already registered by "${existingOwner}". ` +
+				`"${incomingOwner}" cannot register the same key without declaring an override.`,
+			{ existingOwner, incomingOwner, provider: key }
+		);
+		this.providerKey = key;
+		this.existingOwner = existingOwner;
+		this.incomingOwner = incomingOwner;
+	}
+}
+
 let registryInstance: LLMProviderRegistry | null = null;
 
-/**
- * Get the singleton provider registry instance
- * Note: Providers must be initialized separately via initializeProviders()
- */
 export function getProviderRegistry(): LLMProviderRegistry {
 	registryInstance ??= new LLMProviderRegistry();
 	return registryInstance;
+}
+
+export function resetProviderRegistry(): void {
+	registryInstance = null;
 }

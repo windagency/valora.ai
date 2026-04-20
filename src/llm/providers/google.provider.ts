@@ -257,4 +257,4 @@ export class GoogleProvider extends BaseLLMProvider {
 }
 
 // Self-register this provider with the registry when module is loaded
-getProviderRegistry().registerProvider(ProviderName.GOOGLE, GoogleProvider);
+getProviderRegistry().registerProvider(ProviderName.GOOGLE, GoogleProvider, { owner: 'core' });

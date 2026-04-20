@@ -9,6 +9,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CodePluginModule } from 'plugins/plugin-api.types';
 
 import { readFileSync } from 'fs';
+import { preloadConflictResolutions, resolveProviderConflict } from 'plugins/conflict-resolver';
 import { createPluginAPI, type PluginLifecycleRegistry } from 'plugins/plugin-api.factory';
 import { PluginLoaderService } from 'plugins/plugin-loader.service';
 
@@ -27,6 +28,7 @@ import { getHookExecutionService } from 'executor/hook-execution.service';
 import { PipelineExecutor } from 'executor/pipeline';
 import { PromptLoader } from 'executor/prompt-loader';
 import { StageExecutor } from 'executor/stage-executor';
+import { getProviderRegistry, ProviderConflictError } from 'llm/registry';
 import { ExternalMCPIntegrator } from 'mcp/external-mcp-integrator';
 import { MCPApprovalWorkflow } from 'mcp/mcp-approval-workflow';
 // Initialize providers before importing registry (triggers self-registration)
@@ -40,7 +42,6 @@ import { getToolIntegrityMonitor } from 'security/tool-integrity-monitor';
 import type { ExternalMCPServerConfig } from 'types/mcp-client.types';
 import type { ToolCallArgs } from 'types/mcp.types';
 
-import { getProviderRegistry } from 'llm/registry';
 import { ExternalMCPToolProxy } from 'mcp/external-client/tool-proxy';
 import { MCPApprovalCacheService } from 'mcp/mcp-approval-cache.service';
 import { MCPAuditLoggerService } from 'mcp/mcp-audit-logger.service';
@@ -246,6 +247,8 @@ export async function initializePlugins(container: DIContainer): Promise<void> {
 
 	if (plugins.length === 0) return;
 
+	await preloadConflictResolutions();
+
 	const agentLoader = container.resolve<AgentLoader>(SERVICE_IDENTIFIERS.AGENT_LOADER);
 	const commandLoader = container.resolve<CommandLoader>(SERVICE_IDENTIFIERS.COMMAND_LOADER);
 	const promptLoader = container.resolve<PromptLoader>(SERVICE_IDENTIFIERS.PROMPT_LOADER);
@@ -270,8 +273,31 @@ async function loadCodePlugin(
 	lifecycleRegistries.set(plugin.manifest.name, registry);
 	try {
 		const mod = (await import(plugin.codeEntrypoint!)) as CodePluginModule;
-		const api = createPluginAPI(container, plugin, registry);
-		await mod.register(api);
+		const resolvedOverrides = new Set<string>();
+		const api = createPluginAPI(container, plugin, registry, resolvedOverrides);
+		const MAX_CONFLICT_RETRIES = 50;
+		for (let attempt = 0; attempt <= MAX_CONFLICT_RETRIES; attempt++) {
+			if (attempt === MAX_CONFLICT_RETRIES) {
+				throw new Error(
+					`Plugin "${plugin.manifest.name}" exceeded conflict resolution limit (${MAX_CONFLICT_RETRIES} conflicts). ` +
+						`Declare conflicting keys in the plugin's overrides list in valora-plugin.json.`
+				);
+			}
+			try {
+				await mod.register(api);
+				break;
+			} catch (err) {
+				if (!(err instanceof ProviderConflictError)) throw err;
+				const winner = await resolveProviderConflict({
+					existingOwner: err.existingOwner,
+					incomingOwner: err.incomingOwner,
+					key: err.providerKey
+				});
+				if (winner === err.incomingOwner) {
+					resolvedOverrides.add(err.providerKey);
+				}
+			}
+		}
 	} catch (error) {
 		getLogger().warn('Failed to load code plugin', {
 			error: (error as Error).message,

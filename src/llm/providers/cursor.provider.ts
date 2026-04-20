@@ -302,4 +302,4 @@ export class CursorProvider extends BaseLLMProvider {
 }
 
 // Self-register this provider with the registry when module is loaded
-getProviderRegistry().registerProvider(ProviderName.CURSOR, CursorProvider);
+getProviderRegistry().registerProvider(ProviderName.CURSOR, CursorProvider, { owner: 'core' });

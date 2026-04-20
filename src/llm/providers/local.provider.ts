@@ -240,4 +240,4 @@ export class LocalProvider extends BaseLLMProvider {
 }
 
 // Self-register this provider with the registry when module is loaded
-getProviderRegistry().registerProvider(ProviderName.LOCAL, LocalProvider);
+getProviderRegistry().registerProvider(ProviderName.LOCAL, LocalProvider, { owner: 'core' });
