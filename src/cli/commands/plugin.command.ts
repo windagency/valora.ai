@@ -1,13 +1,20 @@
-import { spawn } from 'node:child_process';
-import { type InstallScope, PluginInstallerService, type ProcessRunner } from 'plugins/plugin-installer.service';
+import { createRequire } from 'node:module';
+import { type InstallScope, PluginInstallerService } from 'plugins/plugin-installer.service';
 import { PluginLoaderService } from 'plugins/plugin-loader.service';
 import { fetchPluginRegistry } from 'plugins/plugin-registry.service';
+import { diffPluginVersions } from 'updater/plugin-compare';
+import { fetchLatestVersionFor } from 'updater/registry';
 
 import type { CommandAdapter } from 'cli/command-adapter.interface';
 import type { CataloguedPlugin } from 'types/plugin.types';
 
+import { buildCatalogMap, isUpdatablePlugin, toInstalledPluginRef } from 'cli/plugin-catalogue-utils';
+import { spawnRunner } from 'cli/spawn-runner';
 import { getConfigLoader } from 'config/loader';
 import { type ColorAdapter, getColorAdapter } from 'output/color-adapter.interface';
+
+const require = createRequire(import.meta.url);
+const packageJson = require('../../../package.json') as { version: string };
 
 const VALID_SCOPES: InstallScope[] = ['global', 'project', 'user'];
 
@@ -15,21 +22,8 @@ interface PluginInstallOptions extends Record<string, unknown> {
 	scope?: string;
 }
 
-const spawnRunner: ProcessRunner = {
-	run: (argv: string[], options?: { cwd?: string }): Promise<number> =>
-		new Promise((resolve) => {
-			const [cmd, ...args] = argv;
-			if (!cmd) {
-				resolve(1);
-				return;
-			}
-			const child = spawn(cmd, args, { cwd: options?.cwd, stdio: 'inherit' });
-			child.on('exit', (code) => resolve(code ?? 1));
-			child.on('error', () => resolve(1));
-		})
-};
-
 export function configurePluginCommand(program: CommandAdapter): void {
+	const installer = new PluginInstallerService(spawnRunner);
 	const pluginCmd = program.command('plugin').description('Manage Valora plugins');
 
 	pluginCmd
@@ -54,7 +48,7 @@ export function configurePluginCommand(program: CommandAdapter): void {
 
 			console.log(`Installing ${name} (scope: ${scope})…`);
 			try {
-				await new PluginInstallerService(spawnRunner).install(name, scope as InstallScope);
+				await installer.install(name, scope as InstallScope);
 				console.log(`✓ Plugin installed. Restart Valora to activate.`);
 			} catch (error) {
 				const message = error instanceof Error ? error.message : String(error);
@@ -80,7 +74,7 @@ export function configurePluginCommand(program: CommandAdapter): void {
 			}
 
 			try {
-				new PluginInstallerService(spawnRunner).uninstall(name, scope as InstallScope);
+				installer.uninstall(name, scope as InstallScope);
 				console.log(`✓ Plugin removed. Restart Valora to deactivate.`);
 			} catch (error) {
 				const message = error instanceof Error ? error.message : String(error);
@@ -93,7 +87,7 @@ export function configurePluginCommand(program: CommandAdapter): void {
 		.command('list')
 		.description('List all discovered plugins and their status')
 		.action(() => {
-			const color: ColorAdapter = getColorAdapter();
+			const color = getColorAdapter();
 			const config = getConfigLoader().get();
 			const plugins = new PluginLoaderService().catalogAll(config?.plugins);
 
@@ -137,7 +131,7 @@ export function configurePluginCommand(program: CommandAdapter): void {
 		.command('available')
 		.description('List plugins available to install from the @windagency registry')
 		.action(async () => {
-			const color: ColorAdapter = getColorAdapter();
+			const color = getColorAdapter();
 			const registry = await fetchPluginRegistry();
 
 			if (!registry) {
@@ -161,6 +155,83 @@ export function configurePluginCommand(program: CommandAdapter): void {
 			console.log(`\nInstall with: valora plugin add <name>`);
 			process.exit(0);
 		});
+
+	pluginCmd
+		.command('update')
+		.description('Update installed plugins to their latest versions')
+		.argument('[name]', 'Plugin name to update (updates all outdated plugins if omitted)')
+		.option('--check', 'Check for updates without installing')
+		.action(async (...args: Array<Record<string, unknown>>) => {
+			const nameArg = args[0] as unknown as string | undefined;
+			const options = args[1] as unknown as { check?: boolean };
+			const color = getColorAdapter();
+
+			const [catalog, allInstalled] = await Promise.all([
+				fetchPluginRegistry(),
+				Promise.resolve(new PluginLoaderService().catalogAll())
+			]);
+
+			const catalogMap = buildCatalogMap(catalog);
+			const refs = allInstalled.filter(isUpdatablePlugin).map(toInstalledPluginRef);
+
+			const normalised = nameArg ? (nameArg.startsWith('valora-plugin-') ? nameArg : `valora-plugin-${nameArg}`) : null;
+			const filtered = normalised ? refs.filter((r) => r.name === normalised) : refs;
+
+			const missingFromCatalog = filtered.filter((r) => !catalogMap.has(r.name));
+			const npmLatestMap = await buildNpmLatestMap(missingFromCatalog);
+
+			const outdated = diffPluginVersions(filtered, catalogMap, npmLatestMap);
+
+			if (outdated.length === 0) {
+				console.log('All plugins are up to date.');
+				process.exit(0);
+				return;
+			}
+
+			if (options.check) {
+				console.log(`Plugin updates available:\n`);
+				for (const p of outdated) {
+					console.log(`  ${p.name}  ${p.currentVersion}  →  ${p.latestVersion}`);
+				}
+				process.exit(0);
+				return;
+			}
+
+			await installOutdatedPlugins(installer, outdated, color);
+			process.exit(0);
+		});
+}
+
+async function buildNpmLatestMap(plugins: Array<{ name: string; packageName: string }>): Promise<Map<string, string>> {
+	if (plugins.length === 0) return new Map();
+	const results = await Promise.all(
+		plugins.map(async (r) => ({
+			name: r.name,
+			version: await fetchLatestVersionFor(r.packageName, packageJson.version)
+		}))
+	);
+	return new Map(results.filter((r) => r.version !== null).map((r) => [r.name, r.version as string]));
+}
+
+async function installOutdatedPlugins(
+	installer: PluginInstallerService,
+	outdated: Awaited<ReturnType<typeof diffPluginVersions>>,
+	color: ColorAdapter
+): Promise<void> {
+	for (const p of outdated) {
+		if (p.location === 'npm') {
+			console.log(`  ${color.yellow('○')} ${p.name} — managed by your package manager, update manually.`);
+			continue;
+		}
+		console.log(`Updating ${p.name} (${p.currentVersion} → ${p.latestVersion})…`);
+		try {
+			await installer.install(p.name, p.location as InstallScope);
+			console.log(`  ${color.green('✓')} ${p.name} updated.`);
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			console.error(`  ${color.red('✗')} ${p.name}: ${message}`);
+		}
+	}
 }
 
 function pluginContribs(plugin: CataloguedPlugin): string {

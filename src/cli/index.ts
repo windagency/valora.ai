@@ -9,7 +9,10 @@
  * - dynamic commands: runtime-loaded orchestration commands
  */
 
+import type { UpdateCheckState } from 'updater/throttle';
+
 import { createRequire } from 'node:module';
+import { PluginInstallerService } from 'plugins/plugin-installer.service';
 import {
 	runAutoInstall,
 	scheduleUpdateCheck,
@@ -18,7 +21,10 @@ import {
 	shouldShowReminder,
 	writeUpdateState
 } from 'updater/index';
+import { DEFAULT_STATE } from 'updater/state';
 
+import { autoInstallOutdatedPlugins } from 'cli/auto-plugin-install';
+import { silentSpawnRunner } from 'cli/spawn-runner';
 import { getConfigLoader, setGlobalCliOverrides } from 'config/loader';
 import { getGlobalConfigDir } from 'utils/paths';
 import { handlePromptCancellation, isPromptCancellation } from 'utils/prompt-handler';
@@ -50,10 +56,14 @@ import { configureUpdateCommand, persistUpdateSuccess } from './commands/update.
 import { CliConfigBuilder } from './config-builder';
 import { checkAndRunFirstTimeSetup, shouldTriggerFirstRun } from './first-run-setup';
 import { globalFlags } from './flags';
+import { schedulePluginUpdateCheck, settlePluginUpdateCheck } from './plugin-update-orchestrator';
 import { printUpdateBanner } from './update-banner';
 
 const require = createRequire(import.meta.url);
 const packageJson = require('../../package.json') as { version: string };
+
+const CORE_UPDATE_SETTLE_MS = 200;
+const PLUGIN_UPDATE_SETTLE_MS = 500;
 
 // Check for --no-interactive flag before any setup (needed for command actions)
 const rawArgs = process.argv.slice(2);
@@ -146,8 +156,7 @@ configureUpdateCommand(rawProgram);
 
 const isUpdateCommand = rawArgs[0] === 'update';
 
-async function handleAutoInstall(state: Awaited<ReturnType<typeof settleUpdateCheck>>): Promise<void> {
-	if (!state) return;
+async function handleAutoInstall(state: UpdateCheckState): Promise<void> {
 	const { latestVersion } = state;
 	if (!latestVersion || !shouldAutoUpdate(state, packageJson.version)) return;
 	process.stderr.write(`Updating Valora to v${latestVersion}…\n`);
@@ -155,6 +164,28 @@ async function handleAutoInstall(state: Awaited<ReturnType<typeof settleUpdateCh
 	if (result === 'success') {
 		process.stderr.write(`✓ Updated to v${latestVersion}.\n`);
 		await persistUpdateSuccess(getGlobalConfigDir(), packageJson.version, latestVersion);
+	}
+}
+
+async function handleAutoMode(
+	state: null | UpdateCheckState,
+	outdatedPlugins: Awaited<ReturnType<typeof settlePluginUpdateCheck>>
+): Promise<void> {
+	if (state) await handleAutoInstall(state);
+	const installer = new PluginInstallerService(silentSpawnRunner);
+	await autoInstallOutdatedPlugins(installer, outdatedPlugins);
+}
+
+async function handleReminderMode(
+	state: null | UpdateCheckState,
+	outdatedPlugins: Awaited<ReturnType<typeof settlePluginUpdateCheck>>
+): Promise<void> {
+	const hasCoreUpdate = state !== null && shouldShowReminder(state, packageJson.version, 'reminder');
+	const hasPluginUpdates = outdatedPlugins.length > 0;
+	if (!hasCoreUpdate && !hasPluginUpdates) return;
+	printUpdateBanner(state ?? { ...DEFAULT_STATE }, packageJson.version, outdatedPlugins);
+	if (state) {
+		await writeUpdateState(getGlobalConfigDir(), { ...state, remindedForVersion: state.latestVersion });
 	}
 }
 
@@ -170,21 +201,23 @@ function shouldSkipUpdateCheck(): boolean {
 }
 
 rawProgram.hook('postAction', async () => {
-	if (shouldSkipUpdateCheck()) return;
-	if (isUpdateCommand) return;
+	if (shouldSkipUpdateCheck() || isUpdateCommand) return;
 
 	const config = await getConfigLoader().load();
 	const mode = config.autoUpdate?.mode ?? 'reminder';
 	if (mode === 'disabled') return;
 
-	const state = await settleUpdateCheck(200);
-	if (!state) return;
+	const [state, outdatedPlugins] = await Promise.all([
+		settleUpdateCheck(CORE_UPDATE_SETTLE_MS),
+		settlePluginUpdateCheck(PLUGIN_UPDATE_SETTLE_MS)
+	]);
 
-	if (shouldShowReminder(state, packageJson.version, mode)) {
-		printUpdateBanner(state, packageJson.version);
-		await writeUpdateState(getGlobalConfigDir(), { ...state, remindedForVersion: state.latestVersion });
+	if (!state && outdatedPlugins.length === 0) return;
+
+	if (mode === 'reminder') {
+		await handleReminderMode(state, outdatedPlugins);
 	} else if (mode === 'auto') {
-		await handleAutoInstall(state);
+		await handleAutoMode(state, outdatedPlugins);
 	}
 });
 
@@ -264,13 +297,15 @@ void (async () => {
 		// Parse arguments
 		program.parse();
 
-		// Schedule background update check after parse — fire-and-forget, never blocks the command
+		// Schedule background update checks after parse — fire-and-forget, never blocks the command
 		if (!shouldSkipUpdateCheck() && !isUpdateCommand) {
 			void (async () => {
 				const config = await getConfigLoader().load();
 				const mode = config.autoUpdate?.mode ?? 'reminder';
 				if (mode === 'disabled') return;
-				scheduleUpdateCheck(getGlobalConfigDir(), packageJson.version, config.autoUpdate?.frequencyDays ?? 1);
+				const frequencyDays = config.autoUpdate?.frequencyDays ?? 1;
+				scheduleUpdateCheck(getGlobalConfigDir(), packageJson.version, frequencyDays);
+				schedulePluginUpdateCheck(getGlobalConfigDir(), packageJson.version, frequencyDays);
 			})();
 		}
 

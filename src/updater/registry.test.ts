@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { fetchLatestVersion } from './registry';
+import { fetchLatestVersion, fetchLatestVersionFor } from './registry';
 
 function makeResponse(bodyText: string, init?: { ok?: boolean; status?: number }): Response {
 	const ok = init?.ok ?? true;
@@ -62,5 +62,37 @@ describe('fetchLatestVersion', () => {
 	it('accepts prerelease versions', async () => {
 		fetchSpy.mockResolvedValue(makeResponse(JSON.stringify({ version: '2.6.0-rc.1' })));
 		expect(await fetchLatestVersion('2.5.0')).toBe('2.6.0-rc.1');
+	});
+});
+
+describe('fetchLatestVersionFor', () => {
+	it('fetches the npm registry URL for the given package', async () => {
+		fetchSpy.mockResolvedValue(makeResponse(JSON.stringify({ version: '1.2.0' })));
+		const result = await fetchLatestVersionFor('@windagency/valora-plugin-rtk', '1.0.0');
+		expect(result).toBe('1.2.0');
+		expect(fetchSpy).toHaveBeenCalledWith(
+			'https://registry.npmjs.org/@windagency/valora-plugin-rtk/latest',
+			expect.objectContaining({ headers: expect.objectContaining({ Accept: expect.any(String) }) })
+		);
+	});
+
+	it('returns null when fetch throws', async () => {
+		fetchSpy.mockRejectedValue(new Error('network error'));
+		expect(await fetchLatestVersionFor('@windagency/valora-plugin-rtk', '1.0.0')).toBeNull();
+	});
+
+	it('returns null when the response is not ok', async () => {
+		fetchSpy.mockResolvedValue(new Response('Not Found', { status: 404, statusText: 'Not Found' }));
+		expect(await fetchLatestVersionFor('@windagency/valora-plugin-rtk', '1.0.0')).toBeNull();
+	});
+
+	it('returns null when the body is oversized', async () => {
+		fetchSpy.mockResolvedValue(makeResponse('x'.repeat(70 * 1024)));
+		expect(await fetchLatestVersionFor('@windagency/valora-plugin-rtk', '1.0.0')).toBeNull();
+	});
+
+	it('returns null when the version is not valid semver', async () => {
+		fetchSpy.mockResolvedValue(makeResponse(JSON.stringify({ version: 'bad' })));
+		expect(await fetchLatestVersionFor('@windagency/valora-plugin-rtk', '1.0.0')).toBeNull();
 	});
 });

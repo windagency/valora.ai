@@ -17,8 +17,9 @@ export const DEFAULT_STATE: UpdateCheckState = {
 	lastSuccessAt: null,
 	latestVersion: null,
 	latestVersionFetchedAt: null,
+	plugins: {},
 	remindedForVersion: null,
-	schemaVersion: 1
+	schemaVersion: 2
 };
 
 function cloneDefault(): UpdateCheckState {

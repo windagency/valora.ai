@@ -2,7 +2,8 @@
  * npm registry lookup for the latest published version.
  */
 
-const REGISTRY_URL = 'https://registry.npmjs.org/@windagency/valora/latest';
+const NPM_REGISTRY_BASE = 'https://registry.npmjs.org';
+const VALORA_PACKAGE = '@windagency/valora';
 const TIMEOUT_MS = 3000;
 const MAX_BYTES = 64 * 1024; // 64 KiB
 const VERSION_REGEX = /^\d+\.\d+\.\d+(-[\w.]+)?(\+[\w.]+)?$/;
@@ -28,15 +29,16 @@ function extractVersion(text: string): null | string {
 }
 
 /**
- * Fetches the latest published version of @windagency/valora from the npm
- * registry. Returns null on any failure — never throws.
+ * Fetches the latest published version of any npm package.
+ * Returns null on any failure — never throws.
  */
-export async function fetchLatestVersion(currentVersion: string): Promise<null | string> {
+export async function fetchLatestVersionFor(packageName: string, userAgentVersion: string): Promise<null | string> {
+	const url = `${NPM_REGISTRY_BASE}/${packageName}/latest`;
 	try {
-		const response = await fetch(REGISTRY_URL, {
+		const response = await fetch(url, {
 			headers: {
 				Accept: 'application/vnd.npm.install-v1+json',
-				'User-Agent': `valora-cli/${currentVersion} (+https://github.com/windagency/valora.ai)`
+				'User-Agent': `valora-cli/${userAgentVersion} (+https://github.com/windagency/valora.ai)`
 			},
 			signal: AbortSignal.timeout(TIMEOUT_MS)
 		});
@@ -51,4 +53,12 @@ export async function fetchLatestVersion(currentVersion: string): Promise<null |
 	} catch {
 		return null;
 	}
+}
+
+/**
+ * Fetches the latest published version of @windagency/valora from the npm
+ * registry. Returns null on any failure — never throws.
+ */
+export async function fetchLatestVersion(currentVersion: string): Promise<null | string> {
+	return fetchLatestVersionFor(VALORA_PACKAGE, currentVersion);
 }

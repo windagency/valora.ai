@@ -25,8 +25,23 @@ describe('readUpdateState', () => {
 		expect(state).toEqual(DEFAULT_STATE);
 	});
 
-	it('returns parsed state for a valid file', async () => {
+	it('returns parsed state for a valid v2 file', async () => {
 		const fixture: UpdateCheckState = {
+			schemaVersion: 2,
+			lastCheckAt: '2026-04-20T00:00:00.000Z',
+			lastSuccessAt: '2026-04-20T00:00:00.000Z',
+			latestVersion: '2.6.0',
+			latestVersionFetchedAt: '2026-04-20T00:00:00.000Z',
+			remindedForVersion: null,
+			installedVersionAtCheck: '2.5.0',
+			plugins: {}
+		};
+		await fs.writeFile(path.join(tmpDir, 'update-check.json'), JSON.stringify(fixture));
+		expect(await readUpdateState(tmpDir)).toEqual(fixture);
+	});
+
+	it('migrates a valid v1 file to v2 by adding an empty plugins map', async () => {
+		const v1Fixture = {
 			schemaVersion: 1,
 			lastCheckAt: '2026-04-20T00:00:00.000Z',
 			lastSuccessAt: '2026-04-20T00:00:00.000Z',
@@ -35,8 +50,12 @@ describe('readUpdateState', () => {
 			remindedForVersion: null,
 			installedVersionAtCheck: '2.5.0'
 		};
-		await fs.writeFile(path.join(tmpDir, 'update-check.json'), JSON.stringify(fixture));
-		expect(await readUpdateState(tmpDir)).toEqual(fixture);
+		await fs.writeFile(path.join(tmpDir, 'update-check.json'), JSON.stringify(v1Fixture));
+
+		const state = await readUpdateState(tmpDir);
+		expect(state.schemaVersion).toBe(2);
+		expect(state.latestVersion).toBe('2.6.0');
+		expect(state.plugins).toEqual({});
 	});
 
 	it('returns DEFAULT_STATE when JSON is malformed', async () => {
@@ -44,8 +63,8 @@ describe('readUpdateState', () => {
 		expect(await readUpdateState(tmpDir)).toEqual(DEFAULT_STATE);
 	});
 
-	it('returns DEFAULT_STATE when schemaVersion is wrong', async () => {
-		await fs.writeFile(path.join(tmpDir, 'update-check.json'), JSON.stringify({ schemaVersion: 2, lastCheckAt: 'x' }));
+	it('returns DEFAULT_STATE when schemaVersion is an unrecognised value', async () => {
+		await fs.writeFile(path.join(tmpDir, 'update-check.json'), JSON.stringify({ schemaVersion: 99, lastCheckAt: 'x' }));
 		expect(await readUpdateState(tmpDir)).toEqual(DEFAULT_STATE);
 	});
 
@@ -53,13 +72,14 @@ describe('readUpdateState', () => {
 		await fs.writeFile(
 			path.join(tmpDir, 'update-check.json'),
 			JSON.stringify({
-				schemaVersion: 1,
+				schemaVersion: 2,
 				lastCheckAt: '2026-04-20T00:00:00.000Z',
 				lastSuccessAt: null,
 				latestVersion: 42,
 				latestVersionFetchedAt: null,
 				remindedForVersion: null,
-				installedVersionAtCheck: null
+				installedVersionAtCheck: null,
+				plugins: {}
 			})
 		);
 		expect(await readUpdateState(tmpDir)).toEqual(DEFAULT_STATE);
@@ -80,21 +100,44 @@ describe('readUpdateState', () => {
 		expect(await readUpdateState(tmpDir)).toEqual(DEFAULT_STATE);
 	});
 
-	it('accepts a valid file with extra unknown fields and returns only the known fields', async () => {
+	it('accepts a valid v2 file with extra unknown fields and strips them', async () => {
 		const fixture: UpdateCheckState = {
-			schemaVersion: 1,
+			schemaVersion: 2,
 			lastCheckAt: '2026-04-20T00:00:00.000Z',
 			lastSuccessAt: null,
 			latestVersion: '2.6.0',
 			latestVersionFetchedAt: null,
 			remindedForVersion: null,
-			installedVersionAtCheck: null
+			installedVersionAtCheck: null,
+			plugins: {}
 		};
 		await fs.writeFile(
 			path.join(tmpDir, 'update-check.json'),
 			JSON.stringify({ ...fixture, unexpectedField: 'should-be-stripped' })
 		);
 		expect(await readUpdateState(tmpDir)).toEqual(fixture);
+	});
+
+	it('preserves per-plugin entries in a v2 file', async () => {
+		const fixture: UpdateCheckState = {
+			schemaVersion: 2,
+			lastCheckAt: '2026-04-20T00:00:00.000Z',
+			lastSuccessAt: null,
+			latestVersion: null,
+			latestVersionFetchedAt: null,
+			remindedForVersion: null,
+			installedVersionAtCheck: null,
+			plugins: {
+				'valora-plugin-rtk': {
+					latestVersion: '2.0.0',
+					latestVersionFetchedAt: '2026-04-20T00:00:00.000Z',
+					remindedForVersion: null
+				}
+			}
+		};
+		await fs.writeFile(path.join(tmpDir, 'update-check.json'), JSON.stringify(fixture));
+		const state = await readUpdateState(tmpDir);
+		expect(state.plugins['valora-plugin-rtk']?.latestVersion).toBe('2.0.0');
 	});
 });
 
@@ -118,13 +161,14 @@ describe('writeUpdateState', () => {
 
 	it('round-trips state through write then read', async () => {
 		const state: UpdateCheckState = {
-			schemaVersion: 1,
+			schemaVersion: 2,
 			lastCheckAt: '2026-04-20T10:00:00.000Z',
 			lastSuccessAt: '2026-04-20T10:00:00.000Z',
 			latestVersion: '2.7.0',
 			latestVersionFetchedAt: '2026-04-20T10:00:00.000Z',
 			remindedForVersion: '2.7.0',
-			installedVersionAtCheck: '2.5.0'
+			installedVersionAtCheck: '2.5.0',
+			plugins: {}
 		};
 		await writeUpdateState(tmpDir, state);
 		const read = await readUpdateState(tmpDir);

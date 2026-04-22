@@ -106,6 +106,38 @@ valora plugin remove compression-universal --scope project
 
 ---
 
+## `valora plugin update`
+
+Update installed plugins to their latest versions. Valora checks the plugin registry and the npm registry for newer versions.
+
+```
+valora plugin update [name] [--check]
+```
+
+| Argument / Option | Description                                                    |
+| ----------------- | -------------------------------------------------------------- |
+| `[name]`          | Update only the named plugin (e.g. `rtk`). Omit to update all. |
+| `--check`         | List available plugin updates without installing.              |
+
+Plugins installed via your project's package manager (`npm` scope from `node_modules`) are reported but not installed — update those via `npm install`, `pnpm add`, etc.
+
+You can also enable automatic plugin updates by setting `autoUpdate.mode=auto` in `~/.valora/config.json`. See [Auto-update](./auto-update.md) for details.
+
+### Examples
+
+```bash
+# See which plugins have updates
+valora plugin update --check
+
+# Update all outdated plugins
+valora plugin update
+
+# Update a specific plugin
+valora plugin update rtk
+```
+
+---
+
 ## Code Plugins
 
 Code plugins contribute a compiled JavaScript module (`dist/index.js`) that Valora dynamically imports and passes a `PluginAPI` object to. Use them to register **compression strategies**, future LLM providers, and other runtime extensions.

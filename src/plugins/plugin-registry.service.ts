@@ -1,19 +1,22 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { z } from 'zod';
 
 import { getPackageRoot } from 'utils/paths';
 
 const TIMEOUT_MS = 5000;
 const MAX_BYTES = 64 * 1024;
 
-export interface RegistryEntry {
-	contributes: string[];
-	description: string;
-	name: string;
-	package: string;
-	path?: string;
-	version: string;
-}
+const REGISTRY_ENTRY_SCHEMA = z.object({
+	contributes: z.array(z.string()),
+	description: z.string(),
+	name: z.string().min(1),
+	package: z.string().min(1),
+	path: z.string().optional(),
+	version: z.string().regex(/^\d+\.\d+\.\d+(-[\w.]+)?(\+[\w.]+)?$/)
+});
+
+export type RegistryEntry = z.infer<typeof REGISTRY_ENTRY_SCHEMA>;
 
 function getRemoteRegistryUrl(): null | string {
 	try {
@@ -61,7 +64,12 @@ async function fetchRemoteRegistry(): Promise<null | RegistryEntry[]> {
 
 function parseRegistry(text: string): null | RegistryEntry[] {
 	try {
-		return JSON.parse(text) as RegistryEntry[];
+		const raw: unknown = JSON.parse(text);
+		if (!Array.isArray(raw)) return null;
+		return raw
+			.map((item) => REGISTRY_ENTRY_SCHEMA.safeParse(item))
+			.filter((r) => r.success)
+			.map((r) => r.data);
 	} catch {
 		return null;
 	}

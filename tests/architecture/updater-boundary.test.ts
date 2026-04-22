@@ -25,6 +25,45 @@ describe('Updater Module Boundaries', () => {
 				.because('The updater module is a leaf; it must not depend on application layers')
 				.check(srcProject.allClasses());
 		});
+
+		it('updater production code does not depend on cli/', () => {
+			const updaterProductionClasses = srcProject
+				.allClasses()
+				.get()
+				.filter((c) => {
+					const path = c.packagePath.get();
+					return path.includes('updater') && !c.getSimpleName().includes('.test.');
+				});
+
+			updaterProductionClasses.forEach((updaterClass) => {
+				const violatingDeps = updaterClass.dependencies.filter((dep) => {
+					const depPath = dep.typeScriptClass.packagePath.get();
+					if (depPath.includes('node_modules')) return false;
+					return depPath.includes('cli');
+				});
+
+				if (violatingDeps.length > 0) {
+					const violations = violatingDeps.map((d) => d.typeScriptClass.packagePath.get()).join(', ');
+					throw new Error(
+						`Updater module "${updaterClass.getSimpleName()}" imports from cli/: ${violations}. ` +
+							`The updater package must not create circular dependencies with cli/.`
+					);
+				}
+			});
+		});
+	});
+
+	describe('Updater leaf constraints', () => {
+		it('updater modules do not depend on plugin services', () => {
+			noClasses()
+				.that()
+				.resideInAPackage('updater..')
+				.should()
+				.dependOnClassesThat()
+				.resideInAnyPackage('plugins..')
+				.because('The updater module is a leaf; plugin services must be composed in cli/')
+				.check(srcProject.allClasses());
+		});
 	});
 
 	describe('Updater access restriction', () => {

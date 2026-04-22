@@ -36,6 +36,7 @@
 | `plugin remove`                | —                | Remove an installed plugin                                  | `--scope`                                                |
 | `plugin list`                  | —                | Show all discovered plugins with status                     | —                                                        |
 | `plugin available`             | —                | Browse the full @windagency plugin catalogue                | —                                                        |
+| `plugin update`                | —                | Update installed plugins to their latest versions           | `[name]`, `--check`                                      |
 | `update`                       | —                | Install the latest version of Valora                        | `--check`, `--force`                                     |
 
 > **Note on batch stages:** Several commands have stages marked `batch: true`, eligible when `--batch` is set and the provider supports it (Anthropic and OpenAI only). See [Batch Processing](#batch-processing) for details.
@@ -1392,6 +1393,32 @@ Available plugins  (14 total, @windagency registry)
   ○ valora-plugin-engineering   1.0.0  Engineering workflow commands
 
 Install with: valora plugin add <name>
+```
+
+---
+
+### plugin update
+
+Update installed plugins to their latest versions. Valora checks the plugin registry and the npm registry for newer versions.
+
+```bash
+valora plugin update [name] [--check]
+```
+
+| Argument / Option | Description                                                    |
+| ----------------- | -------------------------------------------------------------- |
+| `[name]`          | Update only the named plugin (e.g. `rtk`). Omit to update all. |
+| `--check`         | List available plugin updates without installing.              |
+
+```bash
+# See which plugins have updates
+valora plugin update --check
+
+# Update all outdated plugins
+valora plugin update
+
+# Update a specific plugin
+valora plugin update rtk
 ```
 
 ---

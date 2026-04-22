@@ -2,14 +2,21 @@
  * Throttle logic for the auto-update check.
  */
 
+export interface PluginUpdateState {
+	latestVersion: null | string;
+	latestVersionFetchedAt: null | string;
+	remindedForVersion: null | string;
+}
+
 export interface UpdateCheckState {
 	installedVersionAtCheck: null | string;
 	lastCheckAt: string;
 	lastSuccessAt: null | string;
 	latestVersion: null | string;
 	latestVersionFetchedAt: null | string;
+	plugins: Record<string, PluginUpdateState>;
 	remindedForVersion: null | string;
-	schemaVersion: 1;
+	schemaVersion: 2;
 }
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
