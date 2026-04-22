@@ -44,7 +44,7 @@ data/                     # Built-in resources (shipped with the package)
 │   ├── config.default.json
 │   ├── hooks.default.json
 │   └── external-mcp.default.json
-tests/
+__tests__/
 │   ├── integration/
 │   ├── e2e/
 │   ├── security/

@@ -13,7 +13,7 @@
 | Types              | `interface` for extensible objects; `type` for unions/primitives     | ESLint                                 |
 | `any`              | Forbidden without comment justification                              | `@typescript-eslint/no-explicit-any`   |
 | Conditionals       | Object literal lookups over `switch`/`if-else` for value mappings    | Code review                            |
-| Architecture       | All dependency rules validated with `arch-unit-ts`                   | `tests/architecture/`                  |
+| Architecture       | All dependency rules validated with `arch-unit-ts`                   | `__tests__/architecture/`              |
 | API versioning     | URI path versioning; shared business logic, versioned controllers    | Code review                            |
 | Security           | Zod validation on all external input; no direct third-party coupling | Code review                            |
 
@@ -753,7 +753,7 @@ items.forEach(async (item) => {
 **CRITICAL: All architectural decisions MUST be validated with tests**
 
 ```typescript
-// tests/architecture/dependency-rules.test.ts
+// __tests__/architecture/dependency-rules.test.ts
 import { filesOfProject } from 'arch-unit-ts';
 
 describe('Architecture Rules', () => {
@@ -1450,7 +1450,7 @@ app.get('/api/users/:id', (req, res) => {
 
 ```typescript
 // ✅ CORRECT: Test all supported versions
-// tests/api/user.test.ts
+// __tests__/api/user.test.ts
 import { describe, it, expect } from 'vitest';
 
 describe.each(['v1', 'v2'])('User API %s', (version) => {

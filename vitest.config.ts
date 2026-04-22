@@ -51,7 +51,6 @@ export default defineConfig({
 				'node_modules/',
 				'dist/',
 				'coverage/',
-				'tests/',
 				'**/__tests__/',
 				'**/*.d.ts',
 				'**/*.config.ts',
@@ -72,7 +71,7 @@ export default defineConfig({
 		exclude: ['node_modules', 'dist', 'coverage'],
 		globals: true,
 		hookTimeout: 120000, // 2 minutes for architecture tests that need to parse all files
-		include: ['src/**/*.{test,spec}.ts', 'tests/**/*.{test,spec}.ts'],
+		include: ['src/**/*.{test,spec}.ts', '__tests__/**/*.{test,spec}.ts'],
 		// Use threads for better performance, but allow fallback to single thread
 		pool: process.env.CI ? 'threads' : 'forks',
 		poolOptions: {
@@ -86,7 +85,7 @@ export default defineConfig({
 			}
 		},
 		reporters: process.env.CI ? ['verbose', 'json'] : ['verbose'],
-		setupFiles: ['./tests/utils/setup.ts'],
+		setupFiles: ['./__tests__/utils/setup.ts'],
 		testTimeout: 30000
 	}
 });

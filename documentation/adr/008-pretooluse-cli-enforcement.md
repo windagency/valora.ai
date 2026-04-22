@@ -134,7 +134,7 @@ Override `grep`, `find`, etc. with shell aliases pointing to modern tools.
 ### New Files
 
 - `data/hooks/enforce-modern-cli.sh` — PreToolUse hook script (built-in)
-- `data/hooks/tests/enforce-modern-cli.test.sh` — Automated test suite (43 test cases)
+- `data/hooks/__tests__/enforce-modern-cli.test.sh` — Automated test suite (43 test cases)
 
 ### Modified Files
 

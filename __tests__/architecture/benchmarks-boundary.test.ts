@@ -1,12 +1,12 @@
 /**
- * Architecture boundary tests for tests/benchmarks/compression/.
+ * Architecture boundary tests for __tests__/benchmarks/compression/.
  *
  * The benchmark harness is allowed to import from:
  *   - executor/output-compression.service (the public compression surface)
  *   - packages/valora-plugin-compression-* index files (plugin registration)
  *   - plugins/plugin-api.types (type import only)
  *   - Node built-ins (node:fs, node:path, node:os, etc.)
- *   - Other files within tests/benchmarks/compression/ (relative ./ or ../)
+ *   - Other files within __tests__/benchmarks/compression/ (relative ./ or ../)
  *
  * It must NOT import from executor internals beyond output-compression.service,
  * nor from cli, llm, mcp, services, or session.
@@ -16,7 +16,7 @@ import { readFile } from 'node:fs/promises';
 import { join, relative, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-const BENCHMARKS_DIR = resolve(process.cwd(), 'tests/benchmarks/compression');
+const BENCHMARKS_DIR = resolve(process.cwd(), '__tests__/benchmarks/compression');
 
 const FORBIDDEN_PATTERNS: RegExp[] = [
 	/from ['"]cli\//,

@@ -15,7 +15,7 @@
 #   bash scripts/capture-compression-fixtures.sh --with-rtk   # also capture RTK pairs
 set -euo pipefail
 
-FIXTURES="tests/fixtures/compression"
+FIXTURES="__tests__/fixtures/compression"
 WITH_RTK=false
 [[ "${1-}" == "--with-rtk" ]] && WITH_RTK=true
 
@@ -90,6 +90,6 @@ capture "$FIXTURES/mixed/npx-vitest-wrapper.txt"   pnpm exec vitest run --report
 capture "$FIXTURES/mixed/yarn-eslint-wrapper.txt"  pnpm lint
 
 echo
-echo "=== Done. Review changes with: git diff tests/fixtures/compression/ ==="
+echo "=== Done. Review changes with: git diff __tests__/fixtures/compression/ ==="
 echo "Update manifest.json if new fixtures were added, then run:"
 echo "  WRITE_BENCHMARK_REPORT=true pnpm bench:compression"

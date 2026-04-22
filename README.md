@@ -471,7 +471,7 @@ valora/                          # npm package root
 │   ├── hooks.default.json       # Default hooks config
 │   └── external-mcp.default.json # External MCP server registry
 ├── dist/                        # Compiled output (gitignored)
-├── tests/                       # Test suites
+├── __tests__/                   # Test suites
 ├── documentation/               # Comprehensive docs
 └── package.json
 ```

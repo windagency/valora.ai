@@ -193,12 +193,12 @@ The project enforces supply chain security. See [ADR-009](../adr/009-supply-chai
 
 ## Testing Requirements
 
-| Type        | Location             | Minimum requirement           |
-| ----------- | -------------------- | ----------------------------- |
-| Unit        | `src/**/*.test.ts`   | All new functions and classes |
-| Integration | `tests/integration/` | Module interaction paths      |
-| E2E         | `tests/e2e/`         | Complete user-facing flows    |
-| Security    | `tests/security/`    | Any security-relevant change  |
+| Type        | Location                 | Minimum requirement           |
+| ----------- | ------------------------ | ----------------------------- |
+| Unit        | `src/**/*.test.ts`       | All new functions and classes |
+| Integration | `__tests__/integration/` | Module interaction paths      |
+| E2E         | `__tests__/e2e/`         | Complete user-facing flows    |
+| Security    | `__tests__/security/`    | Any security-relevant change  |
 
 Aim for 80 % coverage on new code. All bug fixes must include a regression test.
 

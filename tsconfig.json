@@ -43,7 +43,7 @@
 			"services/*": ["./src/services/*"],
 			"session/*": ["./src/session/*"],
 			"src/*": ["./src/*"],
-			"tests/*": ["./tests/*"],
+			"__tests__/*": ["./__tests__/*"],
 			"types/*": ["./src/types/*"],
 			"ui/*": ["./src/ui/*"],
 			"updater/*": ["./src/updater/*"],

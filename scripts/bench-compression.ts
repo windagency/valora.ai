@@ -7,14 +7,14 @@
  *   WRITE_BENCHMARK_REPORT=true pnpm bench:compression   # also write JSON+MD reports
  */
 
+import { runBenchmark } from '__tests__/benchmarks/compression/lib/runner';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { runBenchmark } from 'tests/benchmarks/compression/lib/runner';
 
 const SCRIPT_DIR = resolve(fileURLToPath(import.meta.url), '..');
-const FIXTURES_DIR = resolve(SCRIPT_DIR, '../tests/fixtures/compression');
-const REPORTS_DIR = resolve(SCRIPT_DIR, '../tests/benchmarks/compression/reports');
+const FIXTURES_DIR = resolve(SCRIPT_DIR, '../__tests__/fixtures/compression');
+const REPORTS_DIR = resolve(SCRIPT_DIR, '../__tests__/benchmarks/compression/reports');
 
 const report = await runBenchmark({ fixturesDir: FIXTURES_DIR });
 
