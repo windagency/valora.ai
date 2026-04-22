@@ -63,8 +63,8 @@ describe('djb2', () => {
 		expect(djb2('input-a')).not.toBe(djb2('input-b'));
 	});
 
-	it('handles empty string without throwing', () => {
-		expect(() => djb2('')).not.toThrow();
+	it('returns a numeric hash for an empty string', () => {
+		expect(typeof djb2('')).toBe('number');
 	});
 });
 

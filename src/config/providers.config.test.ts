@@ -5,6 +5,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+	BuiltinProviders,
 	getAllModels,
 	getAllProviderKeys,
 	getDefaultModel,
@@ -14,14 +15,12 @@ import {
 	getProvidersWithoutApiKey,
 	hasModel,
 	isValidProvider,
-	PROVIDER_REGISTRY,
-	ProviderName
+	PROVIDER_REGISTRY
 } from './providers.config';
-
 describe('providers.config', () => {
 	describe('PROVIDER_REGISTRY', () => {
 		it('should have all expected providers', () => {
-			const expectedProviders = ['anthropic', 'cursor', 'google', 'moonshot', 'openai', 'xai'];
+			const expectedProviders = ['anthropic', 'cursor', 'google', 'local', 'moonshot', 'openai', 'xai'];
 			const actualProviders = Object.keys(PROVIDER_REGISTRY);
 
 			expectedProviders.forEach((provider) => {
@@ -56,28 +55,38 @@ describe('providers.config', () => {
 		});
 
 		it('should have cursor provider without API key requirement', () => {
-			expect(PROVIDER_REGISTRY[ProviderName.CURSOR].requiresApiKey).toBe(false);
-			expect(PROVIDER_REGISTRY[ProviderName.CURSOR].helpText).toBeDefined();
+			expect(PROVIDER_REGISTRY[BuiltinProviders.CURSOR].requiresApiKey).toBe(false);
+			expect(PROVIDER_REGISTRY[BuiltinProviders.CURSOR].helpText).toBeDefined();
 		});
 
 		it('should have other providers requiring API keys', () => {
-			expect(PROVIDER_REGISTRY[ProviderName.ANTHROPIC].requiresApiKey).toBe(true);
-			expect(PROVIDER_REGISTRY[ProviderName.OPENAI].requiresApiKey).toBe(true);
-			expect(PROVIDER_REGISTRY[ProviderName.GOOGLE].requiresApiKey).toBe(true);
-			expect(PROVIDER_REGISTRY[ProviderName.XAI].requiresApiKey).toBe(true);
-			expect(PROVIDER_REGISTRY[ProviderName.MOONSHOT].requiresApiKey).toBe(true);
+			expect(PROVIDER_REGISTRY[BuiltinProviders.ANTHROPIC].requiresApiKey).toBe(true);
+			expect(PROVIDER_REGISTRY[BuiltinProviders.OPENAI].requiresApiKey).toBe(true);
+			expect(PROVIDER_REGISTRY[BuiltinProviders.GOOGLE].requiresApiKey).toBe(true);
+			expect(PROVIDER_REGISTRY[BuiltinProviders.XAI].requiresApiKey).toBe(true);
+			expect(PROVIDER_REGISTRY[BuiltinProviders.MOONSHOT].requiresApiKey).toBe(true);
+		});
+
+		it('should have correct configuration for Local provider', () => {
+			const local = PROVIDER_REGISTRY[BuiltinProviders.LOCAL];
+
+			expect(local.defaultModel).toBe('llama3.1');
+			expect(local.requiresApiKey).toBe(false);
+			expect(local.label).toBe('Local');
+			expect(local.modelModes).toHaveLength(1);
+			expect(local.key).toBe(BuiltinProviders.LOCAL);
 		});
 	});
 
 	describe('getAllProviderKeys', () => {
 		it('should return all provider keys', () => {
 			const keys = getAllProviderKeys();
-			expect(keys).toContain(ProviderName.ANTHROPIC);
-			expect(keys).toContain(ProviderName.CURSOR);
-			expect(keys).toContain(ProviderName.OPENAI);
-			expect(keys).toContain(ProviderName.GOOGLE);
-			expect(keys).toContain(ProviderName.XAI);
-			expect(keys).toContain(ProviderName.MOONSHOT);
+			expect(keys).toContain(BuiltinProviders.ANTHROPIC);
+			expect(keys).toContain(BuiltinProviders.CURSOR);
+			expect(keys).toContain(BuiltinProviders.OPENAI);
+			expect(keys).toContain(BuiltinProviders.GOOGLE);
+			expect(keys).toContain(BuiltinProviders.XAI);
+			expect(keys).toContain(BuiltinProviders.MOONSHOT);
 		});
 
 		it('should return at least 6 providers', () => {
@@ -88,9 +97,9 @@ describe('providers.config', () => {
 
 	describe('getProviderMetadata', () => {
 		it('should return metadata for valid provider', () => {
-			const metadata = getProviderMetadata(ProviderName.ANTHROPIC);
+			const metadata = getProviderMetadata(BuiltinProviders.ANTHROPIC);
 			expect(metadata).toBeDefined();
-			expect(metadata?.key).toBe(ProviderName.ANTHROPIC);
+			expect(metadata?.key).toBe(BuiltinProviders.ANTHROPIC);
 			expect(metadata?.label).toBe('Anthropic');
 		});
 
@@ -100,7 +109,7 @@ describe('providers.config', () => {
 		});
 
 		it('should return cursor metadata correctly', () => {
-			const metadata = getProviderMetadata(ProviderName.CURSOR);
+			const metadata = getProviderMetadata(BuiltinProviders.CURSOR);
 			expect(metadata).toBeDefined();
 			expect(metadata?.requiresApiKey).toBe(false);
 			expect(metadata?.defaultModel).toBe('cursor-sonnet-4.5');
@@ -112,10 +121,10 @@ describe('providers.config', () => {
 			const providers = getProvidersRequiringApiKey();
 			const keys = providers.map((p) => p.key);
 
-			expect(keys).toContain(ProviderName.ANTHROPIC);
-			expect(keys).toContain(ProviderName.OPENAI);
-			expect(keys).toContain(ProviderName.GOOGLE);
-			expect(keys).not.toContain(ProviderName.CURSOR);
+			expect(keys).toContain(BuiltinProviders.ANTHROPIC);
+			expect(keys).toContain(BuiltinProviders.OPENAI);
+			expect(keys).toContain(BuiltinProviders.GOOGLE);
+			expect(keys).not.toContain(BuiltinProviders.CURSOR);
 		});
 
 		it('should return at least 5 providers', () => {
@@ -129,9 +138,9 @@ describe('providers.config', () => {
 			const providers = getProvidersWithoutApiKey();
 			const keys = providers.map((p) => p.key);
 
-			expect(keys).toContain(ProviderName.CURSOR);
-			expect(keys).not.toContain(ProviderName.ANTHROPIC);
-			expect(keys).not.toContain(ProviderName.OPENAI);
+			expect(keys).toContain(BuiltinProviders.CURSOR);
+			expect(keys).not.toContain(BuiltinProviders.ANTHROPIC);
+			expect(keys).not.toContain(BuiltinProviders.OPENAI);
 		});
 
 		it('should return at least 1 provider', () => {
@@ -142,23 +151,23 @@ describe('providers.config', () => {
 
 	describe('hasModel', () => {
 		it('should return true for existing model', () => {
-			expect(hasModel(ProviderName.ANTHROPIC, 'claude-opus-4.6')).toBe(true);
-			expect(hasModel(ProviderName.ANTHROPIC, 'claude-sonnet-4.6')).toBe(true);
-			expect(hasModel(ProviderName.ANTHROPIC, 'claude-opus-4.5')).toBe(true);
-			expect(hasModel(ProviderName.OPENAI, 'gpt-5')).toBe(true);
-			expect(hasModel(ProviderName.CURSOR, 'cursor-sonnet-4.5')).toBe(true);
-			expect(hasModel(ProviderName.XAI, 'grok-code')).toBe(true);
+			expect(hasModel(BuiltinProviders.ANTHROPIC, 'claude-opus-4.6')).toBe(true);
+			expect(hasModel(BuiltinProviders.ANTHROPIC, 'claude-sonnet-4.6')).toBe(true);
+			expect(hasModel(BuiltinProviders.ANTHROPIC, 'claude-opus-4.5')).toBe(true);
+			expect(hasModel(BuiltinProviders.OPENAI, 'gpt-5')).toBe(true);
+			expect(hasModel(BuiltinProviders.CURSOR, 'cursor-sonnet-4.5')).toBe(true);
+			expect(hasModel(BuiltinProviders.XAI, 'grok-code')).toBe(true);
 		});
 
 		it('should return false for non-existing model', () => {
-			expect(hasModel(ProviderName.ANTHROPIC, 'non-existent-model')).toBe(false);
+			expect(hasModel(BuiltinProviders.ANTHROPIC, 'non-existent-model')).toBe(false);
 			expect(hasModel('invalid-provider', 'any-model')).toBe(false);
 		});
 	});
 
 	describe('getProviderModels', () => {
 		it('should return models for valid provider', () => {
-			const models = getProviderModels(ProviderName.ANTHROPIC);
+			const models = getProviderModels(BuiltinProviders.ANTHROPIC);
 			expect(models.length).toBeGreaterThan(0);
 			expect(models).toContain('claude-opus-4.6');
 			expect(models).toContain('claude-sonnet-4.6');
@@ -171,7 +180,7 @@ describe('providers.config', () => {
 		});
 
 		it('should return unique models only', () => {
-			const models = getProviderModels(ProviderName.OPENAI);
+			const models = getProviderModels(BuiltinProviders.OPENAI);
 			const uniqueModels = Array.from(new Set(models));
 			expect(models.length).toBe(uniqueModels.length);
 		});
@@ -202,10 +211,10 @@ describe('providers.config', () => {
 
 	describe('getDefaultModel', () => {
 		it('should return default model for valid provider', () => {
-			expect(getDefaultModel(ProviderName.ANTHROPIC)).toBe('claude-opus-4.6');
-			expect(getDefaultModel(ProviderName.OPENAI)).toBe('gpt-5');
-			expect(getDefaultModel(ProviderName.CURSOR)).toBe('cursor-sonnet-4.5');
-			expect(getDefaultModel(ProviderName.XAI)).toBe('grok-code');
+			expect(getDefaultModel(BuiltinProviders.ANTHROPIC)).toBe('claude-opus-4.6');
+			expect(getDefaultModel(BuiltinProviders.OPENAI)).toBe('gpt-5');
+			expect(getDefaultModel(BuiltinProviders.CURSOR)).toBe('cursor-sonnet-4.5');
+			expect(getDefaultModel(BuiltinProviders.XAI)).toBe('grok-code');
 		});
 
 		it('should return undefined for invalid provider', () => {
@@ -215,9 +224,9 @@ describe('providers.config', () => {
 
 	describe('isValidProvider', () => {
 		it('should return true for valid providers', () => {
-			expect(isValidProvider(ProviderName.ANTHROPIC)).toBe(true);
-			expect(isValidProvider(ProviderName.OPENAI)).toBe(true);
-			expect(isValidProvider(ProviderName.CURSOR)).toBe(true);
+			expect(isValidProvider(BuiltinProviders.ANTHROPIC)).toBe(true);
+			expect(isValidProvider(BuiltinProviders.OPENAI)).toBe(true);
+			expect(isValidProvider(BuiltinProviders.CURSOR)).toBe(true);
 		});
 
 		it('should return false for invalid providers', () => {

@@ -111,17 +111,17 @@ export const TOOL_TO_SERVER_ID: Record<MCPTool, MCPServerId> = Object.fromEntrie
  * Check if a string is a valid MCP tool name
  */
 export function isValidMCPTool(tool: string): tool is MCPTool {
-	return tool.startsWith('mcp_') && Object.values(SERVER_ID_TO_TOOL).includes(tool as MCPTool);
+	return tool.startsWith('mcp_') && tool.length > 4;
 }
 
 /**
  * Get server ID from MCP tool name
- * Returns undefined if not a valid MCP tool
+ * Returns undefined if the tool name is not in mcp_<id> format
  */
 export function getServerIdFromTool(tool: string): MCPServerId | undefined {
 	if (!tool.startsWith('mcp_')) return undefined;
 	const serverId = tool.substring(4).replace(/_/g, '-');
-	return MCP_SERVER_IDS.includes(serverId as MCPServerId) ? (serverId as MCPServerId) : undefined;
+	return serverId.length > 0 ? (serverId as MCPServerId) : undefined;
 }
 
 /**

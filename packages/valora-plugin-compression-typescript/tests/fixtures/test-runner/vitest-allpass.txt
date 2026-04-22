@@ -1,0 +1,43 @@
+npm warn Unknown project config "frozen-lockfile". This will stop working in the next major version of npm.
+
+ RUN  v1.6.1 /workspaces/valora
+
+ ✓ packages/valora-plugin-rtk/src/binary-manager.test.ts > RtkBinaryManagerImpl > isInstalled() > returns true when rtk --version exits with code 0
+ ✓ packages/valora-plugin-rtk/src/binary-manager.test.ts > RtkBinaryManagerImpl > isInstalled() > returns false when rtk binary is not on PATH
+ ✓ packages/valora-plugin-rtk/src/binary-manager.test.ts > RtkBinaryManagerImpl > install() > runs the install script when rtk is absent
+ ✓ packages/valora-plugin-rtk/src/binary-manager.test.ts > RtkBinaryManagerImpl > install() > throws RtkInstallError when the install script fails
+ ✓ packages/valora-plugin-rtk/src/binary-manager.test.ts > RtkBinaryManagerImpl > install() > wraps the underlying error message in RtkInstallError
+ ✓ packages/valora-plugin-rtk/src/binary-manager.test.ts > RtkBinaryManagerImpl > ensureInstalled() > resolves immediately when rtk is already installed
+ ✓ packages/valora-plugin-rtk/src/binary-manager.test.ts > RtkBinaryManagerImpl > ensureInstalled() > installs rtk when not on PATH
+ ✓ packages/valora-plugin-rtk/src/binary-manager.test.ts > RtkBinaryManagerImpl > ensureInstalled() > propagates RtkInstallError when the install script fails
+ ✓ packages/valora-plugin-rtk/src/index.test.ts > register() > registers an onActivate lifecycle hook
+ ✓ packages/valora-plugin-rtk/src/index.test.ts > register() > calls ensureInstalled when the activation hook fires
+ ✓ packages/valora-plugin-rtk/src/rtk-rewrite.test.ts > rtk-rewrite.sh > passes through when rtk is not on PATH
+ ✓ packages/valora-plugin-rtk/src/rtk-rewrite.test.ts > rtk-rewrite.sh > passes through when tool_input.command is absent
+ ✓ packages/valora-plugin-rtk/src/rtk-rewrite.test.ts > rtk-rewrite.sh > passes through for non-whitelisted commands
+ ✓ packages/valora-plugin-rtk/src/rtk-rewrite.test.ts > rtk-rewrite.sh > does not double-wrap a command already prefixed with rtk
+ ✓ packages/valora-plugin-rtk/src/rtk-rewrite.test.ts > rtk-rewrite.sh > rewrites git commands
+ ✓ packages/valora-plugin-rtk/src/rtk-rewrite.test.ts > rtk-rewrite.sh > rewrites cargo commands
+ ✓ packages/valora-plugin-rtk/src/rtk-rewrite.test.ts > rtk-rewrite.sh > rewrites npm commands
+ ✓ packages/valora-plugin-rtk/src/rtk-rewrite.test.ts > rtk-rewrite.sh > rewrites docker commands
+ ✓ packages/valora-plugin-rtk/src/rtk-rewrite.test.ts > rtk-rewrite.sh > rewrites kubectl commands
+ ✓ packages/valora-plugin-rtk/src/rtk-rewrite.test.ts > rtk-rewrite.sh > rewrites make commands
+ ✓ packages/valora-plugin-rtk/src/rtk-rewrite.test.ts > rtk-rewrite.sh > rewrites python commands
+ ✓ packages/valora-plugin-rtk/src/rtk-rewrite.test.ts > rtk-rewrite.sh > rewrites pip commands
+ ✓ packages/valora-plugin-rtk/src/rtk-rewrite.test.ts > rtk-rewrite.sh > rewrites yarn commands
+ ✓ packages/valora-plugin-rtk/src/rtk-rewrite.test.ts > rtk-rewrite.sh > rewrites bun commands
+ ✓ packages/valora-plugin-rtk/src/rtk-rewrite.test.ts > rtk-rewrite.sh > rewrites pnpm commands
+ ✓ packages/valora-plugin-rtk/src/rtk-rewrite.test.ts > rtk-rewrite.sh > rewrites npx commands
+ ✓ packages/valora-plugin-rtk/src/rtk-rewrite.test.ts > rtk-rewrite.sh > rewrites bunx commands
+ ✓ packages/valora-plugin-rtk/src/rtk-rewrite.test.ts > rtk-rewrite.sh > rewrites tsc commands
+ ✓ packages/valora-plugin-rtk/src/rtk-rewrite.test.ts > rtk-rewrite.sh > rewrites eslint commands
+ ✓ packages/valora-plugin-rtk/src/rtk-rewrite.test.ts > rtk-rewrite.sh > rewrites vitest commands
+ ✓ packages/valora-plugin-rtk/src/rtk-rewrite.test.ts > rtk-rewrite.sh > rewrites jest commands
+ ✓ packages/valora-plugin-rtk/src/rtk-rewrite.test.ts > rtk-rewrite.sh > passes through sudo-prefixed commands unchanged
+ ✓ packages/valora-plugin-rtk/src/rtk-rewrite.test.ts > rtk-rewrite.sh > passes through malformed JSON without erroring
+
+ Test Files  3 passed (3)
+      Tests  33 passed (33)
+   Start at  00:09:32
+   Duration  4.00s (transform 118ms, setup 351ms, collect 114ms, tests 540ms, environment 0ms, prepare 5.88s)
+

@@ -1,0 +1,23 @@
+commit 7ebd98879e974df228c648e25ee44e8f9ed4a4f0
+Author: Damien Tivelet <damien.tivelet@qodea.com>
+Date:   Mon Apr 20 20:17:16 2026 +0000
+
+    Add RTK plugin
+
+ packages/valora-plugin-rtk/.editorconfig           | 17 ++++
+ packages/valora-plugin-rtk/.gitattributes          | 25 ++++++
+ packages/valora-plugin-rtk/.gitignore              | 50 ++++++++++++
+ packages/valora-plugin-rtk/.npmignore              | 11 +++
+ packages/valora-plugin-rtk/.npmrc                  |  1 +
+ packages/valora-plugin-rtk/.nvmrc                  |  1 +
+ packages/valora-plugin-rtk/.prettierrc.json        | 12 +++
+ packages/valora-plugin-rtk/eslint.config.js        | 38 +++++++++
+ packages/valora-plugin-rtk/hooks.json              | 16 ++++
+ packages/valora-plugin-rtk/hooks/rtk-rewrite.sh    | 43 ++++++++++
+ packages/valora-plugin-rtk/package.json            | 49 +++++++++++
+ packages/valora-plugin-rtk/src/rtk-rewrite.test.ts | 94 ++++++++++++++++++++++
+ packages/valora-plugin-rtk/tsconfig.json           | 15 ++++
+ packages/valora-plugin-rtk/valora-plugin.json      | 19 +++++
+ packages/valora-plugin-rtk/vitest.config.ts        |  8 ++
+ src/plugins/plugin-loader.service.ts               | 22 ++++-
+ 16 files changed, 420 insertions(+), 1 deletion(-)

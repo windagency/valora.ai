@@ -5,7 +5,8 @@
 import type { Config, ProviderConfig } from 'types/config.types';
 
 import { getConfigLoader } from 'config/loader';
-import { getDefaultModel, getProviderModels, PROVIDER_REGISTRY, ProviderName } from 'config/providers.config';
+import { getProviderCatalog } from 'config/provider-catalog';
+import { BuiltinProviders, getDefaultModel, getProviderModels, PROVIDER_REGISTRY } from 'config/providers.config';
 import { getLogger } from 'output/logger';
 import { ExecutionError } from 'utils/error-handler';
 import { formatErrorMessage } from 'utils/error-utils';
@@ -103,11 +104,11 @@ export class CLIProviderResolver {
 
 		if (process.env['AI_MCP_ENABLED'] === 'true' && !options.flags['model']) {
 			logger.info('Auto-selected cursor provider (MCP context)');
-			return ProviderName.CURSOR;
+			return BuiltinProviders.CURSOR;
 		}
 
 		const providerName = this.getProviderForModel(requestedModel);
-		if (providerName === ProviderName.CURSOR && process.env['AI_MCP_ENABLED'] === 'true') {
+		if (providerName === BuiltinProviders.CURSOR && process.env['AI_MCP_ENABLED'] === 'true') {
 			logger.info('Auto-selected cursor provider (MCP context)');
 		}
 
@@ -121,13 +122,13 @@ export class CLIProviderResolver {
 		providerName: string,
 		requestedModel?: string
 	): Promise<{ config: ProviderConfig; resolvedModel?: string; resolvedProviderName?: string }> {
-		if (providerName === ProviderName.CURSOR) {
+		if (providerName === BuiltinProviders.CURSOR) {
 			return { config: {} }; // Empty config for cursor provider
 		}
-		if (providerName === ProviderName.LOCAL) {
+		if (providerName === BuiltinProviders.LOCAL) {
 			const configLoader = getConfigLoader();
 			const config = await configLoader.load();
-			const localConfig = config.providers?.local;
+			const localConfig = config.providers?.['local'];
 			return { config: localConfig ?? {} };
 		}
 		return this.getProviderConfig(providerName, requestedModel);
@@ -179,19 +180,22 @@ export class CLIProviderResolver {
 	 * Get provider name for a given model
 	 */
 	private getProviderForModel(model: string): string {
-		if (model.startsWith('ollama:')) {
-			return ProviderName.OLLAMA;
+		// Descriptor-driven prefix routing — works for both built-in and plugin providers
+		for (const [providerName, desc] of getProviderCatalog().descriptors()) {
+			if (desc.modelPrefix && model.startsWith(desc.modelPrefix)) {
+				return providerName;
+			}
 		}
 
 		// Model-based provider inference mapping
 		const providerKeywords: Record<string, string[]> = {
-			[ProviderName.ANTHROPIC]: ['claude', 'anthropic'],
-			[ProviderName.CURSOR]: ['cursor'],
-			[ProviderName.GOOGLE]: ['gemini', 'google'],
-			[ProviderName.LOCAL]: ['local', 'llama', 'mistral', 'phi', 'qwen', 'codellama', 'deepseek', 'yi'],
-			[ProviderName.MOONSHOT]: ['kimi', 'moonshot'],
-			[ProviderName.OPENAI]: ['gpt', 'openai'],
-			[ProviderName.XAI]: ['grok', 'xai']
+			[BuiltinProviders.ANTHROPIC]: ['claude', 'anthropic'],
+			[BuiltinProviders.CURSOR]: ['cursor'],
+			[BuiltinProviders.GOOGLE]: ['gemini', 'google'],
+			[BuiltinProviders.LOCAL]: ['local', 'llama', 'mistral', 'phi', 'qwen', 'codellama', 'deepseek', 'yi'],
+			[BuiltinProviders.MOONSHOT]: ['kimi', 'moonshot'],
+			[BuiltinProviders.OPENAI]: ['gpt', 'openai'],
+			[BuiltinProviders.XAI]: ['grok', 'xai']
 		};
 
 		// Find provider by checking if model includes any of its keywords
@@ -199,7 +203,7 @@ export class CLIProviderResolver {
 			keywords.some((keyword) => model.includes(keyword))
 		);
 
-		return matchedProvider ? matchedProvider[0] : ProviderName.CURSOR;
+		return matchedProvider ? matchedProvider[0] : BuiltinProviders.CURSOR;
 	}
 
 	/**
@@ -359,12 +363,12 @@ export class CLIProviderResolver {
 			}
 
 			// Cursor provider doesn't need API key
-			if (providerName === ProviderName.CURSOR) {
+			if (providerName === BuiltinProviders.CURSOR) {
 				return true;
 			}
 
 			// Local provider doesn't need API key
-			if (providerName === ProviderName.LOCAL) {
+			if (providerName === BuiltinProviders.LOCAL) {
 				return true;
 			}
 
@@ -438,11 +442,11 @@ export class CLIProviderResolver {
 
 		// Priority order for fallback
 		const priority = [
-			ProviderName.ANTHROPIC,
-			ProviderName.OPENAI,
-			ProviderName.GOOGLE,
-			ProviderName.XAI,
-			ProviderName.MOONSHOT
+			BuiltinProviders.ANTHROPIC,
+			BuiltinProviders.OPENAI,
+			BuiltinProviders.GOOGLE,
+			BuiltinProviders.XAI,
+			BuiltinProviders.MOONSHOT
 		];
 
 		// Find first configured provider with API key using find

@@ -241,78 +241,10 @@ async function initializeTestcontainers() {
 		LocalStackContainer = localstackModule.LocalstackContainer;
 		GenericContainer = genericModule.GenericContainer;
 		testcontainersInitialized = true;
-	} catch (_error) {
-		console.warn('Testcontainers not available, using mock implementations for tests');
-		// Create mock implementations
-		PostgreSqlContainer = class MockPostgreSqlContainer {
-			async start() {
-				return {
-					getDatabase: () => 'test',
-					getHost: () => 'localhost',
-					getMappedPort: () => 5432,
-					getPassword: () => 'test',
-					getUsername: () => 'test',
-					stop: async () => {}
-				};
-			}
-			withDatabase() {
-				return this;
-			}
-			withExposedPorts() {
-				return this;
-			}
-			withPassword() {
-				return this;
-			}
-			withUsername() {
-				return this;
-			}
-		};
-
-		RedisContainer = class MockRedisContainer {
-			async start() {
-				return {
-					getHost: () => 'localhost',
-					getMappedPort: () => 6379,
-					stop: async () => {}
-				};
-			}
-			withExposedPorts() {
-				return this;
-			}
-		};
-
-		LocalStackContainer = class MockLocalStackContainer {
-			async start() {
-				return {
-					getHost: () => 'localhost',
-					getMappedPort: () => 4566,
-					stop: async () => {}
-				};
-			}
-			withExposedPorts() {
-				return this;
-			}
-			withServices() {
-				return this;
-			}
-		};
-
-		GenericContainer = class MockGenericContainer {
-			async start() {
-				return {
-					stop: async () => {}
-				};
-			}
-			withCommand() {
-				return this;
-			}
-			withEnvironment() {
-				return this;
-			}
-			withExposedPorts() {
-				return this;
-			}
-		};
+	} catch (error) {
+		throw new Error(
+			`Testcontainers modules are unavailable. Ensure Docker is running and the` +
+				` testcontainers packages are installed.\nCause: ${error}`
+		);
 	}
 }

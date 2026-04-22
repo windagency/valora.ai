@@ -30,7 +30,19 @@ export default defineConfig({
 			types: path.resolve(__dirname, './src/types'),
 			ui: path.resolve(__dirname, './src/ui'),
 			updater: path.resolve(__dirname, './src/updater'),
-			utils: path.resolve(__dirname, './src/utils')
+			utils: path.resolve(__dirname, './src/utils'),
+			'@windagency/valora-plugin-compression-python/src/index': path.resolve(
+				__dirname,
+				'./packages/valora-plugin-compression-python/src/index'
+			),
+			'@windagency/valora-plugin-compression-typescript/src/index': path.resolve(
+				__dirname,
+				'./packages/valora-plugin-compression-typescript/src/index'
+			),
+			'@windagency/valora-plugin-compression-universal/src/index': path.resolve(
+				__dirname,
+				'./packages/valora-plugin-compression-universal/src/index'
+			)
 		}
 	},
 	test: {
@@ -60,7 +72,7 @@ export default defineConfig({
 		exclude: ['node_modules', 'dist', 'coverage'],
 		globals: true,
 		hookTimeout: 120000, // 2 minutes for architecture tests that need to parse all files
-		include: ['src/**/*.{test,spec}.ts', 'tests/**/*.{test,spec}.ts', 'packages/**/*.{test,spec}.ts'],
+		include: ['src/**/*.{test,spec}.ts', 'tests/**/*.{test,spec}.ts'],
 		// Use threads for better performance, but allow fallback to single thread
 		pool: process.env.CI ? 'threads' : 'forks',
 		poolOptions: {

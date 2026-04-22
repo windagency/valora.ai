@@ -1,0 +1,21 @@
+[rtk] /!\ No hook installed — run `rtk init -g` for automatic token savings
+7ebd988 Add RTK plugin (4 hours ago) <Damien Tivelet>
+23ca936 Documentation (4 hours ago) <Damien Tivelet>
+aa93757 Add auto updater (6 hours ago) <Damien Tivelet>
+21fed02 docs(auto-update): add arch boundary rule and user documentation (8 hours ago) <Damien Tivelet>
+dc60ba8 Add packager (11 hours ago) <Damien Tivelet>
+b1c5cab fix(cli): use stderr.isTTY and extract rawProgram to reduce cast duplication (11 hours ago) <Damien Tivelet>
+3fd630d feat(cli): wire auto-update check and update command into CLI entry point (11 hours ago) <Damien Tivelet>
+946c10d fix(cli): update state fields and --force --check output in update command (11 hours ago) <Damien Tivelet>
+2bc34a7 Clean (11 hours ago) <Damien Tivelet>
+35e7ccb test(cli): add --force scenario to update command tests (11 hours ago) <Damien Tivelet>
+bd138fd feat(cli): add valora update command (11 hours ago) <Damien Tivelet>
+1fb68d8 feat(config): add autoUpdate schema with reminder/auto/disabled mode (11 hours ago) <Damien Tivelet>
+05bc547 fix(updater): add runtime path alias; clean up test imports and pending reset (12 hours ago) <Damien Tivelet>
+e0295cc fix(updater): store pending check synchronously to prevent race condition (12 hours ago) <Damien Tivelet>
+b3eae80 feat(updater): add core auto-update module (12 hours ago) <Damien Tivelet>
+9def755 Update documentation (13 hours ago) <Damien Tivelet>
+ef02a52 Update package.json files (14 hours ago) <Damien Tivelet>
+7650c61 Update package, tsconfig, eslint, prettier, etc config (14 hours ago) <Damien Tivelet>
+8b185de fix: clean:build removes any leaked JS files from src/ (15 hours ago) <Damien Tivelet>
+b78d1d9 fix: restore rootDir in tsconfig.plugins.json to prevent core JS leaking into src/ (15 hours ago) <Damien Tiv...

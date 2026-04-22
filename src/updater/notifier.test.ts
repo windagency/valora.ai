@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { printUpdateBanner, shouldAutoUpdate, shouldShowReminder } from './notifier';
+import { printUpdateBanner } from 'cli/update-banner';
+
+import { shouldAutoUpdate, shouldShowReminder } from './notifier';
 import type { UpdateCheckState } from './throttle';
 
 function makeState(overrides: Partial<UpdateCheckState> = {}): UpdateCheckState {
@@ -66,6 +68,14 @@ describe('shouldShowReminder', () => {
 	});
 });
 
+describe('auto mode routing contract', () => {
+	it('shouldShowReminder returns false and shouldAutoUpdate returns true for mode=auto with a newer version', () => {
+		const state = makeState({ latestVersion: '2.6.0' });
+		expect(shouldShowReminder(state, '2.5.0', 'auto')).toBe(false);
+		expect(shouldAutoUpdate(state, '2.5.0')).toBe(true);
+	});
+});
+
 describe('shouldAutoUpdate', () => {
 	it('returns true when a newer version is available', () => {
 		expect(shouldAutoUpdate(makeState({ latestVersion: '2.6.0' }), '2.5.0')).toBe(true);
@@ -83,10 +93,13 @@ describe('shouldAutoUpdate', () => {
 
 describe('printUpdateBanner', () => {
 	it('writes a banner to stderr including both versions', () => {
-		const write = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+		const writes: string[] = [];
+		vi.spyOn(process.stderr, 'write').mockImplementation((chunk) => {
+			writes.push(String(chunk));
+			return true;
+		});
 		printUpdateBanner(makeState({ latestVersion: '2.6.0' }), '2.5.0');
-		expect(write).toHaveBeenCalledTimes(1);
-		const output = write.mock.calls[0]?.[0] as string;
+		const output = writes.join('');
 		expect(output).toContain('2.5.0');
 		expect(output).toContain('2.6.0');
 		expect(output).toContain('Update available');

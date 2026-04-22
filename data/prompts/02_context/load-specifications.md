@@ -15,7 +15,6 @@ model_requirements:
     - gpt-5-thinking-high
     - gpt-o1-high
 agents:
-  - product-manager
 dependencies:
   requires:
     - context.use-modern-cli-tools

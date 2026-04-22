@@ -20,7 +20,7 @@ export interface PluginAPI {
 	lifecycle: PluginLifecycleHooks;
 	logger: Pick<Logger, 'debug' | 'error' | 'info' | 'warn'>;
 	providers: {
-		register(name: string, providerClass: PluginProviderClass): void;
+		register(name: string, provider: PluginProvider, descriptor?: ProviderDescriptor): void;
 	};
 }
 
@@ -29,4 +29,26 @@ export interface PluginLifecycleHooks {
 	onDeactivate: (fn: () => Promise<void>) => void;
 }
 
+export type PluginProvider = PluginProviderClass | PluginProviderFactory;
+
 export type PluginProviderClass = new (config: Record<string, unknown>) => LLMProvider;
+
+export type PluginProviderFactory = (config: Record<string, unknown>) => LLMProvider;
+
+export interface ProviderDescriptor {
+	configSchema?: ZodTypeAny;
+	configureInteractive?: (ctx: ProviderWizardContext) => Promise<Record<string, unknown>>;
+	contextWindows?: Record<string, number>;
+	defaultModel: string;
+	description?: string;
+	envVars?: { apiKey?: string; model?: string };
+	helpText?: string;
+	label: string;
+	modelModes: Array<{ mode: string; model: string }>;
+	modelPrefix?: string;
+	requiresApiKey: boolean;
+}
+
+export interface ProviderWizardContext {
+	currentConfig?: Record<string, unknown>;
+}

@@ -4,7 +4,6 @@
 
 import type { LogLevel, OutputFormat } from './common.types';
 import type { ExternalMCPServerConfig } from './mcp-client.types';
-import type { ProviderName } from './provider-names.types';
 
 export interface Config {
 	defaults: DefaultsConfig;
@@ -103,13 +102,6 @@ export interface ScopeConfig {
 
 /**
  * Provider configurations
- * Keys match ProviderName enum values
+ * Accepts any provider key, including those contributed by plugins.
  */
-export interface ProvidersConfig {
-	[ProviderName.ANTHROPIC]?: ProviderConfig;
-	[ProviderName.CURSOR]?: ProviderConfig;
-	[ProviderName.GOOGLE]?: ProviderConfig;
-	[ProviderName.MOONSHOT]?: ProviderConfig;
-	[ProviderName.OPENAI]?: ProviderConfig;
-	[ProviderName.XAI]?: ProviderConfig;
-}
+export type ProvidersConfig = Record<string, ProviderConfig | undefined>;

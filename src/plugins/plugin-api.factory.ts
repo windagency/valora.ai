@@ -41,12 +41,14 @@ export function createPluginAPI(
 		},
 		logger,
 		providers: {
-			register(name, providerClass) {
+			register(name, provider, descriptor) {
 				const override = resolvedOverrides.has(name) || (plugin.manifest.overrides?.includes(name) ?? false);
-				getProviderRegistry().registerProvider(name, providerClass, {
-					override,
-					owner: plugin.manifest.name
-				});
+				const options = { override, owner: plugin.manifest.name };
+				if (descriptor !== undefined) {
+					getProviderRegistry().registerProvider(name, provider, options, descriptor);
+				} else {
+					getProviderRegistry().registerProvider(name, provider, options);
+				}
 			}
 		}
 	};

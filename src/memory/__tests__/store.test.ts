@@ -145,8 +145,10 @@ describe('MemoryStore', () => {
 			expect(parsed.entries[0]?.id).toBe(entry.id);
 		});
 
-		it('does not throw if nothing is dirty', async () => {
-			await expect(store.flush()).resolves.not.toThrow();
+		it('resolves without writing files when nothing is dirty', async () => {
+			const filesBefore = fs.readdirSync(tempDir);
+			await store.flush();
+			expect(fs.readdirSync(tempDir)).toEqual(filesBefore);
 		});
 	});
 

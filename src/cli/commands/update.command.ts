@@ -2,14 +2,14 @@
  * `valora update` command — check for, and install, a newer CLI version.
  */
 
-import type { Command } from 'commander';
-
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { isNewerVersion } from 'updater/compare';
 import { detectPackageManager, getInstallCommand, type PackageManager } from 'updater/detect-package-manager';
 import { fetchLatestVersion } from 'updater/registry';
 import { readUpdateState, writeUpdateState } from 'updater/state';
+
+import type { Command } from 'cli/commander-adapter';
 
 import { getGlobalConfigDir } from 'utils/paths';
 
@@ -46,45 +46,29 @@ export function configureUpdateCommand(program: Command): void {
 			}
 
 			if (options.check) {
-				if (hasUpdate) {
-					console.log(`Update available: v${currentVersion} → v${latestVersion}`);
-					console.log('Run: valora update');
-				} else {
-					console.log(`Valora is already up to date (v${currentVersion}).`);
-				}
+				handleCheckOnly(currentVersion, latestVersion);
 				return;
 			}
-
-			const pm = detectPackageManager();
-			if (pm === null) {
-				printAmbiguousPackageManager();
-				return;
-			}
-
-			const installArgv = getInstallCommand(pm);
-			const exitCode = await runInstall(installArgv);
-
-			if (exitCode === 0) {
-				const stateDir = getGlobalConfigDir();
-				const state = await readUpdateState(stateDir);
-				const nowIso = new Date().toISOString();
-				await writeUpdateState(stateDir, {
-					...state,
-					installedVersionAtCheck: currentVersion,
-					lastCheckAt: nowIso,
-					lastSuccessAt: nowIso,
-					latestVersion,
-					latestVersionFetchedAt: nowIso,
-					remindedForVersion: latestVersion
-				});
-				console.log(`✓ Updated to v${latestVersion}`);
-				return;
-			}
-
-			console.log('Update failed. Retry manually:');
-			console.log(`  ${installArgv.join(' ')}`);
-			process.exit(exitCode);
+			await handleInstall(currentVersion, latestVersion);
 		});
+}
+
+export async function persistUpdateSuccess(
+	stateDir: string,
+	currentVersion: string,
+	latestVersion: string
+): Promise<void> {
+	const state = await readUpdateState(stateDir);
+	const nowIso = new Date().toISOString();
+	await writeUpdateState(stateDir, {
+		...state,
+		installedVersionAtCheck: currentVersion,
+		lastCheckAt: nowIso,
+		lastSuccessAt: nowIso,
+		latestVersion,
+		latestVersionFetchedAt: nowIso,
+		remindedForVersion: latestVersion
+	});
 }
 
 function getCurrentVersion(): string {
@@ -93,11 +77,40 @@ function getCurrentVersion(): string {
 	return pkg.version;
 }
 
+function handleCheckOnly(currentVersion: string, latestVersion: string): void {
+	const hasUpdate = isNewerVersion(currentVersion, latestVersion);
+	if (hasUpdate) {
+		console.log(`Update available: v${currentVersion} → v${latestVersion}`);
+		console.log('Run: valora update');
+	} else {
+		console.log(`Valora is already up to date (v${currentVersion}).`);
+	}
+}
+
+async function handleInstall(currentVersion: string, latestVersion: string): Promise<void> {
+	const pm = detectPackageManager();
+	if (pm === null) {
+		printAmbiguousPackageManager();
+		return;
+	}
+
+	const installArgv = getInstallCommand(pm);
+	const exitCode = await runInstall(installArgv);
+
+	if (exitCode === 0) {
+		await persistUpdateSuccess(getGlobalConfigDir(), currentVersion, latestVersion);
+		console.log(`✓ Updated to v${latestVersion}`);
+		return;
+	}
+
+	console.log('Update failed. Retry manually:');
+	console.log(`  ${installArgv.join(' ')}`);
+	process.exit(exitCode);
+}
+
 function printAmbiguousPackageManager(): void {
 	console.log('Could not detect package manager. Run one of:');
-	for (const pm of PACKAGE_MANAGERS) {
-		console.log(`  ${getInstallCommand(pm).join(' ')}`);
-	}
+	PACKAGE_MANAGERS.forEach((pm) => console.log(`  ${getInstallCommand(pm).join(' ')}`));
 }
 
 function runInstall(argv: string[]): Promise<number> {

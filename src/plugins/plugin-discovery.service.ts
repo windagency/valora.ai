@@ -1,8 +1,10 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
+import type { PluginLocation } from 'types/plugin.types';
+
 import { getLogger } from 'output/logger';
-import { getGlobalPluginsDir, getPackagePluginsDir, getProjectPluginsDir } from 'utils/paths';
+import { getGlobalPluginsDir, getPackagePluginsDir, getProjectPluginsDir, getSystemPluginsDir } from 'utils/paths';
 
 import { PLUGIN_MANIFEST_FILE } from './plugin-manifest.schema';
 
@@ -15,17 +17,26 @@ export class PluginDiscoveryService {
 	constructor(private readonly cwd = process.cwd()) {}
 
 	discoverPluginDirs(): string[] {
-		const standard = this.buildSearchRoots().flatMap((root) => this.scanPluginRoot(root));
-		const npm = this.discoverNpmPluginDirs();
+		return this.discoverWithSource().map(({ dir }) => dir);
+	}
+
+	discoverWithSource(): Array<{ dir: string; location: PluginLocation }> {
+		const standard = this.buildSearchRootsWithLocations().flatMap(({ location, root }) =>
+			this.scanPluginRoot(root).map((dir) => ({ dir, location }))
+		);
+		const npm = this.discoverNpmPluginDirs().map((dir) => ({ dir, location: 'npm' as PluginLocation }));
 		return [...standard, ...npm];
 	}
 
-	private buildSearchRoots(): string[] {
-		const builtIn = getPackagePluginsDir();
-		const global = getGlobalPluginsDir();
+	private buildSearchRootsWithLocations(): Array<{ location: PluginLocation; root: string }> {
+		const roots: Array<{ location: PluginLocation; root: string }> = [
+			{ location: 'built-in', root: getPackagePluginsDir() },
+			{ location: 'global', root: getSystemPluginsDir() },
+			{ location: 'user', root: getGlobalPluginsDir() }
+		];
 		const project = getProjectPluginsDir();
-
-		return [builtIn, global, ...(project ? [project] : [])].filter((dir) => fs.existsSync(dir));
+		if (project) roots.push({ location: 'project', root: project });
+		return roots.filter(({ root }) => fs.existsSync(root));
 	}
 
 	private discoverNpmPluginDirs(): string[] {

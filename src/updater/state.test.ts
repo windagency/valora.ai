@@ -48,6 +48,54 @@ describe('readUpdateState', () => {
 		await fs.writeFile(path.join(tmpDir, 'update-check.json'), JSON.stringify({ schemaVersion: 2, lastCheckAt: 'x' }));
 		expect(await readUpdateState(tmpDir)).toEqual(DEFAULT_STATE);
 	});
+
+	it('returns DEFAULT_STATE when latestVersion is a number instead of a string', async () => {
+		await fs.writeFile(
+			path.join(tmpDir, 'update-check.json'),
+			JSON.stringify({
+				schemaVersion: 1,
+				lastCheckAt: '2026-04-20T00:00:00.000Z',
+				lastSuccessAt: null,
+				latestVersion: 42,
+				latestVersionFetchedAt: null,
+				remindedForVersion: null,
+				installedVersionAtCheck: null
+			})
+		);
+		expect(await readUpdateState(tmpDir)).toEqual(DEFAULT_STATE);
+	});
+
+	it('returns DEFAULT_STATE when schemaVersion field is missing', async () => {
+		await fs.writeFile(
+			path.join(tmpDir, 'update-check.json'),
+			JSON.stringify({
+				lastCheckAt: '2026-04-20T00:00:00.000Z',
+				lastSuccessAt: null,
+				latestVersion: '2.6.0',
+				latestVersionFetchedAt: null,
+				remindedForVersion: null,
+				installedVersionAtCheck: null
+			})
+		);
+		expect(await readUpdateState(tmpDir)).toEqual(DEFAULT_STATE);
+	});
+
+	it('accepts a valid file with extra unknown fields and returns only the known fields', async () => {
+		const fixture: UpdateCheckState = {
+			schemaVersion: 1,
+			lastCheckAt: '2026-04-20T00:00:00.000Z',
+			lastSuccessAt: null,
+			latestVersion: '2.6.0',
+			latestVersionFetchedAt: null,
+			remindedForVersion: null,
+			installedVersionAtCheck: null
+		};
+		await fs.writeFile(
+			path.join(tmpDir, 'update-check.json'),
+			JSON.stringify({ ...fixture, unexpectedField: 'should-be-stripped' })
+		);
+		expect(await readUpdateState(tmpDir)).toEqual(fixture);
+	});
 });
 
 describe('writeUpdateState', () => {

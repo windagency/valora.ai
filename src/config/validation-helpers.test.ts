@@ -4,47 +4,47 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { ProviderName } from './providers.config';
+import { BuiltinProviders } from './providers.config';
 import { DEFAULT_MODELS, PROVIDER_CHOICES, PROVIDER_LABELS, QUICK_SETUP_CHOICES } from './validation-helpers';
 
 describe('validation-helpers', () => {
 	describe('PROVIDER_LABELS', () => {
 		it('should include Cursor provider', () => {
-			expect(PROVIDER_LABELS).toHaveProperty(ProviderName.CURSOR);
-			expect(PROVIDER_LABELS[ProviderName.CURSOR]).toBe('Cursor');
+			expect(PROVIDER_LABELS).toHaveProperty(BuiltinProviders.CURSOR);
+			expect(PROVIDER_LABELS[BuiltinProviders.CURSOR]).toBe('Cursor');
 		});
 
 		it('should include all standard providers', () => {
-			expect(PROVIDER_LABELS).toHaveProperty(ProviderName.ANTHROPIC);
-			expect(PROVIDER_LABELS).toHaveProperty(ProviderName.OPENAI);
-			expect(PROVIDER_LABELS).toHaveProperty(ProviderName.GOOGLE);
-			expect(PROVIDER_LABELS).toHaveProperty(ProviderName.XAI);
-			expect(PROVIDER_LABELS).toHaveProperty(ProviderName.MOONSHOT);
+			expect(PROVIDER_LABELS).toHaveProperty(BuiltinProviders.ANTHROPIC);
+			expect(PROVIDER_LABELS).toHaveProperty(BuiltinProviders.OPENAI);
+			expect(PROVIDER_LABELS).toHaveProperty(BuiltinProviders.GOOGLE);
+			expect(PROVIDER_LABELS).toHaveProperty(BuiltinProviders.XAI);
+			expect(PROVIDER_LABELS).toHaveProperty(BuiltinProviders.MOONSHOT);
 		});
 	});
 
 	describe('DEFAULT_MODELS', () => {
 		it('should include Cursor with correct default model', () => {
-			expect(DEFAULT_MODELS).toHaveProperty(ProviderName.CURSOR);
-			expect(DEFAULT_MODELS[ProviderName.CURSOR]).toBe('cursor-sonnet-4.5');
+			expect(DEFAULT_MODELS).toHaveProperty(BuiltinProviders.CURSOR);
+			expect(DEFAULT_MODELS[BuiltinProviders.CURSOR]).toBe('cursor-sonnet-4.5');
 		});
 
 		it('should include xAI with grok-code', () => {
-			expect(DEFAULT_MODELS).toHaveProperty(ProviderName.XAI);
-			expect(DEFAULT_MODELS[ProviderName.XAI]).toBe('grok-code');
+			expect(DEFAULT_MODELS).toHaveProperty(BuiltinProviders.XAI);
+			expect(DEFAULT_MODELS[BuiltinProviders.XAI]).toBe('grok-code');
 		});
 
 		it('should have default models for all providers', () => {
-			expect(DEFAULT_MODELS[ProviderName.ANTHROPIC]).toBe('claude-opus-4.6');
-			expect(DEFAULT_MODELS[ProviderName.GOOGLE]).toBe('gemini-2.5-pro');
-			expect(DEFAULT_MODELS[ProviderName.MOONSHOT]).toBe('kimi-k2');
-			expect(DEFAULT_MODELS[ProviderName.OPENAI]).toBe('gpt-5');
+			expect(DEFAULT_MODELS[BuiltinProviders.ANTHROPIC]).toBe('claude-opus-4.6');
+			expect(DEFAULT_MODELS[BuiltinProviders.GOOGLE]).toBe('gemini-2.5-pro');
+			expect(DEFAULT_MODELS[BuiltinProviders.MOONSHOT]).toBe('kimi-k2');
+			expect(DEFAULT_MODELS[BuiltinProviders.OPENAI]).toBe('gpt-5');
 		});
 	});
 
 	describe('PROVIDER_CHOICES', () => {
 		it('should include Cursor provider option', () => {
-			const cursorChoice = PROVIDER_CHOICES.find((choice) => choice.value === ProviderName.CURSOR);
+			const cursorChoice = PROVIDER_CHOICES.find((choice) => choice.value === BuiltinProviders.CURSOR);
 			expect(cursorChoice).toBeDefined();
 			expect(cursorChoice?.name).toContain('Cursor');
 			expect(cursorChoice?.name).toContain('Zero config');
@@ -59,27 +59,27 @@ describe('validation-helpers', () => {
 
 		it('should have all standard providers', () => {
 			const providers = PROVIDER_CHOICES.map((c) => c.value);
-			expect(providers).toContain(ProviderName.ANTHROPIC);
-			expect(providers).toContain(ProviderName.CURSOR);
-			expect(providers).toContain(ProviderName.OPENAI);
-			expect(providers).toContain(ProviderName.GOOGLE);
-			expect(providers).toContain(ProviderName.XAI);
-			expect(providers).toContain(ProviderName.MOONSHOT);
+			expect(providers).toContain(BuiltinProviders.ANTHROPIC);
+			expect(providers).toContain(BuiltinProviders.CURSOR);
+			expect(providers).toContain(BuiltinProviders.OPENAI);
+			expect(providers).toContain(BuiltinProviders.GOOGLE);
+			expect(providers).toContain(BuiltinProviders.XAI);
+			expect(providers).toContain(BuiltinProviders.MOONSHOT);
 		});
 	});
 
 	describe('QUICK_SETUP_CHOICES', () => {
 		it('should have Cursor as first option', () => {
-			expect(QUICK_SETUP_CHOICES[0].value).toBe(ProviderName.CURSOR);
+			expect(QUICK_SETUP_CHOICES[0].value).toBe(BuiltinProviders.CURSOR);
 			expect(QUICK_SETUP_CHOICES[0].name).toContain('No API key needed');
 		});
 
 		it('should include key providers for quick setup', () => {
 			const providers = QUICK_SETUP_CHOICES.map((c) => c.value);
-			expect(providers).toContain(ProviderName.CURSOR);
-			expect(providers).toContain(ProviderName.ANTHROPIC);
-			expect(providers).toContain(ProviderName.OPENAI);
-			expect(providers).toContain(ProviderName.GOOGLE);
+			expect(providers).toContain(BuiltinProviders.CURSOR);
+			expect(providers).toContain(BuiltinProviders.ANTHROPIC);
+			expect(providers).toContain(BuiltinProviders.OPENAI);
+			expect(providers).toContain(BuiltinProviders.GOOGLE);
 		});
 
 		it('should have at least 4 quick setup options', () => {

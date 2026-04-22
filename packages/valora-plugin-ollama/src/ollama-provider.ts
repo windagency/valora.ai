@@ -2,20 +2,10 @@ import OpenAI from 'openai';
 
 import type { LLMCompletionOptions, LLMCompletionResult, LLMProvider } from 'types/llm.types';
 
-interface OllamaManagers {
+export interface OllamaManagers {
 	binary: { assertInstalled(): Promise<void> };
 	model: { ensureModel(_baseUrl: string, _model: string): Promise<void> };
 	process: { ensureRunning(_baseUrl: string): Promise<void>; stop(): Promise<void> };
-}
-
-let managers: null | OllamaManagers = null;
-
-export function resetManagers(): void {
-	managers = null;
-}
-
-export function setManagers(m: OllamaManagers): void {
-	managers = m;
 }
 
 const DEFAULT_OLLAMA_HOST = 'http://localhost:11434';
@@ -26,9 +16,11 @@ export class OllamaProvider implements LLMProvider {
 	private client: null | OpenAI = null;
 
 	private readonly config: Record<string, unknown>;
+	private readonly managers: OllamaManagers;
 
-	constructor(config: Record<string, unknown>) {
+	constructor(config: Record<string, unknown>, managers: OllamaManagers) {
 		this.config = config;
+		this.managers = managers;
 	}
 
 	async complete(options: LLMCompletionOptions): Promise<LLMCompletionResult> {
@@ -37,10 +29,7 @@ export class OllamaProvider implements LLMProvider {
 
 		const response = await this.getClient().chat.completions.create({
 			max_tokens: options.max_tokens,
-			messages: options.messages.map((m) => ({
-				content: m.content,
-				role: m.role as 'assistant' | 'system' | 'user'
-			})),
+			messages: this.mapMessages(options.messages),
 			model,
 			stop: options.stop,
 			temperature: options.temperature,
@@ -88,10 +77,7 @@ export class OllamaProvider implements LLMProvider {
 
 		const stream = await this.getClient().chat.completions.create({
 			max_tokens: options.max_tokens,
-			messages: options.messages.map((m) => ({
-				content: m.content,
-				role: m.role as 'assistant' | 'system' | 'user'
-			})),
+			messages: this.mapMessages(options.messages),
 			model,
 			stop: options.stop,
 			stream: true,
@@ -119,11 +105,10 @@ export class OllamaProvider implements LLMProvider {
 	}
 
 	private async ensureReady(model: string): Promise<void> {
-		if (!managers) throw new Error('OllamaProvider: managers not initialised — register() was not called');
 		const host = this.getOllamaHost();
-		await managers.binary.assertInstalled();
-		await managers.process.ensureRunning(host);
-		await managers.model.ensureModel(host, model);
+		await this.managers.binary.assertInstalled();
+		await this.managers.process.ensureRunning(host);
+		await this.managers.model.ensureModel(host, model);
 	}
 
 	private getClient(): OpenAI {
@@ -136,11 +121,20 @@ export class OllamaProvider implements LLMProvider {
 	}
 
 	private getModel(): string {
-		return (this.config['model'] as string) ?? DEFAULT_MODEL;
+		return getStringConfig(this.config, 'model', DEFAULT_MODEL);
 	}
 
 	private getOllamaHost(): string {
-		return (this.config['ollama_host'] as string) ?? DEFAULT_OLLAMA_HOST;
+		return getStringConfig(this.config, 'ollama_host', DEFAULT_OLLAMA_HOST);
+	}
+
+	private mapMessages(
+		messages: LLMCompletionOptions['messages']
+	): Array<{ content: string; role: 'assistant' | 'system' | 'user' }> {
+		return messages.map((m) => ({
+			content: m.content,
+			role: m.role as 'assistant' | 'system' | 'user'
+		}));
 	}
 
 	private parseArgs(raw: string): Record<string, unknown> {
@@ -150,4 +144,9 @@ export class OllamaProvider implements LLMProvider {
 			return {};
 		}
 	}
+}
+
+function getStringConfig(config: Record<string, unknown>, key: string, fallback: string): string {
+	const value = config[key];
+	return typeof value === 'string' ? value : fallback;
 }

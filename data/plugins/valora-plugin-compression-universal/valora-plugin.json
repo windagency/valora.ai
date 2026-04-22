@@ -1,9 +1,0 @@
-{
-	"name": "valora-plugin-compression-universal",
-	"version": "1.0.0",
-	"description": "Compression strategies for universal tools: git, grep, rg, docker, make.",
-	"engines": { "valora": ">=0.1.0" },
-	"contributes": ["code"],
-	"permissions": ["code-exec"],
-	"codeEntrypoint": "index.js"
-}

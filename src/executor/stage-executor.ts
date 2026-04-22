@@ -27,7 +27,7 @@ import type { PromptDefinition } from 'types/prompt.types';
 import { getASTIndexService } from 'ast/ast-index.service';
 import { generateCodebaseMap } from 'ast/ast-query.service';
 import { DEFAULT_MAX_TOKENS, DEFAULT_TEMPERATURE } from 'config/constants';
-import { ProviderName } from 'config/providers.config';
+import { BuiltinProviders } from 'config/providers.config';
 import { MCPApprovalCacheService } from 'mcp/mcp-approval-cache.service';
 import { MCPApprovalWorkflow } from 'mcp/mcp-approval-workflow';
 import { MCPAuditLoggerService } from 'mcp/mcp-audit-logger.service';
@@ -1424,7 +1424,7 @@ Summarize ALL changes you made during tool execution. Output ONLY the JSON code 
 			duration_ms: duration,
 			metadata: {
 				guidedMode: true,
-				provider: ProviderName.CURSOR,
+				provider: BuiltinProviders.CURSOR,
 				resolutionPath: ResolutionPath.GUIDED,
 				stageContext: {
 					inputs: resolvedInputs,

@@ -1,21 +1,22 @@
-/**
- * Dynamic command definitions for CLI
- */
+import { fetchPluginRegistry } from 'plugins/plugin-registry.service';
 
 import type { CommandAdapter } from 'cli/command-adapter.interface';
 import type { CommandExecutor } from 'cli/command-executor';
-import type { CommandLoader } from 'executor/command-loader';
 import type { IsolatedExecutionOptions } from 'types/command.types';
 import type { DocumentCategory, DocumentOutputOptions } from 'types/document.types';
 
 import { DocumentOutputProcessor } from 'cli/document-output-processor';
 import { getConfigLoader } from 'config/loader';
 import { SetupWizard } from 'config/wizard';
-import { createContainer, initializePlugins, SERVICE_IDENTIFIERS } from 'di/container';
+import { createContainer, getLoadedPlugins, initializePlugins, SERVICE_IDENTIFIERS } from 'di/container';
+import { listAvailableCommands } from 'executor/command-discovery';
 import { getColorAdapter } from 'output/color-adapter.interface';
 import { getLogger } from 'output/logger';
 import { formatError } from 'utils/error-handler';
+import { listFiles } from 'utils/file-utils';
 import { getCommandHelp } from 'utils/help-content';
+
+type ColorAdapter = ReturnType<typeof getColorAdapter>;
 
 /**
  * CLI options for exec command
@@ -33,6 +34,8 @@ interface ExecCommandOptions extends Record<string, unknown> {
 	skipValidation?: boolean;
 	stage?: string | string[];
 }
+
+type LoadedPlugin = ReturnType<typeof getLoadedPlugins>[number];
 
 /**
  * Filter options to only include flags compatible with CommandExecutionOptions
@@ -118,6 +121,58 @@ function buildDocumentOutputOptions(options: ExecCommandOptions | ShortcutComman
 /**
  * Build isolation options from CLI flags
  */
+export function configureListCommand(program: CommandAdapter): void {
+	program
+		.command('list')
+		.description('List installed plugins and their contributions')
+		.action(async () => {
+			const color = getColorAdapter();
+			try {
+				const container = createContainer();
+				await initializePlugins(container);
+				const plugins = getLoadedPlugins();
+
+				console.log(`${color.bold('Loaded plugins')}  (${String(plugins.length)})\n`);
+
+				if (plugins.length === 0) {
+					console.log('  No plugins loaded.\n');
+				} else {
+					for (const plugin of plugins) {
+						await renderPlugin(plugin, color);
+					}
+				}
+
+				const registry = await fetchPluginRegistry();
+				if (registry) {
+					const loadedNames = new Set(plugins.map((p) => p.manifest.name));
+					const available = registry.filter((e) => !loadedNames.has(e.name));
+
+					if (available.length > 0) {
+						console.log(`${color.bold('Available to install')}  (${String(available.length)})\n`);
+						for (const entry of available) {
+							console.log(
+								`  ${entry.name.padEnd(40)} ${entry.contributes.join(', ').padEnd(24)} ${color.dim(entry.description)}`
+							);
+						}
+						console.log(`\nInstall with: valora plugin add <name>`);
+					}
+				}
+			} catch (error) {
+				console.error(color.red('Failed to list plugins:'), formatError(error as Error));
+
+				const { stopAllCleanupSchedulers } = await import('cleanup/coordinator');
+				stopAllCleanupSchedulers();
+
+				process.exit(1);
+				return;
+			}
+
+			const { stopAllCleanupSchedulers } = await import('cleanup/coordinator');
+			stopAllCleanupSchedulers();
+			process.exit(0);
+		});
+}
+
 function buildIsolationOptions(options: ExecCommandOptions): IsolatedExecutionOptions | undefined {
 	const isolation: IsolatedExecutionOptions = {} as IsolatedExecutionOptions;
 
@@ -141,43 +196,47 @@ function buildIsolationOptions(options: ExecCommandOptions): IsolatedExecutionOp
 	return Object.keys(isolation).length > 0 ? isolation : undefined;
 }
 
-/**
- * Configure the main list command
- */
-export function configureListCommand(program: CommandAdapter): void {
-	program
-		.command('list')
-		.description('List available commands')
-		.action(async () => {
-			const color = getColorAdapter();
-			try {
-				const container = createContainer();
-				await initializePlugins(container);
-				const commandLoader = container.resolve(SERVICE_IDENTIFIERS.COMMAND_LOADER) as CommandLoader;
-				const commands = await commandLoader.listCommands();
+async function listPluginResourcesInDir(dir: string): Promise<string[]> {
+	try {
+		const files = await listFiles(dir, '.md');
+		return files.filter((f) => !f.startsWith('_')).map((f) => f.replace(/\.md$/, ''));
+	} catch {
+		return [];
+	}
+}
 
-				console.group(color.bold('\nAvailable commands:'));
-				commands.forEach((cmd) => console.log(`  ${color.cyan(cmd)}`));
-				console.groupEnd();
+async function renderPlugin(plugin: LoadedPlugin, color: ColorAdapter): Promise<void> {
+	const { name, version } = plugin.manifest;
+	const scope = color.dim(`[${plugin.location}]`);
+	console.log(`  ${color.bold(`${name}@${version}`)}  ${scope}`);
 
-				console.log();
+	if (plugin.commandsDir) {
+		const cmds = await listAvailableCommands(plugin.commandsDir);
+		if (cmds.length > 0) console.log(`    commands: ${cmds.join(', ')}`);
+	}
 
-				// Stop cleanup schedulers before exit
-				const { stopAllCleanupSchedulers } = await import('cleanup/coordinator');
-				stopAllCleanupSchedulers();
+	if (plugin.agentsDir) {
+		const agents = await listPluginResourcesInDir(plugin.agentsDir);
+		if (agents.length > 0) console.log(`    agents:   ${agents.join(', ')}`);
+	}
 
-				// Exit successfully
-				process.exit(0);
-			} catch (error) {
-				console.error(color.red('Failed to list commands:'), formatError(error as Error));
+	if (plugin.promptsDir) {
+		const prompts = await listPluginResourcesInDir(plugin.promptsDir);
+		if (prompts.length > 0) console.log(`    prompts:  ${prompts.join(', ')}`);
+	}
 
-				// Stop cleanup schedulers before exit
-				const { stopAllCleanupSchedulers } = await import('cleanup/coordinator');
-				stopAllCleanupSchedulers();
+	renderPluginHooks(plugin);
 
-				process.exit(1);
-			}
-		});
+	if (plugin.mcpsFile) console.log(`    mcps:     yes`);
+	if (plugin.codeEntrypoint) console.log(`    code:     (dynamic)`);
+
+	console.log();
+}
+
+function renderPluginHooks(plugin: LoadedPlugin): void {
+	if (!plugin.hooks) return;
+	const count = Object.keys(plugin.hooks).length;
+	if (count > 0) console.log(`    hooks:    ${String(count)} ${count === 1 ? 'event' : 'events'}`);
 }
 
 /**

@@ -106,10 +106,32 @@ export function getPackagePluginsDir(): string {
 }
 
 /**
+ * Get the path to the shipped plugin registry JSON file.
+ */
+export function getPluginRegistryPath(): string {
+	return path.join(getPackagePluginsDir(), 'registry.json');
+}
+
+/**
  * Get the global user plugins directory (~/.valora/plugins/).
  */
 export function getGlobalPluginsDir(): string {
 	return path.join(getGlobalConfigDir(), 'plugins');
+}
+
+/**
+ * Get the system-wide plugins directory, accessible to all users on the machine.
+ * Override with VALORA_SYSTEM_PLUGINS_DIR for testing or custom deployments.
+ * Defaults: /usr/local/share/valora/plugins (Unix/macOS), %PROGRAMDATA%\valora\plugins (Windows).
+ */
+export function getSystemPluginsDir(): string {
+	const envOverride = process.env['VALORA_SYSTEM_PLUGINS_DIR'];
+	if (envOverride) return envOverride;
+	if (process.platform === 'win32') {
+		const programData = process.env['PROGRAMDATA'] ?? path.join('C:', 'ProgramData');
+		return path.join(programData, 'valora', 'plugins');
+	}
+	return '/usr/local/share/valora/plugins';
 }
 
 /**

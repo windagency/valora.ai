@@ -7,6 +7,8 @@ import path from 'node:path';
 
 import type { UpdateCheckState } from './throttle';
 
+import { UPDATE_CHECK_STATE_SCHEMA } from './state.schema';
+
 const STATE_FILENAME = 'update-check.json';
 
 export const DEFAULT_STATE: UpdateCheckState = {
@@ -31,10 +33,11 @@ export async function readUpdateState(stateDir: string): Promise<UpdateCheckStat
 	try {
 		const raw = await fs.readFile(filePath, 'utf-8');
 		const parsed = JSON.parse(raw) as unknown;
-		if (parsed === null || typeof parsed !== 'object' || (parsed as { schemaVersion?: unknown }).schemaVersion !== 1) {
+		const result = UPDATE_CHECK_STATE_SCHEMA.safeParse(parsed);
+		if (!result.success) {
 			return cloneDefault();
 		}
-		return parsed as UpdateCheckState;
+		return result.data;
 	} catch {
 		return cloneDefault();
 	}

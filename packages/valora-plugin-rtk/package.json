@@ -27,18 +27,21 @@
 		"pnpm": "10.19.0"
 	},
 	"scripts": {
+		"build": "tsc -p tsconfig.json",
+		"clean": "rm -rf ./dist",
 		"lint": "eslint --color",
 		"lint:fix": "eslint --color --fix",
-		"beautify": "prettier --check \"**/*.+(js|ts|json|md|yml|yaml)\"",
-		"beautify:fix": "prettier --write \"**/*.+(js|ts|json|md|yml|yaml)\"",
+		"beautify": "prettier --check \"**/*.+(js|jsx|ts|tsx|json|md|yml|yaml)\"",
+		"beautify:fix": "prettier --write \"**/*.+(js|jsx|ts|tsx|json|md|yml|yaml)\"",
 		"format": "pnpm beautify:fix && pnpm lint:fix",
 		"test": "vitest run",
-		"prepublishOnly": "pnpm test"
+		"prepublishOnly": "pnpm clean && pnpm build && pnpm test"
 	},
 	"files": [
 		"valora-plugin.json",
 		"hooks.json",
-		"hooks/"
+		"hooks/",
+		"dist/"
 	],
 	"peerDependencies": {
 		"@windagency/valora": ">=0.1.0"

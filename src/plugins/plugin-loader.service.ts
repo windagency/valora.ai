@@ -2,7 +2,14 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 import type { HooksConfig } from 'types/hook.types';
-import type { LoadedPlugin, PluginContributionType, PluginManifest, PluginsConfig } from 'types/plugin.types';
+import type {
+	CataloguedPlugin,
+	LoadedPlugin,
+	PluginContributionType,
+	PluginLocation,
+	PluginManifest,
+	PluginsConfig
+} from 'types/plugin.types';
 
 import { getLogger } from 'output/logger';
 import { getResourceResolver } from 'utils/resource-resolver';
@@ -24,6 +31,28 @@ export class PluginLoaderService {
 		this.discovery = discovery ?? new PluginDiscoveryService();
 	}
 
+	catalogAll(config?: PluginsConfig): CataloguedPlugin[] {
+		return this.discovery.discoverWithSource().map(({ dir, location }) => {
+			const manifestPath = path.join(dir, PLUGIN_MANIFEST_FILE);
+			try {
+				const raw = fs.readFileSync(manifestPath, 'utf-8');
+				const result = PLUGIN_MANIFEST_SCHEMA.safeParse(JSON.parse(raw) as unknown);
+				if (!result.success) {
+					return { dir, location, manifest: null, status: 'invalid' as const };
+				}
+				const manifest: PluginManifest = result.data;
+				const enabled = !config?.enabled || config.enabled.includes(manifest.name);
+				return { dir, location, manifest, status: enabled ? ('enabled' as const) : ('disabled' as const) };
+			} catch {
+				return { dir, location, manifest: null, status: 'invalid' as const };
+			}
+		});
+	}
+
+	isInstalled(shortName: string): boolean {
+		return this.catalogAll().some((p) => p.manifest?.name === shortName);
+	}
+
 	/**
 	 * Discover and load all enabled plugins.
 	 * Registers each plugin directory with ResourceResolver so that the existing
@@ -31,8 +60,8 @@ export class PluginLoaderService {
 	 */
 	loadAll(config?: PluginsConfig): LoadedPlugin[] {
 		const loaded = this.discovery
-			.discoverPluginDirs()
-			.map((pluginDir) => this.loadPlugin(pluginDir, config))
+			.discoverWithSource()
+			.map(({ dir, location }) => this.loadPlugin(dir, location, config))
 			.filter((plugin): plugin is LoadedPlugin => plugin !== null);
 		return this.sortByDependencies(loaded);
 	}
@@ -60,7 +89,7 @@ export class PluginLoaderService {
 		}
 	}
 
-	private loadPlugin(pluginDir: string, config?: PluginsConfig): LoadedPlugin | null {
+	private loadPlugin(pluginDir: string, location: PluginLocation, config?: PluginsConfig): LoadedPlugin | null {
 		const manifestPath = path.join(pluginDir, PLUGIN_MANIFEST_FILE);
 
 		try {
@@ -86,6 +115,7 @@ export class PluginLoaderService {
 			getResourceResolver().registerPluginDir(pluginDir);
 
 			const plugin: LoadedPlugin = {
+				location,
 				manifest,
 				pluginDir,
 				status: 'enabled',

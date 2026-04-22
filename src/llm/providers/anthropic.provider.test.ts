@@ -5,6 +5,8 @@
 import type Anthropic from '@anthropic-ai/sdk';
 import { describe, expect, it } from 'vitest';
 
+import { getProviderRegistry } from 'llm/registry';
+
 import { AnthropicProvider } from './anthropic.provider';
 
 /**
@@ -194,5 +196,20 @@ describe('AnthropicProvider', () => {
 			provider.applyCacheBreakpoints(params);
 			expect(params.tools).toEqual([]);
 		});
+	});
+});
+
+describe('AnthropicProvider — descriptor registration', () => {
+	it('registers a descriptor with label "Anthropic"', () => {
+		const descriptor = getProviderRegistry().getDescriptor('anthropic');
+		expect(descriptor?.label).toBe('Anthropic');
+	});
+
+	it('registers a descriptor with requiresApiKey: true', () => {
+		expect(getProviderRegistry().getDescriptor('anthropic')?.requiresApiKey).toBe(true);
+	});
+
+	it('registers a non-empty modelModes list', () => {
+		expect(getProviderRegistry().getDescriptor('anthropic')?.modelModes.length ?? 0).toBeGreaterThan(0);
 	});
 });

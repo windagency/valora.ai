@@ -1,36 +1,42 @@
 # Command Reference
 
-> Complete reference for all 25 commands in VALORA.
+> Complete reference for all 26 commands in VALORA.
 
 ## Commands Quick Reference
 
-| Command                        | Agent            | Purpose                                            | Key flags                                                |
-| ------------------------------ | ---------------- | -------------------------------------------------- | -------------------------------------------------------- |
-| `refine-specs`                 | @product-manager | Collaboratively refine specifications              | `--domain`, `--stakeholders`                             |
-| `create-prd`                   | @product-manager | Generate PRD from specifications                   | `--specs-file`, `--template`                             |
-| `create-backlog`               | @product-manager | Decompose PRD into tasks                           | `--granularity`, `--format`                              |
-| `generate-docs`                | @lead            | Generate technical documentation                   | `--domain`, `--quick`, `--extract-only`                  |
-| `generate-all-documentation`   | @lead            | Parallel documentation generation (~6 min faster)  | `--skip-review`, `--cache-context`, `--security-context` |
-| `fetch-task`                   | @product-manager | Retrieve task from backlog                         | `--task-id`, `--priority`, `--domain`                    |
-| `refine-task`                  | @product-manager | Clarify task requirements                          | `--task-id`, `--interactive`                             |
-| `gather-knowledge`             | @lead            | Analyse codebase context                           | `--scope`, `--domain`, `--depth`                         |
-| `plan`                         | @lead            | Create implementation plan                         | `--mode`, `--pattern`, `--complexity-threshold`          |
-| `plan-architecture`            | @lead            | High-level architecture plan (Phase 1)             | `--task-id`, `--backlog-file`                            |
-| `plan-implementation`          | @lead            | Detailed implementation plan (Phase 2)             | `--arch-plan`, `--task-id`                               |
-| `validate-plan`                | @lead            | Pre-review validation (catches 60–70% of issues)   | `--fix`, `--strict`                                      |
-| `validate-coverage`            | @qa              | Test coverage validation with quality scoring      | `--threshold`, `--strict`, `--fail-on-decrease`          |
-| `pre-check`                    | @qa              | Automated code quality pre-checks before review    | `--fix`, `--strict`, `--ci`                              |
-| `review-plan`                  | @lead            | Validate implementation plan                       | `--strict-mode`, `--focus`, `--checklist`                |
-| `implement`                    | Dynamic          | Execute code changes                               | `--agent`, `--mode`, `--step`                            |
-| `assert`                       | @asserter        | Validate implementation                            | `--severity`, `--quick`                                  |
-| `test`                         | @qa              | Execute test suites                                | `--type`, `--coverage-threshold`                         |
-| `validate-parallel`            | @lead            | Run assert + review-code in parallel (~50% faster) | `--quick`, `--severity`, `--focus`                       |
-| `review-code`                  | @lead            | Code quality review                                | `--severity`, `--focus`, `--checklist`, `--auto-only`    |
-| `review-functional`            | @lead            | Functional review                                  | `--severity`, `--check-a11y`                             |
-| `commit`                       | @lead            | Create conventional commits                        | `--scope`, `--breaking`, `--update-changelog`            |
-| `create-pr`                    | @lead            | Generate pull request                              | `--draft`, `--auto-assign`, `--link-issues`              |
-| `feedback`                     | @product-manager | Capture outcomes                                   | `--command`, `--satisfaction`, `--suggest-improvements`  |
-| `consolidate` _(experimental)_ | @lead (system)   | Consolidate and prune the agent memory stores      | `--prune-only`, `--dry-run`, `--since`                   |
+| Command                        | Agent            | Purpose                                                     | Key flags                                                |
+| ------------------------------ | ---------------- | ----------------------------------------------------------- | -------------------------------------------------------- |
+| `refine-specs`                 | @product-manager | Collaboratively refine specifications                       | `--domain`, `--stakeholders`                             |
+| `create-prd`                   | @product-manager | Generate PRD from specifications                            | `--specs-file`, `--template`                             |
+| `create-backlog`               | @product-manager | Decompose PRD into tasks                                    | `--granularity`, `--format`                              |
+| `generate-docs`                | @lead            | Generate technical documentation                            | `--domain`, `--quick`, `--extract-only`                  |
+| `generate-all-documentation`   | @lead            | Parallel documentation generation (~6 min faster)           | `--skip-review`, `--cache-context`, `--security-context` |
+| `fetch-task`                   | @product-manager | Retrieve task from backlog                                  | `--task-id`, `--priority`, `--domain`                    |
+| `refine-task`                  | @product-manager | Clarify task requirements                                   | `--task-id`, `--interactive`                             |
+| `gather-knowledge`             | @lead            | Analyse codebase context                                    | `--scope`, `--domain`, `--depth`                         |
+| `plan`                         | @lead            | Create implementation plan                                  | `--mode`, `--pattern`, `--complexity-threshold`          |
+| `plan-architecture`            | @lead            | High-level architecture plan (Phase 1)                      | `--task-id`, `--backlog-file`                            |
+| `plan-implementation`          | @lead            | Detailed implementation plan (Phase 2)                      | `--arch-plan`, `--task-id`                               |
+| `validate-plan`                | @lead            | Pre-review validation (catches 60–70% of issues)            | `--fix`, `--strict`                                      |
+| `validate-coverage`            | @qa              | Test coverage validation with quality scoring               | `--threshold`, `--strict`, `--fail-on-decrease`          |
+| `pre-check`                    | @qa              | Automated code quality pre-checks before review             | `--fix`, `--strict`, `--ci`                              |
+| `review-plan`                  | @lead            | Validate implementation plan                                | `--strict-mode`, `--focus`, `--checklist`                |
+| `implement`                    | Dynamic          | Execute code changes                                        | `--agent`, `--mode`, `--step`                            |
+| `assert`                       | @asserter        | Validate implementation                                     | `--severity`, `--quick`                                  |
+| `test`                         | @qa              | Execute test suites                                         | `--type`, `--coverage-threshold`                         |
+| `validate-parallel`            | @lead            | Run assert + review-code in parallel (~50% faster)          | `--quick`, `--severity`, `--focus`                       |
+| `review-code`                  | @lead            | Code quality review                                         | `--severity`, `--focus`, `--checklist`, `--auto-only`    |
+| `review-functional`            | @lead            | Functional review                                           | `--severity`, `--check-a11y`                             |
+| `commit`                       | @lead            | Create conventional commits                                 | `--scope`, `--breaking`, `--update-changelog`            |
+| `create-pr`                    | @lead            | Generate pull request                                       | `--draft`, `--auto-assign`, `--link-issues`              |
+| `feedback`                     | @product-manager | Capture outcomes                                            | `--command`, `--satisfaction`, `--suggest-improvements`  |
+| `consolidate` _(experimental)_ | @lead (system)   | Consolidate and prune the agent memory stores               | `--prune-only`, `--dry-run`, `--since`                   |
+| `list`                         | —                | Show loaded plugins, their contributions, and install hints | —                                                        |
+| `plugin add`                   | —                | Download and install a plugin from the registry             | `--scope`                                                |
+| `plugin remove`                | —                | Remove an installed plugin                                  | `--scope`                                                |
+| `plugin list`                  | —                | Show all discovered plugins with status                     | —                                                        |
+| `plugin available`             | —                | Browse the full @windagency plugin catalogue                | —                                                        |
+| `update`                       | —                | Install the latest version of Valora                        | `--check`, `--force`                                     |
 
 > **Note on batch stages:** Several commands have stages marked `batch: true`, eligible when `--batch` is set and the provider supports it (Anthropic and OpenAI only). See [Batch Processing](#batch-processing) for details.
 
@@ -1270,6 +1276,195 @@ valora explore cleanup [exploration-id] [options]
 | `--dry-run`        | Preview cleanup without removing anything |
 
 If the exploration state has already been removed (e.g., from a previous partial cleanup), the command falls back to pattern-based cleanup of leftover git branches and worktrees.
+
+---
+
+## Plugin Management
+
+### list
+
+Show every loaded plugin alongside its active contributions, then list plugins available to install from the `@windagency` registry.
+
+```bash
+valora list
+```
+
+```
+Loaded plugins  (2)
+
+  valora-core-generators@1.0.0
+    prompts:  generate-agent, generate-command
+
+  valora-defaults@1.0.0
+    hooks:    2 events
+    mcps:     yes
+
+Available to install  (12)
+
+  valora-plugin-engineering   commands, agents   Lead engineer agent and core engineering workflow commands
+  valora-plugin-qa            commands, agents   QA Engineer agent and test-execution workflow commands
+  …
+
+Install with: valora plugin add <name>
+```
+
+If the registry is unreachable (offline, network timeout), the "Available to install" section is silently omitted — only loaded plugins are shown.
+
+### plugin add
+
+Download and install a plugin from the npm registry.
+
+```bash
+valora plugin add <name> [options]
+```
+
+| Option            | Description                                               |
+| ----------------- | --------------------------------------------------------- |
+| `--scope <scope>` | Installation scope: `user` (default), `project`, `global` |
+
+The `<name>` argument accepts either a short name (`compression-universal`) or a full npm package name (`@windagency/valora-plugin-ollama`). Short names are automatically expanded to `@windagency/valora-plugin-<name>`.
+
+After installing, add the plugin's short name to `plugins.enabled` in `.valora/config.json` to activate it.
+
+```bash
+# Install for all your projects
+valora plugin add ollama
+
+# Install for this project only
+valora plugin add rtk --scope project
+
+# Install using the full package name
+valora plugin add @windagency/valora-plugin-engineering
+```
+
+See [Plugins](./plugins.md) for the full plugin reference, scope locations, enabling and disabling plugins, and troubleshooting.
+
+### plugin remove
+
+Remove an installed plugin.
+
+```bash
+valora plugin remove <name> [options]
+```
+
+| Option            | Description                                                 |
+| ----------------- | ----------------------------------------------------------- |
+| `--scope <scope>` | Scope to remove from: `user` (default), `project`, `global` |
+
+```bash
+# Remove from your personal plugins
+valora plugin remove rtk
+
+# Remove from this project only
+valora plugin remove compression-universal --scope project
+```
+
+### plugin list
+
+Show every plugin Valora has discovered, grouped by enabled / disabled / invalid.
+
+```bash
+valora plugin list
+```
+
+```
+Plugins  (2 enabled, 1 disabled)
+
+  ✓ valora-plugin-rtk       1.0.0  hooks, code      [project]
+  ✓ valora-core-generators  2.5.0  agents, commands [built-in]
+  ○ valora-plugin-qa        0.3.0  agents, commands [user]  not in plugins.enabled
+```
+
+Unlike `valora doctor`, this command shows _all_ discovered plugins — including those that are disabled or have invalid manifests.
+
+### plugin available
+
+Browse all plugins published in the `@windagency` registry and see which are already installed.
+
+```bash
+valora plugin available
+```
+
+```
+Available plugins  (14 total, @windagency registry)
+
+  ✓ valora-plugin-rtk           1.0.0  RTK integration…          installed
+  ○ valora-plugin-engineering   1.0.0  Engineering workflow commands
+
+Install with: valora plugin add <name>
+```
+
+---
+
+## Maintenance
+
+### update
+
+Install the latest version of Valora. Valora also checks for updates automatically in the background and prints a reminder banner when a newer version is available.
+
+```bash
+valora update [options]
+```
+
+| Option    | Description                                      |
+| --------- | ------------------------------------------------ |
+| `--check` | Check for an available update without installing |
+| `--force` | Reinstall even if already on the latest version  |
+
+```bash
+# Check whether an update is available
+valora update --check
+
+# Install the latest version
+valora update
+
+# Reinstall the current version (e.g. to repair vendored tools)
+valora update --force
+```
+
+**On success:** the new version is installed and vendored tools (jq, ripgrep, fzf, lazygit) are refreshed automatically by the package manager's postinstall hook.
+
+**On failure:** the exact install command is printed so you can run it yourself.
+
+<details>
+<summary><strong>Background check, configuration, and environment variables</strong></summary>
+
+After each command completes, Valora runs a background check against the npm registry (at most once per day). The check is non-blocking — the banner appears after your command finishes.
+
+The check is automatically suppressed in CI environments (`CI=true`), non-interactive (piped or redirected) sessions, and MCP mode (`AI_MCP_ENABLED=true`).
+
+**Configuration** — add an `autoUpdate` block to `~/.valora/config.json`:
+
+```json
+{
+	"autoUpdate": {
+		"mode": "reminder",
+		"frequencyDays": 1
+	}
+}
+```
+
+| Key             | Type                                     | Default      | Description                            |
+| --------------- | ---------------------------------------- | ------------ | -------------------------------------- |
+| `mode`          | `"reminder"` \| `"disabled"` \| `"auto"` | `"reminder"` | Controls when updates are surfaced     |
+| `frequencyDays` | integer (1–365)                          | `1`          | Minimum days between background checks |
+
+| Mode       | Behaviour                                                                                         |
+| ---------- | ------------------------------------------------------------------------------------------------- |
+| `reminder` | Show a banner when an update is available; you run `valora update` manually. This is the default. |
+| `disabled` | Suppress all background checks and banners. `valora update` still works.                          |
+| `auto`     | Silently install the latest version in the background after each command completes.               |
+
+**Environment variables:**
+
+| Variable                       | Effect                                         |
+| ------------------------------ | ---------------------------------------------- |
+| `VALORA_DISABLE_AUTO_UPDATE=1` | Disable update checks for this invocation only |
+| `CI=true`                      | Update checks are automatically suppressed     |
+
+See [Auto-update guide](./auto-update.md) for troubleshooting and package-manager detection details.
+
+</details>
 
 ---
 

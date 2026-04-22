@@ -7,7 +7,7 @@ import type { getProviderRegistry } from 'llm/registry';
 import type { CommandDefinition } from 'types/command.types';
 import type { MCPSamplingService } from 'types/mcp.types';
 
-import { ProviderName } from 'config/providers.config';
+import { BuiltinProviders } from 'config/providers.config';
 import { getLogger, type Logger } from 'output/logger';
 import { ExecutionError } from 'utils/error-handler';
 
@@ -106,7 +106,7 @@ export class CommandResolver {
 						mode: undefined,
 						model: commandModel,
 						providerConfig: {},
-						providerName: ProviderName.CURSOR,
+						providerName: BuiltinProviders.CURSOR,
 						shouldAttemptFallback: true
 					};
 				}

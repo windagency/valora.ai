@@ -7,39 +7,56 @@ export type PackageManager = 'bun' | 'npm' | 'pnpm' | 'yarn';
 const PACKAGE = '@windagency/valora@latest';
 
 /**
- * Inspects process.execPath to determine which package manager owns the
- * global install. Returns null when the path matches no known signature.
+ * Inspects a normalised (forward-slash) path string and returns the package
+ * manager whose store signature it contains, or null when nothing matches.
+ *
+ * Order is significant: pnpm must be checked before npm because pnpm uses
+ * node_modules internally and would otherwise trigger the npm rule.
  */
-export function detectPackageManager(): null | PackageManager {
-	const execPath = process.execPath.toLowerCase();
+export function detectFromPath(path: string): null | PackageManager {
+	const normalised = path.replace(/\\/g, '/').toLowerCase();
 
-	if (execPath.includes('.local/share/pnpm') || execPath.includes('/pnpm/')) {
+	if (normalised.includes('.local/share/pnpm') || normalised.includes('/pnpm/')) {
 		return 'pnpm';
 	}
-	if (execPath.includes('.bun/install/global')) {
+	if (normalised.includes('.bun/install/global') || normalised.includes('.bun/bin')) {
 		return 'bun';
 	}
-	if (execPath.includes('/yarn/global') || execPath.includes('.config/yarn/global')) {
+	if (normalised.includes('/yarn/global') || normalised.includes('.config/yarn/global')) {
 		return 'yarn';
 	}
-	if (execPath.includes('/lib/node_modules') || execPath.includes('/node_modules')) {
+	if (normalised.includes('/lib/node_modules') || normalised.includes('/node_modules')) {
 		return 'npm';
 	}
 	return null;
 }
 
 /**
+ * Detects which package manager owns the current global Valora install.
+ *
+ * Uses `import.meta.url` as the primary signal (resolves to the actual module
+ * file inside the package manager's global store) and falls back to
+ * `process.execPath` when the module path does not match any known signature.
+ *
+ * Returns null when neither path matches a known package manager.
+ */
+export function detectPackageManager(): null | PackageManager {
+	const fromMeta = detectFromPath(import.meta.url);
+	if (fromMeta !== null) return fromMeta;
+
+	return detectFromPath(process.execPath);
+}
+
+const INSTALL_COMMANDS: Record<PackageManager, string[]> = {
+	bun: ['bun', 'install', '-g', PACKAGE],
+	npm: ['npm', 'install', '-g', PACKAGE],
+	pnpm: ['pnpm', 'add', '-g', PACKAGE],
+	yarn: ['yarn', 'global', 'add', PACKAGE]
+};
+
+/**
  * Returns the install command (argv) for the given package manager.
  */
 export function getInstallCommand(pm: PackageManager): string[] {
-	switch (pm) {
-		case 'bun':
-			return ['bun', 'install', '-g', PACKAGE];
-		case 'npm':
-			return ['npm', 'install', '-g', PACKAGE];
-		case 'pnpm':
-			return ['pnpm', 'add', '-g', PACKAGE];
-		case 'yarn':
-			return ['yarn', 'global', 'add', PACKAGE];
-	}
+	return INSTALL_COMMANDS[pm];
 }

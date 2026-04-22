@@ -195,3 +195,5 @@ export function createCommand(nameAndArgs?: string): CommandAdapter {
 export function createOption(flags: string, description?: string): OptionAdapter {
 	return new CommanderOptionAdapter(flags, description);
 }
+
+export type { Command } from 'commander';

@@ -1,10 +1,19 @@
 import type { HooksConfig } from './hook.types';
 
+export interface CataloguedPlugin {
+	dir: string;
+	location: PluginLocation;
+	manifest: null | PluginManifest;
+	status: 'disabled' | 'enabled' | 'invalid';
+	validationErrors?: string[];
+}
+
 export interface LoadedPlugin {
 	agentsDir?: string;
 	codeEntrypoint?: string;
 	commandsDir?: string;
 	hooks?: HooksConfig;
+	location: PluginLocation;
 	manifest: PluginManifest;
 	mcpsFile?: string;
 	pluginDir: string;
@@ -28,6 +37,8 @@ export type PluginContributionType =
 	| 'mcps'
 	| 'prompts'
 	| 'templates';
+
+export type PluginLocation = 'built-in' | 'global' | 'npm' | 'project' | 'user';
 
 export interface PluginManifest {
 	codeEntrypoint?: string;

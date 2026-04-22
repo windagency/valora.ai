@@ -1,0 +1,65 @@
+======== Resolving module 'tslib' from '/workspaces/valora/src/analysis/analysis.types.ts'. ========
+Explicitly specified module resolution kind: 'Bundler'.
+Resolving in CJS mode with conditions 'import', 'types'.
+'paths' option is specified, looking for a pattern to match module name 'tslib'.
+File '/workspaces/valora/src/analysis/package.json' does not exist.
+File '/workspaces/valora/src/package.json' does not exist.
+Found 'package.json' at '/workspaces/valora/package.json'.
+Loading module 'tslib' from 'node_modules' folder, target file types: TypeScript, JavaScript, Declaration, JSON.
+Searching all ancestor node_modules directories for preferred extensions: TypeScript, Declaration.
+Directory '/workspaces/valora/src/analysis/node_modules' does not exist, skipping all lookups in it.
+Directory '/workspaces/valora/src/node_modules' does not exist, skipping all lookups in it.
+File '/workspaces/valora/node_modules/tslib.ts' does not exist.
+File '/workspaces/valora/node_modules/tslib.tsx' does not exist.
+File '/workspaces/valora/node_modules/tslib.d.ts' does not exist.
+Directory '/workspaces/node_modules' does not exist, skipping all lookups in it.
+Directory '/node_modules' does not exist, skipping all lookups in it.
+======== Module name 'tslib' was not resolved. ========
+======== Resolving module 'react/jsx-runtime' from '/workspaces/valora/src/analysis/analysis.types.ts'. ========
+Explicitly specified module resolution kind: 'Bundler'.
+Resolving in CJS mode with conditions 'import', 'types'.
+'paths' option is specified, looking for a pattern to match module name 'react/jsx-runtime'.
+File '/workspaces/valora/src/analysis/package.json' does not exist according to earlier cached lookups.
+Found 'package.json' at '/workspaces/valora/node_modules/react/package.json'.
+Entering conditional exports.
+Saw non-matching condition 'react-server'.
+Matched 'exports' condition 'default'.
+File '/workspaces/valora/node_modules/react/jsx-runtime.ts' does not exist.
+File '/workspaces/valora/node_modules/react/jsx-runtime.tsx' does not exist.
+File '/workspaces/valora/node_modules/react/jsx-runtime.d.ts' does not exist.
+Failed to resolve under condition 'default'.
+Exiting conditional exports.
+Found 'package.json' at '/workspaces/valora/node_modules/@types/react/package.json'.
+Entering conditional exports.
+Matched 'exports' condition 'types'.
+Using 'exports' subpath './jsx-runtime' with target './jsx-runtime.d.ts'.
+File '/workspaces/valora/node_modules/@types/react/jsx-runtime.d.ts' exists - use it as a name resolution result.
+Resolving real path for '/workspaces/valora/node_modules/@types/react/jsx-runtime.d.ts', result '/workspaces/valora/node_modules/.pnpm/@types+react@19.2.10/node_modules/@types/react/jsx-runtime.d.ts'.
+======== Module name 'react/jsx-runtime' was successfully resolved to '/workspaces/valora/node_modules/.pnpm/@types+react@19.2.10/node_modules/@types/react/jsx-runtime.d.ts' with Package ID '@types/react/jsx-runtime.d.ts@19.2.10'. ========
+======== Resolving module 'ast/ast.types' from '/workspaces/valora/src/analysis/analysis.types.ts'. ========
+Explicitly specified module resolution kind: 'Bundler'.
+Resolving in CJS mode with conditions 'import', 'types'.
+'paths' option is specified, looking for a pattern to match module name 'ast/ast.types'.
+Module name 'ast/ast.types', matched pattern 'ast/*'.
+Trying substitution './src/ast/*', candidate module location: './src/ast/ast.types'.
+File '/workspaces/valora/src/ast/ast.types.ts' exists - use it as a name resolution result.
+======== Module name 'ast/ast.types' was successfully resolved to '/workspaces/valora/src/ast/ast.types.ts'. ========
+======== Resolving module 'missing-module' from '/workspaces/valora/src/executor/output-compression.service.ts'. ========
+Explicitly specified module resolution kind: 'Bundler'.
+Resolving in CJS mode with conditions 'import', 'types'.
+'paths' option is specified, looking for a pattern to match module name 'missing-module'.
+No 'paths' pattern matched module name 'missing-module'.
+File '/workspaces/valora/src/executor/package.json' does not exist.
+Loading module 'missing-module' from 'node_modules' folder, target file types: TypeScript, JavaScript, Declaration, JSON.
+Directory '/workspaces/valora/src/executor/node_modules' does not exist, skipping all lookups in it.
+File '/workspaces/valora/node_modules/missing-module.ts' does not exist.
+File '/workspaces/valora/node_modules/missing-module.tsx' does not exist.
+File '/workspaces/valora/node_modules/missing-module.d.ts' does not exist.
+File '/workspaces/valora/node_modules/@types/missing-module.d.ts' does not exist.
+======== Module name 'missing-module' was not resolved. ========
+src/executor/output-compression.service.ts:1:23 - error TS2307: Cannot find module 'missing-module' or its corresponding type declarations.
+
+1 import type { Foo } from 'missing-module';
+                            ~~~~~~~~~~~~~~~~
+
+Found 1 error.

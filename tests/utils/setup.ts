@@ -22,14 +22,9 @@ let testcontainersAvailable = false;
 let testcontainersHelper: any = null;
 
 async function initializeTestcontainersHelper() {
-	try {
-		const { TestcontainersHelper } = await import('./testcontainers-helper.js');
-		testcontainersHelper = new TestcontainersHelper();
-		testcontainersAvailable = true;
-	} catch (_error) {
-		console.warn('Testcontainers not available, running tests without containerized dependencies');
-		testcontainersAvailable = false;
-	}
+	const { TestcontainersHelper } = await import('./testcontainers-helper.js');
+	testcontainersHelper = new TestcontainersHelper();
+	testcontainersAvailable = true;
 }
 
 /**
@@ -44,14 +39,9 @@ beforeAll(
 			await initializeTestcontainersHelper();
 
 			if (testcontainersAvailable && testcontainersHelper) {
-				try {
-					await testcontainersHelper.startSharedContainers();
-					process.env.AI_TEST_DATABASE_URL = await testcontainersHelper.getDatabaseUrl();
-					process.env.AI_TEST_REDIS_URL = await testcontainersHelper.getRedisUrl();
-				} catch (error) {
-					console.warn('Failed to start testcontainers, continuing without containers:', error);
-					testcontainersAvailable = false;
-				}
+				await testcontainersHelper.startSharedContainers();
+				process.env.AI_TEST_DATABASE_URL = await testcontainersHelper.getDatabaseUrl();
+				process.env.AI_TEST_REDIS_URL = await testcontainersHelper.getRedisUrl();
 			}
 		}
 

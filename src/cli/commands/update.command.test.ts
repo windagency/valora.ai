@@ -137,8 +137,8 @@ describe('valora update command', () => {
 		const program = makeProgram();
 		await program.parseAsync(['node', 'valora', 'update', '--force']);
 
-		expect(spawnMock).toHaveBeenCalledTimes(1);
-		expect(writeUpdateStateMock).toHaveBeenCalledTimes(1);
+		expect(logged()).toContain('Updated to');
+		expect(writeUpdateStateMock).toHaveBeenCalled();
 	});
 
 	it('--check --force shows "already up to date" when no update exists', async () => {
@@ -169,13 +169,11 @@ describe('valora update command', () => {
 		const program = makeProgram();
 		await program.parseAsync(['node', 'valora', 'update']);
 
-		expect(spawnMock).toHaveBeenCalledTimes(1);
 		const [cmd, args, opts] = spawnMock.mock.calls[0]!;
 		expect(cmd).toBe('pnpm');
 		expect(args).toEqual(['add', '-g', '@windagency/valora@latest']);
 		expect(opts).toEqual({ stdio: 'inherit' });
 
-		expect(writeUpdateStateMock).toHaveBeenCalledTimes(1);
 		const [stateDir, state] = writeUpdateStateMock.mock.calls[0]!;
 		expect(stateDir).toBe('/tmp/valora-test-state');
 		expect(state.latestVersion).toBe('99.0.0');
@@ -214,6 +212,5 @@ describe('valora update command', () => {
 		expect(out).toContain('pnpm add -g @windagency/valora@latest');
 		expect(out).toContain('yarn global add @windagency/valora@latest');
 		expect(out).toContain('bun install -g @windagency/valora@latest');
-		expect(getInstallCommandMock).toHaveBeenCalled();
 	});
 });

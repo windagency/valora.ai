@@ -542,10 +542,14 @@ export async function loadAvailableAgents(agentRoles: string[]): Promise<null | 
 
 	logger.debug('Loading available agents for pre-injection', { roles: agentRoles });
 
-	// Load agent files
+	// Collect search dirs: primary data/agents first, then each loaded plugin's agentsDir
 	const { getPackageDataDir } = await import('utils/paths');
-	const agentsDir = path.join(getPackageDataDir(), 'agents');
-	const loadedAgents = await loadAgentFiles(agentsDir, agentRoles, logger);
+	const { getLoadedPlugins } = await import('di/container');
+	const primaryDir = path.join(getPackageDataDir(), 'agents');
+	const pluginAgentDirs = getLoadedPlugins()
+		.map((p) => p.agentsDir)
+		.filter((d): d is string => !!d);
+	const loadedAgents = await loadAgentFiles([primaryDir, ...pluginAgentDirs], agentRoles, logger);
 
 	if (loadedAgents.length === 0) {
 		logger.debug('No agent files found', { requestedRoles: agentRoles });
@@ -594,34 +598,34 @@ function getCachedAgents(
  * Load agent files from disk
  */
 async function loadAgentFiles(
-	agentsDir: string,
+	dirs: string[],
 	agentRoles: string[],
 	logger: ReturnType<typeof getLogger>
 ): Promise<Array<{ content: string; role: string }>> {
 	const loadedAgents: Array<{ content: string; role: string }> = [];
 
 	for (const role of agentRoles) {
-		const agentFile = path.join(agentsDir, `${role}.md`);
+		let found = false;
 
-		if (!fileExists(agentFile)) {
-			logger.warn(`Agent file not found: ${role}`, { path: agentFile });
-			continue;
+		for (const dir of dirs) {
+			const agentFile = path.join(dir, `${role}.md`);
+			if (!fileExists(agentFile)) continue;
+
+			try {
+				const content = await readFile(agentFile);
+				if (content.trim()) {
+					loadedAgents.push({ content: content.trim(), role });
+					logger.debug(`Loaded agent file: ${role}`, { contentLength: content.length });
+					found = true;
+					break;
+				}
+			} catch (error) {
+				logger.warn(`Failed to read agent file: ${role}`, { error: (error as Error).message });
+			}
 		}
 
-		try {
-			const content = await readFile(agentFile);
-
-			if (content.trim()) {
-				loadedAgents.push({
-					content: content.trim(),
-					role
-				});
-				logger.debug(`Loaded agent file: ${role}`, { contentLength: content.length });
-			}
-		} catch (error) {
-			logger.warn(`Failed to read agent file: ${role}`, {
-				error: (error as Error).message
-			});
+		if (!found) {
+			logger.warn(`Agent file not found: ${role}`, { path: path.join(dirs[0] ?? '', `${role}.md`) });
 		}
 	}
 

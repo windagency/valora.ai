@@ -1,7 +1,9 @@
+import type { ProviderDescriptor } from 'plugins/plugin-api.types';
+
 import type { LLMProvider, ProviderFactory } from 'types/llm.types';
 import type { MCPSamplingService } from 'types/mcp.types';
 
-import { ProviderName } from 'config/providers.config';
+import { BuiltinProviders } from 'config/providers.config';
 import { getLogger } from 'output/logger';
 import { ProviderError } from 'utils/error-handler';
 
@@ -11,20 +13,24 @@ export interface RegisterProviderOptions {
 }
 
 type ProviderClass = new (config: Record<string, unknown>) => LLMProvider;
+type ProviderEntry = ProviderClass | ProviderFactoryFn;
+type ProviderFactoryFn = (config: Record<string, unknown>) => LLMProvider;
 
 export class LLMProviderRegistry implements ProviderFactory {
+	private providerDescriptors: Map<string, ProviderDescriptor>;
 	private providerOwners: Map<string, string>;
-	private providers: Map<string, ProviderClass>;
+	private providers: Map<string, ProviderEntry>;
 
 	constructor() {
+		this.providerDescriptors = new Map();
 		this.providers = new Map();
 		this.providerOwners = new Map();
 	}
 
 	createProvider(providerName: string, config: Record<string, unknown>, mcpSampling?: MCPSamplingService): LLMProvider {
-		const providerClass = this.providers.get(providerName);
+		const providerEntry = this.providers.get(providerName);
 
-		if (!providerClass) {
+		if (!providerEntry) {
 			throw new ProviderError(`Unknown provider: ${providerName}`, {
 				available: this.getAvailableProviders(),
 				provider: providerName
@@ -32,19 +38,23 @@ export class LLMProviderRegistry implements ProviderFactory {
 		}
 
 		let provider: LLMProvider;
-		if (providerName === ProviderName.CURSOR) {
+		if (providerName === BuiltinProviders.CURSOR) {
 			type CursorProviderConstructor = new (
 				config: Record<string, unknown>,
 				mcpSampling?: MCPSamplingService
 			) => LLMProvider;
-			const cursorProviderClass = providerClass as unknown as CursorProviderConstructor;
+			const cursorProviderClass = providerEntry as unknown as CursorProviderConstructor;
 			provider = new cursorProviderClass(config, mcpSampling ?? undefined);
+		} else if (providerEntry.prototype) {
+			// It's a class constructor
+			provider = new (providerEntry as ProviderClass)(config);
 		} else {
-			provider = new providerClass(config);
+			// It's a plain factory function
+			provider = (providerEntry as ProviderFactoryFn)(config);
 		}
 
 		if (!provider.isConfigured()) {
-			if (providerName === ProviderName.CURSOR) {
+			if (providerName === BuiltinProviders.CURSOR) {
 				throw new ProviderError(
 					`Cursor provider requires MCP context (must run in Cursor via MCP).\n\n` +
 						`If you're in Cursor and seeing this error, Cursor may not support MCP sampling yet.\n` +
@@ -69,6 +79,10 @@ export class LLMProviderRegistry implements ProviderFactory {
 		return Array.from(this.providers.keys());
 	}
 
+	getDescriptor(name: string): ProviderDescriptor | undefined {
+		return this.providerDescriptors.get(name);
+	}
+
 	getOwner(name: string): string | undefined {
 		return this.providerOwners.get(name);
 	}
@@ -77,7 +91,12 @@ export class LLMProviderRegistry implements ProviderFactory {
 		return this.providers.has(name);
 	}
 
-	registerProvider(name: string, providerClass: ProviderClass, options: RegisterProviderOptions = {}): void {
+	registerProvider(
+		name: string,
+		providerEntry: ProviderEntry,
+		options: RegisterProviderOptions = {},
+		descriptor?: ProviderDescriptor
+	): void {
 		const { override = false, owner = 'core' } = options;
 
 		if (this.providers.has(name)) {
@@ -98,8 +117,11 @@ export class LLMProviderRegistry implements ProviderFactory {
 			});
 		}
 
-		this.providers.set(name, providerClass);
+		this.providers.set(name, providerEntry);
 		this.providerOwners.set(name, owner);
+		if (descriptor) {
+			this.providerDescriptors.set(name, descriptor);
+		}
 	}
 }
 

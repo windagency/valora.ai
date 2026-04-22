@@ -18,6 +18,11 @@ import type { ExecutionContext } from './execution-context';
 import { type DryRunCacheEntry, getDryRunCache } from './dry-run-cache';
 import { DryRunExecutionStrategy } from './dry-run-strategy';
 
+/**
+ * Register plugin-contributed agent and prompt directories on freshly created loaders.
+ * Must be called after `initializePlugins` has run; uses the module-level plugin list
+ * populated by `di/container.initializePlugins`.
+ */
 export interface CommandExecutionStrategy {
 	/**
 	 * Check if this strategy can handle the given command and options
@@ -28,6 +33,17 @@ export interface CommandExecutionStrategy {
 	 * Execute the command using this strategy
 	 */
 	execute(command: CommandDefinition, context: ExecutionContext): Promise<CommandResult>;
+}
+
+export async function registerPluginDirsOnLoaders(
+	agentLoader: { registerPluginDir(dir: string): void },
+	promptLoader: { registerPluginPromptsDir(dir: string): void }
+): Promise<void> {
+	const { getLoadedPlugins } = await import('di/container');
+	for (const plugin of getLoadedPlugins()) {
+		if (plugin.agentsDir) agentLoader.registerPluginDir(plugin.agentsDir);
+		if (plugin.promptsDir) promptLoader.registerPluginPromptsDir(plugin.promptsDir);
+	}
 }
 
 /**
@@ -170,6 +186,7 @@ export class PipelineExecutionStrategy implements CommandExecutionStrategy {
 		// Create loaders with pre-populated caches from dry-run
 		const promptLoader = new promptLoaderModule.PromptLoader();
 		const agentLoader = new agentLoaderModule.AgentLoader();
+		await registerPluginDirsOnLoaders(agentLoader, promptLoader);
 
 		// Pre-populate prompt loader cache with cached prompts
 		if (cachedEntry.preloadedPrompts && cachedEntry.preloadedPrompts.length > 0) {
@@ -226,6 +243,7 @@ export class PipelineExecutionStrategy implements CommandExecutionStrategy {
 
 		const promptLoader = new promptLoaderModule.PromptLoader();
 		const agentLoader = new agentLoaderModule.AgentLoader();
+		await registerPluginDirsOnLoaders(agentLoader, promptLoader);
 		const pipelineExecutor = new pipelineModule.PipelineExecutor(promptLoader, agentLoader);
 		return pipelineExecutor.execute(stages, { executionContext: context });
 	}
@@ -257,6 +275,7 @@ export class IsolatedExecutionStrategy implements CommandExecutionStrategy {
 
 		const promptLoader = new promptLoaderModule.PromptLoader();
 		const agentLoader = new agentLoaderModule.AgentLoader();
+		await registerPluginDirsOnLoaders(agentLoader, promptLoader);
 		const stageExecutor = new stageExecutorModule.StageExecutor(promptLoader, agentLoader);
 		const isolationExecutor = new isolationExecutorModule.CommandIsolationExecutor(stageExecutor);
 		return isolationExecutor.executeIsolated(command.name, command.prompts.pipeline, context.isolation ?? {}, context);

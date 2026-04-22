@@ -4,6 +4,8 @@
 
 import * as path from 'path';
 
+import { getProviderRegistry } from 'llm/registry';
+import { getLogger } from 'output/logger';
 import { ConfigurationError } from 'utils/error-handler';
 import { formatErrorMessage } from 'utils/error-utils';
 import { ensureDir, fileExists, readJSON, writeJSON } from 'utils/file-utils';
@@ -72,6 +74,7 @@ export class ConfigLoader {
 
 		try {
 			this.config = CONFIG_SCHEMA.parse(mergedConfig);
+			this.warnUnknownProviders();
 			this.autoMigrateDefaultProvider();
 			return this.config;
 		} catch (error) {
@@ -130,6 +133,23 @@ export class ConfigLoader {
 		} catch {
 			// Non-fatal: skip invalid project config
 			return {};
+		}
+	}
+
+	/**
+	 * Emit a one-time warning for any provider key in config that has no registered descriptor.
+	 */
+	private warnUnknownProviders(): void {
+		if (!this.config?.providers) {
+			return;
+		}
+		for (const key of Object.keys(this.config.providers)) {
+			if (!getProviderRegistry().getDescriptor(key) && !warnedUnknownProviders.has(key)) {
+				warnedUnknownProviders.add(key);
+				getLogger().warn(
+					`Provider "${key}" is configured but no plugin registers it — install the plugin or remove the entry`
+				);
+			}
 		}
 	}
 
@@ -201,8 +221,8 @@ export class ConfigLoader {
 		const vertexProjectId = process.env['ANTHROPIC_VERTEX_PROJECT_ID'];
 
 		if (useVertex && config.providers) {
-			config.providers.anthropic = {
-				...(config.providers.anthropic ?? {}),
+			config.providers['anthropic'] = {
+				...(config.providers['anthropic'] ?? {}),
 				vertexAI: useVertex === '1' || useVertex.toLowerCase() === 'true',
 				vertexProjectId: vertexProjectId,
 				vertexRegion: vertexRegion
@@ -534,6 +554,16 @@ export class ConfigLoader {
 		this.config = null;
 		return this.load();
 	}
+}
+
+// Tracks provider keys that have already been warned about in this process run
+const warnedUnknownProviders = new Set<string>();
+
+/**
+ * Resets the warned-unknown-providers tracking set. Intended for use in tests only.
+ */
+export function resetUnknownProviderWarningsForTests(): void {
+	warnedUnknownProviders.clear();
 }
 
 // Singleton instance

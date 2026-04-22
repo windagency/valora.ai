@@ -5,7 +5,7 @@ import path from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { scheduleUpdateCheck, settleUpdateCheck } from './index';
+import { resetPendingUpdateCheck, scheduleUpdateCheck, settleUpdateCheck } from './index';
 import { DEFAULT_STATE, readUpdateState, writeUpdateState } from './state';
 import type { UpdateCheckState } from './throttle';
 
@@ -15,7 +15,8 @@ let fetchSpy: ReturnType<typeof vi.spyOn>;
 beforeEach(async () => {
 	tmpDir = path.join(os.tmpdir(), `valora-updater-idx-${randomUUID()}`);
 	await fs.mkdir(tmpDir, { recursive: true });
-	// drain any pending from a previous test before starting the next
+	// reset the singleton and drain any in-flight fetch from a previous test
+	resetPendingUpdateCheck();
 	await settleUpdateCheck(0);
 	fetchSpy = vi.spyOn(globalThis, 'fetch');
 });
@@ -97,5 +98,20 @@ describe('settleUpdateCheck', () => {
 		expect(settled?.lastCheckAt).toBe(now.toISOString());
 		// lastSuccessAt remains null because fetch failed
 		expect(settled?.lastSuccessAt).toBeNull();
+	});
+
+	it('ignores a second scheduleUpdateCheck call while one is already pending', async () => {
+		fetchSpy.mockResolvedValue(new Response(JSON.stringify({ version: '2.6.0' }), { status: 200 }));
+
+		const now = new Date('2026-04-20T12:00:00Z');
+		// Call twice — second call must be a no-op (first-write-wins)
+		scheduleUpdateCheck(tmpDir, '2.5.0', 7, now);
+		scheduleUpdateCheck(tmpDir, '2.5.1', 7, now);
+		await flushAsync();
+
+		await settleUpdateCheck(1000);
+
+		// fetch must have been invoked at most once, not twice
+		expect(fetchSpy).toHaveBeenCalledTimes(1);
 	});
 });

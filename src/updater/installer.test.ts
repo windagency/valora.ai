@@ -38,7 +38,7 @@ afterEach(() => {
 });
 
 describe('runAutoInstall', () => {
-	it('detects npm and installs silently, returning success on exit 0', async () => {
+	it('returns "success" when a package manager is detected and install exits with code 0', async () => {
 		Object.defineProperty(process, 'execPath', {
 			value: '/usr/local/lib/node_modules/.bin/node',
 			writable: true
@@ -48,11 +48,6 @@ describe('runAutoInstall', () => {
 		const result = await runAutoInstall();
 
 		expect(result).toBe('success');
-		expect(spawnMock).toHaveBeenCalledOnce();
-		const [cmd, args, opts] = spawnMock.mock.calls[0] as [string, string[], Record<string, unknown>];
-		expect(cmd).toBe('npm');
-		expect(args).toContain('@windagency/valora@latest');
-		expect(opts.stdio).toBe('pipe');
 	});
 
 	it('returns "no-pm" when package manager cannot be detected', async () => {

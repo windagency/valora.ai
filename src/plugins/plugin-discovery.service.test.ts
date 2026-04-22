@@ -19,7 +19,8 @@ vi.mock('output/logger', () => ({
 vi.mock('utils/paths', () => ({
 	getGlobalPluginsDir: vi.fn(() => '/nonexistent/global'),
 	getPackagePluginsDir: vi.fn(() => '/nonexistent/builtin'),
-	getProjectPluginsDir: vi.fn(() => undefined)
+	getProjectPluginsDir: vi.fn(() => undefined),
+	getSystemPluginsDir: vi.fn(() => '/nonexistent/system')
 }));
 
 function writeJson(filePath: string, data: unknown): void {
@@ -74,9 +75,10 @@ describe('PluginDiscoveryService — npm plugin discovery', () => {
 		expect(dirs).not.toContain(nonPluginDir);
 	});
 
-	it('returns empty array (not throws) when node_modules/@windagency does not exist', () => {
+	it('returns empty array when node_modules/@windagency does not exist', () => {
 		// tmpDir has no node_modules at all
-		expect(() => discovery.discoverPluginDirs()).not.toThrow();
+		const dirs = discovery.discoverPluginDirs();
+		expect(dirs).toEqual([]);
 	});
 
 	it('discovers multiple plugins from the same scope directory', () => {
@@ -107,5 +109,105 @@ describe('PluginDiscoveryService — npm plugin discovery', () => {
 		const dirs = discovery.discoverPluginDirs();
 
 		expect(dirs.indexOf(builtinPluginDir)).toBeLessThan(dirs.indexOf(npmPluginDir));
+	});
+});
+
+describe('PluginDiscoveryService — discoverWithSource()', () => {
+	let tmpDir: string;
+
+	beforeEach(() => {
+		tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'valora-discovery-src-test-'));
+	});
+
+	afterEach(() => {
+		fs.rmSync(tmpDir, { recursive: true, force: true });
+	});
+
+	it('labels a plugin found in the built-in root as built-in', async () => {
+		const { getPackagePluginsDir } = await import('utils/paths');
+		const builtinRoot = path.join(tmpDir, 'builtin');
+		const pluginDir = path.join(builtinRoot, 'my-builtin');
+		writeJson(path.join(pluginDir, 'valora-plugin.json'), { name: 'my-builtin', version: '1.0.0' });
+		vi.mocked(getPackagePluginsDir).mockReturnValueOnce(builtinRoot);
+
+		const discovery = new PluginDiscoveryService(tmpDir);
+		const results = discovery.discoverWithSource();
+
+		expect(results).toContainEqual({ dir: pluginDir, location: 'built-in' });
+	});
+
+	it('labels a plugin found in the global user root as user', async () => {
+		const { getGlobalPluginsDir } = await import('utils/paths');
+		const userRoot = path.join(tmpDir, 'user-plugins');
+		const pluginDir = path.join(userRoot, 'my-user-plugin');
+		writeJson(path.join(pluginDir, 'valora-plugin.json'), { name: 'my-user-plugin', version: '1.0.0' });
+		vi.mocked(getGlobalPluginsDir).mockReturnValueOnce(userRoot);
+
+		const discovery = new PluginDiscoveryService(tmpDir);
+		const results = discovery.discoverWithSource();
+
+		expect(results).toContainEqual({ dir: pluginDir, location: 'user' });
+	});
+
+	it('labels a plugin found in the project root as project', async () => {
+		const { getProjectPluginsDir } = await import('utils/paths');
+		const projectRoot = path.join(tmpDir, 'project-plugins');
+		const pluginDir = path.join(projectRoot, 'my-project-plugin');
+		writeJson(path.join(pluginDir, 'valora-plugin.json'), { name: 'my-project-plugin', version: '1.0.0' });
+		vi.mocked(getProjectPluginsDir).mockReturnValueOnce(projectRoot);
+
+		const discovery = new PluginDiscoveryService(tmpDir);
+		const results = discovery.discoverWithSource();
+
+		expect(results).toContainEqual({ dir: pluginDir, location: 'project' });
+	});
+
+	it('labels a plugin found in node_modules/@windagency as npm', () => {
+		const pluginDir = path.join(tmpDir, 'node_modules', '@windagency', 'valora-plugin-engineering');
+		writeJson(path.join(pluginDir, 'valora-plugin.json'), { name: 'valora-core-engineering', version: '1.0.0' });
+
+		const discovery = new PluginDiscoveryService(tmpDir);
+		const results = discovery.discoverWithSource();
+
+		expect(results).toContainEqual({ dir: pluginDir, location: 'npm' });
+	});
+
+	it('returns an empty array when no plugins exist in any root', () => {
+		const discovery = new PluginDiscoveryService(tmpDir);
+		expect(discovery.discoverWithSource()).toEqual([]);
+	});
+
+	it('labels a plugin found in the system root as global', async () => {
+		const { getSystemPluginsDir } = await import('utils/paths');
+		const systemRoot = path.join(tmpDir, 'system-plugins');
+		const pluginDir = path.join(systemRoot, 'my-system-plugin');
+		writeJson(path.join(pluginDir, 'valora-plugin.json'), { name: 'my-system-plugin', version: '1.0.0' });
+		vi.mocked(getSystemPluginsDir).mockReturnValueOnce(systemRoot);
+
+		const discovery = new PluginDiscoveryService(tmpDir);
+		const results = discovery.discoverWithSource();
+
+		expect(results).toContainEqual({ dir: pluginDir, location: 'global' });
+	});
+
+	it('places global plugins before user plugins so user copy takes precedence', async () => {
+		const { getSystemPluginsDir, getGlobalPluginsDir } = await import('utils/paths');
+		const systemRoot = path.join(tmpDir, 'system-plugins');
+		const userRoot = path.join(tmpDir, 'user-plugins');
+		const systemPluginDir = path.join(systemRoot, 'shared-plugin');
+		const userPluginDir = path.join(userRoot, 'shared-plugin');
+		writeJson(path.join(systemPluginDir, 'valora-plugin.json'), { name: 'shared-plugin', version: '1.0.0' });
+		writeJson(path.join(userPluginDir, 'valora-plugin.json'), { name: 'shared-plugin', version: '1.0.0' });
+		vi.mocked(getSystemPluginsDir).mockReturnValueOnce(systemRoot);
+		vi.mocked(getGlobalPluginsDir).mockReturnValueOnce(userRoot);
+
+		const discovery = new PluginDiscoveryService(tmpDir);
+		const results = discovery.discoverWithSource();
+
+		const globalIdx = results.findIndex((r) => r.location === 'global');
+		const userIdx = results.findIndex((r) => r.location === 'user');
+		expect(globalIdx).toBeGreaterThanOrEqual(0);
+		expect(userIdx).toBeGreaterThanOrEqual(0);
+		expect(globalIdx).toBeLessThan(userIdx);
 	});
 });

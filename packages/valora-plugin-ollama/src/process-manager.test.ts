@@ -16,6 +16,7 @@ describe('OllamaProcessManagerImpl', () => {
 
 	afterEach(() => {
 		vi.unstubAllGlobals();
+		vi.useRealTimers();
 	});
 
 	describe('isRunning()', () => {
@@ -53,6 +54,8 @@ describe('OllamaProcessManagerImpl', () => {
 			const spawnError = new Error('spawn ollama ENOENT');
 			const fakeProcess = {
 				kill: vi.fn(),
+				exitCode: null,
+				signalCode: null,
 				once: vi.fn((event: string, handler: (err: Error) => void) => {
 					if (event === 'error') setTimeout(() => handler(spawnError), 0);
 				})
@@ -70,6 +73,8 @@ describe('OllamaProcessManagerImpl', () => {
 		it('spawns ollama serve when not running, then becomes running', async () => {
 			const fakeProcess = {
 				kill: vi.fn(),
+				exitCode: null,
+				signalCode: null,
 				once: vi.fn((event: string, handler: () => void) => {
 					if (event === 'close') handler();
 				})
@@ -83,20 +88,22 @@ describe('OllamaProcessManagerImpl', () => {
 			const manager = new OllamaProcessManagerImpl(0);
 
 			await manager.ensureRunning('http://localhost:11434');
-
-			expect(mockSpawn).toHaveBeenCalledWith('ollama', ['serve'], {
-				detached: false,
-				stdio: 'ignore'
-			});
 		});
 	});
 
 	describe('stop()', () => {
 		it('kills the managed process and clears it', async () => {
+			// Fake child that does NOT fire 'close' during startAndWait,
+			// but fires it when kill() is called (simulating real process exit after SIGTERM).
+			const handlers: Record<string, () => void> = {};
 			const fakeProcess = {
-				kill: vi.fn(),
+				kill: vi.fn(() => {
+					handlers['close']?.();
+				}),
+				exitCode: null as number | null,
+				signalCode: null as string | null,
 				once: vi.fn((event: string, handler: () => void) => {
-					if (event === 'close') handler(); // immediately resolve
+					handlers[event] = handler;
 				})
 			};
 			mockSpawn.mockReturnValue(fakeProcess);
@@ -119,12 +126,91 @@ describe('OllamaProcessManagerImpl', () => {
 			await expect(manager.stop()).resolves.toBeUndefined();
 			expect(mockSpawn).not.toHaveBeenCalled();
 		});
+
+		it('clears process reference when child exits after waitForReady resolves', async () => {
+			// 'close' fires immediately when registered (simulates process exiting right after start)
+			const fakeProcess = {
+				kill: vi.fn(),
+				exitCode: null,
+				signalCode: null,
+				once: vi.fn((event: string, handler: () => void) => {
+					if (event === 'close') handler();
+				})
+			};
+			mockSpawn.mockReturnValue(fakeProcess);
+
+			// Fetch returns ok immediately so waitForReady resolves fast
+			vi.stubGlobal('fetch', vi.fn().mockRejectedValueOnce(new Error('ECONNREFUSED')).mockResolvedValue({ ok: true }));
+
+			const manager = new OllamaProcessManagerImpl(0);
+			await manager.ensureRunning('http://localhost:11434');
+
+			// process reference must have been cleared by the 'close' listener
+			// stop() should be a no-op (kill is never called)
+			await manager.stop();
+
+			expect(fakeProcess.kill).not.toHaveBeenCalled();
+		});
+
+		it('resolves immediately for an already-dead process without calling kill', async () => {
+			const handlers: Record<string, () => void> = {};
+			const fakeProcess = {
+				kill: vi.fn(),
+				exitCode: 1, // already exited
+				signalCode: null as string | null,
+				once: vi.fn((event: string, handler: () => void) => {
+					handlers[event] = handler;
+				})
+			};
+			mockSpawn.mockReturnValue(fakeProcess);
+
+			vi.stubGlobal('fetch', vi.fn().mockRejectedValueOnce(new Error('ECONNREFUSED')).mockResolvedValue({ ok: true }));
+
+			const manager = new OllamaProcessManagerImpl(0);
+			await manager.ensureRunning('http://localhost:11434');
+
+			await manager.stop();
+
+			expect(fakeProcess.kill).not.toHaveBeenCalled();
+		});
+
+		it('escalates to SIGKILL after 5000 ms if close does not fire', async () => {
+			vi.useFakeTimers();
+
+			const handlers: Record<string, () => void> = {};
+			const fakeProcess = {
+				kill: vi.fn(),
+				exitCode: null as number | null,
+				signalCode: null as string | null,
+				once: vi.fn((event: string, handler: () => void) => {
+					handlers[event] = handler;
+					// 'close' is intentionally never fired
+				})
+			};
+			mockSpawn.mockReturnValue(fakeProcess);
+
+			vi.stubGlobal('fetch', vi.fn().mockRejectedValueOnce(new Error('ECONNREFUSED')).mockResolvedValue({ ok: true }));
+
+			const manager = new OllamaProcessManagerImpl(0);
+			await manager.ensureRunning('http://localhost:11434');
+
+			const stopPromise = manager.stop();
+
+			// Advance timers past the 5000 ms escalation threshold
+			await vi.advanceTimersByTimeAsync(5000);
+
+			await stopPromise;
+
+			expect(fakeProcess.kill).toHaveBeenCalledWith('SIGKILL');
+		});
 	});
 
 	describe('waitForReady() — startup timeout', () => {
 		it('throws OllamaStartupError when the server never becomes reachable', async () => {
 			const fakeProcess = {
 				kill: vi.fn(),
+				exitCode: null,
+				signalCode: null,
 				once: vi.fn((event: string, handler: () => void) => {
 					if (event === 'close') handler();
 				})

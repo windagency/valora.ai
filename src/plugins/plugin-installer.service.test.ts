@@ -1,0 +1,420 @@
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
+
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import {
+	type ProcessRunner,
+	PluginInstallerService,
+	resolvePackageName,
+	shortNameFromPackage
+} from './plugin-installer.service';
+
+vi.mock('utils/paths', () => ({
+	getGlobalPluginsDir: vi.fn(() => '/mock/global/plugins'),
+	getProjectPluginsDir: vi.fn(() => null),
+	getSystemPluginsDir: vi.fn(() => '/mock/system/plugins')
+}));
+
+interface MockRunnerOptions {
+	packCode?: number;
+	packCodeByShortName?: Record<string, number>;
+	tarCode?: number;
+	manifests?: Record<string, object>;
+}
+
+function makeMockRunner(overrides?: MockRunnerOptions): ProcessRunner & { packCalls: string[] } {
+	const packCalls: string[] = [];
+	return {
+		packCalls,
+		run: vi.fn(async (argv: string[]) => {
+			if (argv[0] === 'npm' && argv[1] === 'pack') {
+				const pkgArg = argv[2] as string;
+				const shortName = pkgArg.startsWith('@') ? (pkgArg.split('/')[1] ?? pkgArg) : path.basename(pkgArg);
+				packCalls.push(shortName);
+
+				if (overrides?.packCodeByShortName?.[shortName] !== undefined) {
+					return overrides.packCodeByShortName[shortName];
+				}
+				if ((overrides?.packCode ?? 0) !== 0) return overrides!.packCode!;
+
+				const destIdx = argv.indexOf('--pack-destination');
+				const destDir = argv[destIdx + 1];
+				if (destDir) {
+					fs.writeFileSync(path.join(destDir, `${shortName}-1.0.0.tgz`), '');
+				}
+				return 0;
+			}
+			if (argv[0] === 'tar') {
+				if (overrides?.manifests) {
+					const cIdx = argv.indexOf('-C');
+					const targetDir = argv[cIdx + 1] as string | undefined;
+					if (targetDir) {
+						const shortName = path.basename(targetDir);
+						const manifest = overrides.manifests[shortName];
+						if (manifest) {
+							fs.writeFileSync(path.join(targetDir, 'valora-plugin.json'), JSON.stringify(manifest));
+						}
+					}
+				}
+				return overrides?.tarCode ?? 0;
+			}
+			return 0;
+		})
+	};
+}
+
+describe('resolvePackageName', () => {
+	it('expands a bare short name to the full scoped package', () => {
+		expect(resolvePackageName('compression-universal')).toBe('@windagency/valora-plugin-compression-universal');
+	});
+
+	it('expands a name that already has the valora-plugin- prefix', () => {
+		expect(resolvePackageName('valora-plugin-rtk')).toBe('@windagency/valora-plugin-rtk');
+	});
+
+	it('leaves a full @scope/name unchanged', () => {
+		expect(resolvePackageName('@windagency/valora-plugin-rtk')).toBe('@windagency/valora-plugin-rtk');
+	});
+
+	it('leaves an arbitrary third-party scoped package unchanged', () => {
+		expect(resolvePackageName('@other/some-plugin')).toBe('@other/some-plugin');
+	});
+});
+
+describe('shortNameFromPackage', () => {
+	it('extracts the package name from a scoped package', () => {
+		expect(shortNameFromPackage('@windagency/valora-plugin-rtk')).toBe('valora-plugin-rtk');
+	});
+
+	it('returns an unscoped package name unchanged', () => {
+		expect(shortNameFromPackage('valora-plugin-rtk')).toBe('valora-plugin-rtk');
+	});
+});
+
+describe('PluginInstallerService', () => {
+	let tmpTarget: string;
+
+	beforeEach(() => {
+		tmpTarget = fs.mkdtempSync(path.join(os.tmpdir(), 'valora-install-target-'));
+	});
+
+	afterEach(() => {
+		fs.rmSync(tmpTarget, { recursive: true, force: true });
+		vi.resetAllMocks();
+	});
+
+	describe('user scope', () => {
+		it('invokes npm pack with the resolved package name', async () => {
+			const { getGlobalPluginsDir } = await import('utils/paths');
+			vi.mocked(getGlobalPluginsDir).mockReturnValue(tmpTarget);
+
+			const runner = makeMockRunner();
+			await new PluginInstallerService(runner).install('rtk', 'user');
+
+			expect(runner.run).toHaveBeenCalledWith(expect.arrayContaining(['npm', 'pack', '@windagency/valora-plugin-rtk']));
+		});
+
+		it('extracts the tarball into a subdirectory of the global plugins root', async () => {
+			const { getGlobalPluginsDir } = await import('utils/paths');
+			vi.mocked(getGlobalPluginsDir).mockReturnValue(tmpTarget);
+
+			const runner = makeMockRunner();
+			await new PluginInstallerService(runner).install('rtk', 'user');
+
+			expect(runner.run).toHaveBeenCalledWith(
+				expect.arrayContaining(['-C', path.join(tmpTarget, 'valora-plugin-rtk')])
+			);
+		});
+
+		it('creates the target directory when it does not already exist', async () => {
+			const { getGlobalPluginsDir } = await import('utils/paths');
+			const targetRoot = path.join(tmpTarget, 'new-dir');
+			vi.mocked(getGlobalPluginsDir).mockReturnValue(targetRoot);
+
+			await new PluginInstallerService(makeMockRunner()).install('rtk', 'user');
+
+			expect(fs.existsSync(path.join(targetRoot, 'valora-plugin-rtk'))).toBe(true);
+		});
+
+		it('throws when npm pack exits non-zero', async () => {
+			const { getGlobalPluginsDir } = await import('utils/paths');
+			vi.mocked(getGlobalPluginsDir).mockReturnValue(tmpTarget);
+
+			await expect(new PluginInstallerService(makeMockRunner({ packCode: 1 })).install('rtk', 'user')).rejects.toThrow(
+				'Failed to download'
+			);
+		});
+
+		it('throws when npm pack produces no tarball', async () => {
+			const { getGlobalPluginsDir } = await import('utils/paths');
+			vi.mocked(getGlobalPluginsDir).mockReturnValue(tmpTarget);
+
+			const noTarballRunner: ProcessRunner = { run: vi.fn(async () => 0) };
+			await expect(new PluginInstallerService(noTarballRunner).install('rtk', 'user')).rejects.toThrow('no tarball');
+		});
+
+		it('throws when tar extraction exits non-zero', async () => {
+			const { getGlobalPluginsDir } = await import('utils/paths');
+			vi.mocked(getGlobalPluginsDir).mockReturnValue(tmpTarget);
+
+			await expect(new PluginInstallerService(makeMockRunner({ tarCode: 1 })).install('rtk', 'user')).rejects.toThrow(
+				'Failed to extract'
+			);
+		});
+	});
+
+	describe('global scope', () => {
+		it('installs to the system plugins directory, not the user directory', async () => {
+			const { getSystemPluginsDir } = await import('utils/paths');
+			vi.mocked(getSystemPluginsDir).mockReturnValue(tmpTarget);
+
+			const runner = makeMockRunner();
+			await new PluginInstallerService(runner).install('rtk', 'global');
+
+			expect(runner.run).toHaveBeenCalledWith(
+				expect.arrayContaining(['-C', path.join(tmpTarget, 'valora-plugin-rtk')])
+			);
+		});
+
+		it('installs to a different directory than user scope', async () => {
+			const { getGlobalPluginsDir, getSystemPluginsDir } = await import('utils/paths');
+			const systemDir = fs.mkdtempSync(path.join(os.tmpdir(), 'valora-system-'));
+			vi.mocked(getSystemPluginsDir).mockReturnValue(systemDir);
+			vi.mocked(getGlobalPluginsDir).mockReturnValue(tmpTarget);
+
+			await new PluginInstallerService(makeMockRunner()).install('rtk', 'global');
+
+			const systemTarget = path.join(systemDir, 'valora-plugin-rtk');
+			const userTarget = path.join(tmpTarget, 'valora-plugin-rtk');
+			expect(fs.existsSync(systemTarget)).toBe(true);
+			expect(fs.existsSync(userTarget)).toBe(false);
+			fs.rmSync(systemDir, { force: true, recursive: true });
+		});
+
+		it('surfaces a permission error as an elevated-privileges message', async () => {
+			const { getSystemPluginsDir } = await import('utils/paths');
+
+			// A read-only parent directory causes mkdirSync to throw EACCES for any subdirectory
+			const readonlyDir = fs.mkdtempSync(path.join(os.tmpdir(), 'valora-readonly-'));
+			fs.chmodSync(readonlyDir, 0o555);
+			vi.mocked(getSystemPluginsDir).mockReturnValue(readonlyDir);
+
+			try {
+				await expect(new PluginInstallerService(makeMockRunner()).install('rtk', 'global')).rejects.toThrow(
+					/elevated privileges/
+				);
+			} finally {
+				fs.chmodSync(readonlyDir, 0o755);
+				fs.rmSync(readonlyDir, { force: true, recursive: true });
+			}
+		});
+	});
+
+	describe('local package override via VALORA_PLUGIN_REGISTRY', () => {
+		let localPackagesDir: string;
+		let registryFile: string;
+
+		beforeEach(() => {
+			localPackagesDir = fs.mkdtempSync(path.join(os.tmpdir(), 'valora-local-pkgs-'));
+			const pkgDir = path.join(localPackagesDir, 'valora-plugin-rtk');
+			fs.mkdirSync(pkgDir);
+			fs.writeFileSync(path.join(pkgDir, 'valora-plugin.json'), '{"name":"valora-plugin-rtk"}');
+
+			registryFile = path.join(localPackagesDir, 'registry.json');
+			fs.writeFileSync(
+				registryFile,
+				JSON.stringify([
+					{
+						name: 'valora-plugin-rtk',
+						package: '@windagency/valora-plugin-rtk',
+						path: path.join(localPackagesDir, 'valora-plugin-rtk'),
+						version: '1.0.0'
+					}
+				])
+			);
+		});
+
+		afterEach(() => {
+			fs.rmSync(localPackagesDir, { recursive: true, force: true });
+			delete process.env['VALORA_PLUGIN_REGISTRY'];
+		});
+
+		it('uses npm pack with the local source path from the registry entry', async () => {
+			process.env['VALORA_PLUGIN_REGISTRY'] = registryFile;
+			const { getGlobalPluginsDir } = await import('utils/paths');
+			vi.mocked(getGlobalPluginsDir).mockReturnValue(tmpTarget);
+
+			const runner = makeMockRunner();
+			await new PluginInstallerService(runner).install('rtk', 'user');
+
+			const localPath = path.join(localPackagesDir, 'valora-plugin-rtk');
+			expect(runner.run).toHaveBeenCalledWith(expect.arrayContaining(['npm', 'pack', localPath]));
+		});
+
+		it('falls back to npm pack when the registry entry has no path field', async () => {
+			const noPathRegistry = path.join(localPackagesDir, 'no-path-registry.json');
+			fs.writeFileSync(
+				noPathRegistry,
+				JSON.stringify([{ name: 'valora-plugin-rtk', package: '@windagency/valora-plugin-rtk', version: '1.0.0' }])
+			);
+			process.env['VALORA_PLUGIN_REGISTRY'] = noPathRegistry;
+			const { getGlobalPluginsDir } = await import('utils/paths');
+			vi.mocked(getGlobalPluginsDir).mockReturnValue(tmpTarget);
+
+			const runner = makeMockRunner();
+			await new PluginInstallerService(runner).install('rtk', 'user');
+
+			expect(runner.run).toHaveBeenCalledWith(expect.arrayContaining(['npm', 'pack', '@windagency/valora-plugin-rtk']));
+		});
+
+		it('falls back to npm pack when the path in the registry entry does not exist on disk', async () => {
+			const missingPathRegistry = path.join(localPackagesDir, 'missing-path-registry.json');
+			fs.writeFileSync(
+				missingPathRegistry,
+				JSON.stringify([
+					{
+						name: 'valora-plugin-rtk',
+						package: '@windagency/valora-plugin-rtk',
+						path: '/nonexistent/path',
+						version: '1.0.0'
+					}
+				])
+			);
+			process.env['VALORA_PLUGIN_REGISTRY'] = missingPathRegistry;
+			const { getGlobalPluginsDir } = await import('utils/paths');
+			vi.mocked(getGlobalPluginsDir).mockReturnValue(tmpTarget);
+
+			const runner = makeMockRunner();
+			await new PluginInstallerService(runner).install('rtk', 'user');
+
+			expect(runner.run).toHaveBeenCalledWith(expect.arrayContaining(['npm', 'pack', '@windagency/valora-plugin-rtk']));
+		});
+	});
+
+	describe('uninstall', () => {
+		it('removes the plugin directory from the user scope', async () => {
+			const { getGlobalPluginsDir } = await import('utils/paths');
+			const pluginDir = path.join(tmpTarget, 'valora-plugin-rtk');
+			fs.mkdirSync(pluginDir, { recursive: true });
+			vi.mocked(getGlobalPluginsDir).mockReturnValue(tmpTarget);
+
+			new PluginInstallerService(makeMockRunner()).uninstall('rtk', 'user');
+
+			expect(fs.existsSync(pluginDir)).toBe(false);
+		});
+
+		it('throws when the plugin directory does not exist in the given scope', async () => {
+			const { getGlobalPluginsDir } = await import('utils/paths');
+			vi.mocked(getGlobalPluginsDir).mockReturnValue(tmpTarget);
+
+			expect(() => new PluginInstallerService(makeMockRunner()).uninstall('rtk', 'user')).toThrow('not installed');
+		});
+	});
+
+	describe('project scope', () => {
+		it('extracts to the project plugins directory', async () => {
+			const { getProjectPluginsDir } = await import('utils/paths');
+			vi.mocked(getProjectPluginsDir).mockReturnValue(tmpTarget);
+
+			const runner = makeMockRunner();
+			await new PluginInstallerService(runner).install('rtk', 'project');
+
+			expect(runner.run).toHaveBeenCalledWith(
+				expect.arrayContaining(['-C', path.join(tmpTarget, 'valora-plugin-rtk')])
+			);
+		});
+
+		it('throws when not inside a Valora project context', async () => {
+			const { getProjectPluginsDir } = await import('utils/paths');
+			vi.mocked(getProjectPluginsDir).mockReturnValue(null);
+
+			await expect(new PluginInstallerService(makeMockRunner()).install('rtk', 'project')).rejects.toThrow('.valora/');
+		});
+	});
+
+	describe('dependency resolution', () => {
+		let tmpDepTarget: string;
+
+		beforeEach(() => {
+			tmpDepTarget = fs.mkdtempSync(path.join(os.tmpdir(), 'valora-dep-test-'));
+		});
+
+		afterEach(() => {
+			fs.rmSync(tmpDepTarget, { recursive: true, force: true });
+			vi.resetAllMocks();
+		});
+
+		it('installs required dependencies transitively', async () => {
+			const { getGlobalPluginsDir } = await import('utils/paths');
+			vi.mocked(getGlobalPluginsDir).mockReturnValue(tmpDepTarget);
+
+			const runner = makeMockRunner({
+				manifests: {
+					'valora-plugin-a': { name: 'valora-plugin-a', version: '1.0.0', requires: ['valora-plugin-b'] },
+					'valora-plugin-b': { name: 'valora-plugin-b', version: '1.0.0', requires: ['valora-plugin-c'] },
+					'valora-plugin-c': { name: 'valora-plugin-c', version: '1.0.0' }
+				}
+			});
+
+			await new PluginInstallerService(runner, () => false).install('valora-plugin-a', 'user');
+
+			expect(fs.existsSync(path.join(tmpDepTarget, 'valora-plugin-a'))).toBe(true);
+			expect(fs.existsSync(path.join(tmpDepTarget, 'valora-plugin-b'))).toBe(true);
+			expect(fs.existsSync(path.join(tmpDepTarget, 'valora-plugin-c'))).toBe(true);
+		});
+
+		it('skips a required dependency that is already installed in any scope', async () => {
+			const { getGlobalPluginsDir } = await import('utils/paths');
+			vi.mocked(getGlobalPluginsDir).mockReturnValue(tmpDepTarget);
+
+			const runner = makeMockRunner({
+				manifests: {
+					'valora-plugin-a': { name: 'valora-plugin-a', version: '1.0.0', requires: ['valora-plugin-b'] }
+				}
+			});
+
+			const isInstalled = (name: string) => name === 'valora-plugin-b';
+			await new PluginInstallerService(runner, isInstalled).install('valora-plugin-a', 'user');
+
+			expect(runner.packCalls).not.toContain('valora-plugin-b');
+			expect(fs.existsSync(path.join(tmpDepTarget, 'valora-plugin-a'))).toBe(true);
+		});
+
+		it('rolls back the parent plugin directory when a dependency cannot be installed', async () => {
+			const { getGlobalPluginsDir } = await import('utils/paths');
+			vi.mocked(getGlobalPluginsDir).mockReturnValue(tmpDepTarget);
+
+			const runner = makeMockRunner({
+				manifests: {
+					'valora-plugin-a': { name: 'valora-plugin-a', version: '1.0.0', requires: ['valora-plugin-b'] }
+				},
+				packCodeByShortName: { 'valora-plugin-b': 1 }
+			});
+
+			await expect(new PluginInstallerService(runner, () => false).install('valora-plugin-a', 'user')).rejects.toThrow(
+				'Failed to download'
+			);
+			expect(fs.existsSync(path.join(tmpDepTarget, 'valora-plugin-a'))).toBe(false);
+		});
+
+		it('terminates without error when plugins have a circular dependency', async () => {
+			const { getGlobalPluginsDir } = await import('utils/paths');
+			vi.mocked(getGlobalPluginsDir).mockReturnValue(tmpDepTarget);
+
+			const runner = makeMockRunner({
+				manifests: {
+					'valora-plugin-a': { name: 'valora-plugin-a', version: '1.0.0', requires: ['valora-plugin-b'] },
+					'valora-plugin-b': { name: 'valora-plugin-b', version: '1.0.0', requires: ['valora-plugin-a'] }
+				}
+			});
+
+			await expect(
+				new PluginInstallerService(runner, () => false).install('valora-plugin-a', 'user')
+			).resolves.toBeUndefined();
+			expect(fs.existsSync(path.join(tmpDepTarget, 'valora-plugin-a'))).toBe(true);
+			expect(fs.existsSync(path.join(tmpDepTarget, 'valora-plugin-b'))).toBe(true);
+		});
+	});
+});

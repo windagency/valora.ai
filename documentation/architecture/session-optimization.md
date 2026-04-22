@@ -85,17 +85,19 @@ Three complementary strategies reduce the token cost of tool results within ever
 
 Every shell command result passes through a content-aware filter before being appended to the conversation. Outputs below 500 characters are returned unchanged (after ANSI stripping). Above that threshold, per-command filters remove structural noise while preserving meaningful content:
 
-| Command family                  | What is removed                                       |
-| ------------------------------- | ----------------------------------------------------- |
-| `git diff` / `log` / `status`   | Metadata lines, redundant section headers             |
-| `pnpm` / `npm` / `yarn` / `npx` | Progress spinners, peer-dep and audit warnings        |
-| `vitest` / `jest`               | Passing test lines (collapsed to a count summary)     |
-| `tsc` / `eslint`                | Duplicate diagnostics (grouped by error code or rule) |
-| `rg` / `grep`                   | Identical duplicate lines                             |
-| `docker`                        | Layer-pull progress lines                             |
-| `make`                          | Directory entry/exit banners                          |
-| `cargo`                         | Consecutive `Compiling` lines (collapsed to a count)  |
-| `python` / `pytest`             | Passing test lines (collapsed to a count summary)     |
+| Command family                  | What is removed                                                                       |
+| ------------------------------- | ------------------------------------------------------------------------------------- |
+| `git diff` / `show`             | Metadata lines; added and removed lines capped at 15 per hunk with a count summary    |
+| `git log`                       | Verbose commit headers collapsed to one `<hash> <subject>` line each; capped at 20    |
+| `git status`                    | Instruction lines; only branch line and file status lines are kept                    |
+| `pnpm` / `npm` / `yarn` / `npx` | Progress spinners, peer-dep warnings, funding notices; added packages folded to count |
+| `vitest` / `jest`               | Passing test lines (collapsed to a count summary); coverage tables collapsed          |
+| `tsc`                           | Duplicate diagnostics (≤3 examples per error code); code-frame source excerpts        |
+| `eslint`                        | Duplicate rule violations (≤3 examples per rule)                                      |
+| `rg` / `grep`                   | Identical duplicate lines; per-file match cap of 5 with a count summary               |
+| `docker`                        | Layer-pull progress, BuildKit boilerplate, pip download/progress lines                |
+| `make`                          | Directory entry/exit banners                                                          |
+| `python` / `pytest`             | Passing test lines (collapsed to a count summary)                                     |
 
 Savings are tracked by the `compression.terminal.saved_chars` counter and the `compression.terminal.ratio` gauge, visible in the dashboard Optimisation panel. The dashboard also displays approximate token and cost savings derived from the character count — see below.
 
@@ -126,28 +128,15 @@ This is most effective when the LLM reads the same file or runs the same diagnos
 
 **Files:** `src/executor/output-compression.service.ts`, `src/executor/tool-execution.service.ts`
 
-The filter is dispatched via the `TOOL_FILTERS` dictionary, keyed on the first token of the command string:
+Strategies are registered by plugins at startup via `registerStrategy(tool, fn)`. The core pipeline in `output-compression.service.ts` resolves the right strategy using `resolveStrategyKey`, which handles wrapper commands transparently: `pnpm tsc --noEmit` dispatches to the `tsc` strategy, not the `pnpm` strategy, because `pnpm` is a wrapper and `tsc` is a registered tool.
 
-```typescript
-const TOOL_FILTERS: Record<string, (output: string, command: string) => string> = {
-	cargo: filterCargo,
-	docker: filterDocker,
-	eslint: filterEslint,
-	git: filterGit,
-	grep: filterRg,
-	jest: filterTestRunner,
-	make: filterMake,
-	npm: filterPackageManager,
-	npx: filterPackageManager,
-	pnpm: filterPackageManager,
-	pytest: filterPython,
-	python: filterPython,
-	rg: filterRg,
-	tsc: filterTsc,
-	vitest: filterTestRunner,
-	yarn: filterPackageManager
-};
-```
+Three standalone packages under `packages/` register all built-in strategies:
+
+| Package                                          | Strategies                                                      |
+| ------------------------------------------------ | --------------------------------------------------------------- |
+| `packages/valora-plugin-compression-universal/`  | `git`, `grep`, `rg`, `docker`, `make`                           |
+| `packages/valora-plugin-compression-typescript/` | `tsc`, `eslint`, `jest`, `vitest`, `pnpm`, `npm`, `npx`, `yarn` |
+| `packages/valora-plugin-compression-python/`     | `python`, `pytest`                                              |
 
 Unknown commands fall back to an identity function (no-op). The call site uses a stats delta to measure only filter savings, not ANSI-stripping savings:
 

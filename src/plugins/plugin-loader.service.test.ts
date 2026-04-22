@@ -39,7 +39,7 @@ describe('PluginLoaderService — agent-only bundles', () => {
 	beforeEach(() => {
 		tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'valora-plugin-test-'));
 		loader = new PluginLoaderService({
-			discoverPluginDirs: () => [tmpDir]
+			discoverWithSource: () => [{ dir: tmpDir, location: 'built-in' as const }]
 		} as never);
 	});
 
@@ -64,6 +64,18 @@ describe('PluginLoaderService — agent-only bundles', () => {
 		expect(plugins[0].agentsDir).toBe(path.join(tmpDir, 'agents'));
 		expect(plugins[0].commandsDir).toBeUndefined();
 		expect(plugins[0].hooks).toBeUndefined();
+	});
+
+	it('preserves the discovery location on the loaded plugin', () => {
+		writeJson(path.join(tmpDir, 'valora-plugin.json'), {
+			name: 'valora-core-secops',
+			version: '1.0.0',
+			contributes: ['agents']
+		});
+
+		const plugins = loader.loadAll();
+
+		expect(plugins[0].location).toBe('built-in');
 	});
 
 	it('returns status enabled for a valid agent plugin', () => {
@@ -100,7 +112,7 @@ describe('PluginLoaderService — prompts bundle', () => {
 	beforeEach(() => {
 		tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'valora-plugin-test-'));
 		loader = new PluginLoaderService({
-			discoverPluginDirs: () => [tmpDir]
+			discoverWithSource: () => [{ dir: tmpDir, location: 'user' as const }]
 		} as never);
 	});
 
@@ -135,7 +147,7 @@ describe('PluginLoaderService — command + agent bundles', () => {
 	beforeEach(() => {
 		tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'valora-plugin-test-'));
 		loader = new PluginLoaderService({
-			discoverPluginDirs: () => [tmpDir]
+			discoverWithSource: () => [{ dir: tmpDir, location: 'project' as const }]
 		} as never);
 	});
 
@@ -190,7 +202,7 @@ describe('PluginLoaderService — mcps bundle', () => {
 	beforeEach(() => {
 		tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'valora-plugin-test-'));
 		loader = new PluginLoaderService({
-			discoverPluginDirs: () => [tmpDir]
+			discoverWithSource: () => [{ dir: tmpDir, location: 'npm' as const }]
 		} as never);
 	});
 
@@ -262,7 +274,7 @@ describe('PluginLoaderService — code plugin bundle', () => {
 	beforeEach(() => {
 		tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'valora-code-plugin-test-'));
 		loader = new PluginLoaderService({
-			discoverPluginDirs: () => [tmpDir]
+			discoverWithSource: () => [{ dir: tmpDir, location: 'built-in' as const }]
 		} as never);
 	});
 
@@ -325,7 +337,10 @@ describe('PluginLoaderService — requires dependency ordering', () => {
 		tmpDirA = fs.mkdtempSync(path.join(os.tmpdir(), 'valora-req-test-a-'));
 		tmpDirB = fs.mkdtempSync(path.join(os.tmpdir(), 'valora-req-test-b-'));
 		loader = new PluginLoaderService({
-			discoverPluginDirs: () => [tmpDirA, tmpDirB]
+			discoverWithSource: () => [
+				{ dir: tmpDirA, location: 'user' as const },
+				{ dir: tmpDirB, location: 'user' as const }
+			]
 		} as never);
 	});
 
@@ -395,5 +410,143 @@ describe('PluginLoaderService — requires dependency ordering', () => {
 
 		const plugins = loader.loadAll();
 		expect(plugins).toHaveLength(2);
+	});
+});
+
+describe('PluginLoaderService — isInstalled()', () => {
+	let tmpDir: string;
+
+	beforeEach(() => {
+		tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'valora-is-installed-test-'));
+	});
+
+	afterEach(() => {
+		fs.rmSync(tmpDir, { recursive: true, force: true });
+	});
+
+	function makeLoader(dirs: Array<{ dir: string; location: 'built-in' | 'npm' | 'project' | 'user' }>) {
+		return new PluginLoaderService({
+			discoverWithSource: () => dirs
+		} as never);
+	}
+
+	it('returns true when a plugin with the given name is catalogued', () => {
+		writeJson(path.join(tmpDir, 'valora-plugin.json'), { name: 'valora-plugin-rtk', version: '1.0.0' });
+		const loader = makeLoader([{ dir: tmpDir, location: 'user' }]);
+
+		expect(loader.isInstalled('valora-plugin-rtk')).toBe(true);
+	});
+
+	it('returns false when no catalogued plugin has the given name', () => {
+		writeJson(path.join(tmpDir, 'valora-plugin.json'), { name: 'valora-plugin-rtk', version: '1.0.0' });
+		const loader = makeLoader([{ dir: tmpDir, location: 'user' }]);
+
+		expect(loader.isInstalled('valora-plugin-other')).toBe(false);
+	});
+
+	it('returns false when the only catalogued plugin has an invalid manifest', () => {
+		fs.writeFileSync(path.join(tmpDir, 'valora-plugin.json'), '{ "broken": true }');
+		const loader = makeLoader([{ dir: tmpDir, location: 'user' }]);
+
+		expect(loader.isInstalled('valora-plugin-rtk')).toBe(false);
+	});
+});
+
+describe('PluginLoaderService — catalogAll()', () => {
+	let tmpDirEnabled: string;
+	let tmpDirDisabled: string;
+
+	beforeEach(() => {
+		tmpDirEnabled = fs.mkdtempSync(path.join(os.tmpdir(), 'valora-catalog-test-enabled-'));
+		tmpDirDisabled = fs.mkdtempSync(path.join(os.tmpdir(), 'valora-catalog-test-disabled-'));
+	});
+
+	afterEach(() => {
+		fs.rmSync(tmpDirEnabled, { recursive: true, force: true });
+		fs.rmSync(tmpDirDisabled, { recursive: true, force: true });
+	});
+
+	function makeDiscovery(dirs: Array<{ dir: string; location: 'built-in' | 'npm' | 'project' | 'user' }>) {
+		return {
+			discoverPluginDirs: () => dirs.map((d) => d.dir),
+			discoverWithSource: () => dirs
+		};
+	}
+
+	it('returns enabled status for a plugin listed in plugins.enabled', () => {
+		writeJson(path.join(tmpDirEnabled, 'valora-plugin.json'), {
+			name: 'my-plugin',
+			version: '1.0.0'
+		});
+		const loader = new PluginLoaderService(makeDiscovery([{ dir: tmpDirEnabled, location: 'user' }]) as never);
+
+		const result = loader.catalogAll({ enabled: ['my-plugin'] });
+
+		expect(result).toHaveLength(1);
+		expect(result[0].status).toBe('enabled');
+		expect(result[0].manifest?.name).toBe('my-plugin');
+		expect(result[0].location).toBe('user');
+	});
+
+	it('returns disabled status for a plugin not listed in plugins.enabled', () => {
+		writeJson(path.join(tmpDirDisabled, 'valora-plugin.json'), {
+			name: 'inactive-plugin',
+			version: '2.0.0'
+		});
+		const loader = new PluginLoaderService(makeDiscovery([{ dir: tmpDirDisabled, location: 'project' }]) as never);
+
+		const result = loader.catalogAll({ enabled: ['other-plugin'] });
+
+		expect(result).toHaveLength(1);
+		expect(result[0].status).toBe('disabled');
+		expect(result[0].manifest?.name).toBe('inactive-plugin');
+	});
+
+	it('returns enabled for all plugins when no plugins.enabled allowlist is set', () => {
+		writeJson(path.join(tmpDirEnabled, 'valora-plugin.json'), { name: 'any-plugin', version: '1.0.0' });
+		const loader = new PluginLoaderService(makeDiscovery([{ dir: tmpDirEnabled, location: 'built-in' }]) as never);
+
+		const result = loader.catalogAll();
+
+		expect(result[0].status).toBe('enabled');
+	});
+
+	it('returns invalid status for a plugin with a malformed manifest', () => {
+		fs.mkdirSync(tmpDirDisabled, { recursive: true });
+		fs.writeFileSync(path.join(tmpDirDisabled, 'valora-plugin.json'), '{ "broken": true }');
+		const loader = new PluginLoaderService(makeDiscovery([{ dir: tmpDirDisabled, location: 'user' }]) as never);
+
+		const result = loader.catalogAll();
+
+		expect(result).toHaveLength(1);
+		expect(result[0].status).toBe('invalid');
+		expect(result[0].manifest).toBeNull();
+	});
+
+	it('returns invalid status when the manifest file is missing entirely', () => {
+		fs.mkdirSync(tmpDirDisabled, { recursive: true });
+		// No valora-plugin.json written
+		const loader = new PluginLoaderService(makeDiscovery([{ dir: tmpDirDisabled, location: 'npm' }]) as never);
+
+		const result = loader.catalogAll();
+
+		expect(result[0].status).toBe('invalid');
+	});
+
+	it('catalogs both enabled and disabled plugins together', () => {
+		writeJson(path.join(tmpDirEnabled, 'valora-plugin.json'), { name: 'plugin-a', version: '1.0.0' });
+		writeJson(path.join(tmpDirDisabled, 'valora-plugin.json'), { name: 'plugin-b', version: '1.0.0' });
+		const loader = new PluginLoaderService(
+			makeDiscovery([
+				{ dir: tmpDirEnabled, location: 'user' },
+				{ dir: tmpDirDisabled, location: 'project' }
+			]) as never
+		);
+
+		const result = loader.catalogAll({ enabled: ['plugin-a'] });
+
+		expect(result).toHaveLength(2);
+		expect(result.find((p) => p.manifest?.name === 'plugin-a')?.status).toBe('enabled');
+		expect(result.find((p) => p.manifest?.name === 'plugin-b')?.status).toBe('disabled');
 	});
 });

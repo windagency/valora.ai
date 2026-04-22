@@ -10,7 +10,7 @@ import { TypeScriptProject } from 'arch-unit-ts/dist/arch-unit/core/domain/TypeS
 import { RelativePath } from 'arch-unit-ts/dist/arch-unit/core/domain/RelativePath';
 import { describe, it } from 'vitest';
 
-const srcProject = new TypeScriptProject(RelativePath.of('src'));
+const srcProject = new TypeScriptProject(RelativePath.of('src'), '**/*.test.ts', '**/*.spec.ts');
 
 describe('Dependency Rules', () => {
 	describe('Acyclic Dependencies Principle', () => {
@@ -154,6 +154,7 @@ describe('Dependency Rules', () => {
 				'mcp',
 				'memory',
 				'output',
+				'plugins',
 				'security',
 				'services',
 				'session',

@@ -11,7 +11,6 @@
 
 import { createRequire } from 'node:module';
 import {
-	printUpdateBanner,
 	runAutoInstall,
 	scheduleUpdateCheck,
 	settleUpdateCheck,
@@ -45,11 +44,13 @@ import { configureHelpCommand } from './commands/help';
 import { configureInitCommand } from './commands/init';
 import { configureMapCommand } from './commands/map';
 import { configureMonitoringCommand } from './commands/monitoring';
+import { configurePluginCommand } from './commands/plugin.command';
 import { configureSessionCommand } from './commands/session';
-import { configureUpdateCommand } from './commands/update.command';
+import { configureUpdateCommand, persistUpdateSuccess } from './commands/update.command';
 import { CliConfigBuilder } from './config-builder';
 import { checkAndRunFirstTimeSetup, shouldTriggerFirstRun } from './first-run-setup';
 import { globalFlags } from './flags';
+import { printUpdateBanner } from './update-banner';
 
 const require = createRequire(import.meta.url);
 const packageJson = require('../../package.json') as { version: string };
@@ -138,6 +139,7 @@ configureTemplateCommand(program);
 configureInitCommand(program);
 configureBatchCommand(program);
 configureMapCommand(program);
+configurePluginCommand(program);
 
 const rawProgram = (program as CommanderCommandContract).getUnderlyingCommand();
 configureUpdateCommand(rawProgram);
@@ -146,16 +148,13 @@ const isUpdateCommand = rawArgs[0] === 'update';
 
 async function handleAutoInstall(state: Awaited<ReturnType<typeof settleUpdateCheck>>): Promise<void> {
 	if (!state) return;
-	if (!shouldAutoUpdate(state, packageJson.version)) return;
-	process.stderr.write(`Updating Valora to v${state.latestVersion}…\n`);
+	const { latestVersion } = state;
+	if (!latestVersion || !shouldAutoUpdate(state, packageJson.version)) return;
+	process.stderr.write(`Updating Valora to v${latestVersion}…\n`);
 	const result = await runAutoInstall();
 	if (result === 'success') {
-		process.stderr.write(`✓ Updated to v${state.latestVersion}.\n`);
-		await writeUpdateState(getGlobalConfigDir(), {
-			...state,
-			installedVersionAtCheck: state.latestVersion,
-			remindedForVersion: state.latestVersion
-		});
+		process.stderr.write(`✓ Updated to v${latestVersion}.\n`);
+		await persistUpdateSuccess(getGlobalConfigDir(), packageJson.version, latestVersion);
 	}
 }
 

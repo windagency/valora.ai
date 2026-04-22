@@ -15,11 +15,13 @@
  * Self-registers with the LLM Provider Registry using dependency inversion pattern
  */
 
+import type { ProviderDescriptor } from 'plugins/plugin-api.types';
+
 import type { LLMCompletionOptions, LLMCompletionResult, LLMMessage } from 'types/llm.types';
 import type { MCPSamplingService } from 'types/mcp.types';
 
 import { COMPLETION_MODE, DEFAULT_MAX_TOKENS } from 'config/constants';
-import { getProviderModels, ProviderName } from 'config/providers.config';
+import { BuiltinProviders, getProviderModels, ModelName } from 'config/providers.config';
 import { BaseLLMProvider } from 'llm/provider.interface';
 import { getProviderRegistry } from 'llm/registry';
 import { ProviderError } from 'utils/error-handler';
@@ -27,11 +29,11 @@ import { formatErrorMessage } from 'utils/error-utils';
 import { getTemplateLoader } from 'utils/template-loader';
 
 export class CursorProvider extends BaseLLMProvider {
-	name = ProviderName.CURSOR;
+	name = BuiltinProviders.CURSOR;
 	private mcpSampling: MCPSamplingService | null;
 
 	override getAlternativeModels(currentModel?: string): string[] {
-		const alternatives = getProviderModels(ProviderName.CURSOR);
+		const alternatives = getProviderModels(BuiltinProviders.CURSOR);
 		if (currentModel) {
 			return alternatives.filter((m) => m !== currentModel);
 		}
@@ -40,7 +42,7 @@ export class CursorProvider extends BaseLLMProvider {
 
 	override validateModel(modelName: string): Promise<boolean> {
 		// Get known models from MODEL_PROVIDER_SUGGESTIONS
-		const knownModels = getProviderModels(ProviderName.CURSOR);
+		const knownModels = getProviderModels(BuiltinProviders.CURSOR);
 
 		// Check if model is in known list
 		if (knownModels.includes(modelName)) {
@@ -147,7 +149,7 @@ export class CursorProvider extends BaseLLMProvider {
 		if (!this.mcpSampling) {
 			throw new ProviderError('Cursor provider only available when running via MCP in Cursor', {
 				hint: 'This provider requires the orchestration engine to run as an MCP server in Cursor',
-				provider: ProviderName.CURSOR
+				provider: BuiltinProviders.CURSOR
 			});
 		}
 		return this.mcpSampling;
@@ -182,7 +184,7 @@ export class CursorProvider extends BaseLLMProvider {
 					mode: COMPLETION_MODE.GUIDED,
 					model: options.model ?? 'default',
 					originalMessages: options.messages.length,
-					provider: ProviderName.CURSOR,
+					provider: BuiltinProviders.CURSOR,
 					temperature: options.temperature,
 					useCursorSubscription: true
 				},
@@ -302,4 +304,15 @@ export class CursorProvider extends BaseLLMProvider {
 }
 
 // Self-register this provider with the registry when module is loaded
-getProviderRegistry().registerProvider(ProviderName.CURSOR, CursorProvider, { owner: 'core' });
+getProviderRegistry().registerProvider(BuiltinProviders.CURSOR, CursorProvider, { owner: 'core' }, {
+	defaultModel: ModelName.CURSOR_SONNET_4_5,
+	description: 'Zero config - uses your Cursor subscription',
+	helpText: 'The Cursor provider uses your Cursor subscription via MCP. No API key needed!',
+	label: 'Cursor',
+	modelModes: [
+		{ mode: 'normal', model: ModelName.CURSOR_SONNET_4_5 },
+		{ mode: 'high reasoning', model: ModelName.CURSOR_GPT_4 },
+		{ mode: 'normal', model: ModelName.CURSOR_CLAUDE_3_5 }
+	],
+	requiresApiKey: false
+} satisfies ProviderDescriptor);

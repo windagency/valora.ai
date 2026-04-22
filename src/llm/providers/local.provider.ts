@@ -1,28 +1,29 @@
 /**
  * Local model provider implementation
  *
- * Supports any OpenAI-compatible local model server:
- * Ollama, LM Studio, vLLM, llama.cpp, LocalAI, etc.
+ * Supports any OpenAI-compatible local model server.
  *
- * No API key required. Default base URL: http://localhost:11434/v1
+ * No API key required.
  *
  * Self-registers with the LLM Provider Registry using dependency inversion pattern
  */
+
+import type { ProviderDescriptor } from 'plugins/plugin-api.types';
 
 import OpenAI from 'openai';
 
 import type { LLMCompletionOptions, LLMCompletionResult, LLMUsage } from 'types/llm.types';
 
-import { ProviderName } from 'config/providers.config';
+import { BuiltinProviders } from 'config/providers.config';
 import { BaseLLMProvider } from 'llm/provider.interface';
 import { getProviderRegistry } from 'llm/registry';
 import { getLogger } from 'output/logger';
 import { createErrorContext, ProviderError, withRetry } from 'utils/error-handler';
 
-const DEFAULT_LOCAL_BASE_URL = 'http://localhost:11434/v1';
+const DEFAULT_LOCAL_BASE_URL = 'http://localhost:8080/v1';
 
 export class LocalProvider extends BaseLLMProvider {
-	name = ProviderName.LOCAL;
+	name = BuiltinProviders.LOCAL;
 	private client: null | OpenAI = null;
 
 	async complete(options: LLMCompletionOptions): Promise<LLMCompletionResult> {
@@ -63,7 +64,7 @@ export class LocalProvider extends BaseLLMProvider {
 			if (!choice) {
 				throw new ProviderError(
 					'Local model server returned no choices in response',
-					{ baseURL, provider: ProviderName.LOCAL, response },
+					{ baseURL, provider: BuiltinProviders.LOCAL, response },
 					context
 				);
 			}
@@ -207,8 +208,8 @@ export class LocalProvider extends BaseLLMProvider {
 
 		if (code === 'ECONNREFUSED' || msg.includes('ECONNREFUSED')) {
 			return new ProviderError(
-				`Cannot connect to local model server at ${baseURL}. Is your server running? For Ollama: \`ollama serve\``,
-				{ baseURL, error, model, provider: ProviderName.LOCAL },
+				`Cannot connect to local model server at ${baseURL}. Is your server running? Start your local model server.`,
+				{ baseURL, error, model, provider: BuiltinProviders.LOCAL },
 				context,
 				{ maxRetries: 0, type: 'retry' }
 			);
@@ -217,15 +218,15 @@ export class LocalProvider extends BaseLLMProvider {
 		if (code === 'ECONNRESET' || msg.includes('ECONNRESET') || msg.toLowerCase().includes('timeout')) {
 			return new ProviderError(
 				`Local model server timed out at ${baseURL}. The model may still be loading or the server is overloaded.`,
-				{ baseURL, error, model, provider: ProviderName.LOCAL },
+				{ baseURL, error, model, provider: BuiltinProviders.LOCAL },
 				context
 			);
 		}
 
 		if (msg.includes('404') || msg.toLowerCase().includes('not found')) {
 			return new ProviderError(
-				`Model '${model}' not found on local server at ${baseURL}. Check available models (e.g., \`ollama list\`).`,
-				{ baseURL, error, model, provider: ProviderName.LOCAL },
+				`Model '${model}' not found on local server at ${baseURL}. Check your model server's model list.`,
+				{ baseURL, error, model, provider: BuiltinProviders.LOCAL },
 				context,
 				{ maxRetries: 0, type: 'retry' }
 			);
@@ -233,11 +234,18 @@ export class LocalProvider extends BaseLLMProvider {
 
 		return new ProviderError(
 			`Local model server error: ${msg}`,
-			{ baseURL, error, model, provider: ProviderName.LOCAL },
+			{ baseURL, error, model, provider: BuiltinProviders.LOCAL },
 			context
 		);
 	}
 }
 
 // Self-register this provider with the registry when module is loaded
-getProviderRegistry().registerProvider(ProviderName.LOCAL, LocalProvider, { owner: 'core' });
+getProviderRegistry().registerProvider(BuiltinProviders.LOCAL, LocalProvider, { owner: 'core' }, {
+	defaultModel: 'llama3.1',
+	description: 'Local OpenAI-compatible model server',
+	helpText: 'Connect to a local OpenAI-compatible server.',
+	label: 'Local',
+	modelModes: [{ mode: 'default', model: 'llama3.1' }],
+	requiresApiKey: false
+} satisfies ProviderDescriptor);

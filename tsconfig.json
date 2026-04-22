@@ -43,10 +43,20 @@
 			"services/*": ["./src/services/*"],
 			"session/*": ["./src/session/*"],
 			"src/*": ["./src/*"],
+			"tests/*": ["./tests/*"],
 			"types/*": ["./src/types/*"],
 			"ui/*": ["./src/ui/*"],
 			"updater/*": ["./src/updater/*"],
-			"utils/*": ["./src/utils/*"]
+			"utils/*": ["./src/utils/*"],
+			"@windagency/valora-plugin-compression-python/src/index": [
+				"./packages/valora-plugin-compression-python/src/index"
+			],
+			"@windagency/valora-plugin-compression-typescript/src/index": [
+				"./packages/valora-plugin-compression-typescript/src/index"
+			],
+			"@windagency/valora-plugin-compression-universal/src/index": [
+				"./packages/valora-plugin-compression-universal/src/index"
+			]
 		},
 		"removeComments": false,
 		"resolveJsonModule": true,

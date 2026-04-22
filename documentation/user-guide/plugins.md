@@ -17,29 +17,94 @@
 
 ## Installing a Plugin
 
+The recommended way to install an official plugin is `valora plugin add`. For local or custom plugins, copy the directory into the appropriate scope location.
+
 Plugins are discovered from four locations on every startup. Later locations take precedence over earlier ones for conflicting contributions (last wins):
 
-| Location                    | Scope                          | Install method    |
-| --------------------------- | ------------------------------ | ----------------- |
-| `data/plugins/`             | Shipped with Valora (built-in) | n/a               |
-| `~/.valora/plugins/`        | Personal — all your projects   | copy directory    |
-| `.valora/plugins/`          | This project only              | copy directory    |
-| `node_modules/@windagency/` | This project — npm packages    | npm / pnpm / yarn |
+| Location                    | Scope                          | Install method                                        |
+| --------------------------- | ------------------------------ | ----------------------------------------------------- |
+| `data/plugins/`             | Shipped with Valora (built-in) | n/a                                                   |
+| `~/.valora/plugins/`        | Personal — all your projects   | `valora plugin add` or copy directory                 |
+| `.valora/plugins/`          | This project only              | `valora plugin add --scope project` or copy directory |
+| `node_modules/@windagency/` | This project — npm packages    | `pnpm add` / `npm install`                            |
 
-```bash
-# Install a plugin for this project only
-cp -r my-plugin .valora/plugins/
+After installing, add the plugin's short name to `plugins.enabled` in `.valora/config.json` to activate it. No restart required.
 
-# Install a plugin for all your projects
-cp -r my-plugin ~/.valora/plugins/
+---
 
-# Install an official plugin via npm (auto-discovered, no copy needed)
-pnpm add @windagency/valora-plugin-ollama
+## `valora plugin add`
+
+Download and install a plugin from the npm registry.
+
+```
+valora plugin add <name> [options]
 ```
 
-Any npm package under `@windagency/` whose name starts with `valora-plugin-` and contains a valid `valora-plugin.json` is discovered automatically from `node_modules/`. You still need to add its name to `plugins.enabled` to activate it.
+| Option            | Description                                                |
+| ----------------- | ---------------------------------------------------------- |
+| `--scope <scope>` | Where to install: `user` (default), `project`, or `global` |
 
-No restart or rebuild required after adding a plugin.
+The command fetches the plugin tarball from npm and extracts it directly into the scope directory. It does not modify your project's `package.json` or `node_modules/`.
+
+**After installing:** add the plugin's short name to `plugins.enabled` in `.valora/config.json`:
+
+```json
+{
+	"plugins": {
+		"enabled": ["valora-plugin-ollama"]
+	}
+}
+```
+
+### Scope values
+
+| Scope              | Target directory                        | Typical use                                |
+| ------------------ | --------------------------------------- | ------------------------------------------ |
+| `user` _(default)_ | `~/.valora/plugins/`                    | Available in all your projects             |
+| `project`          | `.valora/plugins/` (nearest `.valora/`) | This project only; committable to the repo |
+| `global`           | `~/.valora/plugins/` (same as `user`)   | Alias for `user`                           |
+
+### Examples
+
+```bash
+# Install a plugin for all your projects (default scope)
+valora plugin add compression-universal
+
+# Install using the full package name
+valora plugin add @windagency/valora-plugin-ollama
+
+# Install for this project only
+valora plugin add rtk --scope project
+
+# Install a plugin explicitly for your user account
+valora plugin add engineering --scope user
+```
+
+## `valora plugin remove`
+
+Remove an installed plugin from a scope directory.
+
+```
+valora plugin remove <name> [options]
+```
+
+| Option            | Description                                                    |
+| ----------------- | -------------------------------------------------------------- |
+| `--scope <scope>` | Where to remove from: `user` (default), `project`, or `global` |
+
+The plugin directory is deleted from disk. Remove the plugin's name from `plugins.enabled` in `.valora/config.json` as well to avoid a stale reference.
+
+### Examples
+
+```bash
+# Remove from your personal plugins
+valora plugin remove rtk
+
+# Remove from this project only
+valora plugin remove compression-universal --scope project
+```
+
+---
 
 ## Code Plugins
 
@@ -69,36 +134,43 @@ export function register(api) {
 }
 ```
 
-Three built-in compression plugins ship under `data/plugins/` and register 17 tool strategies. They are the reference implementation for the `code` contribution type:
+Three compression plugins ship as standalone packages under `packages/`. They register 17 tool strategies and serve as the reference implementation for the `code` contribution type:
 
-| Plugin                                 | Strategies covered                                              |
-| -------------------------------------- | --------------------------------------------------------------- |
-| `valora-plugin-compression-typescript` | `tsc`, `eslint`, `jest`, `vitest`, `pnpm`, `npm`, `npx`, `yarn` |
-| `valora-plugin-compression-universal`  | `git`, `grep`, `rg`, `docker`, `make`                           |
-| `valora-plugin-compression-python`     | `python`, `pytest`                                              |
+| Package (source)                                 | Strategies covered                                              |
+| ------------------------------------------------ | --------------------------------------------------------------- |
+| `packages/valora-plugin-compression-typescript/` | `tsc`, `eslint`, `jest`, `vitest`, `pnpm`, `npm`, `npx`, `yarn` |
+| `packages/valora-plugin-compression-universal/`  | `git`, `grep`, `rg`, `docker`, `make`                           |
+| `packages/valora-plugin-compression-python/`     | `python`, `pytest`                                              |
 
-These are enabled by default and require no configuration.
+These are enabled by default and require no configuration. Each package has its own `package.json`, `tsconfig.json`, and `valora-plugin.json` manifest. Run `pnpm build:plugins` to (re)compile all three.
 
 ## Official Plugins
 
 The following plugins are published as npm packages under `@windagency/`:
 
-| Package                      | What it adds                                                    |
-| ---------------------------- | --------------------------------------------------------------- |
-| `valora-plugin-engineering`  | Engineering commands: `plan`, `implement`, `review-code`, …     |
-| `valora-plugin-product`      | Product commands: `refine-specs`, `create-prd`, `fetch-task`, … |
-| `valora-plugin-implement`    | Implementation agents (TypeScript, backend, frontend, React)    |
-| `valora-plugin-qa`           | QA agent and commands: `test`, `validate-coverage`, `pre-check` |
-| `valora-plugin-quality-gate` | Asserter agent and `assert` command                             |
-| `valora-plugin-secops`       | SecOps agent for security and compliance tasks                  |
-| `valora-plugin-platform`     | Platform-engineer agent for infrastructure tasks                |
-| `valora-plugin-design`       | UI/UX designer agent                                            |
-| `valora-plugin-docs`         | Documentation generation commands                               |
-| `valora-plugin-ollama`       | Self-managed Ollama LLM provider (code plugin)                  |
+| Package                      | What it adds                                                                                     |
+| ---------------------------- | ------------------------------------------------------------------------------------------------ |
+| `valora-plugin-rtk`          | RTK (Rust Token Killer) hook — reduces LLM token consumption by 60–90% for known-noisy CLI tools |
+| `valora-plugin-engineering`  | Engineering commands: `plan`, `implement`, `review-code`, …                                      |
+| `valora-plugin-product`      | Product commands: `refine-specs`, `create-prd`, `fetch-task`, …                                  |
+| `valora-plugin-implement`    | Implementation agents (TypeScript, backend, frontend, React)                                     |
+| `valora-plugin-qa`           | QA agent and commands: `test`, `validate-coverage`, `pre-check`                                  |
+| `valora-plugin-quality-gate` | Asserter agent and `assert` command                                                              |
+| `valora-plugin-secops`       | SecOps agent for security and compliance tasks                                                   |
+| `valora-plugin-platform`     | Platform-engineer agent for infrastructure tasks                                                 |
+| `valora-plugin-design`       | UI/UX designer agent                                                                             |
+| `valora-plugin-docs`         | Documentation generation commands                                                                |
+| `valora-plugin-ollama`       | Self-managed Ollama LLM provider (code plugin)                                                   |
+| `valora-plugin-openrouter`   | OpenRouter LLM provider (code plugin, requires API key)                                          |
 
 ```bash
+# Ollama (local, no API key)
 pnpm add @windagency/valora-plugin-ollama
 # then add "valora-plugin-ollama" to plugins.enabled in .valora/config.json
+
+# OpenRouter (cloud gateway, requires OPENROUTER_API_KEY)
+pnpm add @windagency/valora-plugin-openrouter
+# then add "valora-plugin-openrouter" to plugins.enabled in .valora/config.json
 ```
 
 ## Enabling and Disabling Plugins
@@ -128,18 +200,64 @@ Any plugin that fails manifest validation is skipped with a warning, never a har
 
 ## Checking Plugin Status
 
+### `valora plugin list`
+
+Show every plugin Valora has discovered, grouped by status:
+
+```bash
+valora plugin list
+```
+
+```
+Plugins  (2 enabled, 1 disabled)
+
+  ✓ valora-plugin-rtk           1.0.0  hooks, code      [project]
+  ✓ valora-core-generators      2.5.0  agents, commands [built-in]
+  ○ valora-plugin-qa            0.3.0  agents, commands [user]  not in plugins.enabled
+```
+
+| Marker | Meaning                                 |
+| ------ | --------------------------------------- |
+| `✓`    | Enabled and loaded                      |
+| `○`    | Discovered but not in `plugins.enabled` |
+| `✗`    | Invalid manifest — skipped              |
+
+The `[location]` tag shows where the plugin was found: `built-in`, `user`, `project`, or `npm`.
+
+### `valora doctor`
+
+The doctor command includes a **Plugins** section (enabled plugins only):
+
 ```bash
 valora doctor
 ```
 
-The doctor command includes a **Plugins** section:
-
 ```
 Plugins
-  ✓ valora-plugin-rtk      0.1.0  hooks, agent-context
+  ✓ valora-plugin-rtk      1.0.0  hooks, code
   ✓ acme-react-agents      1.2.0  agents, commands
   ✗ old-plugin             —      not enabled
 ```
+
+### `valora plugin available`
+
+Browse all plugins published in the `@windagency` registry:
+
+```bash
+valora plugin available
+```
+
+```
+Available plugins  (14 total, @windagency registry)
+
+  ✓ valora-plugin-rtk           1.0.0  RTK integration…          installed
+  ○ valora-plugin-engineering   1.0.0  Engineering workflow commands
+  ○ valora-plugin-qa            0.3.0  QA agent and commands
+
+Install with: valora plugin add <name>
+```
+
+Plugins already installed on disk are marked `✓`. Use `valora plugin add <name>` to add any listed plugin.
 
 ---
 
@@ -191,20 +309,22 @@ A plugin that contributes hooks must declare the `shell-hooks` permission in its
 ```json
 {
 	"name": "valora-plugin-rtk",
-	"version": "0.1.0",
-	"permissions": ["shell-hooks"],
-	"contributes": ["hooks", "agent-context"]
+	"version": "1.0.0",
+	"permissions": ["shell-hooks", "code-exec", "fs-write", "network"],
+	"contributes": ["hooks", "code"]
 }
 ```
 
 Available permissions:
 
-| Permission    | Required for                              |
-| ------------- | ----------------------------------------- |
-| `shell-hooks` | `hooks` contributions                     |
-| `code-exec`   | `code` contributions (TypeScript modules) |
+| Permission    | Required for                                        |
+| ------------- | --------------------------------------------------- |
+| `shell-hooks` | `hooks` contributions                               |
+| `code-exec`   | `code` contributions (TypeScript modules)           |
+| `fs-write`    | `code` contributions that write to the file system  |
+| `network`     | `code` contributions that make outbound connections |
 
-Future permissions (`network`, `fs-write`, `mcp-connect`) are reserved for additional code-contribution surfaces not yet released.
+The `mcp-connect` permission is reserved for a future code-contribution surface not yet released.
 
 ## `requiresBinary`
 
@@ -224,6 +344,13 @@ Valora checks `$PATH` for the named binary at load time. If it is absent, the pl
 ```
 
 ## Troubleshooting
+
+**`valora plugin add` fails**
+
+1. Confirm you have network access and that npm can reach the registry (`npm ping`)
+2. Check the package name is correct: `@windagency/valora-plugin-<name>`
+3. For `--scope project`, confirm you are inside a directory that has (or is a child of) a `.valora/` folder
+4. Run manually to see the full npm error: `npm pack @windagency/valora-plugin-<name>`
 
 **Plugin not loading**
 

@@ -1,0 +1,97 @@
+[
+	{
+		"id": "docker-build-python",
+		"path": "docker/docker-build-python.txt",
+		"originatingCommand": "docker build --progress=plain .",
+		"category": "docker",
+		"preservation": {
+			"mustContainAll": ["Successfully installed", "DONE"],
+			"mustNotDrop": ["pip install --no-cache-dir"]
+		},
+		"expectedRatioFloor": {
+			"raw": 0,
+			"universal-only": 70,
+			"typescript-only": 0,
+			"python-only": 0,
+			"all-inner": 70,
+			"rtk-only": 0,
+			"all-inner+rtk": 0
+		}
+	},
+	{
+		"id": "docker-build-ruby",
+		"path": "docker/docker-build-ruby.txt",
+		"originatingCommand": "docker build --progress=plain .",
+		"category": "docker",
+		"preservation": {
+			"mustContainAll": ["ERROR: failed to build"],
+			"mustNotDrop": ["gem install"]
+		},
+		"expectedRatioFloor": {
+			"raw": 0,
+			"universal-only": 66,
+			"typescript-only": 0,
+			"python-only": 0,
+			"all-inner": 66,
+			"rtk-only": 0,
+			"all-inner+rtk": 0
+		}
+	},
+	{
+		"id": "git-log-20",
+		"path": "git/git-log-20.txt",
+		"originatingCommand": "git log -20",
+		"category": "git",
+		"preservation": {
+			"mustContainAll": ["Add RTK plugin"],
+			"mustNotDrop": ["Add auto updater"],
+			"skipForCombinations": ["all-inner+rtk"]
+		},
+		"expectedRatioFloor": {
+			"raw": 0,
+			"universal-only": 69,
+			"typescript-only": 0,
+			"python-only": 0,
+			"all-inner": 69,
+			"rtk-only": 49,
+			"all-inner+rtk": 0
+		}
+	},
+	{
+		"id": "git-show-head",
+		"path": "git/git-show-head-full.txt",
+		"originatingCommand": "git show HEAD",
+		"category": "git",
+		"preservation": {
+			"mustContainAll": ["Add RTK plugin"],
+			"mustNotDrop": ["valora-plugin-rtk"]
+		},
+		"expectedRatioFloor": {
+			"raw": 0,
+			"universal-only": 40,
+			"typescript-only": 0,
+			"python-only": 0,
+			"all-inner": 40,
+			"rtk-only": 0,
+			"all-inner+rtk": 0
+		}
+	},
+	{
+		"id": "rg-functions-executor",
+		"path": "search/rg-functions-executor.txt",
+		"originatingCommand": "rg function src/executor/ --type ts",
+		"category": "search",
+		"preservation": {
+			"mustContainAll": ["output-compression.service.ts", "memory-formatter.ts"]
+		},
+		"expectedRatioFloor": {
+			"raw": 0,
+			"universal-only": 31,
+			"typescript-only": 0,
+			"python-only": 0,
+			"all-inner": 31,
+			"rtk-only": 0,
+			"all-inner+rtk": 0
+		}
+	}
+]

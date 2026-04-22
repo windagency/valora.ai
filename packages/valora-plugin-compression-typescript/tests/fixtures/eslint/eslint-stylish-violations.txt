@@ -1,0 +1,55 @@
+/workspaces/valora/src/analysis/code-analyser.ts
+   12:7   error  'result' is defined but never used                                    no-unused-vars
+   45:3   error  'result' is defined but never used                                    no-unused-vars
+   67:9   error  'result' is defined but never used                                    no-unused-vars
+   89:5   error  'result' is defined but never used                                    no-unused-vars
+  112:11  error  'result' is defined but never used                                    no-unused-vars
+  134:7   error  'result' is defined but never used                                    no-unused-vars
+   23:5   error  Promises must be awaited, end with a call to .catch, or end with...   @typescript-eslint/no-floating-promises
+   55:3   error  Promises must be awaited, end with a call to .catch, or end with...   @typescript-eslint/no-floating-promises
+   78:9   error  Promises must be awaited, end with a call to .catch, or end with...   @typescript-eslint/no-floating-promises
+  156:3   error  Promises must be awaited, end with a call to .catch, or end with...   @typescript-eslint/no-floating-promises
+   34:15  error  Function has a complexity of 14. Maximum allowed is 10               complexity
+  167:12  error  Function has a complexity of 12. Maximum allowed is 10               complexity
+  199:1   error  Function has a complexity of 11. Maximum allowed is 10               complexity
+
+/workspaces/valora/src/batch/batch-processor.ts
+   18:3   error  'item' is defined but never used                                      no-unused-vars
+   42:9   error  'item' is defined but never used                                      no-unused-vars
+   77:5   error  'item' is defined but never used                                      no-unused-vars
+  101:13  error  'item' is defined but never used                                      no-unused-vars
+   29:7   error  Promises must be awaited, end with a call to .catch, or end with...   @typescript-eslint/no-floating-promises
+   88:3   error  Promises must be awaited, end with a call to .catch, or end with...   @typescript-eslint/no-floating-promises
+  145:9   error  Promises must be awaited, end with a call to .catch, or end with...   @typescript-eslint/no-floating-promises
+   56:1   warning  Unexpected console statement                                        no-console
+   93:1   warning  Unexpected console statement                                        no-console
+  112:1   warning  Unexpected console statement                                        no-console
+  131:1   warning  Unexpected console statement                                        no-console
+  178:1   warning  Unexpected console statement                                        no-console
+
+/workspaces/valora/src/cli/command-handler.ts
+   14:5   error  'options' is defined but never used                                   no-unused-vars
+   38:9   error  'options' is defined but never used                                   no-unused-vars
+   62:7   error  'options' is defined but never used                                   no-unused-vars
+   91:11  error  'options' is defined but never used                                   no-unused-vars
+  115:3   error  'options' is defined but never used                                   no-unused-vars
+   25:3   error  Promises must be awaited, end with a call to .catch, or end with...   @typescript-eslint/no-floating-promises
+   73:5   error  Promises must be awaited, end with a call to .catch, or end with...   @typescript-eslint/no-floating-promises
+  134:7   error  Promises must be awaited, end with a call to .catch, or end with...   @typescript-eslint/no-floating-promises
+   47:1   warning  Unexpected console statement                                        no-console
+   84:1   warning  Unexpected console statement                                        no-console
+
+/workspaces/valora/src/executor/tool-executor.ts
+   11:7   error  'output' is defined but never used                                    no-unused-vars
+   33:5   error  'output' is defined but never used                                    no-unused-vars
+   57:3   error  'output' is defined but never used                                    no-unused-vars
+   81:9   error  'output' is defined but never used                                    no-unused-vars
+   19:5   error  Promises must be awaited, end with a call to .catch, or end with...   @typescript-eslint/no-floating-promises
+   46:7   error  Promises must be awaited, end with a call to .catch, or end with...   @typescript-eslint/no-floating-promises
+   22:1   error  Function has a complexity of 13. Maximum allowed is 10               complexity
+   69:1   error  Function has a complexity of 11. Maximum allowed is 10               complexity
+   39:1   warning  Unexpected console statement                                        no-console
+   72:1   warning  Unexpected console statement                                        no-console
+  108:1   warning  Unexpected console statement                                        no-console
+
+✖ 52 problems (41 errors, 11 warnings)

@@ -1,5 +1,7 @@
 import { type ChildProcess, spawn } from 'child_process';
 
+const SIGKILL_TIMEOUT_MS = 5_000;
+
 /**
  * Thrown when the Ollama server fails to become reachable within the polling timeout.
  */
@@ -60,10 +62,19 @@ export class OllamaProcessManagerImpl implements OllamaProcessManager {
 			};
 			const child = spawn('ollama', ['serve'], { detached: false, stdio: 'ignore' });
 			this.process = child;
+
 			child.once('error', (err) => {
-				this.process = null;
+				this.process = null; // always clear, even after settled
 				settle(() => reject(err));
 			});
+
+			// Clear the reference whenever the child closes, regardless of whether
+			// waitForReady has already resolved — prevents stop() from sending
+			// signals to a dead process.
+			child.once('close', () => {
+				this.process = null;
+			});
+
 			this.waitForReady(baseUrl).then(
 				() => settle(resolve),
 				(err: unknown) => settle(() => reject(err))
@@ -71,13 +82,30 @@ export class OllamaProcessManagerImpl implements OllamaProcessManager {
 		});
 	}
 
-	/** Sends SIGTERM to the managed process and waits for it to exit; no-op otherwise. */
+	/**
+	 * Sends SIGTERM to the managed process and waits for it to exit.
+	 * If the process is already dead, resolves immediately without signalling.
+	 * Escalates to SIGKILL after 5 000 ms if the process does not close.
+	 */
 	async stop(): Promise<void> {
 		const child = this.process;
 		if (!child) return;
 		this.process = null;
-		await new Promise<void>((resolve) => {
-			child.once('close', () => resolve());
+
+		// Process already exited — no signal needed.
+		if (child.exitCode !== null || child.signalCode !== null) return;
+
+		return new Promise<void>((resolve) => {
+			const timeout = setTimeout(() => {
+				child.kill('SIGKILL');
+				resolve();
+			}, SIGKILL_TIMEOUT_MS);
+
+			child.once('close', () => {
+				clearTimeout(timeout);
+				resolve();
+			});
+
 			child.kill('SIGTERM');
 		});
 	}

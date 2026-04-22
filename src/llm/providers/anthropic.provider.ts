@@ -11,6 +11,7 @@
 
 import type { BatchableProvider } from 'batch/batch-provider.interface';
 import type { BatchRequest, BatchResult, BatchStatusInfo, BatchSubmission } from 'batch/batch.types';
+import type { ProviderDescriptor } from 'plugins/plugin-api.types';
 
 import Anthropic from '@anthropic-ai/sdk';
 import { AnthropicVertex } from '@anthropic-ai/vertex-sdk';
@@ -27,7 +28,7 @@ import { Agent as UndiciAgent, fetch as undiciFetch } from 'undici';
 import type { LLMCompletionOptions, LLMCompletionResult, LLMMessage, LLMUsage } from 'types/llm.types';
 
 import { DEFAULT_MAX_TOKENS } from 'config/constants';
-import { getProviderModels, ProviderName } from 'config/providers.config';
+import { BuiltinProviders, getProviderModels, ModelName } from 'config/providers.config';
 import { getModelMappingRegistry, type ModelMappingRegistry } from 'llm/model-mapping-registry';
 import { BaseLLMProvider } from 'llm/provider.interface';
 import { getProviderRegistry } from 'llm/registry';
@@ -39,7 +40,7 @@ import { estimateTokensFromText } from 'utils/token-estimator';
 const MIN_CACHEABLE_TOKENS = 1024;
 
 export class AnthropicProvider extends BaseLLMProvider implements BatchableProvider {
-	name = ProviderName.ANTHROPIC;
+	name = BuiltinProviders.ANTHROPIC;
 	private client: Anthropic | AnthropicVertex | null = null;
 	private readonly modelMappingRegistry: ModelMappingRegistry;
 
@@ -67,7 +68,7 @@ export class AnthropicProvider extends BaseLLMProvider implements BatchableProvi
 			throw new ProviderError(
 				'Anthropic provider not configured. In sandboxed environments, API keys are required for LLM operations.',
 				{
-					provider: ProviderName.ANTHROPIC,
+					provider: BuiltinProviders.ANTHROPIC,
 					sandboxed: true,
 					suggestion: 'Configure ANTHROPIC_API_KEY or use Cursor provider in non-sandboxed environments'
 				},
@@ -91,7 +92,7 @@ export class AnthropicProvider extends BaseLLMProvider implements BatchableProvi
 				`Anthropic API rate limit exceeded. Try again in ${Math.ceil((status.resetTime - Date.now()) / 1000)} seconds.`,
 				{
 					blockedUntil: status.blockedUntil,
-					provider: ProviderName.ANTHROPIC,
+					provider: BuiltinProviders.ANTHROPIC,
 					remaining: status.remaining,
 					resetTime: status.resetTime
 				},
@@ -179,7 +180,7 @@ export class AnthropicProvider extends BaseLLMProvider implements BatchableProvi
 				{
 					error: error,
 					model: options.model,
-					provider: ProviderName.ANTHROPIC
+					provider: BuiltinProviders.ANTHROPIC
 				},
 				context
 			);
@@ -190,7 +191,7 @@ export class AnthropicProvider extends BaseLLMProvider implements BatchableProvi
 	 * Complete using streaming (required for large token requests)
 	 */
 	override getAlternativeModels(currentModel?: string): string[] {
-		const alternatives = getProviderModels(ProviderName.ANTHROPIC);
+		const alternatives = getProviderModels(BuiltinProviders.ANTHROPIC);
 		return currentModel ? alternatives.filter((m) => m !== currentModel) : alternatives;
 	}
 
@@ -232,7 +233,7 @@ export class AnthropicProvider extends BaseLLMProvider implements BatchableProvi
 		} catch (error) {
 			throw new ProviderError(`Anthropic streaming error: ${(error as Error).message}`, {
 				error: error,
-				provider: ProviderName.ANTHROPIC
+				provider: BuiltinProviders.ANTHROPIC
 			});
 		}
 	}
@@ -273,7 +274,7 @@ export class AnthropicProvider extends BaseLLMProvider implements BatchableProvi
 	 * Process streaming response
 	 */
 	override validateModel(modelName: string): Promise<boolean> {
-		const knownModels = getProviderModels(ProviderName.ANTHROPIC);
+		const knownModels = getProviderModels(BuiltinProviders.ANTHROPIC);
 		// Accept known models or any model following the claude-* pattern
 		return Promise.resolve(knownModels.includes(modelName) || modelName.startsWith('claude-'));
 	}
@@ -754,4 +755,25 @@ export class AnthropicProvider extends BaseLLMProvider implements BatchableProvi
 }
 
 // Self-register this provider with the registry when module is loaded
-getProviderRegistry().registerProvider(ProviderName.ANTHROPIC, AnthropicProvider, { owner: 'core' });
+getProviderRegistry().registerProvider(BuiltinProviders.ANTHROPIC, AnthropicProvider, { owner: 'core' }, {
+	defaultModel: ModelName.CLAUDE_OPUS_4_6,
+	description: 'Claude models from Anthropic',
+	label: 'Anthropic',
+	modelModes: [
+		{ mode: 'normal', model: ModelName.CLAUDE_OPUS_4_6 },
+		{ mode: 'extended thinking', model: ModelName.CLAUDE_OPUS_4_6 },
+		{ mode: 'normal', model: ModelName.CLAUDE_SONNET_4_6 },
+		{ mode: 'extended thinking', model: ModelName.CLAUDE_SONNET_4_6 },
+		{ mode: 'normal', model: ModelName.CLAUDE_OPUS_4_5 },
+		{ mode: 'extended thinking', model: ModelName.CLAUDE_OPUS_4_5 },
+		{ mode: 'normal', model: ModelName.CLAUDE_OPUS_4 },
+		{ mode: 'extended thinking', model: ModelName.CLAUDE_OPUS_4 },
+		{ mode: 'normal', model: ModelName.CLAUDE_SONNET_4_5 },
+		{ mode: 'extended thinking', model: ModelName.CLAUDE_SONNET_4_5 },
+		{ mode: 'normal', model: ModelName.CLAUDE_SONNET_4 },
+		{ mode: 'extended thinking', model: ModelName.CLAUDE_SONNET_4 },
+		{ mode: 'normal', model: ModelName.CLAUDE_HAIKU_4_5 },
+		{ mode: 'normal', model: ModelName.CLAUDE_HAIKU_3_5 }
+	],
+	requiresApiKey: true
+} satisfies ProviderDescriptor);

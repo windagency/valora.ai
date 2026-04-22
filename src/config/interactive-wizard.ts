@@ -8,14 +8,14 @@ import { isPromptCancellation } from 'utils/prompt-handler';
 
 import type { ConfigLoader } from './loader';
 
-import { getProviderMetadata, ProviderName } from './providers.config';
+import { BuiltinProviders, getProviderMetadata } from './providers.config';
 import { type Config, DEFAULT_CONFIG } from './schema';
 import {
 	configureDefaults,
 	configureProvider,
 	filterValidProviders,
-	PROVIDER_CHOICES,
-	QUICK_SETUP_CHOICES
+	getProviderChoices,
+	getQuickSetupChoices
 } from './validation-helpers';
 
 const prompt = getPromptAdapter();
@@ -55,7 +55,7 @@ ${color.gray('   API keys are optional - only needed for CLI or specific provide
 			// Ask which providers to configure
 			const { providers } = await prompt.prompt([
 				{
-					choices: PROVIDER_CHOICES,
+					choices: getProviderChoices(),
 					message: 'Which LLM providers would you like to configure?',
 					name: 'providers',
 					type: 'checkbox'
@@ -134,7 +134,7 @@ ${color.gray(`Config file: ${this.configLoader.getConfigPath()}`)}`);
 	): Promise<string> {
 		// No providers configured, default to Cursor
 		if (validProviders.length === 0) {
-			return ProviderName.CURSOR;
+			return BuiltinProviders.CURSOR;
 		}
 
 		// Single provider - use it automatically
@@ -242,7 +242,7 @@ ${color.gray(`You can run 'valora config setup' for more options.`)}`);
 		// Check if non-interactive mode without API keys
 		if (process.env['AI_INTERACTIVE'] === 'false' || process.env['CI']) {
 			console.info(color.cyan('✨ No API keys found - Using Cursor Provider (non-interactive mode)'));
-			return { apiKey: '', providerChoice: ProviderName.CURSOR };
+			return { apiKey: '', providerChoice: BuiltinProviders.CURSOR };
 		}
 
 		// Interactive mode - prompt user
@@ -254,9 +254,9 @@ ${color.gray(`You can run 'valora config setup' for more options.`)}`);
 	 */
 	private checkEnvForProvider(): null | { apiKey: string; providerChoice: string } {
 		const envMapping = {
-			[ProviderName.ANTHROPIC]: process.env['AI_ANTHROPIC_API_KEY'],
-			[ProviderName.GOOGLE]: process.env['AI_GOOGLE_API_KEY'],
-			[ProviderName.OPENAI]: process.env['AI_OPENAI_API_KEY']
+			[BuiltinProviders.ANTHROPIC]: process.env['AI_ANTHROPIC_API_KEY'],
+			[BuiltinProviders.GOOGLE]: process.env['AI_GOOGLE_API_KEY'],
+			[BuiltinProviders.OPENAI]: process.env['AI_OPENAI_API_KEY']
 		};
 
 		for (const [provider, apiKey] of Object.entries(envMapping)) {
@@ -276,8 +276,8 @@ ${color.gray(`You can run 'valora config setup' for more options.`)}`);
 	): Promise<{ apiKey: string; providerChoice: string }> {
 		const providerAnswer = await prompt.prompt([
 			{
-				choices: QUICK_SETUP_CHOICES,
-				default: ProviderName.CURSOR,
+				choices: getQuickSetupChoices(),
+				default: BuiltinProviders.CURSOR,
 				message: 'Which LLM provider would you like to use?',
 				name: 'providerChoice',
 				type: 'list'
@@ -286,7 +286,7 @@ ${color.gray(`You can run 'valora config setup' for more options.`)}`);
 		const providerChoice = providerAnswer['providerChoice'] as string;
 
 		// Cursor provider doesn't need API key
-		if (providerChoice === ProviderName.CURSOR) {
+		if (providerChoice === BuiltinProviders.CURSOR) {
 			console.info(`${color.cyan('✨ Using Cursor Provider (no API key needed)')}
 ${color.gray('   Available when running in Cursor IDE.')}`);
 			return { apiKey: '', providerChoice };

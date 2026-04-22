@@ -43,14 +43,10 @@ export class ProviderMismatchHandler {
 			// Prompt for action
 			const action = await this.promptUserAction(requestedProvider, configuredProviders, config);
 
-			const actionHandlers = {
-				cancel: () => null,
-				configure: async () => this.configureProvider(requestedProvider),
-				useDefault: () => this.useDefaultProvider(config)
-			} as const;
-
-			const handler = actionHandlers[action as keyof typeof actionHandlers];
-			return handler ? await handler() : null;
+			if (action === 'cancel') return null;
+			if (action === 'configure') return await this.configureProvider(requestedProvider);
+			if (action.startsWith('use:')) return this.useNamedProvider(action.slice(4), config);
+			return null;
 		} catch (error) {
 			// Handle prompt cancellation gracefully
 			if (isPromptCancellation(error)) {
@@ -66,25 +62,18 @@ export class ProviderMismatchHandler {
 	 */
 	private async promptUserAction(
 		requestedProvider: string,
-		_configuredProviders: string[],
+		configuredProviders: string[],
 		config: Config
-	): Promise<'cancel' | 'configure' | 'useDefault'> {
-		const defaultProvider = config.defaults?.default_provider;
-		const defaultModel = this.getDefaultModelForProvider(defaultProvider, config);
+	): Promise<string> {
+		const providerChoices = configuredProviders.map((p) => ({
+			name: `Use ${p} provider instead (model: ${this.getDefaultModelForProvider(p, config)})`,
+			value: `use:${p}`
+		}));
 
 		const choices = [
-			{
-				name: `Configure ${requestedProvider} provider now (run setup wizard)`,
-				value: 'configure'
-			},
-			{
-				name: `Use ${defaultProvider} provider instead (model: ${defaultModel})`,
-				value: 'useDefault'
-			},
-			{
-				name: 'Cancel command execution',
-				value: 'cancel'
-			}
+			{ name: `Configure ${requestedProvider} provider now (run setup wizard)`, value: 'configure' },
+			...providerChoices,
+			{ name: 'Cancel command execution', value: 'cancel' }
 		];
 
 		const { action } = await prompt.prompt([
@@ -96,7 +85,7 @@ export class ProviderMismatchHandler {
 			}
 		]);
 
-		return action as 'cancel' | 'configure' | 'useDefault';
+		return action as string;
 	}
 
 	/**
@@ -134,31 +123,22 @@ export class ProviderMismatchHandler {
 	}
 
 	/**
-	 * Use the default configured provider
+	 * Use a specific configured provider
 	 */
-	private useDefaultProvider(config: Config): ProviderResolution {
+	private useNamedProvider(providerName: string, config: Config): ProviderResolution {
 		const color = getColorAdapter();
-		const defaultProvider = config.defaults?.default_provider;
+		const providerConfig = config.providers[providerName as keyof typeof config.providers];
 
-		if (!defaultProvider) {
-			throw new Error('No default provider configured');
-		}
-
-		const providerConfig = config.providers[defaultProvider as keyof typeof config.providers];
 		if (!providerConfig) {
-			throw new Error(`Default provider ${defaultProvider} not configured`);
+			throw new Error(`Provider ${providerName} not configured`);
 		}
 
-		const defaultModel = this.getDefaultModelForProvider(defaultProvider, config);
+		const model = this.getDefaultModelForProvider(providerName, config);
 
-		console.info(color.cyan(`\n→ Switching to ${defaultProvider} provider`));
-		console.info(color.gray(`  Model: ${defaultModel}\n`));
+		console.info(color.cyan(`\n→ Switching to ${providerName} provider`));
+		console.info(color.gray(`  Model: ${model}\n`));
 
-		return {
-			model: defaultModel,
-			providerConfig,
-			providerName: defaultProvider
-		};
+		return { model, providerConfig, providerName };
 	}
 
 	/**

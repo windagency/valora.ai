@@ -12,7 +12,7 @@ import { shouldCheckNow, type UpdateCheckState } from './throttle';
 export { isNewerVersion } from './compare';
 export { detectPackageManager, getInstallCommand, type PackageManager } from './detect-package-manager';
 export { runAutoInstall } from './installer';
-export { printUpdateBanner, shouldAutoUpdate, shouldShowReminder } from './notifier';
+export { shouldAutoUpdate, shouldShowReminder } from './notifier';
 export { fetchLatestVersion } from './registry';
 export { readUpdateState, writeUpdateState } from './state';
 export { shouldCheckNow, type UpdateCheckState } from './throttle';
@@ -28,8 +28,16 @@ interface PendingContext {
 let pending: null | PendingContext = null;
 
 /**
+ * Reset the pending update check singleton. Intended for test isolation only.
+ */
+export function resetPendingUpdateCheck(): void {
+	pending = null;
+}
+
+/**
  * Schedule a background update check. Fire-and-forget — does not await.
  * No-ops when the throttle window has not elapsed.
+ * First-write-wins: a second call while one is already pending is silently ignored.
  */
 export function scheduleUpdateCheck(
 	stateDir: string,
@@ -37,6 +45,8 @@ export function scheduleUpdateCheck(
 	frequencyDays: number,
 	now: Date = new Date()
 ): void {
+	if (pending !== null) return; // first-write-wins
+
 	const statePromise = readUpdateState(stateDir);
 	const fetchPromise: Promise<'__skipped__' | null | string> = statePromise
 		.then((state) => {
@@ -65,13 +75,13 @@ export async function settleUpdateCheck(timeoutMs: number = 200): Promise<null |
 	if (!ctx) return null;
 	pending = null;
 
-	let timeoutId: ReturnType<typeof setTimeout>;
+	let timeoutId: ReturnType<typeof setTimeout> | undefined;
 	const timeoutPromise = new Promise<'__timeout__'>((resolve) => {
 		timeoutId = setTimeout(() => resolve('__timeout__'), timeoutMs);
 	});
 
 	const result = await Promise.race([ctx.promise, timeoutPromise]);
-	clearTimeout(timeoutId!);
+	clearTimeout(timeoutId);
 	if (result === '__timeout__' || result === '__skipped__') {
 		return null;
 	}

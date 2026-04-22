@@ -82,22 +82,35 @@ export function stripAnsiCodes(text: string): string {
 	return text.replace(ANSI_ESCAPE_RE, '');
 }
 
+const PRIORITY_LINE_RE = /error|Error|FAIL|FAILED|\bTS\d{4}\b|✗|✕|×|npm ERR!/;
+const MAX_PRIORITY_CHARS = 2000;
+
 /**
- * Truncate output to MAX_TERMINAL_OUTPUT_CHARS using head+tail strategy,
- * preserving the beginning (command context) and the end (summary/errors).
- *
- * Exported so callers that need the raw safety net can use it directly.
+ * Truncate output to MAX_TERMINAL_OUTPUT_CHARS using head+tail strategy.
+ * When the omitted middle contains priority lines (errors, failures), up to
+ * 2 000 chars of those lines are surfaced before the omission notice.
  */
 export function truncateTerminalOutput(output: string): string {
 	if (output.length <= MAX_TERMINAL_OUTPUT_CHARS) return output;
 	const HEAD = Math.floor(MAX_TERMINAL_OUTPUT_CHARS * 0.8);
 	const TAIL = MAX_TERMINAL_OUTPUT_CHARS - HEAD;
 	const omitted = output.length - HEAD - TAIL;
-	return (
-		output.substring(0, HEAD) +
-		`\n\n[... ${omitted} characters omitted ...]\n\n` +
-		output.substring(output.length - TAIL)
-	);
+	const middle = output.substring(HEAD, output.length - TAIL);
+	const priority = extractPriorityLines(middle);
+	const omitNotice = priority
+		? `\n\n[... ${omitted} characters omitted, priority lines below ...]\n${priority}\n\n`
+		: `\n\n[... ${omitted} characters omitted ...]\n\n`;
+	return output.substring(0, HEAD) + omitNotice + output.substring(output.length - TAIL);
+}
+
+function extractPriorityLines(text: string): string {
+	let result = '';
+	for (const line of text.split('\n')) {
+		if (!PRIORITY_LINE_RE.test(line)) continue;
+		if (result.length + line.length + 1 > MAX_PRIORITY_CHARS) break;
+		result += line + '\n';
+	}
+	return result.trimEnd();
 }
 
 /**
@@ -117,13 +130,14 @@ export function compressTerminalOutput(command: string, output: string): string 
 		return clean;
 	}
 
-	const tool = firstToken(command);
+	const tool = resolveStrategyKey(command);
 	const strategy = registry.get(tool);
 	let compressed: string;
 	if (strategy) {
 		try {
 			compressed = strategy(clean, command);
-		} catch {
+		} catch (err) {
+			getLogger().warn(`Compression strategy for "${tool}" threw an error: ${String(err)}`);
 			compressed = clean;
 		}
 	} else {
@@ -131,12 +145,21 @@ export function compressTerminalOutput(command: string, output: string): string 
 	}
 
 	const result = truncateTerminalOutput(compressed);
-	recordCompression(clean.length, result.length);
+	recordCompression(output.length, result.length);
 	return result;
 }
 
 // ── Internal helpers ──────────────────────────────────────────────────────────
 
-function firstToken(command: string): string {
-	return command.trimStart().split(/\s+/)[0] ?? '';
+const WRAPPER_COMMANDS = new Set(['bun', 'bunx', 'npm', 'npx', 'pnpm', 'yarn']);
+
+const PM_SUBCOMMANDS = new Set(['add', 'audit', 'dlx', 'exec', 'i', 'install', 'outdated', 'remove', 'run', 'test']);
+
+function resolveStrategyKey(command: string): string {
+	const tokens = command.trimStart().split(/\s+/);
+	const first = tokens[0] ?? '';
+	if (!WRAPPER_COMMANDS.has(first)) return first;
+	const second = tokens[1] ?? '';
+	if (!PM_SUBCOMMANDS.has(second) && registry.has(second)) return second;
+	return first;
 }

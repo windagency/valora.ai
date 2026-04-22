@@ -7,7 +7,7 @@ import type { CommandResult } from 'types/command.types';
 import type { ToolCallArgs, ToolResult } from 'types/mcp.types';
 
 import { getConfigLoader } from 'config/loader';
-import { ProviderName } from 'config/providers.config';
+import { BuiltinProviders } from 'config/providers.config';
 import { getLogger } from 'output/logger';
 import { generateId } from 'utils/id-generator';
 import { validateToolCallArgs, type ValidationResult } from 'utils/input-validator';
@@ -148,13 +148,13 @@ export class MCPRequestHandler {
 		const configLoader = getConfigLoader();
 
 		// Cursor provider doesn't need setup
-		if (args.provider === ProviderName.CURSOR) {
+		if (args.provider === BuiltinProviders.CURSOR) {
 			return false;
 		}
 
 		// Check if other providers are configured
-		const providerName = args.provider ?? ProviderName.CURSOR;
-		if (providerName === ProviderName.CURSOR) {
+		const providerName = args.provider ?? BuiltinProviders.CURSOR;
+		if (providerName === BuiltinProviders.CURSOR) {
 			return false;
 		}
 
@@ -211,7 +211,7 @@ export class MCPRequestHandler {
 					isError: false,
 					metadata: {
 						mode: 'guided_completion',
-						provider: ProviderName.CURSOR,
+						provider: BuiltinProviders.CURSOR,
 						requiresManualProcessing: true,
 						useCursorSubscription: true
 					}

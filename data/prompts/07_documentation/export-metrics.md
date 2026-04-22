@@ -15,7 +15,6 @@ model_requirements:
   recommended:
     - claude-haiku-4.5
 agents:
-  - product-manager
 dependencies:
   requires:
     - context.use-modern-cli-tools

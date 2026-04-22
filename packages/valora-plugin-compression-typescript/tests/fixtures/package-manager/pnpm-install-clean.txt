@@ -1,0 +1,20 @@
+⠙ Resolving dependencies...
+⠹ Resolving dependencies...
+⠸ Resolving dependencies...
+⠼ Resolving dependencies...
+Progress: resolved 842, reused 839, downloaded 3, added 3
+⠴ Linking dependencies...
+warning "@typescript-eslint/eslint-plugin > @typescript-eslint/type-utils@7.0.2" has unmet peer dependency "typescript@>=4.7.4 <5.4.0".
+warning "@typescript-eslint/eslint-plugin > @typescript-eslint/utils > @typescript-eslint/typescript-estree@7.0.2" has unmet peer dependency "typescript@>=4.7.4 <5.4.0".
+warning "workspace-root > @stryker-mutator/core@8.2.6" has unmet peer dependenc:
+npm warn deprecated request@2.88.2: request has been deprecated, see https://github.com/request/request/issues/3142
+npm warn deprecated har-validator@5.1.5: this package is no longer maintained
+npm warn deprecated uuid@3.4.0: Please upgrade  to version 7 or higher.
+warning " > husky@9.1.7" has unmet peer dependency "npm>=10".
+warning "workspace-root > vitest@1.6.1 > @vitest/runner@1.6.1" has incorrect peer dependency "vite@^5.0.0".
+found 0 vulnerabilities
+
+dependencies:
++ typescript 5.3.2
+
+Done in 3.2s

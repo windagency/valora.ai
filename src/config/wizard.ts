@@ -13,6 +13,8 @@ export {
 	configureProvider,
 	DEFAULT_MODELS,
 	filterValidProviders,
+	getProviderChoices,
+	getQuickSetupChoices,
 	PROVIDER_CHOICES,
 	PROVIDER_LABELS,
 	QUICK_SETUP_CHOICES,

@@ -8,7 +8,8 @@ import { isPromptCancellation } from 'utils/prompt-handler';
 
 import type { Config } from './schema';
 
-import { getAllProviderKeys, getProviderMetadata, PROVIDER_REGISTRY, ProviderName } from './providers.config';
+import { getProviderCatalog } from './provider-catalog';
+import { BuiltinProviders, getAllProviderKeys, getProviderMetadata, PROVIDER_REGISTRY } from './providers.config';
 
 const prompt = getPromptAdapter();
 
@@ -24,7 +25,51 @@ export const DEFAULT_MODELS: Record<string, string> = Object.fromEntries(
 );
 
 /**
- * Available provider choices for setup wizard (generated from PROVIDER_REGISTRY)
+ * Available provider choices for setup wizard (queries the catalog at call time).
+ */
+export function getProviderChoices(): Array<{ checked?: boolean; name: string; value: string }> {
+	const catalog = getProviderCatalog();
+	const keys = catalog.getAllProviderKeys();
+	const choices: Array<{ checked?: boolean; name: string; value: string }> = keys.map((key, index) => {
+		const metadata = catalog.getProviderMetadata(key);
+		if (!metadata) {
+			throw new Error(`Provider metadata not found for key: ${key}`);
+		}
+		const displayName = metadata.description ? `${metadata.label} (${metadata.description})` : metadata.label;
+		return {
+			checked: index === 0, // First provider checked by default
+			name: displayName,
+			value: key
+		};
+	});
+	choices.push({ name: getColorAdapter().gray('Skip - No provider configuration'), value: '__skip__' });
+	return choices;
+}
+
+/**
+ * Quick setup provider choices (queries the catalog at call time).
+ * No-API-key providers appear first, followed by the three core API-key providers.
+ */
+export function getQuickSetupChoices(): Array<{ name: string; value: string }> {
+	const catalog = getProviderCatalog();
+	const noKeyDescriptors = catalog.getProvidersWithoutApiKey();
+	const noKeyChoices = noKeyDescriptors.map((desc) => ({
+		name: `${desc.label} (No API key needed)`,
+		value:
+			// Resolve the key from the catalog by matching the descriptor
+			Array.from(catalog.descriptors()).find(([, d]) => d === desc)?.[0] ?? desc.label.toLowerCase()
+	}));
+	return [
+		...noKeyChoices,
+		{ name: 'Anthropic (Claude) - Recommended', value: BuiltinProviders.ANTHROPIC },
+		{ name: 'OpenAI (GPT)', value: BuiltinProviders.OPENAI },
+		{ name: 'Google (Gemini)', value: BuiltinProviders.GOOGLE }
+	];
+}
+
+/**
+ * @deprecated Use getProviderChoices() instead.
+ * Kept for backward compatibility until all callers are updated.
  */
 export const PROVIDER_CHOICES = [
 	...getAllProviderKeys().map((key, index) => {
@@ -34,7 +79,7 @@ export const PROVIDER_CHOICES = [
 		}
 		const displayName = metadata.description ? `${metadata.label} (${metadata.description})` : metadata.label;
 		return {
-			checked: index === 0, // First provider (anthropic) is checked by default
+			checked: index === 0,
 			name: displayName,
 			value: key
 		};
@@ -43,10 +88,10 @@ export const PROVIDER_CHOICES = [
 ];
 
 /**
- * Quick setup provider choices (prioritize no-API-key providers first)
+ * @deprecated Use getQuickSetupChoices() instead.
+ * Kept for backward compatibility until all callers are updated.
  */
 export const QUICK_SETUP_CHOICES = [
-	// No-API-key providers first
 	...getAllProviderKeys()
 		.filter((key) => !PROVIDER_REGISTRY[key]?.requiresApiKey)
 		.map((key) => {
@@ -59,10 +104,9 @@ export const QUICK_SETUP_CHOICES = [
 				value: key
 			};
 		}),
-	// Then API-key providers
-	{ name: 'Anthropic (Claude) - Recommended', value: ProviderName.ANTHROPIC },
-	{ name: 'OpenAI (GPT)', value: ProviderName.OPENAI },
-	{ name: 'Google (Gemini)', value: ProviderName.GOOGLE }
+	{ name: 'Anthropic (Claude) - Recommended', value: BuiltinProviders.ANTHROPIC },
+	{ name: 'OpenAI (GPT)', value: BuiltinProviders.OPENAI },
+	{ name: 'Google (Gemini)', value: BuiltinProviders.GOOGLE }
 ];
 
 /**
@@ -79,21 +123,21 @@ async function configureLocalProvider(
 
 	const { baseUrl, defaultModel } = await prompt.prompt([
 		{
-			default: 'http://localhost:11434/v1',
+			default: 'http://localhost:8080/v1',
 			message: 'Local server URL:',
 			name: 'baseUrl',
 			type: 'input'
 		},
 		{
 			default: metadata.defaultModel,
-			message: 'Default model name (e.g. llama3.1, mistral):',
+			message: 'Default model name:',
 			name: 'defaultModel',
 			type: 'input'
 		}
 	]);
 
-	config.providers[ProviderName.LOCAL as keyof typeof config.providers] = {
-		baseUrl: (baseUrl as string).trim() || 'http://localhost:11434/v1',
+	config.providers[BuiltinProviders.LOCAL as keyof typeof config.providers] = {
+		baseUrl: (baseUrl as string).trim() || 'http://localhost:8080/v1',
 		default_model: (defaultModel as string).trim() || metadata.defaultModel
 	};
 }
@@ -170,7 +214,7 @@ export async function configureProvider(providerName: string, config: Config): P
 
 	try {
 		// Local provider — prompt for base URL instead of API key
-		if (providerName === ProviderName.LOCAL) {
+		if (providerName === BuiltinProviders.LOCAL) {
 			await configureLocalProvider(metadata, config);
 			console.groupEnd();
 			return;
@@ -201,7 +245,7 @@ export async function configureProvider(providerName: string, config: Config): P
 		}
 
 		// Check if this is Anthropic provider - offer Vertex AI option
-		if (providerName === ProviderName.ANTHROPIC) {
+		if (providerName === BuiltinProviders.ANTHROPIC) {
 			const usedVertex = await configureAnthropicVertexOption(metadata, providerName, config);
 			if (usedVertex) {
 				console.groupEnd();

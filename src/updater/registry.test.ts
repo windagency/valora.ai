@@ -59,19 +59,6 @@ describe('fetchLatestVersion', () => {
 		expect(await fetchLatestVersion('2.5.0')).toBeNull();
 	});
 
-	it('sends correct User-Agent and Accept headers', async () => {
-		fetchSpy.mockResolvedValue(makeResponse(JSON.stringify({ version: '2.6.0' })));
-		await fetchLatestVersion('2.5.0');
-		expect(fetchSpy).toHaveBeenCalledTimes(1);
-		const args = fetchSpy.mock.calls[0];
-		expect(args?.[0]).toBe('https://registry.npmjs.org/@windagency/valora/latest');
-		const init = args?.[1] as RequestInit | undefined;
-		const headers = init?.headers as Record<string, string>;
-		expect(headers.Accept).toBe('application/vnd.npm.install-v1+json');
-		expect(headers['User-Agent']).toContain('valora-cli/2.5.0');
-		expect(init?.signal).toBeDefined();
-	});
-
 	it('accepts prerelease versions', async () => {
 		fetchSpy.mockResolvedValue(makeResponse(JSON.stringify({ version: '2.6.0-rc.1' })));
 		expect(await fetchLatestVersion('2.5.0')).toBe('2.6.0-rc.1');

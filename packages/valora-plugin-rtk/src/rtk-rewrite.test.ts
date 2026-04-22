@@ -1,5 +1,5 @@
 import { execFile } from 'child_process';
-import { chmodSync, mkdirSync, rmSync, writeFileSync } from 'fs';
+import { chmodSync, existsSync, mkdirSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -41,11 +41,11 @@ describe('rtk-rewrite.sh', () => {
 	});
 
 	it('passes through when rtk is not on PATH', async () => {
-		// Use the real system PATH minus the fake rtk bin dir — avoids PATH replacement
-		// breaking jq/bash lookups on non-standard hosts.
+		// Strip every PATH component that contains an rtk binary — handles both the
+		// test-created fake binary and any real rtk installed on this host.
 		const pathWithoutRtk = (process.env['PATH'] ?? '')
 			.split(':')
-			.filter((p) => p !== rtkBinDir)
+			.filter((p) => !existsSync(join(p, 'rtk')))
 			.join(':');
 		const { exitCode, stdout } = await run({ tool_input: { command: 'git status' } }, { PATH: pathWithoutRtk });
 		expect(exitCode).toBe(0);
@@ -70,15 +70,30 @@ describe('rtk-rewrite.sh', () => {
 		expect(stdout.trim()).toBe('');
 	});
 
-	it.each(['git', 'cargo', 'npm', 'docker', 'kubectl', 'make', 'python', 'pip', 'yarn', 'bun', 'pnpm'])(
-		'rewrites %s commands',
-		async (tool) => {
-			const { stdout } = await run({ tool_input: { command: `${tool} build` } }, { PATH: pathWithRtk });
-			const output = JSON.parse(stdout) as HookOutput;
-			expect(output.hookSpecificOutput.hookEventName).toBe('PreToolUse');
-			expect(output.hookSpecificOutput.updatedInput.command).toBe(`rtk ${tool} build`);
-		}
-	);
+	it.each([
+		'git',
+		'cargo',
+		'npm',
+		'docker',
+		'kubectl',
+		'make',
+		'python',
+		'pip',
+		'yarn',
+		'bun',
+		'pnpm',
+		'npx',
+		'bunx',
+		'tsc',
+		'eslint',
+		'vitest',
+		'jest'
+	])('rewrites %s commands', async (tool) => {
+		const { stdout } = await run({ tool_input: { command: `${tool} build` } }, { PATH: pathWithRtk });
+		const output = JSON.parse(stdout) as HookOutput;
+		expect(output.hookSpecificOutput.hookEventName).toBe('PreToolUse');
+		expect(output.hookSpecificOutput.updatedInput.command).toBe(`rtk ${tool} build`);
+	});
 
 	it('passes through sudo-prefixed commands unchanged', async () => {
 		// rtk's handling of sudo as a first argument is undefined — pass through rather than risk breakage.

@@ -1,6 +1,7 @@
-import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { OllamaProvider, resetManagers, setManagers } from './ollama-provider.js';
+import type { OllamaManagers } from './ollama-provider.js';
+import { OllamaProvider } from './ollama-provider.js';
 
 const mockBinaryManager = { assertInstalled: vi.fn().mockResolvedValue(undefined) };
 const mockProcessManager = {
@@ -8,6 +9,12 @@ const mockProcessManager = {
 	stop: vi.fn().mockResolvedValue(undefined)
 };
 const mockModelManager = { ensureModel: vi.fn().mockResolvedValue(undefined) };
+
+const doubles: OllamaManagers = {
+	binary: mockBinaryManager,
+	model: mockModelManager,
+	process: mockProcessManager
+};
 
 vi.mock('openai', () => {
 	const mockCreate = vi.fn().mockResolvedValue({
@@ -24,11 +31,6 @@ vi.mock('openai', () => {
 
 describe('OllamaProvider', () => {
 	beforeEach(() => {
-		setManagers({
-			binary: mockBinaryManager,
-			model: mockModelManager,
-			process: mockProcessManager
-		});
 		mockBinaryManager.assertInstalled.mockClear();
 		mockProcessManager.ensureRunning.mockClear();
 		mockProcessManager.stop.mockClear();
@@ -36,22 +38,22 @@ describe('OllamaProvider', () => {
 	});
 
 	it('isConfigured() always returns true', () => {
-		const provider = new OllamaProvider({});
+		const provider = new OllamaProvider({}, doubles);
 		expect(provider.isConfigured()).toBe(true);
 	});
 
 	it('name is "ollama"', () => {
-		const provider = new OllamaProvider({});
+		const provider = new OllamaProvider({}, doubles);
 		expect(provider.name).toBe('ollama');
 	});
 
 	it('getAlternativeModels() returns common Ollama models including llama3.1', () => {
-		const provider = new OllamaProvider({});
+		const provider = new OllamaProvider({}, doubles);
 		expect(provider.getAlternativeModels()).toContain('llama3.1');
 	});
 
 	it('complete() calls assertInstalled, ensureRunning, and ensureModel before LLM call', async () => {
-		const provider = new OllamaProvider({ model: 'llama3.1' });
+		const provider = new OllamaProvider({ model: 'llama3.1' }, doubles);
 
 		await provider.complete({ messages: [{ content: 'Hello', role: 'user' }] });
 
@@ -61,7 +63,7 @@ describe('OllamaProvider', () => {
 	});
 
 	it('complete() returns the model response content', async () => {
-		const provider = new OllamaProvider({ model: 'llama3.1' });
+		const provider = new OllamaProvider({ model: 'llama3.1' }, doubles);
 
 		const result = await provider.complete({ messages: [{ content: 'Hi', role: 'user' }] });
 
@@ -69,17 +71,22 @@ describe('OllamaProvider', () => {
 		expect(result.role).toBe('assistant');
 	});
 
-	afterEach(() => {
-		resetManagers();
-	});
+	describe('config fallbacks', () => {
+		it('uses default model when config.model is not a string', async () => {
+			const provider = new OllamaProvider({ model: 99 }, doubles);
 
-	it('complete() throws when managers have not been initialised', async () => {
-		resetManagers();
-		const provider = new OllamaProvider({});
+			await provider.complete({ messages: [{ content: 'Hi', role: 'user' }] });
 
-		await expect(provider.complete({ messages: [{ content: 'Hi', role: 'user' }] })).rejects.toThrow(
-			'managers not initialised'
-		);
+			expect(mockModelManager.ensureModel).toHaveBeenCalledWith(expect.any(String), 'llama3.1');
+		});
+
+		it('uses default host when config.ollama_host is not a string', async () => {
+			const provider = new OllamaProvider({ ollama_host: false }, doubles);
+
+			await provider.complete({ messages: [{ content: 'Hi', role: 'user' }] });
+
+			expect(mockProcessManager.ensureRunning).toHaveBeenCalledWith('http://localhost:11434');
+		});
 	});
 
 	it('streamComplete() calls ensureReady and streams content', async () => {
@@ -103,7 +110,7 @@ describe('OllamaProvider', () => {
 				}) as never
 		);
 
-		const provider = new OllamaProvider({ model: 'llama3.1' });
+		const provider = new OllamaProvider({ model: 'llama3.1' }, doubles);
 		const collected: string[] = [];
 
 		const result = await provider.streamComplete({ messages: [{ content: 'Hi', role: 'user' }] }, (chunk) =>

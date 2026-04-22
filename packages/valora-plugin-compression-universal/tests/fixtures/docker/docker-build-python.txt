@@ -1,0 +1,81 @@
+#0 building with "default" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile3
+#1 transferring dockerfile: 143B done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/python:3.12-slim
+#2 DONE 0.6s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 2B done
+#3 DONE 0.0s
+
+#4 [1/3] FROM docker.io/library/python:3.12-slim@sha256:804ddf3251a60bbf9c92e73b7566c40428d54d0e79d3428194edf40da6521286
+#4 CACHED
+
+#5 [2/3] RUN pip install --no-cache-dir requests flask sqlalchemy
+#5 1.222 Collecting requests
+#5 1.327   Downloading requests-2.33.1-py3-none-any.whl.metadata (4.8 kB)
+#5 1.361 Collecting flask
+#5 1.383   Downloading flask-3.1.3-py3-none-any.whl.metadata (3.2 kB)
+#5 1.573 Collecting sqlalchemy
+#5 1.595   Downloading sqlalchemy-2.0.49-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl.metadata (9.5 kB)
+#5 1.654 Collecting charset_normalizer<4,>=2 (from requests)
+#5 1.681   Downloading charset_normalizer-3.4.7-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl.metadata (40 kB)
+#5 1.731 Collecting idna<4,>=2.5 (from requests)
+#5 1.754   Downloading idna-3.11-py3-none-any.whl.metadata (8.4 kB)
+#5 1.792 Collecting urllib3<3,>=1.26 (from requests)
+#5 1.814   Downloading urllib3-2.6.3-py3-none-any.whl.metadata (6.9 kB)
+#5 1.850 Collecting certifi>=2023.5.7 (from requests)
+#5 1.870   Downloading certifi-2026.2.25-py3-none-any.whl.metadata (2.5 kB)
+#5 1.897 Collecting blinker>=1.9.0 (from flask)
+#5 1.920   Downloading blinker-1.9.0-py3-none-any.whl.metadata (1.6 kB)
+#5 1.954 Collecting click>=8.1.3 (from flask)
+#5 1.976   Downloading click-8.3.2-py3-none-any.whl.metadata (2.6 kB)
+#5 2.002 Collecting itsdangerous>=2.2.0 (from flask)
+#5 2.023   Downloading itsdangerous-2.2.0-py3-none-any.whl.metadata (1.9 kB)
+#5 2.053 Collecting jinja2>=3.1.2 (from flask)
+#5 2.077   Downloading jinja2-3.1.6-py3-none-any.whl.metadata (2.9 kB)
+#5 2.118 Collecting markupsafe>=2.1.1 (from flask)
+#5 2.138   Downloading markupsafe-3.0.3-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl.metadata (2.7 kB)
+#5 2.173 Collecting werkzeug>=3.1.0 (from flask)
+#5 2.192   Downloading werkzeug-3.1.8-py3-none-any.whl.metadata (4.0 kB)
+#5 2.273 Collecting greenlet>=1 (from sqlalchemy)
+#5 2.297   Downloading greenlet-3.4.0-cp312-cp312-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl.metadata (3.7 kB)
+#5 2.332 Collecting typing-extensions>=4.6.0 (from sqlalchemy)
+#5 2.353   Downloading typing_extensions-4.15.0-py3-none-any.whl.metadata (3.3 kB)
+#5 2.379 Downloading requests-2.33.1-py3-none-any.whl (64 kB)
+#5 2.409 Downloading flask-3.1.3-py3-none-any.whl (103 kB)
+#5 2.438 Downloading sqlalchemy-2.0.49-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl (3.3 MB)
+#5 2.522    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 3.3/3.3 MB 49.7 MB/s eta 0:00:00
+#5 2.544 Downloading blinker-1.9.0-py3-none-any.whl (8.5 kB)
+#5 2.565 Downloading certifi-2026.2.25-py3-none-any.whl (153 kB)
+#5 2.594 Downloading charset_normalizer-3.4.7-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl (208 kB)
+#5 2.617 Downloading click-8.3.2-py3-none-any.whl (108 kB)
+#5 2.642 Downloading greenlet-3.4.0-cp312-cp312-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl (606 kB)
+#5 2.649    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 606.1/606.1 kB 118.2 MB/s eta 0:00:00
+#5 2.673 Downloading idna-3.11-py3-none-any.whl (71 kB)
+#5 2.697 Downloading itsdangerous-2.2.0-py3-none-any.whl (16 kB)
+#5 2.719 Downloading jinja2-3.1.6-py3-none-any.whl (134 kB)
+#5 2.746 Downloading markupsafe-3.0.3-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl (24 kB)
+#5 2.768 Downloading typing_extensions-4.15.0-py3-none-any.whl (44 kB)
+#5 2.790 Downloading urllib3-2.6.3-py3-none-any.whl (131 kB)
+#5 2.816 Downloading werkzeug-3.1.8-py3-none-any.whl (226 kB)
+#5 2.835 Installing collected packages: urllib3, typing-extensions, markupsafe, itsdangerous, idna, greenlet, click, charset_normalizer, certifi, blinker, werkzeug, sqlalchemy, requests, jinja2, flask
+#5 3.748 Successfully installed blinker-1.9.0 certifi-2026.2.25 charset_normalizer-3.4.7 click-8.3.2 flask-3.1.3 greenlet-3.4.0 idna-3.11 itsdangerous-2.2.0 jinja2-3.1.6 markupsafe-3.0.3 requests-2.33.1 sqlalchemy-2.0.49 typing-extensions-4.15.0 urllib3-2.6.3 werkzeug-3.1.8
+#5 3.748 WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager, possibly rendering your system unusable. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv. Use the --root-user-action option if you know what you are doing and want to suppress this warning.
+#5 3.856 
+#5 3.856 [notice] A new release of pip is available: 25.0.1 -> 26.0.1
+#5 3.856 [notice] To update, run: pip install --upgrade pip
+#5 DONE 4.0s
+
+#6 [3/3] RUN echo "BUILD COMPLETE"
+#6 0.332 BUILD COMPLETE
+#6 DONE 0.3s
+
+#7 exporting to image
+#7 exporting layers
+#7 exporting layers 0.2s done
+#7 writing image sha256:7f8ad935090f8f6ad4c75a5dad0ff22cf2d9ea490d3ebede3c78beb2e1d0364c done
+#7 DONE 0.2s

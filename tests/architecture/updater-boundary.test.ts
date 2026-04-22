@@ -6,6 +6,7 @@
  * itself) may import from `src/updater/`.
  */
 
+import { noClasses } from 'arch-unit-ts/dist/main';
 import { TypeScriptProject } from 'arch-unit-ts/dist/arch-unit/core/domain/TypeScriptProject';
 import { RelativePath } from 'arch-unit-ts/dist/arch-unit/core/domain/RelativePath';
 import { describe, it } from 'vitest';
@@ -13,6 +14,19 @@ import { describe, it } from 'vitest';
 const srcProject = new TypeScriptProject(RelativePath.of('src'));
 
 describe('Updater Module Boundaries', () => {
+	describe('Updater isolation', () => {
+		it('updater does not depend on application layers (services, mcp, executor, session, output)', () => {
+			noClasses()
+				.that()
+				.resideInAPackage('updater..')
+				.should()
+				.dependOnClassesThat()
+				.resideInAnyPackage('services..', 'mcp..', 'executor..', 'session..', 'output..')
+				.because('The updater module is a leaf; it must not depend on application layers')
+				.check(srcProject.allClasses());
+		});
+	});
+
 	describe('Updater access restriction', () => {
 		it('only cli/ modules may import from updater/', () => {
 			// Collect all classes that live outside cli/ and outside updater/ itself

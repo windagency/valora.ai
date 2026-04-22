@@ -1,0 +1,3841 @@
+diff --git a/.gitignore b/.gitignore
+index 955190e..21ae1c7 100755
+--- a/.gitignore
++++ b/.gitignore
+@@ -288,6 +288,10 @@ dist/
+ # Mutation testing
+ .stryker-tmp/
+ reports/
++
++# Benchmark report outputs (generated; committed baseline is the exception)
++tests/benchmarks/compression/reports/2*
++tests/benchmarks/compression/reports/latest.json
+ # Bundled CLI tools (populated by postinstall)
+ vendor/
+ 
+diff --git a/README.md b/README.md
+index 43a5529..f562564 100644
+--- a/README.md
++++ b/README.md
+@@ -37,7 +37,8 @@ ## 🏛️ About VALORA
+ 
+ **VALORA (Versatile Agent Logic for Orchestrated Response Architecture)** is a next-generation TypeScript-based platform designed to orchestrate a sophisticated network of AI agents to automate the complete software development lifecycle. By moving beyond simple "code generation", VALORA manages the delicate interplay between requirements, architecture, and deployment. VALORA provides intelligent automation while maintaining human oversight.
+ 
+-### Why VALORA?
++<details>
++<summary><strong>Why VALORA?</strong> — design rationale</summary>
+ 
+ **Intelligent Orchestration**: VALORA coordinates **11 specialised AI agents**, from **@lead** technical oversight to **@secops-engineer** compliance, ensuring the right expert is assigned to every task.
+ 
+@@ -49,6 +50,8 @@ ### Why VALORA?
+ 
+ > VALORA is not a replacement for the developer; it is the high-fidelity instrument through which the developer conducts a full symphony of AI agents.
+ 
++</details>
++
+ ## ✨ Features
+ 
+ <table width="100%">
+@@ -136,9 +139,9 @@ ### 🧩 Plugin System
+ | `agent-context` | Markdown injected into agent system prompts         |
+ | `code`          | TypeScript modules registered via `PluginAPI` hooks |
+ 
+-Drop a plugin into `.valora/plugins/` and list it under `plugins.enabled`. No restart required.
++Plugins are discovered from three locations (later takes precedence): `data/plugins/` (built-in), `~/.valora/plugins/` (global), `.valora/plugins/` (project). npm packages named `@windagency/valora-plugin-*` are auto-discovered from `node_modules/` — install with npm/pnpm/yarn and add to `plugins.enabled`. No restart required.
+ 
+-Built-in compression strategies (git, tsc, eslint, pnpm, pytest, …) ship as **code plugins** and are the canonical example of the `code` contribution type.
++17 built-in compression strategies (git, tsc, eslint, vitest, pytest, docker, …) ship as three **code plugins** and are the canonical example of the `code` contribution type.
+ 
+ </td>
+ <td width="50%">
+@@ -166,7 +169,7 @@ ### 🌳 Worktree Dashboard & Statistics
+ Live visibility into parallel explorations:
+ 
+ - **Worktree Diagram Panel** — Real-time tree view of git worktrees in the `valora dash` dashboard
+-- **Exploration Status** — Color-coded branches with status icons (▶ running, ✓ completed, ✗ failed)
++- **Exploration Status** — Colour-coded branches with status icons (▶ running, ✓ completed, ✗ failed)
+ - **Session-Exploration Linking** — Explorations create linked sessions; the dashboard shows exploration details (task, worktrees, status) in the session details view
+ - **Worktree Usage Stats** — Per-session tracking of worktree creation, concurrency, and duration
+ 
+diff --git a/documentation/README.md b/documentation/README.md
+index ff7c273..06eb851 100644
+--- a/documentation/README.md
++++ b/documentation/README.md
+@@ -143,7 +143,8 @@ ### Architecture layers
+ │   ├── plugins.md                   # Installing and managing plugins
+ │   ├── configuration.md             # Configuration and customisation
+ │   ├── best-practices.md            # Recommended usage patterns
+-│   └── troubleshooting.md           # Common issues and solutions
++│   ├── troubleshooting.md           # Common issues and solutions
++│   └── auto-update.md               # Automatic update checks and valora update command
+ ├── developer-guide/
+ │   ├── README.md                    # Developer guide overview
+ │   ├── setup.md                     # Development environment setup
+diff --git a/documentation/adr/001-multi-agent-architecture.md b/documentation/adr/001-multi-agent-architecture.md
+index 8c00ef4..aa0d698 100644
+--- a/documentation/adr/001-multi-agent-architecture.md
++++ b/documentation/adr/001-multi-agent-architecture.md
+@@ -6,7 +6,31 @@ ## Status
+ 
+ Accepted
+ 
+-## Context
++## Consequences
++
++### Positive
++
++- **Better Quality**: Specialised agents produce higher-quality, domain-specific output
++- **Clearer Responsibilities**: Each agent has well-defined boundaries
++- **Easier Extension**: New agents can be added without modifying existing ones
++- **Optimised Prompting**: Each agent can have tailored system prompts
++- **Context Relevance**: Agents only receive context relevant to their domain
++
++### Negative
++
++- **Complexity**: More components to maintain and test
++- **Selection Overhead**: Agent selection adds latency and potential for errors
++- **Coordination**: Multi-agent tasks require coordination logic
++- **Redundancy**: Some expertise overlaps between agents
++
++### Neutral
++
++- **Configuration Management**: Agent definitions stored as separate files
++- **Registry Maintenance**: Selection criteria need ongoing refinement
++- **Documentation**: Each agent requires its own documentation
++
++<details>
++<summary><strong>Context</strong></summary>
+ 
+ VALORA needs to handle a wide variety of software development tasks, from product management and planning to implementation, testing, and security analysis. A single AI agent cannot effectively handle all these domains with the depth and expertise required for production-quality output.
+ 
+@@ -17,6 +41,8 @@ ## Context
+ 3. **Quality Optimisation**: Different tasks benefit from different prompting strategies and focus areas
+ 4. **Scalability**: Adding new capabilities should not require modifying a monolithic agent
+ 
++</details>
++
+ ## Decision
+ 
+ We will implement a **multi-agent architecture** with 11 specialised AI agents, each with distinct roles, expertise areas, and selection criteria.
+@@ -54,30 +80,8 @@ ### Agent Structure
+ priority: 0-100
+ ```
+ 
+-## Consequences
+-
+-### Positive
+-
+-- **Better Quality**: Specialised agents produce higher-quality, domain-specific output
+-- **Clearer Responsibilities**: Each agent has well-defined boundaries
+-- **Easier Extension**: New agents can be added without modifying existing ones
+-- **Optimised Prompting**: Each agent can have tailored system prompts
+-- **Context Relevance**: Agents only receive context relevant to their domain
+-
+-### Negative
+-
+-- **Complexity**: More components to maintain and test
+-- **Selection Overhead**: Agent selection adds latency and potential for errors
+-- **Coordination**: Multi-agent tasks require coordination logic
+-- **Redundancy**: Some expertise overlaps between agents
+-
+-### Neutral
+-
+-- **Configuration Management**: Agent definitions stored as separate files
+-- **Registry Maintenance**: Selection criteria need ongoing refinement
+-- **Documentation**: Each agent requires its own documentation
+-
+-## Alternatives Considered
++<details>
++<summary><strong>Alternatives considered</strong></summary>
+ 
+ ### Alternative 1: Single Generalist Agent
+ 
+@@ -111,6 +115,8 @@ ### Alternative 3: Hierarchical Agents
+ - Complex coordination
+ - Current approach sufficient for v1
+ 
++</details>
++
+ ## Implementation Notes
+ 
+ - Agents defined in `data/agents/*.md` (built-in) or `.valora/agents/*.md` (project overrides)
+diff --git a/documentation/adr/002-guidance-vs-knowledge-separation.md b/documentation/adr/002-guidance-vs-knowledge-separation.md
+index 8b856c9..039e90b 100644
+--- a/documentation/adr/002-guidance-vs-knowledge-separation.md
++++ b/documentation/adr/002-guidance-vs-knowledge-separation.md
+@@ -6,7 +6,28 @@ ## Status
+ 
+ Accepted
+ 
+-## Context
++## Consequences
++
++### Positive
++
++- **Token Efficiency**: Commands only load knowledge they need
++- **Cleaner Context**: AI receives relevant information only
++- **Correct Classification**: Knowledge is now properly labelled
++- **Flexibility**: Commands can specify exactly what knowledge they need
++- **Glob Support**: Patterns like `PLAN-*.md` load the most recent plan
++
++### Negative
++
++- **Configuration Overhead**: Each command must specify its knowledge requirements
++- **Potential Gaps**: A command might miss needed knowledge if misconfigured
++
++### Neutral
++
++- **Breaking Change**: Old behaviour of loading all knowledge-base files is removed
++- **Cache Separation**: Guidance and knowledge now have separate caches
++
++<details>
++<summary><strong>Context</strong></summary>
+ 
+ VALORA was loading all knowledge-base files (FUNCTIONAL.md, PRD.md) as "project guidance" alongside actual guidance files (AGENTS.md, CLAUDE.md). This approach had several problems:
+ 
+@@ -22,6 +43,8 @@ ### Distinction Between Types
+ | **Guidance**  | AGENTS.md, CLAUDE.md, .cursorrules            | Instructions for how the AI should behave | Always                  |
+ | **Knowledge** | FUNCTIONAL.md, PRD.md, BACKLOG.md, PLAN-\*.md | Information about the project             | Selectively per command |
+ 
++</details>
++
+ ## Decision
+ 
+ We implement a separation between **guidance files** and **project knowledge files**:
+@@ -79,27 +102,8 @@ ### 4. Loading Order
+ 5. **Output Format Instructions** - Expected response structure
+ 6. **Escalation Instructions** - When to escalate
+ 
+-## Consequences
+-
+-### Positive
+-
+-- **Token Efficiency**: Commands only load knowledge they need
+-- **Cleaner Context**: AI receives relevant information only
+-- **Correct Classification**: Knowledge is now properly labelled
+-- **Flexibility**: Commands can specify exactly what knowledge they need
+-- **Glob Support**: Patterns like `PLAN-*.md` load the most recent plan
+-
+-### Negative
+-
+-- **Configuration Overhead**: Each command must specify its knowledge requirements
+-- **Potential Gaps**: A command might miss needed knowledge if misconfigured
+-
+-### Neutral
+-
+-- **Breaking Change**: Old behaviour of loading all knowledge-base files is removed
+-- **Cache Separation**: Guidance and knowledge now have separate caches
+-
+-## Alternatives Considered
++<details>
++<summary><strong>Alternatives considered</strong></summary>
+ 
+ ### Alternative 1: Load All Knowledge Files for Every Command
+ 
+@@ -119,6 +123,8 @@ ### Alternative 3: Single Merged Knowledge File
+ 
+ **Rejected because**: Merging destroys the structural boundaries between documents and makes selective loading impossible.
+ 
++</details>
++
+ ## Implementation
+ 
+ ### Files Modified
+diff --git a/documentation/adr/002-three-tier-execution.md b/documentation/adr/002-three-tier-execution.md
+index 9b97d90..b81937c 100644
+--- a/documentation/adr/002-three-tier-execution.md
++++ b/documentation/adr/002-three-tier-execution.md
+@@ -6,7 +6,30 @@ ## Status
+ 
+ Accepted
+ 
+-## Context
++## Consequences
++
++### Positive
++
++- **Zero-Configuration Start**: Users can begin immediately without API keys
++- **Cost Flexibility**: Users choose their cost model
++- **Learning Mode**: Guided completion helps users understand workflows
++- **Future-Proof**: Ready for MCP sampling when available
++- **IDE Integration**: Tight Cursor integration without custom protocols
++
++### Negative
++
++- **Complexity**: Three execution paths to maintain
++- **User Confusion**: Different behaviours may confuse users
++- **Testing Burden**: All three tiers need testing
++- **Documentation**: Must explain all three modes
++
++### Neutral
++
++- **Provider Configuration**: Centralised in config files
++- **Fallback Detection**: Automatic based on available configuration
++
++<details>
++<summary><strong>Context</strong></summary>
+ 
+ VALORA needs to support multiple execution environments:
+ 
+@@ -16,6 +39,8 @@ ## Context
+ 
+ Additionally, the engine should work with **zero configuration** for new users, while offering advanced options for experienced users.
+ 
++</details>
++
+ ## Decision
+ 
+ We will implement a **three-tier execution model** with intelligent fallback:
+@@ -69,29 +94,8 @@ ### Fallback Logic
+     H --> I[User Applies]
+ ```
+ 
+-## Consequences
+-
+-### Positive
+-
+-- **Zero-Configuration Start**: Users can begin immediately without API keys
+-- **Cost Flexibility**: Users choose their cost model
+-- **Learning Mode**: Guided completion helps users understand workflows
+-- **Future-Proof**: Ready for MCP sampling when available
+-- **IDE Integration**: Tight Cursor integration without custom protocols
+-
+-### Negative
+-
+-- **Complexity**: Three execution paths to maintain
+-- **User Confusion**: Different behaviours may confuse users
+-- **Testing Burden**: All three tiers need testing
+-- **Documentation**: Must explain all three modes
+-
+-### Neutral
+-
+-- **Provider Configuration**: Centralised in config files
+-- **Fallback Detection**: Automatic based on available configuration
+-
+-## Alternatives Considered
++<details>
++<summary><strong>Alternatives considered</strong></summary>
+ 
+ ### Alternative 1: API-Only
+ 
+@@ -123,6 +127,8 @@ ### Alternative 3: Separate Tools
+ - Maintenance burden
+ - Fragmented ecosystem
+ 
++</details>
++
+ ## Implementation Notes
+ 
+ ### Configuration Detection
+diff --git a/documentation/adr/003-session-based-state.md b/documentation/adr/003-session-based-state.md
+index b36c33c..eccdccf 100644
+--- a/documentation/adr/003-session-based-state.md
++++ b/documentation/adr/003-session-based-state.md
+@@ -6,7 +6,30 @@ ## Status
+ 
+ Accepted
+ 
+-## Context
++## Consequences
++
++### Positive
++
++- **Seamless Workflows**: Commands naturally build on each other
++- **Reduced User Effort**: No manual context management
++- **Consistent Context**: All commands share the same understanding
++- **Audit Trail**: Complete history of commands and outputs
++- **Resumability**: Sessions can be resumed after interruption
++
++### Negative
++
++- **Storage Overhead**: Sessions accumulate data over time
++- **Stale Context**: Old sessions may have outdated context
++- **Complexity**: Session management adds code complexity
++- **Cleanup Required**: Sessions need periodic cleanup
++
++### Neutral
++
++- **File-Based Storage**: Simple but not suitable for multi-user scenarios
++- **Session Selection**: Users may need to manage multiple sessions
++
++<details>
++<summary><strong>Context</strong></summary>
+ 
+ Software development workflows involve multiple sequential commands that build upon each other:
+ 
+@@ -22,6 +45,8 @@ ## Context
+ - Inconsistent results
+ - Manual context assembly errors
+ 
++</details>
++
+ ## Decision
+ 
+ We will implement **session-based state management** that:
+@@ -87,27 +112,50 @@ ### Context Propagation
+ 5. Update session context
+ 6. Persist session
+ 
+-## Consequences
++<details>
++<summary><strong>Alternatives considered</strong></summary>
+ 
+-### Positive
++### Alternative 1: Stateless Commands
+ 
+-- **Seamless Workflows**: Commands naturally build on each other
+-- **Reduced User Effort**: No manual context management
+-- **Consistent Context**: All commands share the same understanding
+-- **Audit Trail**: Complete history of commands and outputs
+-- **Resumability**: Sessions can be resumed after interruption
++Each command operates independently.
+ 
+-### Negative
++**Rejected because**:
+ 
+-- **Storage Overhead**: Sessions accumulate data over time
+-- **Stale Context**: Old sessions may have outdated context
+-- **Complexity**: Session management adds code complexity
+-- **Cleanup Required**: Sessions need periodic cleanup
++- Poor user experience
++- Manual context management required
++- No workflow continuity
+ 
+-### Neutral
++### Alternative 2: Database Storage
+ 
+-- **File-Based Storage**: Simple but not suitable for multi-user scenarios
+-- **Session Selection**: Users may need to manage multiple sessions
++Use SQLite or similar for session storage.
++
++**Rejected because**:
++
++- Added dependency
++- Overcomplicated for single-user scenario
++- File-based is sufficient for v1
++
++### Alternative 3: Memory-Only State
++
++Keep state only in memory during CLI execution.
++
++**Rejected because**:
++
++- Lost on process exit
++- Can't resume interrupted workflows
++- No persistence across terminal sessions
++
++### Alternative 4: Git-Based State
++
++Store state in git branches or notes.
++
++**Considered for future** but deferred because:
++
++- Added complexity
++- Git may not always be available
++- Mixing concerns (state vs. source control)
++
++</details>
+ 
+ ## Implementation Details
+ 
+@@ -153,48 +201,6 @@ ### Context Injection
+ }
+ ```
+ 
+-## Alternatives Considered
+-
+-### Alternative 1: Stateless Commands
+-
+-Each command operates independently.
+-
+-**Rejected because**:
+-
+-- Poor user experience
+-- Manual context management required
+-- No workflow continuity
+-
+-### Alternative 2: Database Storage
+-
+-Use SQLite or similar for session storage.
+-
+-**Rejected because**:
+-
+-- Added dependency
+-- Overcomplicated for single-user scenario
+-- File-based is sufficient for v1
+-
+-### Alternative 3: Memory-Only State
+-
+-Keep state only in memory during CLI execution.
+-
+-**Rejected because**:
+-
+-- Lost on process exit
+-- Can't resume interrupted workflows
+-- No persistence across terminal sessions
+-
+-### Alternative 4: Git-Based State
+-
+-Store state in git branches or notes.
+-
+-**Considered for future** but deferred because:
+-
+-- Added complexity
+-- Git may not always be available
+-- Mixing concerns (state vs. source control)
+-
+ ## Session Management Commands
+ 
+ ```bash
+diff --git a/documentation/adr/004-pipeline-execution-model.md b/documentation/adr/004-pipeline-execution-model.md
+index 3b1983a..8ed6752 100644
+--- a/documentation/adr/004-pipeline-execution-model.md
++++ b/documentation/adr/004-pipeline-execution-model.md
+@@ -6,7 +6,30 @@ ## Status
+ 
+ Accepted
+ 
+-## Context
++## Consequences
++
++### Positive
++
++- **Composability**: Stages can be reused across commands
++- **Flexibility**: Mix sequential and parallel execution
++- **Error Handling**: Centralised error and rollback handling
++- **Observability**: Clear execution flow for debugging
++- **Testability**: Stages can be tested in isolation
++
++### Negative
++
++- **Complexity**: More abstraction than simple sequential code
++- **Learning Curve**: Contributors need to understand pipeline model
++- **Overhead**: Small commands may feel over-engineered
++- **Debugging**: Pipeline issues can be harder to trace
++
++### Neutral
++
++- **Configuration-Driven**: Pipelines defined in command specifications
++- **Event Emission**: Stages emit events for monitoring
++
++<details>
++<summary><strong>Context</strong></summary>
+ 
+ Commands in VALORA often require multiple steps:
+ 
+@@ -23,6 +46,8 @@ ## Context
+ - Hard to implement parallel execution
+ - Challenging to handle errors and rollbacks
+ 
++</details>
++
+ ## Decision
+ 
+ We will implement a **pipeline execution model** with the following characteristics:
+@@ -133,27 +158,40 @@ ### Interactive Stages
+ - Permits skipping non-critical questions
+ - Generates a formatted summary for inclusion in final documents
+ 
+-## Consequences
++<details>
++<summary><strong>Alternatives considered</strong></summary>
+ 
+-### Positive
++### Alternative 1: Simple Function Chains
+ 
+-- **Composability**: Stages can be reused across commands
+-- **Flexibility**: Mix sequential and parallel execution
+-- **Error Handling**: Centralised error and rollback handling
+-- **Observability**: Clear execution flow for debugging
+-- **Testability**: Stages can be tested in isolation
++Chain of function calls without abstraction.
+ 
+-### Negative
++**Rejected because**:
+ 
+-- **Complexity**: More abstraction than simple sequential code
+-- **Learning Curve**: Contributors need to understand pipeline model
+-- **Overhead**: Small commands may feel over-engineered
+-- **Debugging**: Pipeline issues can be harder to trace
++- No parallel execution
++- Difficult error handling
++- Hard to extend
+ 
+-### Neutral
++### Alternative 2: Event-Driven Architecture
+ 
+-- **Configuration-Driven**: Pipelines defined in command specifications
+-- **Event Emission**: Stages emit events for monitoring
++Pure event-driven with message queues.
++
++**Rejected because**:
++
++- Overcomplicated for CLI tool
++- Harder to reason about
++- Unnecessary infrastructure
++
++### Alternative 3: Workflow Engine (Temporal/Cadence)
++
++Full workflow orchestration platform.
++
++**Rejected because**:
++
++- Heavy dependency
++- Overcomplicated for local tool
++- Better suited for distributed systems
++
++</details>
+ 
+ ## Implementation Details
+ 
+@@ -237,38 +275,6 @@ ## Command Specification
+         - action: saveToSession
+ ```
+ 
+-## Alternatives Considered
+-
+-### Alternative 1: Simple Function Chains
+-
+-Chain of function calls without abstraction.
+-
+-**Rejected because**:
+-
+-- No parallel execution
+-- Difficult error handling
+-- Hard to extend
+-
+-### Alternative 2: Event-Driven Architecture
+-
+-Pure event-driven with message queues.
+-
+-**Rejected because**:
+-
+-- Overcomplicated for CLI tool
+-- Harder to reason about
+-- Unnecessary infrastructure
+-
+-### Alternative 3: Workflow Engine (Temporal/Cadence)
+-
+-Full workflow orchestration platform.
+-
+-**Rejected because**:
+-
+-- Heavy dependency
+-- Overcomplicated for local tool
+-- Better suited for distributed systems
+-
+ ## References
+ 
+ - [Pipeline](../../src/executor/pipeline.ts)
+diff --git a/documentation/adr/005-llm-provider-abstraction.md b/documentation/adr/005-llm-provider-abstraction.md
+index 95ebfa9..15d28f7 100644
+--- a/documentation/adr/005-llm-provider-abstraction.md
++++ b/documentation/adr/005-llm-provider-abstraction.md
+@@ -6,7 +6,31 @@ ## Status
+ 
+ Accepted
+ 
+-## Context
++## Consequences
++
++### Positive
++
++- **Vendor Independence**: Not locked to any provider
++- **Easy Switching**: Change providers via configuration
++- **Consistent Interface**: Same code works with all providers
++- **Extensibility**: New providers easily added
++- **Optimisation**: Use best provider for each task
++- **Cost Reduction**: Prompt caching reduces input token costs by up to 90%
++
++### Negative
++
++- **Lowest Common Denominator**: Can't use provider-specific features
++- **Abstraction Leakage**: Some provider differences leak through
++- **Maintenance**: Each provider needs updates
++- **Testing**: More combinations to test
++
++### Neutral
++
++- **Configuration Complexity**: Users must understand providers
++- **Error Mapping**: Provider errors need normalisation
++
++<details>
++<summary><strong>Context</strong></summary>
+ 
+ VALORA needs to support multiple LLM providers:
+ 
+@@ -30,6 +54,8 @@ ## Context
+ - Use different providers for different commands
+ - Add new providers without modifying core code
+ 
++</details>
++
+ ## Decision
+ 
+ We will implement an **LLM Provider Abstraction** layer with:
+@@ -161,29 +187,6 @@ ## Batch API
+ 
+ Batch results include `batch_discount_applied: true` on the `LLMUsage` object so cost reporting can distinguish batch from real-time calls.
+ 
+-## Consequences
+-
+-### Positive
+-
+-- **Vendor Independence**: Not locked to any provider
+-- **Easy Switching**: Change providers via configuration
+-- **Consistent Interface**: Same code works with all providers
+-- **Extensibility**: New providers easily added
+-- **Optimisation**: Use best provider for each task
+-- **Cost Reduction**: Prompt caching reduces input token costs by up to 90%
+-
+-### Negative
+-
+-- **Lowest Common Denominator**: Can't use provider-specific features
+-- **Abstraction Leakage**: Some provider differences leak through
+-- **Maintenance**: Each provider needs updates
+-- **Testing**: More combinations to test
+-
+-### Neutral
+-
+-- **Configuration Complexity**: Users must understand providers
+-- **Error Mapping**: Provider errors need normalisation
+-
+ ## Provider Implementations
+ 
+ ### Anthropic Provider
+@@ -282,7 +285,8 @@ ## Model Assignment
+ | Execution | Claude Sonnet 4.5   | Implementation, reviews |
+ | Fast      | Claude Haiku 4.5    | Quick tasks, validation |
+ 
+-## Alternatives Considered
++<details>
++<summary><strong>Alternatives considered</strong></summary>
+ 
+ ### Alternative 1: Direct SDK Usage
+ 
+@@ -314,6 +318,8 @@ ### Alternative 3: OpenAI-Compatible API Only
+ - Limits provider choice
+ - Feature limitations
+ 
++</details>
++
+ ## Configuration
+ 
+ Provider configuration in `config.json`. Model strings are passed through to the provider API unchanged — use the model identifier from the provider's documentation:
+diff --git a/documentation/adr/006-automatic-context-flush.md b/documentation/adr/006-automatic-context-flush.md
+index e03314d..09502ff 100644
+--- a/documentation/adr/006-automatic-context-flush.md
++++ b/documentation/adr/006-automatic-context-flush.md
+@@ -6,7 +6,31 @@ ## Status
+ 
+ Accepted
+ 
+-## Context
++## Consequences
++
++### Positive
++
++- **Unattended execution** - Long-running tasks complete without manual intervention
++- **Graceful degradation** - Context limits handled smoothly, not catastrophically
++- **State preservation** - Execution progress is not lost during flush
++- **Observability** - Events emitted for monitoring and debugging
++- **Configurability** - Thresholds and behaviour configurable per environment
++- **Cost efficiency** - Uses fast, cheap model for summarisation
++
++### Negative
++
++- **Information loss** - Summarisation necessarily loses some detail
++- **Additional latency** - Flush operation adds time during execution
++- **Complexity** - More moving parts in the execution flow
++- **LLM dependency** - Summarisation quality depends on model capability
++
++### Neutral
++
++- **Token estimation** - Estimation may differ from actual counts; safety buffer mitigates this
++- **Checkpoint storage** - In-memory by default; persistence optional
++
++<details>
++<summary><strong>Context</strong></summary>
+ 
+ LLM conversations have finite context windows (e.g., 200,000 tokens for Claude). When executing complex, multi-stage development workflows with numerous tool calls, the context can fill rapidly. Without automatic management, this leads to:
+ 
+@@ -17,6 +41,8 @@ ## Context
+ 
+ VALORA needs automatic context management to handle long-running operations without user intervention.
+ 
++</details>
++
+ ## Decision
+ 
+ Implement an automatic context flush and resume system with the following components:
+@@ -91,30 +117,8 @@ ### Token Estimation
+ - 15% safety buffer for estimation inaccuracies
+ - Uses actual token counts from API when available
+ 
+-## Consequences
+-
+-### Positive
+-
+-- **Unattended execution** - Long-running tasks complete without manual intervention
+-- **Graceful degradation** - Context limits handled smoothly, not catastrophically
+-- **State preservation** - Execution progress is not lost during flush
+-- **Observability** - Events emitted for monitoring and debugging
+-- **Configurability** - Thresholds and behaviour configurable per environment
+-- **Cost efficiency** - Uses fast, cheap model for summarisation
+-
+-### Negative
+-
+-- **Information loss** - Summarisation necessarily loses some detail
+-- **Additional latency** - Flush operation adds time during execution
+-- **Complexity** - More moving parts in the execution flow
+-- **LLM dependency** - Summarisation quality depends on model capability
+-
+-### Neutral
+-
+-- **Token estimation** - Estimation may differ from actual counts; safety buffer mitigates this
+-- **Checkpoint storage** - In-memory by default; persistence optional
+-
+-## Alternatives Considered
++<details>
++<summary><strong>Alternatives considered</strong></summary>
+ 
+ ### Alternative 1: Simple Truncation
+ 
+@@ -156,6 +160,8 @@ ### Alternative 4: Fixed-Window Summarisation
+ - May not summarise when actually needed
+ - Less adaptive to actual usage patterns
+ 
++</details>
++
+ ## References
+ 
+ - [Context Management Module](../../src/context-management/)
+diff --git a/documentation/adr/007-persistent-stage-output-caching.md b/documentation/adr/007-persistent-stage-output-caching.md
+index 16e9f31..33e6b7c 100644
+--- a/documentation/adr/007-persistent-stage-output-caching.md
++++ b/documentation/adr/007-persistent-stage-output-caching.md
+@@ -6,7 +6,32 @@ ## Status
+ 
+ Accepted
+ 
+-## Context
++## Consequences
++
++### Positive
++
++- **2-3 minutes saved** per context loading stage when source documents unchanged
++- **Reduced token consumption** by eliminating redundant LLM calls
++- **No workflow changes required** - caching is transparent to users
++- **Automatic invalidation** when source files change
++- **Configurable per stage** - can enable/disable for specific stages
++- **Works without session management** - benefits all command executions
++
++### Negative
++
++- **Additional disk I/O** for cache reads/writes (mitigated by async operations)
++- **Cache management overhead** - eviction, TTL checks, file monitoring
++- **Potential stale data** if file monitoring misses an update (mitigated by TTL)
++- **Cache directory growth** - requires periodic cleanup (automatic eviction handles this)
++
++### Neutral
++
++- **Cache location** (`.valora/cache/stages/`) is project-specific, not shared across projects
++- **TTL default of 1 hour** balances freshness with performance
++- **File dependency monitoring** relies on content hashing, not filesystem events
++
++<details>
++<summary><strong>Context</strong></summary>
+ 
+ Context loading stages (such as `context.load-specifications`, `context.load-prd`, and `context.load-documentation-context`) are expensive LLM operations that:
+ 
+@@ -29,6 +54,8 @@ ## Context
+ - Invalidates automatically when source documents change
+ - Integrates seamlessly with the existing pipeline execution model
+ 
++</details>
++
+ ## Decision
+ 
+ Implement **file-based persistent stage output caching** with the following characteristics:
+@@ -76,31 +103,8 @@ ### 4. Transparent Integration
+ - On cache hit: Returns cached outputs immediately (0ms execution)
+ - On cache miss: Executes stage normally, then caches the result
+ 
+-## Consequences
+-
+-### Positive
+-
+-- **2-3 minutes saved** per context loading stage when source documents unchanged
+-- **Reduced token consumption** by eliminating redundant LLM calls
+-- **No workflow changes required** - caching is transparent to users
+-- **Automatic invalidation** when source files change
+-- **Configurable per stage** - can enable/disable for specific stages
+-- **Works without session management** - benefits all command executions
+-
+-### Negative
+-
+-- **Additional disk I/O** for cache reads/writes (mitigated by async operations)
+-- **Cache management overhead** - eviction, TTL checks, file monitoring
+-- **Potential stale data** if file monitoring misses an update (mitigated by TTL)
+-- **Cache directory growth** - requires periodic cleanup (automatic eviction handles this)
+-
+-### Neutral
+-
+-- **Cache location** (`.valora/cache/stages/`) is project-specific, not shared across projects
+-- **TTL default of 1 hour** balances freshness with performance
+-- **File dependency monitoring** relies on content hashing, not filesystem events
+-
+-## Alternatives Considered
++<details>
++<summary><strong>Alternatives considered</strong></summary>
+ 
+ ### Alternative 1: In-Memory LRU Cache
+ 
+@@ -142,6 +146,8 @@ ### Alternative 4: Redis/External Cache
+ - Overkill for single-developer CLI tool
+ - Adds deployment complexity
+ 
++</details>
++
+ ## Implementation Details
+ 
+ ### New Files
+diff --git a/documentation/adr/008-pretooluse-cli-enforcement.md b/documentation/adr/008-pretooluse-cli-enforcement.md
+index 4b54f4e..3d16cf0 100644
+--- a/documentation/adr/008-pretooluse-cli-enforcement.md
++++ b/documentation/adr/008-pretooluse-cli-enforcement.md
+@@ -6,7 +6,31 @@ ## Status
+ 
+ Accepted
+ 
+-## Context
++## Consequences
++
++### Positive
++
++- **Automated enforcement** of modern CLI toolkit rules — no manual review needed
++- **Immediate feedback** with deny messages that include the modern alternative and documentation link
++- **Safety gate** for `git push` — prevents accidental pushes without human approval
++- **Configurable** package manager enforcement per project
++- **Zero changes to VALORA core** — uses the existing hook mechanism with config + shell script only
++- **Fail-open design** — if the hook fails, commands proceed normally
++
++### Negative
++
++- **Shell script dependency** — requires `jq` and `bash` in the environment (both standard in dev containers)
++- **Limited to primary commands** — subshells like `$(find ...)` are not caught (acceptable v1 limitation)
++- **Maintenance overhead** — new rules require script changes (hardcoded rules) or config changes (configurable rules)
++
++### Neutral
++
++- **5-second timeout** is generous for a script that completes in <100ms
++- **Regex-based detection** is simple but sufficient for command-level patterns
++- **Pipe filtering is allowed** — this is intentional, as `grep` after a pipe is often legitimate
++
++<details>
++<summary><strong>Context</strong></summary>
+ 
+ VALORA's [Modern CLI Toolkit](../developer-guide/modern-cli-toolkit/README.md) defines modern replacements for legacy CLI commands (`rg` over `grep`, `fd` over `find`, `eza` over `ls`, etc.). These rules exist to reduce token consumption, improve output quality, and enforce project conventions.
+ 
+@@ -19,6 +43,8 @@ ## Context
+ 
+ The recently added PreToolUse/PostToolUse hook mechanism (see `HookExecutionService`) allows intercepting tool calls before execution — the ideal integration point for automated enforcement.
+ 
++</details>
++
+ ## Decision
+ 
+ Implement a **PreToolUse hook** (`enforce-modern-cli.sh`) that intercepts `run_terminal_cmd` calls and blocks commands using legacy CLI tools. The hook:
+@@ -68,30 +94,8 @@ ### 5. Fails Open
+ 
+ If `jq` is missing or the script errors, the hook system allows the tool call to proceed (built-in behaviour of `HookExecutionService`). Timeout is set to 5 seconds; typical execution is <100ms.
+ 
+-## Consequences
+-
+-### Positive
+-
+-- **Automated enforcement** of modern CLI toolkit rules — no manual review needed
+-- **Immediate feedback** with deny messages that include the modern alternative and documentation link
+-- **Safety gate** for `git push` — prevents accidental pushes without human approval
+-- **Configurable** package manager enforcement per project
+-- **Zero changes to VALORA core** — uses the existing hook mechanism with config + shell script only
+-- **Fail-open design** — if the hook fails, commands proceed normally
+-
+-### Negative
+-
+-- **Shell script dependency** — requires `jq` and `bash` in the environment (both standard in dev containers)
+-- **Limited to primary commands** — subshells like `$(find ...)` are not caught (acceptable v1 limitation)
+-- **Maintenance overhead** — new rules require script changes (hardcoded rules) or config changes (configurable rules)
+-
+-### Neutral
+-
+-- **5-second timeout** is generous for a script that completes in <100ms
+-- **Regex-based detection** is simple but sufficient for command-level patterns
+-- **Pipe filtering is allowed** — this is intentional, as `grep` after a pipe is often legitimate
+-
+-## Alternatives Considered
++<details>
++<summary><strong>Alternatives considered</strong></summary>
+ 
+ ### Alternative 1: TypeScript-Based Hook in the Executor
+ 
+@@ -123,6 +127,8 @@ ### Alternative 3: Shell Alias Overrides
+ - Changes system-wide behaviour, not just VALORA context
+ - No deny/feedback mechanism — silently changes behaviour
+ 
++</details>
++
+ ## Implementation Details
+ 
+ ### New Files
+diff --git a/documentation/adr/009-supply-chain-hardening.md b/documentation/adr/009-supply-chain-hardening.md
+index 1284862..f6e01d1 100644
+--- a/documentation/adr/009-supply-chain-hardening.md
++++ b/documentation/adr/009-supply-chain-hardening.md
+@@ -6,7 +6,29 @@ ## Status
+ 
+ Accepted
+ 
+-## Context
++## Consequences
++
++### Positive
++
++- **Reproducible installs** — frozen lockfile prevents "works on my machine" issues from dependency drift
++- **Attack surface reduction** — blocking install scripts eliminates the most common supply chain attack vector
++- **Zero known high/critical vulnerabilities** — `pnpm audit --prod --audit-level=high` returns clean
++- **Proactive dependency updates** — Dependabot ensures vulnerabilities are patched promptly
++- **Developer workflow preserved** — root scripts still work, `pnpm build` and `pnpm test` unaffected
++
++### Negative
++
++- **Extra step for dependency updates** — developers must use `--config.frozen-lockfile=false` or `pnpm update` instead of just `pnpm install`
++- **Override maintenance** — `pnpm.overrides` must be reviewed periodically and removed when upstream fixes are released
++- **Native dependency friction** — packages requiring build scripts need explicit allowlisting
++
++### Neutral
++
++- **Dependabot PR volume** — 2 grouped PRs per week is manageable but adds review overhead
++- **No CI enforcement yet** — these measures lay groundwork for CI audit checks (separate task)
++
++<details>
++<summary><strong>Context</strong></summary>
+ 
+ The project has basic supply chain hygiene — a lockfile with SHA-512 hashes, pinned Node/pnpm versions via Volta, and pre-commit hooks via Husky. However, it lacks active defences against dependency-based attacks:
+ 
+@@ -18,6 +40,8 @@ ## Context
+ 
+ These gaps are standard in early-stage projects but become increasingly risky as the dependency tree grows. Supply chain attacks are now the most common vector for compromising Node.js projects.
+ 
++</details>
++
+ ## Decision
+ 
+ Implement four complementary supply chain hardening measures:
+@@ -59,28 +83,8 @@ ### 4. Configure Dependabot
+ 
+ This reduces PR noise (2 grouped PRs vs 30+ individual ones) while ensuring dependencies stay current.
+ 
+-## Consequences
+-
+-### Positive
+-
+-- **Reproducible installs** — frozen lockfile prevents "works on my machine" issues from dependency drift
+-- **Attack surface reduction** — blocking install scripts eliminates the most common supply chain attack vector
+-- **Zero known high/critical vulnerabilities** — `pnpm audit --prod --audit-level=high` returns clean
+-- **Proactive dependency updates** — Dependabot ensures vulnerabilities are patched promptly
+-- **Developer workflow preserved** — root scripts still work, `pnpm build` and `pnpm test` unaffected
+-
+-### Negative
+-
+-- **Extra step for dependency updates** — developers must use `--config.frozen-lockfile=false` or `pnpm update` instead of just `pnpm install`
+-- **Override maintenance** — `pnpm.overrides` must be reviewed periodically and removed when upstream fixes are released
+-- **Native dependency friction** — packages requiring build scripts need explicit allowlisting
+-
+-### Neutral
+-
+-- **Dependabot PR volume** — 2 grouped PRs per week is manageable but adds review overhead
+-- **No CI enforcement yet** — these measures lay groundwork for CI audit checks (separate task)
+-
+-## Alternatives Considered
++<details>
++<summary><strong>Alternatives considered</strong></summary>
+ 
+ ### Alternative 1: Audit in Pre-Commit Hook
+ 
+@@ -122,6 +126,8 @@ ### Alternative 4: Commit Signing (GPG)
+ - Low threat relevance for this project's risk profile
+ - GitHub provides built-in secret scanning as an alternative
+ 
++</details>
++
+ ## References
+ 
+ - [pnpm `.npmrc` documentation](https://pnpm.io/npmrc)
+diff --git a/documentation/adr/010-batch-processing.md b/documentation/adr/010-batch-processing.md
+index 64015b1..2963a42 100644
+--- a/documentation/adr/010-batch-processing.md
++++ b/documentation/adr/010-batch-processing.md
+@@ -6,12 +6,38 @@ ## Status
+ 
+ Accepted
+ 
+-## Context
++## Consequences
++
++### Positive
++
++- **~50% token cost reduction** for batch-eligible stages on Anthropic and OpenAI.
++- **Zero behavioural change** for stages that do not opt in or do not pass `--batch`.
++- **Resilient** — batch state survives process restarts via file persistence.
++- **Graceful fallback** — ineligible stages silently use real-time execution.
++- **Additive** — no existing provider interfaces or command definitions changed (only new optional fields added).
++
++### Negative
++
++- **Async UX**: Results are not available immediately; users must poll or wait.
++- **24-hour window**: Expired batches cannot be retrieved.
++- **Google batch not implemented**: Vertex AI `BatchPredictionJob` requires `@google-cloud/aiplatform` and GCS setup; deferred.
++- **Anthropic Vertex AI limitation**: The Anthropic Message Batches API is unavailable on Vertex AI; `submitBatch()` throws if a Vertex-hosted Anthropic configuration is detected.
++
++### Neutral
++
++- One new `batch?: boolean` field on `PipelineStage` — purely additive.
++- One new `batch_discount_applied?: boolean` field on `LLMUsage` — purely additive.
++- New `src/batch/` module with its own alias in tsconfig and vitest configs.
++
++<details>
++<summary><strong>Context</strong></summary>
+ 
+ LLM provider batch APIs (Anthropic Message Batches, OpenAI Batch API) offer approximately 50% token cost reduction in exchange for asynchronous processing with a 24-hour completion window. For pipeline stages that complete in a single LLM call without tool loops — analysis, review, documentation, summarisation — this is pure savings with no behavioural difference.
+ 
+ VALORA processes many such stages. Without batch support, every execution pays full real-time token prices even when the user does not need an immediate response.
+ 
++</details>
++
+ ## Decision
+ 
+ We will add an opt-in `--batch` global CLI flag that submits eligible pipeline stages to the provider's batch API. The implementation introduces:
+@@ -85,30 +111,8 @@ ### Provider Implementations
+ | **Google**    | Vertex AI `BatchPredictionJob` — stub, not yet implemented          | `false`           |
+ | **Cursor**    | MCP sampling only — no batch API                                    | N/A               |
+ 
+-## Consequences
+-
+-### Positive
+-
+-- **~50% token cost reduction** for batch-eligible stages on Anthropic and OpenAI.
+-- **Zero behavioural change** for stages that do not opt in or do not pass `--batch`.
+-- **Resilient** — batch state survives process restarts via file persistence.
+-- **Graceful fallback** — ineligible stages silently use real-time execution.
+-- **Additive** — no existing provider interfaces or command definitions changed (only new optional fields added).
+-
+-### Negative
+-
+-- **Async UX**: Results are not available immediately; users must poll or wait.
+-- **24-hour window**: Expired batches cannot be retrieved.
+-- **Google batch not implemented**: Vertex AI `BatchPredictionJob` requires `@google-cloud/aiplatform` and GCS setup; deferred.
+-- **Anthropic Vertex AI limitation**: The Anthropic Message Batches API is unavailable on Vertex AI; `submitBatch()` throws if a Vertex-hosted Anthropic configuration is detected.
+-
+-### Neutral
+-
+-- One new `batch?: boolean` field on `PipelineStage` — purely additive.
+-- One new `batch_discount_applied?: boolean` field on `LLMUsage` — purely additive.
+-- New `src/batch/` module with its own alias in tsconfig and vitest configs.
+-
+-## Alternatives Considered
++<details>
++<summary><strong>Alternatives considered</strong></summary>
+ 
+ ### Alternative 1: Polling wrapper around real-time calls
+ 
+@@ -128,6 +132,8 @@ ### Alternative 3: Automatic batch detection (no `batch: true` stage flag)
+ 
+ **Rejected because** some stages that appear single-call may grow tool loops in future; explicit opt-in prevents surprises and makes intent clear in command definitions.
+ 
++</details>
++
+ ## References
+ 
+ - [BatchableProvider interface](../../src/batch/batch-provider.interface.ts)
+diff --git a/documentation/adr/010-pipeline-resilience-and-tool-failure-observability.md b/documentation/adr/010-pipeline-resilience-and-tool-failure-observability.md
+index c7ead39..b093a11 100644
+--- a/documentation/adr/010-pipeline-resilience-and-tool-failure-observability.md
++++ b/documentation/adr/010-pipeline-resilience-and-tool-failure-observability.md
+@@ -6,7 +6,43 @@ ## Status
+ 
+ Accepted
+ 
+-## Context
++## Consequences
++
++### Positive
++
++- **Measurable failures** — tool failures and loop exhaustions are now counted, emitted as
++  events, shown in the dashboard, and persisted in session history.
++- **Trustworthy forced output** — the exhaustion prompt is grounded in verified filesystem
++  state rather than LLM memory.
++- **Controlled degradation** — stages with too many failures hard-stop instead of silently
++  producing invalid output.
++- **Recoverable stages** — command authors can configure per-stage retry for transient
++  failures (e.g. shell commands that fail due to race conditions or network timeouts).
++- **Cross-session visibility** — engineers can query past sessions to see which stages
++  routinely exhaust their iteration budget or accumulate tool failures.
++
++### Negative
++
++- **Hard-stop can be surprising** — a stage that previously limped through 6 failures and
++  produced degraded output will now hard-stop. Commands that relied on this behaviour
++  must either reduce the failure root cause or raise the threshold.
++- **Retry can mask problems** — retrying a stage that consistently fails due to a
++  prompt or configuration bug delays diagnosis. The retry log warning must be monitored.
++- **Memory overhead** — `extractExecutionSummary` scans the full conversation history at
++  exhaustion time (O(n) over messages). For a 20-iteration loop with multiple tools per
++  iteration this is at most a few hundred messages, which is negligible.
++
++### Neutral
++
++- The `MAX_TOOL_FAILURES_BEFORE_HARD_STOP` constant is defined in `stage-executor.ts` and
++  applies globally. Override per stage via `PipelineStage.max_tool_failures` in the command
++  YAML (see Amendment 2026-03-09 below).
++- The forced-output JSON template is hardcoded to the `code_changes` shape, which suits
++  `code` stages but may not match other stage types. The verified-files injection still
++  improves accuracy regardless of the template shape.
++
++<details>
++<summary><strong>Context</strong></summary>
+ 
+ The pipeline executor runs each stage through an LLM tool loop (up to 20 iterations).
+ Two failure modes were identified where the system continued silently in a degraded state:
+@@ -25,6 +61,8 @@ ## Context
+ Neither failure mode was measurable (no counters, no events, no persistent record) and
+ neither was represented in the dashboard or session history.
+ 
++</details>
++
+ ## Decision
+ 
+ We address these gaps with four coordinated changes:
+@@ -124,41 +162,6 @@ ### 5. Persistent quality metrics
+ The dashboard's `buildMetricsSummary` combines in-memory counters (current session) with
+ the persisted session totals (historical) so both panels reflect cross-session history.
+ 
+-## Consequences
+-
+-### Positive
+-
+-- **Measurable failures** — tool failures and loop exhaustions are now counted, emitted as
+-  events, shown in the dashboard, and persisted in session history.
+-- **Trustworthy forced output** — the exhaustion prompt is grounded in verified filesystem
+-  state rather than LLM memory.
+-- **Controlled degradation** — stages with too many failures hard-stop instead of silently
+-  producing invalid output.
+-- **Recoverable stages** — command authors can configure per-stage retry for transient
+-  failures (e.g. shell commands that fail due to race conditions or network timeouts).
+-- **Cross-session visibility** — engineers can query past sessions to see which stages
+-  routinely exhaust their iteration budget or accumulate tool failures.
+-
+-### Negative
+-
+-- **Hard-stop can be surprising** — a stage that previously limped through 6 failures and
+-  produced degraded output will now hard-stop. Commands that relied on this behaviour
+-  must either reduce the failure root cause or raise the threshold.
+-- **Retry can mask problems** — retrying a stage that consistently fails due to a
+-  prompt or configuration bug delays diagnosis. The retry log warning must be monitored.
+-- **Memory overhead** — `extractExecutionSummary` scans the full conversation history at
+-  exhaustion time (O(n) over messages). For a 20-iteration loop with multiple tools per
+-  iteration this is at most a few hundred messages, which is negligible.
+-
+-### Neutral
+-
+-- The `MAX_TOOL_FAILURES_BEFORE_HARD_STOP` constant is defined in `stage-executor.ts` and
+-  applies globally. Override per stage via `PipelineStage.max_tool_failures` in the command
+-  YAML (see Amendment 2026-03-09 below).
+-- The forced-output JSON template is hardcoded to the `code_changes` shape, which suits
+-  `code` stages but may not match other stage types. The verified-files injection still
+-  improves accuracy regardless of the template shape.
+-
+ ## Configuration
+ 
+ ### Per-stage retry (command YAML)
+diff --git a/documentation/adr/011-biologically-inspired-memory.md b/documentation/adr/011-biologically-inspired-memory.md
+index 076e1f8..5500c24 100644
+--- a/documentation/adr/011-biologically-inspired-memory.md
++++ b/documentation/adr/011-biologically-inspired-memory.md
+@@ -6,12 +6,36 @@ ## Status
+ 
+ Accepted
+ 
+-## Context
++## Consequences
++
++### Positive
++
++- Agents accumulate verified patterns, error signatures, and architectural decisions across sessions without repeating work
++- Zero new runtime dependencies — pure TypeScript with file I/O only
++- Decay is tunable per category; the system self-prunes without manual intervention
++- Git invalidation keeps memory consistent with code evolution (reverted decisions become stale automatically)
++- Graceful degradation — all memory operations are non-fatal; if loading or saving fails, the pipeline continues unaffected
++
++### Negative
++
++- JSON stores are not encrypted (unlike session data); memory entries should contain only non-sensitive observations about code patterns
++- Jaccard tag similarity is a coarse proxy for semantic similarity — fine-grained deduplication requires embeddings
++- Consolidation must be triggered explicitly (or via post-feedback hook); there is no background scheduler
++
++### Neutral
++
++- Memory is stored per-project (`.valora/memory/`), not globally; teams sharing a repository share memory stores if `.valora/memory/` is committed (it is gitignored by default)
++- The `injection_token_budget` (default: 2000 tokens) caps injected context; high-volume use may require tuning
++
++<details>
++<summary><strong>Context</strong></summary>
+ 
+ Valora orchestrates 11 AI agents through multi-stage pipelines, but all learned knowledge is ephemeral — context exists only within a session run. Agents repeat the same mistakes, rediscover the same patterns, and lose architectural decisions between sessions. The `feedback` command analyses workflow outcomes but does not persist findings. The `knowledge-base/` directory exists but is empty.
+ 
+ The Hippo Memory library (github.com/kitfunso/hippo-memory) implements a biologically-inspired model with decay, retrieval strengthening, and consolidation — precisely the characteristics Valora needs. However, a direct dependency was evaluated and rejected (see Alternatives Considered).
+ 
++</details>
++
+ ## Decision
+ 
+ Build a native biologically-inspired memory system within Valora, comprising:
+@@ -37,28 +61,8 @@ ## Decision
+ 
+ 9. **CLI command**: `valora consolidate` triggers a manual consolidation cycle; consolidation also runs automatically after a successful `feedback` pipeline
+ 
+-## Consequences
+-
+-### Positive
+-
+-- Agents accumulate verified patterns, error signatures, and architectural decisions across sessions without repeating work
+-- Zero new runtime dependencies — pure TypeScript with file I/O only
+-- Decay is tunable per category; the system self-prunes without manual intervention
+-- Git invalidation keeps memory consistent with code evolution (reverted decisions become stale automatically)
+-- Graceful degradation — all memory operations are non-fatal; if loading or saving fails, the pipeline continues unaffected
+-
+-### Negative
+-
+-- JSON stores are not encrypted (unlike session data); memory entries should contain only non-sensitive observations about code patterns
+-- Jaccard tag similarity is a coarse proxy for semantic similarity — fine-grained deduplication requires embeddings
+-- Consolidation must be triggered explicitly (or via post-feedback hook); there is no background scheduler
+-
+-### Neutral
+-
+-- Memory is stored per-project (`.valora/memory/`), not globally; teams sharing a repository share memory stores if `.valora/memory/` is committed (it is gitignored by default)
+-- The `injection_token_budget` (default: 2000 tokens) caps injected context; high-volume use may require tuning
+-
+-## Alternatives Considered
++<details>
++<summary><strong>Alternatives considered</strong></summary>
+ 
+ ### Hippo Memory (external dependency)
+ 
+@@ -76,6 +80,8 @@ ### Redis or external key-value store
+ 
+ **Rejected.** Introduces infrastructure dependency; contradicts Valora's "zero infrastructure" design principle (see ADR-001 and ADR-003).
+ 
++</details>
++
+ ## References
+ 
+ - [Memory System Configuration](../user-guide/configuration.md#memory-system-configuration)
+diff --git a/documentation/adr/012-plugin-architecture.md b/documentation/adr/012-plugin-architecture.md
+index c156e0d..dfb8eb3 100644
+--- a/documentation/adr/012-plugin-architecture.md
++++ b/documentation/adr/012-plugin-architecture.md
+@@ -6,7 +6,32 @@ ## Status
+ 
+ Accepted
+ 
+-## Context
++## Consequences
++
++### Positive
++
++- **Composable integrations** — tools that already use shell hooks (RTK, pre-commit linters, custom formatters) can ship a Valora plugin with no Valora core changes.
++- **Versioned, distributable customisation** — teams can package and share agent sets, command libraries, and hook bundles as directories or tarballs with a manifest.
++- **Permission gating** — the `shell-hooks` and `code-exec` permissions create explicit contracts; a misconfigured plugin that omits a permission simply won't have the corresponding surface registered.
++- **Graceful degradation** — manifest validation failures, missing binaries, and code-module import errors produce warnings, never hard failures. A failing strategy falls back to uncompressed output rather than crashing the pipeline.
++- **Reuses existing extension points** — `AgentLoader`, `CommandLoader`, `HookExecutionService` already support multiple directories; the plugin system feeds into these without new loading logic.
++- **Code plugins implemented (Approach C, partial)** — As of April 2026, the `code` contribution type is active. Three built-in compression plugins (`valora-plugin-compression-universal`, `-typescript`, `-python`) register 17 tool strategies via `api.compression.registerStrategy()`. They are the reference implementation for the `PluginAPI` contract.
++- **Horizon 1 migration complete** — As of April 2026, all embedded built-in resources have been packaged into 10 named plugins under `packages/` and `data/plugins/`: `valora-core-secops`, `valora-core-design`, `valora-core-platform`, `valora-core-generators`, `valora-core-product`, `valora-core-qa`, `valora-core-quality-gate`, `valora-core-docs`, `valora-core-engineering`, `valora-core-implement`. The directory `data/commands/` is now docs-only. `data/agents/` retains `registry.json` for dynamic agent selection at runtime.
++
++### Negative
++
++- **`code-exec` scope is limited** — `PluginAPI` currently exposes only `compression`, `logger`, `providers` (reserved), `config` (reserved), and `lifecycle` (reserved). LLM providers, custom presenters, and quality scorers require the `providers` surface to be activated, which is deferred pending the full signing and capability-gating story.
++- **No versioned resolution algorithm** — when two plugins contribute the same agent name or compression strategy key, last-wins (data) or first-wins (code registry) precedence is simple but may surprise plugin authors.
++- **`requiresBinary` version is informational** — the version range in `requiresBinary` is not currently enforced (only presence on `$PATH` is checked).
++- **Code plugin constants must be inlined** — path aliases to Valora core (`config/*`, `executor/*`, etc.) are not resolvable in compiled plugin output. Plugins must inline any shared constants (e.g. `MAX_GREP_OUTPUT_LINES`).
++
++### Neutral
++
++- **`plugins.enabled` allowlist** — plugins are opt-in, not opt-out. A newly installed plugin directory is inert until added to the list.
++- **Synchronous discovery** — `discoverPluginDirs` is synchronous to avoid async complexity at startup. Suitable for the current number of plugin roots; reconsider if roots number in the hundreds.
++
++<details>
++<summary><strong>Context</strong></summary>
+ 
+ Valora's README has advertised "plugin architecture for agents, commands, providers" since the initial release. In practice, no formal plugin model existed: there was no manifest format, no discovery mechanism, no enable/disable toggle, and no permission model. Extension was only possible by editing files in `data/` (shipped with the binary) or `.valora/` (project overrides).
+ 
+@@ -17,6 +42,8 @@ ## Context
+ 
+ The supply chain hardening work (ADR-009) established a strong precedent against arbitrary dependency code execution (`onlyBuiltDependencies: []`, frozen lockfile). Any plugin model must remain consistent with that stance.
+ 
++</details>
++
+ ## Decision
+ 
+ Implement a resource-overlay plugin model with four components:
+@@ -30,28 +57,36 @@ ### 1. Manifest Schema (`src/plugins/plugin-manifest.schema.ts`)
+ 	"name": "valora-plugin-rtk",
+ 	"version": "0.1.0",
+ 	"description": "RTK token-filter integration",
++	"homepage": "https://github.com/example/valora-plugin-rtk",
+ 	"engines": { "valora": ">=2.5.0" },
+ 	"contributes": ["hooks", "agent-context"],
+ 	"permissions": ["shell-hooks"],
+-	"requiresBinary": [{ "name": "rtk", "version": ">=0.5", "install": "brew install rtk" }]
++	"requires": ["valora-defaults"],
++	"requiresBinary": [{ "name": "rtk", "version": ">=0.5", "install": "brew install rtk" }],
++	"overrides": []
+ }
+ ```
+ 
+ Contribution types: `agents`, `commands`, `hooks`, `prompts`, `templates`, `mcps`, `agent-context`, `code`.
+ 
+-Permissions: `shell-hooks` (required to register hook contributions); `code-exec` (required for `code` contributions). Future permissions (`network`, `fs-write`, `mcp-connect`) are declared in the schema but gated on not-yet-built code surfaces.
++Permissions: `shell-hooks` (required to register hook contributions); `code-exec` (required for `code` contributions). Future permissions (`network`, `fs-write`, `mcp-connect`, `fs-read`) are declared in the schema but gated on not-yet-built code surfaces.
++
++`requires`: array of plugin names that must be loaded before this plugin. If a required plugin is absent or not enabled, this plugin is skipped with a warning.
++
++`overrides`: informational list of built-in resource names this plugin supersedes. Valora logs a notice on load. Last-wins precedence applies regardless.
+ 
+ ### 2. Discovery (`src/plugins/plugin-discovery.service.ts`)
+ 
+ `PluginDiscoveryService.discoverPluginDirs()` is a synchronous scan of three roots:
+ 
+-| Root                 | Scope         |
+-| -------------------- | ------------- |
+-| `data/plugins/`      | Built-in      |
+-| `~/.valora/plugins/` | Global user   |
+-| `.valora/plugins/`   | Project-local |
++| Root                                       | Scope                  |
++| ------------------------------------------ | ---------------------- |
++| `data/plugins/`                            | Built-in               |
++| `~/.valora/plugins/`                       | Global user            |
++| `.valora/plugins/`                         | Project-local          |
++| `node_modules/@windagency/valora-plugin-*` | npm-installed packages |
+ 
+-Each root is scanned with `readdirSync`. Directories without `valora-plugin.json` are silently skipped. A path traversal guard (`path.resolve()` + `startsWith(resolvedRoot + path.sep)`) prevents symlink escape.
++The three filesystem roots are scanned with `readdirSync`. The npm root scans `node_modules/@windagency/` for directories whose names start with `valora-plugin-`. Directories without `valora-plugin.json` are silently skipped. A path traversal guard (`path.resolve()` + `startsWith(resolvedRoot + path.sep)`) prevents symlink escape from filesystem roots.
+ 
+ ### 3. Loading (`src/plugins/plugin-loader.service.ts`)
+ 
+@@ -73,31 +108,8 @@ ### Resolution Precedence
+ 
+ This mirrors the existing `data/` → `~/.valora/` → `.valora/` override precedence for all other resource types.
+ 
+-## Consequences
+-
+-### Positive
+-
+-- **Composable integrations** — tools that already use shell hooks (RTK, pre-commit linters, custom formatters) can ship a Valora plugin with no Valora core changes.
+-- **Versioned, distributable customisation** — teams can package and share agent sets, command libraries, and hook bundles as directories or tarballs with a manifest.
+-- **Permission gating** — the `shell-hooks` and `code-exec` permissions create explicit contracts; a misconfigured plugin that omits a permission simply won't have the corresponding surface registered.
+-- **Graceful degradation** — manifest validation failures, missing binaries, and code-module import errors produce warnings, never hard failures. A failing strategy falls back to uncompressed output rather than crashing the pipeline.
+-- **Reuses existing extension points** — `AgentLoader`, `CommandLoader`, `HookExecutionService` already support multiple directories; the plugin system feeds into these without new loading logic.
+-- **Code plugins implemented (Approach C, partial)** — As of April 2026, the `code` contribution type is active. Three built-in compression plugins (`valora-plugin-compression-universal`, `-typescript`, `-python`) register 13 tool strategies via `api.compression.registerStrategy()`. They are the reference implementation for the `PluginAPI` contract.
+-- **Horizon 1 migration complete** — As of April 2026, all embedded built-in resources have been packaged into 10 named plugins under `packages/` and `data/plugins/`: `valora-core-secops`, `valora-core-design`, `valora-core-platform`, `valora-core-generators`, `valora-core-product`, `valora-core-qa`, `valora-core-quality-gate`, `valora-core-docs`, `valora-core-engineering`, `valora-core-implement`. The directory `data/commands/` is now docs-only. `data/agents/` retains `registry.json` for dynamic agent selection at runtime.
+-
+-### Negative
+-
+-- **`code-exec` scope is limited** — `PluginAPI` currently exposes only `compression`, `logger`, `providers` (reserved), `config` (reserved), and `lifecycle` (reserved). LLM providers, custom presenters, and quality scorers require the `providers` surface to be activated, which is deferred pending the full signing and capability-gating story.
+-- **No versioned resolution algorithm** — when two plugins contribute the same agent name or compression strategy key, last-wins (data) or first-wins (code registry) precedence is simple but may surprise plugin authors.
+-- **`requiresBinary` version is informational** — the version range in `requiresBinary` is not currently enforced (only presence on `$PATH` is checked).
+-- **Code plugin constants must be inlined** — path aliases to Valora core (`config/*`, `executor/*`, etc.) are not resolvable in compiled plugin output. Plugins must inline any shared constants (e.g. `MAX_GREP_OUTPUT_LINES`).
+-
+-### Neutral
+-
+-- **`plugins.enabled` allowlist** — plugins are opt-in, not opt-out. A newly installed plugin directory is inert until added to the list.
+-- **Synchronous discovery** — `discoverPluginDirs` is synchronous to avoid async complexity at startup. Suitable for the current number of plugin roots; reconsider if roots number in the hundreds.
+-
+-## Alternatives Considered
++<details>
++<summary><strong>Alternatives considered</strong></summary>
+ 
+ ### Alternative A: Resource-overlay only (no manifest)
+ 
+@@ -117,6 +129,8 @@ ### Alternative C: Hybrid (resource overlay + code contributions behind interfac
+ 
+ **Partially implemented.** The `code` contribution type and `PluginAPI` are active as of April 2026. The `compression` namespace is the first production surface. The `providers`, `config`, and `lifecycle` namespaces are declared but gated pending the signing and capability-gating story (ADR-013). The three built-in compression plugins (`valora-plugin-compression-universal`, `-typescript`, `-python`) are the reference implementation.
+ 
++</details>
++
+ ## References
+ 
+ - [ADR-008: PreToolUse CLI Enforcement](./008-pretooluse-cli-enforcement.md) — Hook execution model that plugins extend
+diff --git a/documentation/architecture/README.md b/documentation/architecture/README.md
+index 6ae3203..5f51b8c 100644
+--- a/documentation/architecture/README.md
++++ b/documentation/architecture/README.md
+@@ -1,6 +1,8 @@
+ # Architecture
+ 
+-Valora follows a modular, layered architecture built on five core principles:
++> Modular, layered architecture reference for VALORA — covering system design, component responsibilities, data flow, session optimisation, and the metrics system.
++
++## Design Principles
+ 
+ | Principle         | Description                                     |
+ | ----------------- | ----------------------------------------------- |
+diff --git a/documentation/design/DESIGN.md b/documentation/design/DESIGN.md
+index a068b0e..797e61a 100644
+--- a/documentation/design/DESIGN.md
++++ b/documentation/design/DESIGN.md
+@@ -1,18 +1,29 @@
+-# Claude CLI–Inspired UI/UX Design Specification
++# UI/UX Design Specification
+ 
+-> **Summary**: Valora's UI/UX is inspired by the Claude CLI — calm, minimal, text-first, and cognitively efficient. The design prioritises readability and conversational flow over decoration.
++Valora's UI/UX is inspired by the Claude CLI — calm, minimal, text-first, and cognitively efficient. The design prioritises readability and conversational flow over decoration.
++
++## Quick Reference
++
++| Principle   | Rule                                                         |
++| ----------- | ------------------------------------------------------------ |
++| Layout      | Single-column, max 720–800 px, centred                       |
++| Typography  | Generous line height (1.5–1.7), no excessive font weights    |
++| Colour      | Predominantly neutral; accents only for interactive elements |
++| Motion      | Minimal and purposeful                                       |
++| Interaction | Keyboard-first; progressive disclosure; streaming output     |
+ 
+ ---
+ 
+ ## Overview
+ 
+-This design is inspired by the **Claude CLI** experience: calm, minimal, text-first, and cognitively efficient. The interface emphasizes clarity, low visual noise, and a sense of conversational flow, prioritizing productivity and trust over decoration.
++This design is inspired by the **Claude CLI** experience: calm, minimal, text-first, and cognitively efficient. The interface emphasises clarity, low visual noise, and a sense of conversational flow, prioritising productivity and trust over decoration.
+ 
+ The goal is to make users feel like they are **thinking alongside the system**, not navigating a traditional app.
+ 
+ ---
+ 
+-## Design Philosophy
++<details>
++<summary><strong>Design philosophy</strong></summary>
+ 
+ - **Text is the primary UI**
+ - **Whitespace is intentional**
+@@ -22,6 +33,8 @@ ## Design Philosophy
+ 
+ This design favours _quiet confidence_ over visual flair.
+ 
++</details>
++
+ ---
+ 
+ ## Layout Structure
+diff --git a/documentation/design/LOGO.md b/documentation/design/LOGO.md
+index 4339e16..b72b16e 100644
+--- a/documentation/design/LOGO.md
++++ b/documentation/design/LOGO.md
+@@ -2,8 +2,23 @@ # Logo
+ 
+ The Valora logo is an indigo/cyan gradient hexagonal badge enclosing a tapered V shape, with the wordmark "VALORA" in a geometric sans-serif and a monospace tagline. See `assets/` for logo files.
+ 
++## Colour System at a Glance
++
++| Name      | Hex                 | Role                                            |
++| --------- | ------------------- | ----------------------------------------------- |
++| Abyss     | `#060b17`           | Page background — deep, near-void navy          |
++| Deep Navy | `#0b1422`           | Hexagon interior — slightly lifted surface      |
++| Surface   | `#121f38`           | Cards, secondary backgrounds                    |
++| Quantum   | `#00d4ff`           | Primary accent — input, activity, energy        |
++| Violet    | `#8b5cf6`           | Secondary accent — synthesis, intelligence      |
++| Pipeline  | `#00d4ff → #8b5cf6` | The gradient — the journey from input to output |
++| Ice White | `#eef4ff`           | Wordmark and text on dark backgrounds           |
++
+ ---
+ 
++<details>
++<summary><strong>Creative process and design rationale</strong></summary>
++
+ ## Creative Process
+ 
+ ### 1. Starting Point: What Does Valora Do?
+@@ -121,3 +136,5 @@ ### 7. Design Principles to Carry Forward
+ - **Dark-first.** The identity was designed for dark surfaces. Light-mode variants should use the monochrome version of the mark (deep navy on white) rather than inverting the gradient, which loses the energy.
+ - **Gradients run input-to-output.** Cyan is always the starting state; violet is always the resolved state. Reversing the gradient direction would contradict the visual narrative.
+ - **Monospace for technical context.** Any instance of code, commands, or CLI output associated with the brand should use a monospace face, maintaining the terminal aesthetic.
++
++</details>
+diff --git a/documentation/developer-guide/CODE-QUALITY-GUIDELINES.md b/documentation/developer-guide/CODE-QUALITY-GUIDELINES.md
+index d70f50d..ed05d99 100644
+--- a/documentation/developer-guide/CODE-QUALITY-GUIDELINES.md
++++ b/documentation/developer-guide/CODE-QUALITY-GUIDELINES.md
+@@ -1,11 +1,21 @@
+-# Typescript Code Quality Standards & Enforcement Guide
++# TypeScript Code Quality Standards & Enforcement Guide
+ 
+-> Comprehensive coding standards  
+-> Version: 1.0.0
++> Consolidated TypeScript coding standards enforced through automated tooling, code reviews, and architectural testing in Valora.
+ 
+-## Executive Summary
++## Quick Reference
+ 
+-This document consolidates all coding considerations into a unified **code quality standard** that can be enforced through automated tooling, code reviews, and architectural testing.
++| Area               | Rule                                                                 | Enforcement                            |
++| ------------------ | -------------------------------------------------------------------- | -------------------------------------- |
++| Naming — classes   | PascalCase nouns; no `I` prefix                                      | `@typescript-eslint/naming-convention` |
++| Naming — functions | camelCase verbs                                                      | ESLint                                 |
++| Naming — files     | kebab-case                                                           | `eslint-plugin-check-file`             |
++| Imports            | Absolute path aliases only                                           | `import/no-relative-parent-imports`    |
++| Types              | `interface` for extensible objects; `type` for unions/primitives     | ESLint                                 |
++| `any`              | Forbidden without comment justification                              | `@typescript-eslint/no-explicit-any`   |
++| Conditionals       | Object literal lookups over `switch`/`if-else` for value mappings    | Code review                            |
++| Architecture       | All dependency rules validated with `arch-unit-ts`                   | `tests/architecture/`                  |
++| API versioning     | URI path versioning; shared business logic, versioned controllers    | Code review                            |
++| Security           | Zod validation on all external input; no direct third-party coupling | Code review                            |
+ 
+ ## 1. Core Programming Principles
+ 
+@@ -1671,7 +1681,7 @@ ### 4.7 RESTful API Design & Semantic Paths
+ 
+ **MUST follow RESTful principles and use semantic, resource-oriented URLs:**
+ 
+-RESTful APIs organize endpoints around resources (nouns) rather than actions (verbs), using HTTP methods to define operations.
++RESTful APIs organise endpoints around resources (nouns) rather than actions (verbs), using HTTP methods to define operations.
+ 
+ #### Resource-Oriented URL Design
+ 
+diff --git a/documentation/developer-guide/README.md b/documentation/developer-guide/README.md
+index cd2a234..369d8ff 100644
+--- a/documentation/developer-guide/README.md
++++ b/documentation/developer-guide/README.md
+@@ -1,6 +1,6 @@
+ # Developer Guide
+ 
+-Technical documentation for developers contributing to or extending Valora.
++> Technical documentation for contributors to and extenders of Valora.
+ 
+ ## Contents
+ 
+diff --git a/documentation/developer-guide/modern-cli-toolkit/fzf-eza-zoxide.md b/documentation/developer-guide/modern-cli-toolkit/fzf-eza-zoxide.md
+index 1a23fac..7827e25 100644
+--- a/documentation/developer-guide/modern-cli-toolkit/fzf-eza-zoxide.md
++++ b/documentation/developer-guide/modern-cli-toolkit/fzf-eza-zoxide.md
+@@ -1,5 +1,7 @@
+ # fzf, eza, and zoxide reference
+ 
++> Command reference for fuzzy finding (`fzf`), modern directory listing (`eza`), and smart navigation (`zoxide`).
++
+ ## Quick Reference
+ 
+ | Command                | Purpose                                            | Example                                        |
+diff --git a/documentation/developer-guide/modern-cli-toolkit/jq-yq.md b/documentation/developer-guide/modern-cli-toolkit/jq-yq.md
+index 49b9008..a1de081 100644
+--- a/documentation/developer-guide/modern-cli-toolkit/jq-yq.md
++++ b/documentation/developer-guide/modern-cli-toolkit/jq-yq.md
+@@ -1,5 +1,7 @@
+ # jq and yq reference
+ 
++> Command reference for querying and transforming JSON (`jq`) and YAML/TOML/XML (`yq`).
++
+ ## Quick Reference
+ 
+ | Command                                   | Purpose                    | Example                                         |
+diff --git a/documentation/developer-guide/modern-cli-toolkit/lazygit.md b/documentation/developer-guide/modern-cli-toolkit/lazygit.md
+index b4837c2..d859b24 100644
+--- a/documentation/developer-guide/modern-cli-toolkit/lazygit.md
++++ b/documentation/developer-guide/modern-cli-toolkit/lazygit.md
+@@ -1,5 +1,7 @@
+ # lazygit reference
+ 
++> When to use lazygit versus direct Git commands, and structured alternatives for non-interactive agent workflows.
++
+ ## When to use lazygit vs direct Git
+ 
+ lazygit is a terminal UI for Git. For agents, its primary value is reducing multi-command Git workflows to fewer operations. However, being a TUI (terminal user interface), it is most useful in interactive contexts. For non-interactive agent workflows, lazygit's CLI flags and direct Git commands with structured output are often more practical.
+diff --git a/documentation/developer-guide/modern-cli-toolkit/rg-fd.md b/documentation/developer-guide/modern-cli-toolkit/rg-fd.md
+index f55868c..3c50ecd 100644
+--- a/documentation/developer-guide/modern-cli-toolkit/rg-fd.md
++++ b/documentation/developer-guide/modern-cli-toolkit/rg-fd.md
+@@ -1,5 +1,7 @@
+ # ripgrep (rg) and fd reference
+ 
++> Command reference for searching file contents (`rg`) and finding files by name or pattern (`fd`).
++
+ ## Quick Reference
+ 
+ | Command                     | Purpose                             | Example                                                                 |
+diff --git a/documentation/developer-guide/writing-plugins.md b/documentation/developer-guide/writing-plugins.md
+index 589fb5f..e65da93 100644
+--- a/documentation/developer-guide/writing-plugins.md
++++ b/documentation/developer-guide/writing-plugins.md
+@@ -153,15 +153,19 @@ ## Full Manifest Schema
+ 
+ Validated by `PLUGIN_MANIFEST_SCHEMA` in `src/plugins/plugin-manifest.schema.ts`.
+ 
+-| Field            | Type       | Required | Description                                                |
+-| ---------------- | ---------- | -------- | ---------------------------------------------------------- |
+-| `name`           | `string`   | Yes      | Unique plugin identifier (kebab-case recommended)          |
+-| `version`        | `string`   | Yes      | SemVer: `MAJOR.MINOR.PATCH`                                |
+-| `description`    | `string`   | No       | Human-readable description                                 |
+-| `engines.valora` | `string`   | No       | SemVer range declaring minimum Valora compatibility        |
+-| `contributes`    | `string[]` | Yes      | List of contribution types (see table above)               |
+-| `permissions`    | `string[]` | No       | Required permissions; must include `shell-hooks` for hooks |
+-| `requiresBinary` | `object[]` | No       | External binaries the plugin depends on                    |
++| Field            | Type       | Required | Description                                                            |
++| ---------------- | ---------- | -------- | ---------------------------------------------------------------------- |
++| `name`           | `string`   | Yes      | Unique plugin identifier (kebab-case recommended)                      |
++| `version`        | `string`   | Yes      | SemVer: `MAJOR.MINOR.PATCH`                                            |
++| `description`    | `string`   | No       | Human-readable description                                             |
++| `homepage`       | `string`   | No       | URL to the plugin's homepage or repository                             |
++| `engines.valora` | `string`   | No       | SemVer range declaring minimum Valora compatibility                    |
++| `contributes`    | `string[]` | No       | List of contribution types (see table above)                           |
++| `permissions`    | `string[]` | No       | Required permissions; must include `shell-hooks` for hooks             |
++| `requires`       | `string[]` | No       | Plugin names that must be loaded before this one                       |
++| `requiresBinary` | `object[]` | No       | External binaries the plugin depends on                                |
++| `overrides`      | `string[]` | No       | Built-in resource names this plugin supersedes (informational)         |
++| `codeEntrypoint` | `string`   | No       | Relative path to compiled JS entry point (required for `code` plugins) |
+ 
+ `requiresBinary` entries:
+ 
+@@ -238,6 +242,18 @@ ## Discovery and Loading Architecture
+ 
+ Arch-unit rule: the `plugins` module may only import from `['plugins', 'types', 'config', 'utils', 'output']`. It must not import executor or service modules.
+ 
++## Distributing a Plugin
++
++Three distribution methods are supported:
++
++| Method                | How to install                            | Discovery            |
++| --------------------- | ----------------------------------------- | -------------------- |
++| Directory copy        | `cp -r my-plugin .valora/plugins/`        | Filesystem scan      |
++| Global directory copy | `cp -r my-plugin ~/.valora/plugins/`      | Filesystem scan      |
++| npm package           | `pnpm add @windagency/valora-plugin-name` | `node_modules/` scan |
++
++To publish as an npm package, set `name` in `package.json` to `@windagency/valora-plugin-<name>` and include `valora-plugin.json` in the published files. Valora automatically discovers any `@windagency/valora-plugin-*` package that exists in `node_modules/` and contains a valid manifest.
++
+ ## Testing a Plugin Locally
+ 
+ ```bash
+diff --git a/documentation/operations/README.md b/documentation/operations/README.md
+index ed66fd7..61f1e91 100644
+--- a/documentation/operations/README.md
++++ b/documentation/operations/README.md
+@@ -1,6 +1,6 @@
+ # Operations Guide
+ 
+-Deployment, monitoring, and operational procedures for Valora.
++> Operational procedures for deploying, monitoring, and maintaining Valora in a project environment.
+ 
+ ## Quick Reference
+ 
+@@ -472,7 +472,3 @@ ## Related Documentation
+ - [User Guide: Troubleshooting](../user-guide/troubleshooting.md)
+ - [Architecture: System Architecture](../architecture/system-architecture.md)
+ - [Automated Reporting](./automated-reporting.md)
+-
+----
+-
+-_For production deployment assistance, consult the operations team._
+diff --git a/documentation/operations/automated-reporting.md b/documentation/operations/automated-reporting.md
+index 232de8a..9a5e325 100644
+--- a/documentation/operations/automated-reporting.md
++++ b/documentation/operations/automated-reporting.md
+@@ -1,6 +1,6 @@
+ # Automated Metrics Reporting
+ 
+-Weekly workflow metrics are collected automatically and compiled into a dashboard report. This document explains how to run reports, what they contain, and how they are scheduled.
++> How to run, schedule, and interpret the weekly workflow metrics reports generated from Valora session data.
+ 
+ ## How to Run Reports
+ 
+@@ -300,7 +300,3 @@ ## References
+ - Scripts documentation: `scripts/README.md`
+ - Optimisation details: `documentation/user-guide/workflow-optimisations.md`
+ - Workflow configuration: `.github/workflows/metrics-dashboard.yml`
+-
+----
+-
+-_Last updated: 2026-02-02_
+diff --git a/documentation/operations/pipeline-resilience.md b/documentation/operations/pipeline-resilience.md
+index be41b14..dcdb14e 100644
+--- a/documentation/operations/pipeline-resilience.md
++++ b/documentation/operations/pipeline-resilience.md
+@@ -1,5 +1,19 @@
+ # Pipeline Resilience — Operations Guide
+ 
++> How to observe, diagnose, and tune pipeline failure behaviour — covering tool execution failures, loop exhaustion, hard stops, and retry configuration.
++
++## Quick Reference
++
++| Task                        | Where to Look                                   |
++| --------------------------- | ----------------------------------------------- |
++| Check loop exhaustion count | Dashboard Overview → Metrics Summary            |
++| See per-tool failure counts | Dashboard Performance tab                       |
++| Adjust iteration limit      | `max_tool_iterations` on the stage definition   |
++| Adjust failure tolerance    | `max_tool_failures` + `failure_policy` on stage |
++| Enable retry on a stage     | `retry.maxAttempts` + `retry.delay_ms` on stage |
++
++---
++
+ This guide covers the observable failure modes in the pipeline executor, how the system responds to each, and how to diagnose and tune the behaviour.
+ 
+ ## Failure Scenarios at a Glance
+diff --git a/documentation/user-guide/README.md b/documentation/user-guide/README.md
+index 7e7d1c8..015802a 100644
+--- a/documentation/user-guide/README.md
++++ b/documentation/user-guide/README.md
+@@ -16,6 +16,7 @@ ## Contents
+ | [Configuration](./configuration.md)            | Configure providers, agents, and external MCP servers |
+ | [Best Practices](./best-practices.md)          | Recommended usage patterns                            |
+ | [Troubleshooting](./troubleshooting.md)        | Common issues and solutions                           |
++| [Auto-update](./auto-update.md)                | Automatic update checks and `valora update` command   |
+ 
+ **New to Valora?** Start with [Quick Start](./quick-start.md).
+ 
+diff --git a/documentation/user-guide/auto-update.md b/documentation/user-guide/auto-update.md
+index 6a9ef45..eda7913 100644
+--- a/documentation/user-guide/auto-update.md
++++ b/documentation/user-guide/auto-update.md
+@@ -2,9 +2,7 @@ # Auto-update
+ 
+ > Valora checks for new versions automatically and shows a reminder when an update is available.
+ 
+-## How it works
+-
+-After each command completes, Valora runs a background check against the npm registry (at most once per day). When a newer version is available, a banner is printed to your terminal:
++When a newer version is available, a banner is printed to your terminal after your command finishes:
+ 
+ ```
+ ┌─ Update available ─────────────────────────────────────┐
+@@ -15,13 +13,21 @@ ## How it works
+ └────────────────────────────────────────────────────────┘
+ ```
+ 
+-The check is **non-blocking** — it never delays your command. The banner appears after your command finishes.
++Run `valora update` to install the new version. The check never delays your command.
++
++<details>
++<summary><strong>How the background check works</strong></summary>
++
++After each command completes, Valora runs a background check against the npm registry (at most once per day). The check is **non-blocking** — the banner appears after your command finishes, not before.
+ 
+ The check is automatically suppressed in:
++
+ - CI environments (`CI=true`)
+ - Non-interactive (piped or redirected) sessions
+ - MCP mode (`AI_MCP_ENABLED=true`)
+ 
++</details>
++
+ ---
+ 
+ ## `valora update`
+@@ -32,10 +38,10 @@ ## `valora update`
+ valora update [options]
+ ```
+ 
+-| Option | Description |
+-| --- | --- |
++| Option    | Description                                      |
++| --------- | ------------------------------------------------ |
+ | `--check` | Check for an available update without installing |
+-| `--force` | Reinstall even if already on the latest version |
++| `--force` | Reinstall even if already on the latest version  |
+ 
+ **On success:** the new version is installed and vendored tools (jq, ripgrep, fzf, lazygit) are refreshed automatically by the package manager's postinstall hook.
+ 
+@@ -62,49 +68,61 @@ ## Configuration
+ 
+ ```json
+ {
+-  "autoUpdate": {
+-    "mode": "reminder",
+-    "frequencyDays": 1
+-  }
++	"autoUpdate": {
++		"mode": "reminder",
++		"frequencyDays": 1
++	}
+ }
+ ```
+ 
+-| Key | Type | Default | Description |
+-| --- | --- | --- | --- |
+-| `mode` | `"reminder"` \| `"disabled"` \| `"auto"` | `"reminder"` | Controls when and how updates are surfaced |
+-| `frequencyDays` | integer (1–365) | `1` | Minimum days between background checks |
++| Key             | Type                                     | Default      | Description                                |
++| --------------- | ---------------------------------------- | ------------ | ------------------------------------------ |
++| `mode`          | `"reminder"` \| `"disabled"` \| `"auto"` | `"reminder"` | Controls when and how updates are surfaced |
++| `frequencyDays` | integer (1–365)                          | `1`          | Minimum days between background checks     |
+ 
+ ### Mode values
+ 
+-| Mode | Behaviour |
+-| --- | --- |
+-| `reminder` | Show a banner when an update is available; you run `valora update` manually. This is the default. |
+-| `disabled` | Suppress all background checks and banners. `valora update` still works. |
+-| `auto` | Reserved for future use. |
++| Mode       | Behaviour                                                                                                                                                                                                                                      |
++| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
++| `reminder` | Show a banner when an update is available; you run `valora update` manually. This is the default.                                                                                                                                              |
++| `disabled` | Suppress all background checks and banners. `valora update` still works.                                                                                                                                                                       |
++| `auto`     | After each command, silently install the latest version in the background. Prints one line to stderr before installing (`Updating Valora to v…`) and a confirmation on success. On failure, nothing is printed — run `valora update` to retry. |
+ 
+ ---
+ 
+ ## Environment variables
+ 
+-| Variable | Effect |
+-| --- | --- |
++| Variable                       | Effect                                         |
++| ------------------------------ | ---------------------------------------------- |
+ | `VALORA_DISABLE_AUTO_UPDATE=1` | Disable update checks for this invocation only |
+-| `CI=true` | Update checks are automatically suppressed |
++| `CI=true`                      | Update checks are automatically suppressed     |
+ 
+ ---
+ 
+ ## Troubleshooting
+ 
+-### Valora does not detect my package manager
++### The update command fails
++
++If `valora update` fails, the exact retry command is printed. You can also run any of the following manually:
++
++```bash
++npm install -g @windagency/valora@latest
++pnpm add -g @windagency/valora@latest
++yarn global add @windagency/valora@latest
++bun install -g @windagency/valora@latest
++```
++
++<details>
++<summary><strong>Valora does not detect my package manager</strong></summary>
+ 
+ Valora inspects the path of the Node.js executable to infer which package manager owns the global install. It recognises the following path patterns:
+ 
+-| Manager | Path pattern |
+-| --- | --- |
+-| pnpm | `.local/share/pnpm` or `/pnpm/` |
+-| bun | `.bun/install/global` |
++| Manager        | Path pattern                            |
++| -------------- | --------------------------------------- |
++| pnpm           | `.local/share/pnpm` or `/pnpm/`         |
++| bun            | `.bun/install/global`                   |
+ | yarn (classic) | `/yarn/global` or `.config/yarn/global` |
+-| npm | `/lib/node_modules` |
++| npm            | `/lib/node_modules`                     |
+ 
+ If none of these match, Valora prints all four install commands and lets you choose:
+ 
+@@ -116,13 +134,4 @@ ### Valora does not detect my package manager
+   bun install -g @windagency/valora@latest
+ ```
+ 
+-### The update command fails
+-
+-If `valora update` fails, the exact retry command is printed. You can also run any of the following manually:
+-
+-```bash
+-npm install -g @windagency/valora@latest
+-pnpm add -g @windagency/valora@latest
+-yarn global add @windagency/valora@latest
+-bun install -g @windagency/valora@latest
+-```
++</details>
+diff --git a/documentation/user-guide/plugins.md b/documentation/user-guide/plugins.md
+index a268e18..68fcec5 100644
+--- a/documentation/user-guide/plugins.md
++++ b/documentation/user-guide/plugins.md
+@@ -17,13 +17,14 @@ ## What Plugins Can Contribute
+ 
+ ## Installing a Plugin
+ 
+-Drop a plugin directory (containing `valora-plugin.json`) into any of the three discovery locations:
++Plugins are discovered from four locations on every startup. Later locations take precedence over earlier ones for conflicting contributions (last wins):
+ 
+-| Location             | Scope                          |
+-| -------------------- | ------------------------------ |
+-| `data/plugins/`      | Shipped with Valora (built-in) |
+-| `~/.valora/plugins/` | Personal — all projects        |
+-| `.valora/plugins/`   | Project-specific               |
++| Location                    | Scope                          | Install method    |
++| --------------------------- | ------------------------------ | ----------------- |
++| `data/plugins/`             | Shipped with Valora (built-in) | n/a               |
++| `~/.valora/plugins/`        | Personal — all your projects   | copy directory    |
++| `.valora/plugins/`          | This project only              | copy directory    |
++| `node_modules/@windagency/` | This project — npm packages    | npm / pnpm / yarn |
+ 
+ ```bash
+ # Install a plugin for this project only
+@@ -31,9 +32,14 @@ # Install a plugin for this project only
+ 
+ # Install a plugin for all your projects
+ cp -r my-plugin ~/.valora/plugins/
++
++# Install an official plugin via npm (auto-discovered, no copy needed)
++pnpm add @windagency/valora-plugin-ollama
+ ```
+ 
+-Valora scans all three locations on every startup. No restart or rebuild required.
++Any npm package under `@windagency/` whose name starts with `valora-plugin-` and contains a valid `valora-plugin.json` is discovered automatically from `node_modules/`. You still need to add its name to `plugins.enabled` to activate it.
++
++No restart or rebuild required after adding a plugin.
+ 
+ ## Code Plugins
+ 
+@@ -63,7 +69,37 @@ ## Code Plugins
+ }
+ ```
+ 
+-The built-in compression strategies for git, tsc, eslint, pnpm, pytest, and others ship as code plugins under `data/plugins/` and are the reference implementation.
++Three compression plugins ship as standalone packages under `packages/` and are built to `data/plugins/` at compile time. They register 17 tool strategies and serve as the reference implementation for the `code` contribution type:
++
++| Package (source)                                      | Strategies covered                                              |
++| ----------------------------------------------------- | --------------------------------------------------------------- |
++| `packages/valora-plugin-compression-typescript/`      | `tsc`, `eslint`, `jest`, `vitest`, `pnpm`, `npm`, `npx`, `yarn` |
++| `packages/valora-plugin-compression-universal/`       | `git`, `grep`, `rg`, `docker`, `make`                           |
++| `packages/valora-plugin-compression-python/`          | `python`, `pytest`                                              |
++
++These are enabled by default and require no configuration. Each package has its own `package.json`, `tsconfig.json`, and `valora-plugin.json` manifest. Run `pnpm build:plugins` to (re)compile all three.
++
++## Official Plugins
++
++The following plugins are published as npm packages under `@windagency/`:
++
++| Package                      | What it adds                                                    |
++| ---------------------------- | --------------------------------------------------------------- |
++| `valora-plugin-engineering`  | Engineering commands: `plan`, `implement`, `review-code`, …     |
++| `valora-plugin-product`      | Product commands: `refine-specs`, `create-prd`, `fetch-task`, … |
++| `valora-plugin-implement`    | Implementation agents (TypeScript, backend, frontend, React)    |
++| `valora-plugin-qa`           | QA agent and commands: `test`, `validate-coverage`, `pre-check` |
++| `valora-plugin-quality-gate` | Asserter agent and `assert` command                             |
++| `valora-plugin-secops`       | SecOps agent for security and compliance tasks                  |
++| `valora-plugin-platform`     | Platform-engineer agent for infrastructure tasks                |
++| `valora-plugin-design`       | UI/UX designer agent                                            |
++| `valora-plugin-docs`         | Documentation generation commands                               |
++| `valora-plugin-ollama`       | Self-managed Ollama LLM provider (code plugin)                  |
++
++```bash
++pnpm add @windagency/valora-plugin-ollama
++# then add "valora-plugin-ollama" to plugins.enabled in .valora/config.json
++```
+ 
+ ## Enabling and Disabling Plugins
+ 
+@@ -117,9 +153,37 @@ ## Discovery Order
+ 1. `data/plugins/` (built-in)
+ 2. `~/.valora/plugins/` (global user)
+ 3. `.valora/plugins/` (project)
++4. `node_modules/@windagency/valora-plugin-*` (npm packages, project-scoped)
+ 
+ A project-level plugin can therefore override any agent, command, or prompt shipped by a built-in plugin.
+ 
++## Plugin Dependencies (`requires`)
++
++If your plugin depends on another plugin being loaded first, declare it in the manifest:
++
++```json
++{
++	"name": "my-advanced-plugin",
++	"version": "1.0.0",
++	"requires": ["valora-plugin-ollama"],
++	"contributes": ["commands"]
++}
++```
++
++Valora loads `requires` entries before the declaring plugin. If a required plugin is not found or not enabled, the dependent plugin is skipped with a warning.
++
++## `overrides`
++
++To explicitly signal that a plugin supersedes a named built-in resource (agent, command, prompt), declare it:
++
++```json
++{
++	"overrides": ["gather-knowledge"]
++}
++```
++
++This is informational — Valora logs a notice rather than silently shadowing. The last-wins resolution still applies regardless of whether `overrides` is declared.
++
+ ## Permission Declarations
+ 
+ A plugin that contributes hooks must declare the `shell-hooks` permission in its manifest. Valora reads this field at load time and will not register hooks from a plugin that lacks the declaration.
+diff --git a/documentation/user-guide/workflows.md b/documentation/user-guide/workflows.md
+index 45b57b3..9e95de1 100644
+--- a/documentation/user-guide/workflows.md
++++ b/documentation/user-guide/workflows.md
+@@ -1,6 +1,6 @@
+ # Development Workflows
+ 
+-Common patterns for using VALORA effectively.
++Common patterns for using Valora effectively.
+ 
+ ## The Complete Development Lifecycle
+ 
+diff --git a/eslint.config.js b/eslint.config.js
+index 29e4d7d..405f57e 100644
+--- a/eslint.config.js
++++ b/eslint.config.js
+@@ -45,9 +45,13 @@ export default [
+ 				global: 'readonly',
+ 				NodeJS: 'readonly',
+ 				process: 'readonly',
++				AbortSignal: 'readonly',
++				fetch: 'readonly',
++				Response: 'readonly',
+ 				require: 'readonly',
+ 				setInterval: 'readonly',
+ 				setTimeout: 'readonly',
++				TextDecoder: 'readonly',
+ 				vi: 'readonly'
+ 			},
+ 			parser: tsparser,
+diff --git a/package.json b/package.json
+index d291746..1c1acf6 100644
+--- a/package.json
++++ b/package.json
+@@ -82,7 +82,7 @@
+ 		"dev:mcp": "tsx src/mcp/server.ts",
+ 		"prebuild": "pnpm clean:build",
+ 		"build": "tsc && tsc-alias && pnpm build:plugins",
+-		"build:plugins": "[ -d src/plugins-src ] && (tsc -p tsconfig.plugins.json && tsc-alias -p tsconfig.plugins.json) || true",
++		"build:plugins": "[ -d src/plugins-src ] && (tsc -p tsconfig.plugins.json && tsc-alias -p tsconfig.plugins.json) || true && pnpm --filter @windagency/valora-plugin-compression-universal build && pnpm --filter @windagency/valora-plugin-compression-typescript build && pnpm --filter @windagency/valora-plugin-compression-python build",
+ 		"postbuild": "cp package.json dist/ && cp tsconfig.runtime.json dist/tsconfig.json",
+ 		"build:watch": "tsc --watch",
+ 		"start": "node dist/cli/index.js",
+@@ -102,6 +102,8 @@
+ 		"test:suite:performance": "vitest run --config vitest.config.ts tests/performance",
+ 		"test:suite:error-scenarios": "vitest run --config vitest.config.ts tests/error-scenarios",
+ 		"test:suite:architecture": "vitest run --config vitest.config.ts tests/architecture",
++		"bench:compression": "tsx scripts/bench-compression.ts",
++		"bench:compression:check": "vitest run --config vitest.config.ts tests/benchmarks/compression",
+ 		"test:light": "SKIP_TESTCONTAINERS=true pnpm test:suite:unit && SKIP_TESTCONTAINERS=true pnpm test:suite:security",
+ 		"test:coverage": "vitest run --coverage",
+ 		"test:ci": "pnpm test && pnpm test:coverage",
+diff --git a/packages/valora-plugin-rtk/.editorconfig b/packages/valora-plugin-rtk/.editorconfig
+new file mode 100644
+index 0000000..095cb35
+--- /dev/null
++++ b/packages/valora-plugin-rtk/.editorconfig
+@@ -0,0 +1,17 @@
++root = true
++
++# EditorConfig : https://EditorConfig.org
++# AirBnB style : https://github.com/airbnb/javascript/blob/master/.editorconfig
++
++[*]
++charset = utf-8
++end_of_line = lf
++indent_size = 2
++indent_style = tab
++insert_final_newline = true
++# editorconfig-tools is unable to ignore longs strings or urls
++max_line_length = 120
++trim_trailing_whitespace = true
++
++[*.md]
++trim_trailing_whitespace = false
+diff --git a/packages/valora-plugin-rtk/.gitattributes b/packages/valora-plugin-rtk/.gitattributes
+new file mode 100644
+index 0000000..2338772
+--- /dev/null
++++ b/packages/valora-plugin-rtk/.gitattributes
+@@ -0,0 +1,25 @@
++*						text 		eol=lf
++*.md        text		diff=markdown
++*.mdx       text		diff=markdown
++
++*.png       binary
++*.jpg       binary
++*.jpeg      binary
++*.webp      binary
++*.gif       binary
++*.mov       binary
++*.mp4       binary
++*.webm      binary
++
++#
++# Exclude files from exporting
++#
++.gitattributes  export-ignore
++.gitignore      export-ignore
++
++#
++# Enable syntax highlighting for files with `.gitattributes` extensions.
++#
++*.gitattributes linguist-language=gitattributes
++*.gitattributes linguist-detectable=true
++*.gitattributes linguist-documentation=false
+diff --git a/packages/valora-plugin-rtk/.gitignore b/packages/valora-plugin-rtk/.gitignore
+new file mode 100644
+index 0000000..91e7c17
+--- /dev/null
++++ b/packages/valora-plugin-rtk/.gitignore
+@@ -0,0 +1,50 @@
++### macOS ###
++.DS_Store
++.AppleDouble
++.LSOverride
++._*
++.DocumentRevisions-V100
++.fseventsd
++.Spotlight-V100
++.TemporaryItems
++.Trashes
++.VolumeIcon.icns
++.com.apple.timemachine.donotpresent
++*.iCloud
++
++### Windows ###
++Thumbs.db
++ehthumbs.db
++[Dd]esktop.ini
++$RECYCLE.BIN/
++*.lnk
++
++### Linux ###
++*~
++.fuse_hidden*
++.directory
++.Trash-*
++.nfs*
++
++### IDE ###
++.idea/
++.vscode/*
++!.vscode/extensions.json
++!.vscode/tasks.json
++!.vscode/launch.json
++.history/
++
++### Node ###
++node_modules/
++*.log
++npm-debug.log*
++yarn-debug.log*
++*.tsbuildinfo
++.npm
++.eslintcache
++*.tgz
++.env*
++!.env.sample
++!.env.example
++.pnp.*
++.yarn-integrity
+diff --git a/packages/valora-plugin-rtk/.npmignore b/packages/valora-plugin-rtk/.npmignore
+new file mode 100644
+index 0000000..0b8e336
+--- /dev/null
++++ b/packages/valora-plugin-rtk/.npmignore
+@@ -0,0 +1,11 @@
++src/
++tsconfig.json
++eslint.config.js
++vitest.config.ts
++node_modules/
++.gitignore
++.gitattributes
++.editorconfig
++.npmrc
++.nvmrc
++.prettierrc.json
+diff --git a/packages/valora-plugin-rtk/.npmrc b/packages/valora-plugin-rtk/.npmrc
+new file mode 100644
+index 0000000..b6f27f1
+--- /dev/null
++++ b/packages/valora-plugin-rtk/.npmrc
+@@ -0,0 +1 @@
++engine-strict=true
+diff --git a/packages/valora-plugin-rtk/.nvmrc b/packages/valora-plugin-rtk/.nvmrc
+new file mode 100644
+index 0000000..b09ba46
+--- /dev/null
++++ b/packages/valora-plugin-rtk/.nvmrc
+@@ -0,0 +1 @@
++v22.21.0
+diff --git a/packages/valora-plugin-rtk/.prettierrc.json b/packages/valora-plugin-rtk/.prettierrc.json
+new file mode 100644
+index 0000000..32f0dfd
+--- /dev/null
++++ b/packages/valora-plugin-rtk/.prettierrc.json
+@@ -0,0 +1,12 @@
++{
++	"arrowParens": "always",
++	"bracketSameLine": true,
++	"bracketSpacing": true,
++	"endOfLine": "auto",
++	"printWidth": 120,
++	"semi": true,
++	"singleQuote": true,
++	"tabWidth": 2,
++	"trailingComma": "none",
++	"useTabs": true
++}
+diff --git a/packages/valora-plugin-rtk/eslint.config.js b/packages/valora-plugin-rtk/eslint.config.js
+new file mode 100644
+index 0000000..b07677c
+--- /dev/null
++++ b/packages/valora-plugin-rtk/eslint.config.js
+@@ -0,0 +1,38 @@
++import rootConfig from '../../eslint.config.js';
++import path from 'node:path';
++import { fileURLToPath } from 'node:url';
++
++const __dirname = path.dirname(fileURLToPath(import.meta.url));
++
++// This package contains only TypeScript test files.
++// Filter out the root config's global test-file ignore so ESLint can reach src/*.test.ts.
++// Restore the other config-file ignores individually (without *.test.ts) so this
++// file is never self-linted (which would cause the import resolver to rewrite the
++// relative path above as an npm package path).
++const baseConfig = rootConfig.filter(
++	(cfg) => !(Array.isArray(cfg.ignores) && !('files' in cfg) && cfg.ignores.includes('**/*.test.ts'))
++);
++
++export default [
++	...baseConfig,
++	{
++		ignores: ['**/*.spec.ts', '**/*.config.ts', '**/*.config.cjs', '**/*.config.js', '**/*.config.mjs']
++	},
++	{
++		files: ['src/**/*.test.ts'],
++		languageOptions: {
++			parserOptions: {
++				project: './tsconfig.json',
++				tsconfigRootDir: __dirname
++			}
++		},
++		settings: {
++			'import/resolver': {
++				typescript: {
++					alwaysTryTypes: true,
++					project: path.resolve(__dirname, 'tsconfig.json')
++				}
++			}
++		}
++	}
++];
+diff --git a/packages/valora-plugin-rtk/hooks.json b/packages/valora-plugin-rtk/hooks.json
+new file mode 100644
+index 0000000..39d4755
+--- /dev/null
++++ b/packages/valora-plugin-rtk/hooks.json
+@@ -0,0 +1,16 @@
++{
++	"hooks": {
++		"PreToolUse": [
++			{
++				"matcher": "^run_terminal_cmd$",
++				"hooks": [
++					{
++						"type": "command",
++						"command": "bash {pluginDir}/hooks/rtk-rewrite.sh",
++						"timeout": 3000
++					}
++				]
++			}
++		]
++	}
++}
+diff --git a/packages/valora-plugin-rtk/hooks/rtk-rewrite.sh b/packages/valora-plugin-rtk/hooks/rtk-rewrite.sh
+new file mode 100755
+index 0000000..dc75cf7
+--- /dev/null
++++ b/packages/valora-plugin-rtk/hooks/rtk-rewrite.sh
+@@ -0,0 +1,43 @@
++#!/usr/bin/env bash
++# rtk-rewrite.sh — PreToolUse hook for run_terminal_cmd
++# Prepends "rtk" to filterable commands when RTK is installed.
++# Exit 0 with no output = pass through unchanged.
++# Exit 0 with JSON on stdout = rewrite tool input.
++set -euo pipefail
++
++if ! command -v rtk &>/dev/null; then
++	exit 0
++fi
++
++INPUT=$(cat)
++
++# Guard against malformed JSON — fail-open rather than producing a noisy hook error.
++COMMAND=$(echo "$INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null) || exit 0
++
++if [[ -z "$COMMAND" ]]; then
++	exit 0
++fi
++
++# Already prefixed — avoid double-wrapping.
++if echo "$COMMAND" | grep -qE '^rtk[[:space:]]'; then
++	exit 0
++fi
++
++# Skip sudo-prefixed commands — rtk's handling of sudo as a first argument is
++# undefined. Pass through unchanged; the command runs without token filtering.
++if echo "$COMMAND" | grep -qE '^sudo[[:space:]]'; then
++	exit 0
++fi
++
++FIRST_TOKEN=$(echo "$COMMAND" | awk '{print $1}')
++
++RTK_TOOLS="git cargo npm docker kubectl make python pip yarn bun pnpm"
++
++for tool in $RTK_TOOLS; do
++	if [[ "$FIRST_TOKEN" == "$tool" ]]; then
++		jq -n --arg cmd "rtk $COMMAND" '{"hookSpecificOutput":{"hookEventName":"PreToolUse","updatedInput":{"command":$cmd}}}'
++		exit 0
++	fi
++done
++
++exit 0
+diff --git a/packages/valora-plugin-rtk/package.json b/packages/valora-plugin-rtk/package.json
+new file mode 100644
+index 0000000..3988968
+--- /dev/null
++++ b/packages/valora-plugin-rtk/package.json
+@@ -0,0 +1,49 @@
++{
++	"name": "@windagency/valora-plugin-rtk",
++	"version": "1.0.0",
++	"description": "RTK (Rust Token Killer) integration for Valora — transparently prepends rtk to known-noisy CLI tools, reducing LLM token consumption by 60–90%.",
++	"keywords": [
++		"valora",
++		"valora-plugin",
++		"rtk",
++		"token-reduction",
++		"hooks",
++		"cli",
++		"rust"
++	],
++	"author": "Damien TIVELET <damien@wind-agency.com>",
++	"repository": {
++		"type": "git",
++		"url": "https://github.com/windagency/valora.ai"
++	},
++	"license": "MIT",
++	"type": "module",
++	"engines": {
++		"node": ">=22.0.0"
++	},
++	"packageManager": "pnpm@10.19.0",
++	"volta": {
++		"node": "22.21.0",
++		"pnpm": "10.19.0"
++	},
++	"scripts": {
++		"lint": "eslint --color",
++		"lint:fix": "eslint --color --fix",
++		"beautify": "prettier --check \"**/*.+(js|ts|json|md|yml|yaml)\"",
++		"beautify:fix": "prettier --write \"**/*.+(js|ts|json|md|yml|yaml)\"",
++		"format": "pnpm beautify:fix && pnpm lint:fix",
++		"test": "vitest run",
++		"prepublishOnly": "pnpm test"
++	},
++	"files": [
++		"valora-plugin.json",
++		"hooks.json",
++		"hooks/"
++	],
++	"peerDependencies": {
++		"@windagency/valora": ">=0.1.0"
++	},
++	"devDependencies": {
++		"vitest": "^1.0.0"
++	}
++}
+diff --git a/packages/valora-plugin-rtk/src/rtk-rewrite.test.ts b/packages/valora-plugin-rtk/src/rtk-rewrite.test.ts
+new file mode 100644
+index 0000000..2fce686
+--- /dev/null
++++ b/packages/valora-plugin-rtk/src/rtk-rewrite.test.ts
+@@ -0,0 +1,94 @@
++import { execFile } from 'child_process';
++import { chmodSync, mkdirSync, rmSync, writeFileSync } from 'fs';
++import { tmpdir } from 'os';
++import { join } from 'path';
++import { afterAll, beforeAll, describe, expect, it } from 'vitest';
++
++const SCRIPT = join(import.meta.dirname, '../hooks/rtk-rewrite.sh');
++
++interface HookOutput {
++	hookSpecificOutput: { hookEventName: string; updatedInput: { command: string } };
++}
++
++function run(
++	input: Record<string, unknown>,
++	env: Record<string, string>
++): Promise<{ exitCode: number; stdout: string }> {
++	return new Promise((resolve) => {
++		const child = execFile('bash', [SCRIPT], { env: { ...process.env, ...env } }, (error, stdout) => {
++			const rawCode = error?.code;
++			resolve({ exitCode: typeof rawCode === 'number' ? rawCode : 0, stdout });
++		});
++		child.stdin!.write(JSON.stringify(input));
++		child.stdin!.end();
++	});
++}
++
++describe('rtk-rewrite.sh', () => {
++	let rtkBinDir: string;
++	let pathWithRtk: string;
++
++	beforeAll(() => {
++		rtkBinDir = join(tmpdir(), `valora-rtk-test-${Date.now()}`);
++		mkdirSync(rtkBinDir, { recursive: true });
++		writeFileSync(join(rtkBinDir, 'rtk'), '#!/usr/bin/env bash\n');
++		chmodSync(join(rtkBinDir, 'rtk'), 0o755);
++		pathWithRtk = `${rtkBinDir}:${process.env['PATH'] ?? ''}`;
++	});
++
++	afterAll(() => {
++		rmSync(rtkBinDir, { force: true, recursive: true });
++	});
++
++	it('passes through when rtk is not on PATH', async () => {
++		// Use the real system PATH minus the fake rtk bin dir — avoids PATH replacement
++		// breaking jq/bash lookups on non-standard hosts.
++		const pathWithoutRtk = (process.env['PATH'] ?? '')
++			.split(':')
++			.filter((p) => p !== rtkBinDir)
++			.join(':');
++		const { exitCode, stdout } = await run({ tool_input: { command: 'git status' } }, { PATH: pathWithoutRtk });
++		expect(exitCode).toBe(0);
++		expect(stdout.trim()).toBe('');
++	});
++
++	it('passes through when tool_input.command is absent', async () => {
++		const { exitCode, stdout } = await run({ tool_input: {} }, { PATH: pathWithRtk });
++		expect(exitCode).toBe(0);
++		expect(stdout.trim()).toBe('');
++	});
++
++	it('passes through for non-whitelisted commands', async () => {
++		const { exitCode, stdout } = await run({ tool_input: { command: 'echo hello' } }, { PATH: pathWithRtk });
++		expect(exitCode).toBe(0);
++		expect(stdout.trim()).toBe('');
++	});
++
++	it('does not double-wrap a command already prefixed with rtk', async () => {
++		const { exitCode, stdout } = await run({ tool_input: { command: 'rtk git status' } }, { PATH: pathWithRtk });
++		expect(exitCode).toBe(0);
++		expect(stdout.trim()).toBe('');
++	});
++
++	it.each(['git', 'cargo', 'npm', 'docker', 'kubectl', 'make', 'python', 'pip', 'yarn', 'bun', 'pnpm'])(
++		'rewrites %s commands',
++		async (tool) => {
++			const { stdout } = await run({ tool_input: { command: `${tool} build` } }, { PATH: pathWithRtk });
++			const output = JSON.parse(stdout) as HookOutput;
++			expect(output.hookSpecificOutput.hookEventName).toBe('PreToolUse');
++			expect(output.hookSpecificOutput.updatedInput.command).toBe(`rtk ${tool} build`);
++		}
++	);
++
++	it('passes through sudo-prefixed commands unchanged', async () => {
++		// rtk's handling of sudo as a first argument is undefined — pass through rather than risk breakage.
++		const { exitCode, stdout } = await run({ tool_input: { command: 'sudo git push' } }, { PATH: pathWithRtk });
++		expect(exitCode).toBe(0);
++		expect(stdout.trim()).toBe('');
++	});
++
++	it('passes through malformed JSON without erroring', async () => {
++		const { exitCode } = await run('not-valid-json' as unknown as Record<string, unknown>, { PATH: pathWithRtk });
++		expect(exitCode).toBe(0);
++	});
++});
+diff --git a/packages/valora-plugin-rtk/tsconfig.json b/packages/valora-plugin-rtk/tsconfig.json
+new file mode 100644
+index 0000000..000c609
+--- /dev/null
++++ b/packages/valora-plugin-rtk/tsconfig.json
+@@ -0,0 +1,15 @@
++{
++	"extends": "../../tsconfig.json",
++	"compilerOptions": {
++		"declaration": false,
++		"declarationMap": false,
++		"module": "ESNext",
++		"moduleResolution": "bundler",
++		"noEmit": true,
++		"paths": {},
++		"rootDir": "src",
++		"sourceMap": false
++	},
++	"include": ["src/**/*.test.ts", "vitest.config.ts"],
++	"exclude": ["node_modules"]
++}
+diff --git a/packages/valora-plugin-rtk/valora-plugin.json b/packages/valora-plugin-rtk/valora-plugin.json
+new file mode 100644
+index 0000000..3cefe26
+--- /dev/null
++++ b/packages/valora-plugin-rtk/valora-plugin.json
+@@ -0,0 +1,19 @@
++{
++	"name": "valora-plugin-rtk",
++	"version": "1.0.0",
++	"description": "RTK (Rust Token Killer) integration for Valora — transparently prepends rtk to known-noisy CLI tools, reducing LLM token consumption by 60–90%.",
++	"engines": { "valora": ">=0.1.0" },
++	"contributes": ["hooks"],
++	"permissions": ["shell-hooks"],
++	"requiresBinary": [
++		{
++			"name": "rtk",
++			"version": ">=0.5",
++			"install": "cargo install rtk"
++		},
++		{
++			"name": "jq",
++			"version": ">=1.6"
++		}
++	]
++}
+diff --git a/packages/valora-plugin-rtk/vitest.config.ts b/packages/valora-plugin-rtk/vitest.config.ts
+new file mode 100644
+index 0000000..f86bd2c
+--- /dev/null
++++ b/packages/valora-plugin-rtk/vitest.config.ts
+@@ -0,0 +1,8 @@
++import { defineConfig } from 'vitest/config';
++
++export default defineConfig({
++	test: {
++		environment: 'node',
++		testTimeout: 30000
++	}
++});
+diff --git a/src/cli/commands/update.command.test.ts b/src/cli/commands/update.command.test.ts
+index 5db11ac..1f01fcc 100644
+--- a/src/cli/commands/update.command.test.ts
++++ b/src/cli/commands/update.command.test.ts
+@@ -141,6 +141,16 @@ describe('valora update command', () => {
+ 		expect(writeUpdateStateMock).toHaveBeenCalledTimes(1);
+ 	});
+ 
++	it('--check --force shows "already up to date" when no update exists', async () => {
++		fetchLatestVersionMock.mockResolvedValue('0.0.1');
++
++		const program = makeProgram();
++		await program.parseAsync(['node', 'valora', 'update', '--check', '--force']);
++
++		expect(spawnMock).not.toHaveBeenCalled();
++		expect(logged()).toContain('already up to date');
++	});
++
+ 	it('prints "Unable to check" when the registry is unreachable, with no spawn', async () => {
+ 		fetchLatestVersionMock.mockResolvedValue(null);
+ 
+diff --git a/src/cli/index.ts b/src/cli/index.ts
+index e3ac674..a5c4e0f 100644
+--- a/src/cli/index.ts
++++ b/src/cli/index.ts
+@@ -10,15 +10,17 @@
+  */
+ 
+ import { createRequire } from 'node:module';
+-
+-import { getConfigLoader, setGlobalCliOverrides } from 'config/loader';
+ import {
+ 	printUpdateBanner,
++	runAutoInstall,
+ 	scheduleUpdateCheck,
+ 	settleUpdateCheck,
++	shouldAutoUpdate,
+ 	shouldShowReminder,
+ 	writeUpdateState
+ } from 'updater/index';
++
++import { getConfigLoader, setGlobalCliOverrides } from 'config/loader';
+ import { getGlobalConfigDir } from 'utils/paths';
+ import { handlePromptCancellation, isPromptCancellation } from 'utils/prompt-handler';
+ 
+@@ -26,7 +28,7 @@ import type { CliOptions } from './types/cli-options.types';
+ 
+ import { configureCompletionCommand } from './autocomplete';
+ import { configureTemplateCommand } from './command-templates';
+-import { createCommand, type CommanderCommandContract } from './commander-adapter';
++import { type CommanderCommandContract, createCommand } from './commander-adapter';
+ import { configureBatchCommand } from './commands/batch.command';
+ import { configureConfigCommand } from './commands/config';
+ import { configureDashboardCommand } from './commands/dashboard';
+@@ -142,6 +144,21 @@ configureUpdateCommand(rawProgram);
+ 
+ const isUpdateCommand = rawArgs[0] === 'update';
+ 
++async function handleAutoInstall(state: Awaited<ReturnType<typeof settleUpdateCheck>>): Promise<void> {
++	if (!state) return;
++	if (!shouldAutoUpdate(state, packageJson.version)) return;
++	process.stderr.write(`Updating Valora to v${state.latestVersion}…\n`);
++	const result = await runAutoInstall();
++	if (result === 'success') {
++		process.stderr.write(`✓ Updated to v${state.latestVersion}.\n`);
++		await writeUpdateState(getGlobalConfigDir(), {
++			...state,
++			installedVersionAtCheck: state.latestVersion,
++			remindedForVersion: state.latestVersion
++		});
++	}
++}
++
+ function shouldSkipUpdateCheck(): boolean {
+ 	return (
+ 		process.env['VALORA_DISABLE_AUTO_UPDATE'] === '1' ||
+@@ -166,11 +183,9 @@ rawProgram.hook('postAction', async () => {
+ 
+ 	if (shouldShowReminder(state, packageJson.version, mode)) {
+ 		printUpdateBanner(state, packageJson.version);
+-		const stateDir = getGlobalConfigDir();
+-		await writeUpdateState(stateDir, {
+-			...state,
+-			remindedForVersion: state.latestVersion
+-		});
++		await writeUpdateState(getGlobalConfigDir(), { ...state, remindedForVersion: state.latestVersion });
++	} else if (mode === 'auto') {
++		await handleAutoInstall(state);
+ 	}
+ });
+ 
+@@ -247,16 +262,19 @@ void (async () => {
+ 		// Initialize unified cleanup schedulers (log and session)
+ 		await initializeCleanupIfNeeded();
+ 
+-		// Schedule background update check (non-blocking, fire-and-forget)
+-		if (!shouldSkipUpdateCheck() && !isUpdateCommand) {
+-			const config = await getConfigLoader().load();
+-			const frequencyDays = config.autoUpdate?.frequencyDays ?? 1;
+-			scheduleUpdateCheck(getGlobalConfigDir(), packageJson.version, frequencyDays);
+-		}
+-
+ 		// Parse arguments
+ 		program.parse();
+ 
++		// Schedule background update check after parse — fire-and-forget, never blocks the command
++		if (!shouldSkipUpdateCheck() && !isUpdateCommand) {
++			void (async () => {
++				const config = await getConfigLoader().load();
++				const mode = config.autoUpdate?.mode ?? 'reminder';
++				if (mode === 'disabled') return;
++				scheduleUpdateCheck(getGlobalConfigDir(), packageJson.version, config.autoUpdate?.frequencyDays ?? 1);
++			})();
++		}
++
+ 		// Build CLI configuration from options
+ 		const options = program.opts() as CliOptions;
+ 
+diff --git a/src/executor/output-compression.service.ts b/src/executor/output-compression.service.ts
+index 3a7c832..6d40b79 100644
+--- a/src/executor/output-compression.service.ts
++++ b/src/executor/output-compression.service.ts
+@@ -117,7 +117,7 @@ export function compressTerminalOutput(command: string, output: string): string
+ 		return clean;
+ 	}
+ 
+-	const tool = firstToken(command);
++	const tool = resolveStrategyKey(command);
+ 	const strategy = registry.get(tool);
+ 	let compressed: string;
+ 	if (strategy) {
+@@ -131,12 +131,21 @@ export function compressTerminalOutput(command: string, output: string): string
+ 	}
+ 
+ 	const result = truncateTerminalOutput(compressed);
+-	recordCompression(clean.length, result.length);
++	recordCompression(output.length, result.length);
+ 	return result;
+ }
+ 
+ // ── Internal helpers ──────────────────────────────────────────────────────────
+ 
+-function firstToken(command: string): string {
+-	return command.trimStart().split(/\s+/)[0] ?? '';
++const WRAPPER_COMMANDS = new Set(['pnpm', 'npm', 'npx', 'yarn', 'bun', 'bunx']);
++
++const PM_SUBCOMMANDS = new Set(['install', 'add', 'remove', 'i', 'audit', 'outdated', 'run', 'exec', 'dlx', 'test']);
++
++function resolveStrategyKey(command: string): string {
++	const tokens = command.trimStart().split(/\s+/);
++	const first = tokens[0] ?? '';
++	if (!WRAPPER_COMMANDS.has(first)) return first;
++	const second = tokens[1] ?? '';
++	if (!PM_SUBCOMMANDS.has(second) && registry.has(second)) return second;
++	return first;
+ }
+diff --git a/src/plugins-src/valora-plugin-compression-python/index.test.ts b/src/plugins-src/valora-plugin-compression-python/index.test.ts
+deleted file mode 100644
+index d4819c3..0000000
+--- a/src/plugins-src/valora-plugin-compression-python/index.test.ts
++++ /dev/null
+@@ -1,25 +0,0 @@
+-import { describe, expect, it, vi } from 'vitest';
+-
+-import type { PluginAPI } from 'plugins/plugin-api.types';
+-
+-import { register } from './index';
+-
+-function makeApi(): PluginAPI {
+-	return {
+-		compression: { registerStrategy: vi.fn() },
+-		config: { extend: vi.fn() },
+-		lifecycle: { onActivate: vi.fn(), onDeactivate: vi.fn() },
+-		logger: { debug: vi.fn(), error: vi.fn(), info: vi.fn(), warn: vi.fn() },
+-		providers: { register: vi.fn() }
+-	};
+-}
+-
+-describe('valora-plugin-compression-python register()', () => {
+-	it('registers python and pytest tool keys', () => {
+-		const api = makeApi();
+-		register(api);
+-		const calls = vi.mocked(api.compression.registerStrategy).mock.calls.map(([tool]) => tool);
+-		expect(calls).toEqual(expect.arrayContaining(['python', 'pytest']));
+-		expect(calls).toHaveLength(2);
+-	});
+-});
+diff --git a/src/plugins-src/valora-plugin-compression-python/index.ts b/src/plugins-src/valora-plugin-compression-python/index.ts
+deleted file mode 100644
+index 03f572c..0000000
+--- a/src/plugins-src/valora-plugin-compression-python/index.ts
++++ /dev/null
+@@ -1,8 +0,0 @@
+-import type { PluginAPI } from 'plugins/plugin-api.types';
+-
+-import { filterPython } from './strategies';
+-
+-export function register(api: PluginAPI): void {
+-	api.compression.registerStrategy('python', filterPython);
+-	api.compression.registerStrategy('pytest', filterPython);
+-}
+diff --git a/src/plugins-src/valora-plugin-compression-python/strategies.test.ts b/src/plugins-src/valora-plugin-compression-python/strategies.test.ts
+deleted file mode 100644
+index f131ea5..0000000
+--- a/src/plugins-src/valora-plugin-compression-python/strategies.test.ts
++++ /dev/null
+@@ -1,35 +0,0 @@
+-import { describe, expect, it } from 'vitest';
+-
+-import { filterPython } from './strategies';
+-
+-function pad(str: string, targetLength: number): string {
+-	return str.repeat(Math.ceil(targetLength / str.length)).slice(0, targetLength);
+-}
+-
+-describe('filterPython', () => {
+-	it('collapses passing tests to a count summary', () => {
+-		const input = [
+-			'PASSED tests/test_a.py::test_one',
+-			'PASSED tests/test_a.py::test_two',
+-			'FAILED tests/test_b.py::test_three'
+-		].join('\n');
+-		const result = filterPython(input, 'pytest');
+-		expect(result).toContain('[2 tests passed]');
+-		expect(result).toContain('FAILED tests/test_b.py::test_three');
+-	});
+-
+-	it('preserves FAILED lines and tracebacks', () => {
+-		const input = [pad('PASSED test\n', 20), 'FAILED tests/test_bad.py::test_x', 'AssertionError: assert 1 == 2'].join(
+-			'\n'
+-		);
+-		const result = filterPython(input, 'python -m pytest');
+-		expect(result).toContain('FAILED tests/test_bad.py::test_x');
+-		expect(result).toContain('AssertionError: assert 1 == 2');
+-	});
+-
+-	it('preserves summary lines (=== short test summary ===)', () => {
+-		const input = ['PASSED a', '=== short test summary info ===', 'FAILED b'].join('\n');
+-		const result = filterPython(input, 'pytest');
+-		expect(result).toContain('=== short test summary info ===');
+-	});
+-});
+diff --git a/src/plugins-src/valora-plugin-compression-python/strategies.ts b/src/plugins-src/valora-plugin-compression-python/strategies.ts
+deleted file mode 100644
+index 4c4e7bf..0000000
+--- a/src/plugins-src/valora-plugin-compression-python/strategies.ts
++++ /dev/null
+@@ -1,33 +0,0 @@
+-export function filterPython(output: string, _command: string): string {
+-	const lines = output.split('\n');
+-	const kept: string[] = [];
+-	let passCount = 0;
+-
+-	const flushPassCount = (): void => {
+-		if (passCount > 0) {
+-			kept.push(`[${passCount} test${passCount === 1 ? '' : 's'} passed]`);
+-			passCount = 0;
+-		}
+-	};
+-
+-	for (const line of lines) {
+-		const isPassLine = /^\s*(PASSED|\.)\s*$/.test(line) || /\s+PASSED$/.test(line) || /^\s*PASSED\s+/.test(line);
+-		const isFailLine = /^\s*(FAILED|F\s|ERROR)/.test(line);
+-		const isSummaryLine = /^(=+|FAILED|ERROR|passed|failed|error|warnings summary|short test)/.test(line);
+-
+-		if (isFailLine) {
+-			flushPassCount();
+-			kept.push(line);
+-		} else if (isPassLine) {
+-			passCount++;
+-		} else if (isSummaryLine) {
+-			flushPassCount();
+-			kept.push(line);
+-		} else {
+-			kept.push(line);
+-		}
+-	}
+-
+-	flushPassCount();
+-	return kept.join('\n');
+-}
+diff --git a/src/plugins-src/valora-plugin-compression-typescript/index.test.ts b/src/plugins-src/valora-plugin-compression-typescript/index.test.ts
+deleted file mode 100644
+index bb7e64a..0000000
+--- a/src/plugins-src/valora-plugin-compression-typescript/index.test.ts
++++ /dev/null
+@@ -1,25 +0,0 @@
+-import { describe, expect, it, vi } from 'vitest';
+-
+-import type { PluginAPI } from 'plugins/plugin-api.types';
+-
+-import { register } from './index';
+-
+-function makeApi(): PluginAPI {
+-	return {
+-		compression: { registerStrategy: vi.fn() },
+-		config: { extend: vi.fn() },
+-		lifecycle: { onActivate: vi.fn(), onDeactivate: vi.fn() },
+-		logger: { debug: vi.fn(), error: vi.fn(), info: vi.fn(), warn: vi.fn() },
+-		providers: { register: vi.fn() }
+-	};
+-}
+-
+-describe('valora-plugin-compression-typescript register()', () => {
+-	it('registers all eight tool keys', () => {
+-		const api = makeApi();
+-		register(api);
+-		const calls = vi.mocked(api.compression.registerStrategy).mock.calls.map(([tool]) => tool);
+-		expect(calls).toEqual(expect.arrayContaining(['tsc', 'eslint', 'jest', 'vitest', 'pnpm', 'npm', 'npx', 'yarn']));
+-		expect(calls).toHaveLength(8);
+-	});
+-});
+diff --git a/src/plugins-src/valora-plugin-compression-typescript/index.ts b/src/plugins-src/valora-plugin-compression-typescript/index.ts
+deleted file mode 100644
+index 3815972..0000000
+--- a/src/plugins-src/valora-plugin-compression-typescript/index.ts
++++ /dev/null
+@@ -1,14 +0,0 @@
+-import type { PluginAPI } from 'plugins/plugin-api.types';
+-
+-import { filterEslint, filterPackageManager, filterTestRunner, filterTsc } from './strategies';
+-
+-export function register(api: PluginAPI): void {
+-	api.compression.registerStrategy('tsc', filterTsc);
+-	api.compression.registerStrategy('eslint', filterEslint);
+-	api.compression.registerStrategy('jest', filterTestRunner);
+-	api.compression.registerStrategy('vitest', filterTestRunner);
+-	api.compression.registerStrategy('pnpm', filterPackageManager);
+-	api.compression.registerStrategy('npm', filterPackageManager);
+-	api.compression.registerStrategy('npx', filterPackageManager);
+-	api.compression.registerStrategy('yarn', filterPackageManager);
+-}
+diff --git a/src/plugins-src/valora-plugin-compression-typescript/strategies.test.ts b/src/plugins-src/valora-plugin-compression-typescript/strategies.test.ts
+deleted file mode 100644
+index d7b21eb..0000000
+--- a/src/plugins-src/valora-plugin-compression-typescript/strategies.test.ts
++++ /dev/null
+@@ -1,64 +0,0 @@
+-import { describe, expect, it } from 'vitest';
+-
+-import { filterEslint, filterPackageManager, filterTestRunner, filterTsc } from './strategies';
+-
+-function pad(str: string, targetLength: number): string {
+-	return str.repeat(Math.ceil(targetLength / str.length)).slice(0, targetLength);
+-}
+-
+-describe('filterTsc', () => {
+-	it('groups errors by code and caps at 3 examples per code', () => {
+-		const lines = Array.from({ length: 5 }, (_, i) => `src/file${i}.ts(1,1): error TS2345: message`);
+-		const input = lines.join('\n');
+-		const result = filterTsc(input, 'tsc');
+-		const ts2345Lines = result.split('\n').filter((l) => l.includes('TS2345'));
+-		expect(ts2345Lines.length).toBeLessThanOrEqual(4); // 3 examples + 1 ellipsis line
+-	});
+-
+-	it('preserves non-diagnostic lines', () => {
+-		const input = 'Found 3 errors in 2 files.\nsrc/a.ts(1,1): error TS2345: msg';
+-		const result = filterTsc(input, 'tsc');
+-		expect(result).toContain('Found 3 errors');
+-	});
+-});
+-
+-describe('filterEslint', () => {
+-	it('groups violations by rule and caps at 2 examples per rule', () => {
+-		const lines = Array.from({ length: 4 }, (_, i) => `  ${i + 1}:5  error  no-unused-vars  'x' is defined`);
+-		const result = filterEslint(lines.join('\n'), 'eslint');
+-		const ruleLines = result.split('\n').filter((l) => l.includes('no-unused-vars'));
+-		expect(ruleLines.length).toBeLessThanOrEqual(3); // 2 examples + 1 ellipsis
+-	});
+-});
+-
+-describe('filterTestRunner', () => {
+-	it('collapses passing suites to a count summary', () => {
+-		const input = ['✓ suite one', '✓ suite two', '✗ FAIL suite/three.test.ts'].join('\n');
+-		const result = filterTestRunner(input, 'vitest');
+-		expect(result).toContain('[2 test suites passed]');
+-		expect(result).toContain('FAIL suite/three.test.ts');
+-	});
+-
+-	it('preserves FAIL suite lines', () => {
+-		const input = pad('✓ passing\n', 200) + '✗ FAIL broken.test.ts\n  Error: expected 1 to be 2';
+-		const result = filterTestRunner(input, 'jest');
+-		expect(result).toContain('FAIL broken.test.ts');
+-		expect(result).toContain('Error: expected 1 to be 2');
+-	});
+-});
+-
+-describe('filterPackageManager', () => {
+-	it('removes pnpm braille spinner lines', () => {
+-		const input = '⠋ Resolving dependencies\nDone in 1.2s';
+-		const result = filterPackageManager(input, 'pnpm install');
+-		expect(result).not.toContain('⠋');
+-		expect(result).toContain('Done in 1.2s');
+-	});
+-
+-	it('removes npm warn lines', () => {
+-		const input = 'npm warn deprecated foo@1.0.0\nadded 42 packages';
+-		const result = filterPackageManager(input, 'npm install');
+-		expect(result).not.toContain('npm warn');
+-		expect(result).toContain('added 42 packages');
+-	});
+-});
+diff --git a/src/plugins-src/valora-plugin-compression-typescript/strategies.ts b/src/plugins-src/valora-plugin-compression-typescript/strategies.ts
+deleted file mode 100644
+index ad77acb..0000000
+--- a/src/plugins-src/valora-plugin-compression-typescript/strategies.ts
++++ /dev/null
+@@ -1,104 +0,0 @@
+-const TSC_MAX_EXAMPLES_PER_CODE = 3;
+-const ESLINT_MAX_EXAMPLES_PER_RULE = 2;
+-
+-export function filterEslint(output: string, _command: string): string {
+-	const lines = output.split('\n');
+-	const byRule = new Map<string, string[]>();
+-	const other: string[] = [];
+-
+-	for (const line of lines) {
+-		const match = line.match(/^\s+\d+:\d+\s+(error|warning)\s+(\S+)/);
+-		if (match) {
+-			const rule = match[2] ?? '';
+-			const bucket = byRule.get(rule);
+-			if (!bucket) {
+-				byRule.set(rule, [line]);
+-			} else if (bucket.length < ESLINT_MAX_EXAMPLES_PER_RULE) {
+-				bucket.push(line);
+-			} else if (bucket.length === ESLINT_MAX_EXAMPLES_PER_RULE) {
+-				bucket.push(`  ... (more ${rule} violations)`);
+-			}
+-		} else {
+-			other.push(line);
+-		}
+-	}
+-
+-	return [...other, ...[...byRule.values()].flat()].join('\n');
+-}
+-
+-export function filterPackageManager(output: string, _command: string): string {
+-	return output
+-		.split('\n')
+-		.filter((line) => !isPackageManagerNoise(line))
+-		.join('\n');
+-}
+-
+-export function filterTestRunner(output: string, _command: string): string {
+-	const lines = output.split('\n');
+-	const kept: string[] = [];
+-	let passCount = 0;
+-
+-	const flushPassCount = (): void => {
+-		if (passCount > 0) {
+-			kept.push(`[${passCount} test suite${passCount === 1 ? '' : 's'} passed]`);
+-			passCount = 0;
+-		}
+-	};
+-
+-	for (const line of lines) {
+-		const isPassLine = /^\s*(✓|PASS\b|passed\b)/.test(line);
+-		const isFailLine = /^\s*(✗|✕|FAIL\b|×)/.test(line);
+-		const isSummaryLine = /^(Tests?|Test Files?|Suites?|Duration|Time|Ran all)/.test(line);
+-
+-		if (isFailLine) {
+-			flushPassCount();
+-			kept.push(line);
+-		} else if (isPassLine) {
+-			passCount++;
+-		} else if (isSummaryLine) {
+-			flushPassCount();
+-			kept.push(line);
+-		} else {
+-			kept.push(line);
+-		}
+-	}
+-
+-	flushPassCount();
+-	return kept.join('\n');
+-}
+-
+-export function filterTsc(output: string, _command: string): string {
+-	const lines = output.split('\n');
+-	const errorsByCode = new Map<string, string[]>();
+-	const other: string[] = [];
+-
+-	for (const line of lines) {
+-		const match = line.match(/: (error|warning) (TS\d+):/);
+-		if (match) {
+-			const code = match[2] ?? '';
+-			const bucket = errorsByCode.get(code);
+-			if (!bucket) {
+-				errorsByCode.set(code, [line]);
+-			} else if (bucket.length < TSC_MAX_EXAMPLES_PER_CODE) {
+-				bucket.push(line);
+-			} else if (bucket.length === TSC_MAX_EXAMPLES_PER_CODE) {
+-				bucket.push(`  ... (more ${code} errors)`);
+-			}
+-		} else {
+-			other.push(line);
+-		}
+-	}
+-
+-	return [...other, ...[...errorsByCode.values()].flat()].join('\n');
+-}
+-
+-function isPackageManagerNoise(line: string): boolean {
+-	if (/^[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏]/.test(line)) return true;
+-	if (/^Progress:/.test(line)) return true;
+-	if (/^npm warn/i.test(line)) return true;
+-	if (/^warning /i.test(line)) return true;
+-	if (/^npm warn deprecated/i.test(line)) return true;
+-	if (/^warning ".+ >/.test(line)) return true;
+-	if (/^found \d+ vulnerabilit/i.test(line)) return true;
+-	return false;
+-}
+diff --git a/src/plugins-src/valora-plugin-compression-universal/index.test.ts b/src/plugins-src/valora-plugin-compression-universal/index.test.ts
+deleted file mode 100644
+index 75d6d1f..0000000
+--- a/src/plugins-src/valora-plugin-compression-universal/index.test.ts
++++ /dev/null
+@@ -1,25 +0,0 @@
+-import { describe, expect, it, vi } from 'vitest';
+-
+-import type { PluginAPI } from 'plugins/plugin-api.types';
+-
+-import { register } from './index';
+-
+-function makeApi(): PluginAPI {
+-	return {
+-		compression: { registerStrategy: vi.fn() },
+-		config: { extend: vi.fn() },
+-		lifecycle: { onActivate: vi.fn(), onDeactivate: vi.fn() },
+-		logger: { debug: vi.fn(), error: vi.fn(), info: vi.fn(), warn: vi.fn() },
+-		providers: { register: vi.fn() }
+-	};
+-}
+-
+-describe('valora-plugin-compression-universal register()', () => {
+-	it('registers all five tool keys', async () => {
+-		const api = makeApi();
+-		register(api);
+-		const calls = vi.mocked(api.compression.registerStrategy).mock.calls.map(([tool]) => tool);
+-		expect(calls).toEqual(expect.arrayContaining(['git', 'grep', 'rg', 'docker', 'make']));
+-		expect(calls).toHaveLength(5);
+-	});
+-});
+diff --git a/src/plugins-src/valora-plugin-compression-universal/index.ts b/src/plugins-src/valora-plugin-compression-universal/index.ts
+deleted file mode 100644
+index 1e745a2..0000000
+--- a/src/plugins-src/valora-plugin-compression-universal/index.ts
++++ /dev/null
+@@ -1,11 +0,0 @@
+-import type { PluginAPI } from 'plugins/plugin-api.types';
+-
+-import { filterDocker, filterGit, filterMake, filterRg } from './strategies';
+-
+-export function register(api: PluginAPI): void {
+-	api.compression.registerStrategy('git', filterGit);
+-	api.compression.registerStrategy('grep', filterRg);
+-	api.compression.registerStrategy('rg', filterRg);
+-	api.compression.registerStrategy('docker', filterDocker);
+-	api.compression.registerStrategy('make', filterMake);
+-}
+diff --git a/src/plugins-src/valora-plugin-compression-universal/strategies.test.ts b/src/plugins-src/valora-plugin-compression-universal/strategies.test.ts
+deleted file mode 100644
+index 038e732..0000000
+--- a/src/plugins-src/valora-plugin-compression-universal/strategies.test.ts
++++ /dev/null
+@@ -1,139 +0,0 @@
+-import { describe, expect, it } from 'vitest';
+-
+-import { filterDocker, filterGit, filterMake, filterRg } from './strategies';
+-
+-function pad(str: string, targetLength: number): string {
+-	return str.repeat(Math.ceil(targetLength / str.length)).slice(0, targetLength);
+-}
+-
+-describe('filterGit', () => {
+-	describe('git diff', () => {
+-		const gitDiffOutput = [
+-			'diff --git a/src/foo.ts b/src/foo.ts',
+-			'index a3f8c2e..9d4b1f7 100644',
+-			'--- a/src/foo.ts',
+-			'+++ b/src/foo.ts',
+-			'@@ -10,6 +10,7 @@ function foo() {',
+-			' context line',
+-			'-removed line',
+-			'+added line',
+-			' another context line'
+-		].join('\n');
+-
+-		it('removes "index HASH..HASH" lines', () => {
+-			const result = filterGit(gitDiffOutput + '\n' + pad(' context\n', 500), 'git diff HEAD');
+-			expect(result).not.toMatch(/^index [0-9a-f]+\.\.[0-9a-f]+/m);
+-		});
+-
+-		it('preserves diff --git header lines', () => {
+-			const result = filterGit(gitDiffOutput + '\n' + pad(' context\n', 500), 'git diff HEAD');
+-			expect(result).toContain('diff --git a/src/foo.ts');
+-		});
+-
+-		it('preserves changed lines (+/-)', () => {
+-			const result = filterGit(gitDiffOutput + '\n' + pad(' context\n', 500), 'git diff HEAD');
+-			expect(result).toContain('-removed line');
+-			expect(result).toContain('+added line');
+-		});
+-
+-		it('removes "old mode / new mode" lines', () => {
+-			const modeChange = ['diff --git a/script.sh b/script.sh', 'old mode 100644', 'new mode 100755'].join('\n');
+-			const result = filterGit(modeChange + '\n' + pad(' context\n', 500), 'git diff');
+-			expect(result).not.toMatch(/^old mode/m);
+-			expect(result).not.toMatch(/^new mode/m);
+-		});
+-	});
+-
+-	describe('git log', () => {
+-		function makeCommit(hash: string, subject: string): string {
+-			return [
+-				`commit ${hash}`,
+-				'Author: Dev <dev@example.com>',
+-				'Date:   Mon Jan 1 12:00:00 2025 +0000',
+-				'',
+-				`    ${subject}`,
+-				''
+-			].join('\n');
+-		}
+-
+-		it('condenses multi-line commit entries to one line per commit', () => {
+-			const log =
+-				makeCommit('a3f8c2e1b2c3d4e5f678', 'feat(auth): add OAuth2') +
+-				makeCommit('9d4b1f78', 'fix(cache): resolve race');
+-			const result = filterGit(log, 'git log --oneline');
+-			const lines = result.split('\n').filter(Boolean);
+-			expect(lines[0]).toMatch(/^a3f8c2e feat\(auth\): add OAuth2/);
+-			expect(lines[1]).toMatch(/^9d4b1f7 fix\(cache\): resolve race/);
+-		});
+-
+-		it('caps output at 20 entries', () => {
+-			const log = Array.from({ length: 25 }, (_, i) =>
+-				makeCommit(`${String(i).padStart(2, '0')}abcdef1234567890`, `chore: commit ${i}`)
+-			).join('');
+-			const result = filterGit(log, 'git log');
+-			expect(result.split('\n').filter(Boolean).length).toBeLessThanOrEqual(20);
+-		});
+-	});
+-
+-	describe('git status', () => {
+-		it('keeps branch line and file status lines', () => {
+-			const status = [
+-				'On branch feature/token-optimisation',
+-				'Changes not staged for commit:',
+-				'  (use "git add <file>..." to update)',
+-				'',
+-				'\tmodified:   src/foo.ts',
+-				''
+-			].join('\n');
+-			const result = filterGit(status, 'git status');
+-			expect(result).toContain('On branch feature/token-optimisation');
+-			expect(result).toContain('modified:   src/foo.ts');
+-			expect(result).not.toContain('(use "git add');
+-		});
+-	});
+-
+-	it('passes through non-diff/log/status subcommands unchanged', () => {
+-		const output = 'everything\nfine';
+-		expect(filterGit(output, 'git fetch')).toBe(output);
+-	});
+-});
+-
+-describe('filterRg', () => {
+-	it('deduplicates identical lines', () => {
+-		const input = 'match\nmatch\nother';
+-		expect(filterRg(input, 'rg foo')).toBe('match\nother');
+-	});
+-
+-	it('caps output at 200 lines', () => {
+-		const input = Array.from({ length: 300 }, (_, i) => `line ${i}`).join('\n');
+-		const result = filterRg(input, 'grep foo');
+-		expect(result.split('\n').length).toBeLessThanOrEqual(200);
+-	});
+-});
+-
+-describe('filterDocker', () => {
+-	it('removes progress/pull lines', () => {
+-		const input = [
+-			'Pulling from library/node',
+-			'Pulling fs layer',
+-			'Downloading',
+-			'Extracting',
+-			'Pull complete',
+-			'Digest: sha256:abc'
+-		].join('\n');
+-		const result = filterDocker(input, 'docker pull node');
+-		expect(result).not.toContain('Pulling fs layer');
+-		expect(result).toContain('Digest: sha256:abc');
+-	});
+-});
+-
+-describe('filterMake', () => {
+-	it('removes Entering/Leaving directory lines', () => {
+-		const input = ['make[1]: Entering directory /src', 'gcc -o foo foo.c', 'make[1]: Leaving directory /src'].join(
+-			'\n'
+-		);
+-		const result = filterMake(input, 'make all');
+-		expect(result).not.toContain('Entering directory');
+-		expect(result).toContain('gcc -o foo foo.c');
+-	});
+-});
+diff --git a/src/plugins-src/valora-plugin-compression-universal/strategies.ts b/src/plugins-src/valora-plugin-compression-universal/strategies.ts
+deleted file mode 100644
+index 7e15616..0000000
+--- a/src/plugins-src/valora-plugin-compression-universal/strategies.ts
++++ /dev/null
+@@ -1,120 +0,0 @@
+-const GIT_LOG_MAX_ENTRIES = 20;
+-const MAX_GREP_OUTPUT_LINES = 200; // mirrors config/constants.ts
+-
+-export function filterDocker(output: string, _command: string): string {
+-	return output
+-		.split('\n')
+-		.filter((line) => !isDockerProgressLine(line))
+-		.join('\n');
+-}
+-
+-export function filterGit(output: string, command: string): string {
+-	const subMatch = command.match(/git\s+(\w+)/);
+-	const sub = subMatch?.[1] ?? '';
+-	const subFilters: Record<string, (o: string) => string> = {
+-		diff: filterGitDiff,
+-		log: filterGitLog,
+-		status: filterGitStatus
+-	};
+-	return (subFilters[sub] ?? ((o: string) => o))(output);
+-}
+-
+-export function filterMake(output: string, _command: string): string {
+-	return output
+-		.split('\n')
+-		.filter((line) => !/^make\[\d+\]: (Entering|Leaving) directory/.test(line))
+-		.join('\n');
+-}
+-
+-export function filterRg(output: string, _command: string): string {
+-	const lines = output.split('\n');
+-	const seen = new Set<string>();
+-	const deduped: string[] = [];
+-	for (const line of lines) {
+-		if (!seen.has(line)) {
+-			seen.add(line);
+-			deduped.push(line);
+-		}
+-	}
+-	return deduped.slice(0, MAX_GREP_OUTPUT_LINES).join('\n');
+-}
+-
+-function extractSubject(line: string): string {
+-	const trimmed = line.trim();
+-	return trimmed && !isCommitMetaLine(line) ? trimmed : '';
+-}
+-
+-function filterGitDiff(output: string): string {
+-	return output
+-		.split('\n')
+-		.filter((line) => !isGitDiffMetaLine(line))
+-		.join('\n');
+-}
+-
+-function filterGitLog(output: string): string {
+-	const lines = output.split('\n');
+-	const entries: string[] = [];
+-	let currentHash = '';
+-	let currentSubject = '';
+-
+-	for (const line of lines) {
+-		const commitMatch = line.match(/^commit ([0-9a-f]{7,40})/);
+-		if (commitMatch) {
+-			if (currentHash) entries.push(`${currentHash.slice(0, 7)} ${currentSubject}`);
+-			if (entries.length >= GIT_LOG_MAX_ENTRIES) break;
+-			currentHash = commitMatch[1] ?? '';
+-			currentSubject = '';
+-		} else if (currentHash && !currentSubject) {
+-			currentSubject = extractSubject(line);
+-		}
+-	}
+-
+-	if (currentHash && entries.length < GIT_LOG_MAX_ENTRIES) {
+-		entries.push(`${currentHash.slice(0, 7)} ${currentSubject}`);
+-	}
+-
+-	return entries.join('\n');
+-}
+-
+-function filterGitStatus(output: string): string {
+-	const lines = output.split('\n').filter((l) => l.trim());
+-	const kept: string[] = [];
+-
+-	for (const line of lines) {
+-		if (/^(On branch|HEAD detached|No commits)/.test(line)) {
+-			kept.push(line);
+-			continue;
+-		}
+-		if (/^\t(modified|new file|deleted|renamed|copied|both|Untracked)/.test(line)) {
+-			kept.push(line.trim());
+-			continue;
+-		}
+-		if (/^(Changes|Untracked|nothing|Your branch)/.test(line)) {
+-			kept.push(line);
+-			continue;
+-		}
+-	}
+-
+-	return kept.join('\n');
+-}
+-
+-function isCommitMetaLine(line: string): boolean {
+-	return /^(Author:|Date:|Merge:)/.test(line.trim());
+-}
+-
+-function isDockerProgressLine(line: string): boolean {
+-	if (/^Pulling from /.test(line)) return true;
+-	if (/^Pulling fs layer/.test(line)) return true;
+-	if (/^Waiting$/.test(line.trim())) return true;
+-	if (/^Downloading/.test(line)) return true;
+-	if (/^Extracting/.test(line)) return true;
+-	if (/^Pull complete/.test(line)) return true;
+-	if (/^Already exists/.test(line)) return true;
+-	return false;
+-}
+-
+-function isGitDiffMetaLine(line: string): boolean {
+-	if (/^index [0-9a-f]+\.\.[0-9a-f]+/.test(line)) return true;
+-	if (/^(old|new) mode \d+$/.test(line)) return true;
+-	return false;
+-}
+diff --git a/src/plugins/plugin-loader.service.ts b/src/plugins/plugin-loader.service.ts
+index 2434596..5975c02 100644
+--- a/src/plugins/plugin-loader.service.ts
++++ b/src/plugins/plugin-loader.service.ts
+@@ -132,9 +132,29 @@ export class PluginLoaderService {
+ 		};
+ 	}
+ 
++	private resolveHookCommandPaths(hooks: HooksConfig, pluginDir: string): HooksConfig {
++		// Single-quote the path so the shell never interprets $ ` \ or ! inside it,
++		// regardless of where npm installs the package.
++		const safe = `'${pluginDir.replace(/'/g, "'\\''")}'`;
++		const result: HooksConfig = {};
++
++		for (const key of Object.keys(hooks) as Array<keyof HooksConfig>) {
++			const matchers = hooks[key];
++			if (matchers) {
++				result[key] = matchers.map((m) => ({
++					...m,
++					hooks: m.hooks.map((h) => ({ ...h, command: h.command.replaceAll('{pluginDir}', safe) }))
++				}));
++			}
++		}
++
++		return result;
++	}
++
+ 	private resolveHooks(pluginDir: string, manifest: PluginManifest): HooksConfig | undefined {
+ 		if (!manifest.permissions?.includes('shell-hooks')) return undefined;
+-		return this.loadHooksFile(pluginDir);
++		const hooks = this.loadHooksFile(pluginDir);
++		return hooks ? this.resolveHookCommandPaths(hooks, pluginDir) : undefined;
+ 	}
+ 
+ 	private resolveMcpsFile(pluginDir: string, manifest: PluginManifest): string | undefined {
+diff --git a/src/updater/compare.ts b/src/updater/compare.ts
+index a44e0e4..f3826e8 100644
+--- a/src/updater/compare.ts
++++ b/src/updater/compare.ts
+@@ -40,6 +40,19 @@ function parse(version: string): null | ParsedVersion {
+ 	};
+ }
+ 
++// Returns positive when b-identifier > a-identifier, negative when a > b, 0 when equal.
++function compareIdentifier(av: string, bv: string): number {
++	const aIsNum = /^\d+$/.test(av);
++	const bIsNum = /^\d+$/.test(bv);
++	if (aIsNum && bIsNum) {
++		const diff = Number(bv) - Number(av);
++		return diff === 0 ? 0 : diff > 0 ? 1 : -1;
++	}
++	if (aIsNum) return 1; // numeric < alphanumeric per semver
++	if (bIsNum) return -1;
++	return av < bv ? 1 : av > bv ? -1 : 0;
++}
++
+ /**
+  * Returns positive when b > a, negative when a > b, zero when equal.
+  * Per semver: a release version has higher precedence than a prerelease;
+@@ -47,30 +60,17 @@ function parse(version: string): null | ParsedVersion {
+  */
+ function comparePrerelease(a: null | string[], b: null | string[]): number {
+ 	if (a === null && b === null) return 0;
+-	if (a === null) return -1; // a is release, b is prerelease → a > b → return negative
+-	if (b === null) return 1; // a is prerelease, b is release → b > a → return positive
++	if (a === null) return -1; // a is release, b is prerelease → a > b
++	if (b === null) return 1; // b is release, a is prerelease → b > a
+ 
+ 	const len = Math.max(a.length, b.length);
+ 	for (let i = 0; i < len; i++) {
+ 		const av = a[i];
+ 		const bv = b[i];
+-		// Longer identifier chain wins when prefixes are equal
+-		if (av === undefined) return 1; // b has more → b > a
+-		if (bv === undefined) return -1; // a has more → a > b
+-
+-		const aNum = /^\d+$/.test(av) ? Number(av) : null;
+-		const bNum = /^\d+$/.test(bv) ? Number(bv) : null;
+-
+-		if (aNum !== null && bNum !== null) {
+-			if (aNum !== bNum) return aNum < bNum ? 1 : -1;
+-		} else if (aNum !== null) {
+-			// numeric < alphanumeric → a is lower → b > a
+-			return 1;
+-		} else if (bNum !== null) {
+-			return -1;
+-		} else if (av !== bv) {
+-			return av < bv ? 1 : -1;
+-		}
++		if (av === undefined) return 1; // b has more identifiers → b > a
++		if (bv === undefined) return -1; // a has more identifiers → a > b
++		const cmp = compareIdentifier(av, bv);
++		if (cmp !== 0) return cmp;
+ 	}
+ 	return 0;
+ }
+diff --git a/src/updater/index.ts b/src/updater/index.ts
+index 6506d2f..59a7efa 100644
+--- a/src/updater/index.ts
++++ b/src/updater/index.ts
+@@ -11,7 +11,8 @@ import { shouldCheckNow, type UpdateCheckState } from './throttle';
+ 
+ export { isNewerVersion } from './compare';
+ export { detectPackageManager, getInstallCommand, type PackageManager } from './detect-package-manager';
+-export { printUpdateBanner, shouldShowReminder } from './notifier';
++export { runAutoInstall } from './installer';
++export { printUpdateBanner, shouldAutoUpdate, shouldShowReminder } from './notifier';
+ export { fetchLatestVersion } from './registry';
+ export { readUpdateState, writeUpdateState } from './state';
+ export { shouldCheckNow, type UpdateCheckState } from './throttle';
+@@ -64,11 +65,13 @@ export async function settleUpdateCheck(timeoutMs: number = 200): Promise<null |
+ 	if (!ctx) return null;
+ 	pending = null;
+ 
++	let timeoutId: ReturnType<typeof setTimeout>;
+ 	const timeoutPromise = new Promise<'__timeout__'>((resolve) => {
+-		setTimeout(() => resolve('__timeout__'), timeoutMs);
++		timeoutId = setTimeout(() => resolve('__timeout__'), timeoutMs);
+ 	});
+ 
+ 	const result = await Promise.race([ctx.promise, timeoutPromise]);
++	clearTimeout(timeoutId!);
+ 	if (result === '__timeout__' || result === '__skipped__') {
+ 		return null;
+ 	}
+diff --git a/src/updater/installer.test.ts b/src/updater/installer.test.ts
+new file mode 100644
+index 0000000..82ab656
+--- /dev/null
++++ b/src/updater/installer.test.ts
+@@ -0,0 +1,90 @@
++import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
++
++import { runAutoInstall } from './installer';
++
++const spawnMock = vi.hoisted(() => vi.fn());
++
++vi.mock('node:child_process', () => ({ spawn: spawnMock }));
++
++function makeChild(exitCode: number): ReturnType<typeof spawnMock> {
++	const child = {
++		on: vi.fn((event: string, cb: (...args: unknown[]) => void) => {
++			if (event === 'exit') setImmediate(() => cb(exitCode));
++			return child;
++		})
++	};
++	return child;
++}
++
++function makeErrorChild(err: Error): ReturnType<typeof spawnMock> {
++	const child = {
++		on: vi.fn((event: string, cb: (...args: unknown[]) => void) => {
++			if (event === 'error') setImmediate(() => cb(err));
++			return child;
++		})
++	};
++	return child;
++}
++
++let originalExecPath: string;
++
++beforeEach(() => {
++	originalExecPath = process.execPath;
++});
++
++afterEach(() => {
++	Object.defineProperty(process, 'execPath', { value: originalExecPath, writable: true });
++	vi.clearAllMocks();
++});
++
++describe('runAutoInstall', () => {
++	it('detects npm and installs silently, returning success on exit 0', async () => {
++		Object.defineProperty(process, 'execPath', {
++			value: '/usr/local/lib/node_modules/.bin/node',
++			writable: true
++		});
++		spawnMock.mockReturnValue(makeChild(0));
++
++		const result = await runAutoInstall();
++
++		expect(result).toBe('success');
++		expect(spawnMock).toHaveBeenCalledOnce();
++		const [cmd, args, opts] = spawnMock.mock.calls[0] as [string, string[], Record<string, unknown>];
++		expect(cmd).toBe('npm');
++		expect(args).toContain('@windagency/valora@latest');
++		expect(opts.stdio).toBe('pipe');
++	});
++
++	it('returns "no-pm" when package manager cannot be detected', async () => {
++		Object.defineProperty(process, 'execPath', { value: '/usr/bin/node', writable: true });
++
++		const result = await runAutoInstall();
++
++		expect(result).toBe('no-pm');
++		expect(spawnMock).not.toHaveBeenCalled();
++	});
++
++	it('returns "failure" when install exits with non-zero code', async () => {
++		Object.defineProperty(process, 'execPath', {
++			value: '/usr/local/lib/node_modules/.bin/node',
++			writable: true
++		});
++		spawnMock.mockReturnValue(makeChild(1));
++
++		const result = await runAutoInstall();
++
++		expect(result).toBe('failure');
++	});
++
++	it('returns "failure" when spawn emits an error', async () => {
++		Object.defineProperty(process, 'execPath', {
++			value: '/usr/local/lib/node_modules/.bin/node',
++			writable: true
++		});
++		spawnMock.mockReturnValue(makeErrorChild(new Error('ENOENT')));
++
++		const result = await runAutoInstall();
++
++		expect(result).toBe('failure');
++	});
++});
+diff --git a/src/updater/installer.ts b/src/updater/installer.ts
+new file mode 100644
+index 0000000..40b4ec7
+--- /dev/null
++++ b/src/updater/installer.ts
+@@ -0,0 +1,23 @@
++import { spawn } from 'node:child_process';
++
++import { detectPackageManager, getInstallCommand } from './detect-package-manager';
++
++export type InstallResult = 'failure' | 'no-pm' | 'success';
++
++/**
++ * Detects the active package manager and runs a silent global install of the
++ * latest Valora release. Intended for background auto-update use only.
++ */
++export async function runAutoInstall(): Promise<InstallResult> {
++	const pm = detectPackageManager();
++	if (pm === null) return 'no-pm';
++
++	const [cmd, ...args] = getInstallCommand(pm);
++	if (!cmd) return 'failure';
++
++	return new Promise((resolve) => {
++		const child = spawn(cmd, args, { stdio: 'pipe' });
++		child.on('exit', (code) => resolve(code === 0 ? 'success' : 'failure'));
++		child.on('error', () => resolve('failure'));
++	});
++}
+diff --git a/src/updater/notifier.test.ts b/src/updater/notifier.test.ts
+index 1c40487..92bde6a 100644
+--- a/src/updater/notifier.test.ts
++++ b/src/updater/notifier.test.ts
+@@ -1,6 +1,6 @@
+ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+ 
+-import { printUpdateBanner, shouldShowReminder } from './notifier';
++import { printUpdateBanner, shouldAutoUpdate, shouldShowReminder } from './notifier';
+ import type { UpdateCheckState } from './throttle';
+ 
+ function makeState(overrides: Partial<UpdateCheckState> = {}): UpdateCheckState {
+@@ -66,6 +66,21 @@ describe('shouldShowReminder', () => {
+ 	});
+ });
+ 
++describe('shouldAutoUpdate', () => {
++	it('returns true when a newer version is available', () => {
++		expect(shouldAutoUpdate(makeState({ latestVersion: '2.6.0' }), '2.5.0')).toBe(true);
++	});
++
++	it('returns false when latestVersion is null', () => {
++		expect(shouldAutoUpdate(makeState({ latestVersion: null }), '2.5.0')).toBe(false);
++	});
++
++	it('returns false when latest is not newer than current', () => {
++		expect(shouldAutoUpdate(makeState({ latestVersion: '2.5.0' }), '2.5.0')).toBe(false);
++		expect(shouldAutoUpdate(makeState({ latestVersion: '2.4.0' }), '2.5.0')).toBe(false);
++	});
++});
++
+ describe('printUpdateBanner', () => {
+ 	it('writes a banner to stderr including both versions', () => {
+ 		const write = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+diff --git a/src/updater/notifier.ts b/src/updater/notifier.ts
+index 2518a1d..5397290 100644
+--- a/src/updater/notifier.ts
++++ b/src/updater/notifier.ts
+@@ -18,6 +18,7 @@ export function shouldShowReminder(
+ 	currentVersion: string,
+ 	mode: 'auto' | 'disabled' | 'reminder'
+ ): boolean {
++	// 'auto' is reserved for future silent install; for now it falls through to false like 'disabled'
+ 	if (mode !== 'reminder') return false;
+ 	if (state.latestVersion === null) return false;
+ 	if (!isNewerVersion(currentVersion, state.latestVersion)) return false;
+@@ -26,6 +27,15 @@ export function shouldShowReminder(
+ 	return true;
+ }
+ 
++/**
++ * Returns true when auto-install should run: a newer version is known.
++ * Mode and TTY checks are the caller's responsibility.
++ */
++export function shouldAutoUpdate(state: UpdateCheckState, currentVersion: string): boolean {
++	if (state.latestVersion === null) return false;
++	return isNewerVersion(currentVersion, state.latestVersion);
++}
++
+ /**
+  * Prints an update banner to stderr. Does not mutate the provided state;
+  * the caller is responsible for persisting `{ ...state, remindedForVersion: state.latestVersion }`
+diff --git a/src/updater/registry.ts b/src/updater/registry.ts
+index 9feeff2..f95a586 100644
+--- a/src/updater/registry.ts
++++ b/src/updater/registry.ts
+@@ -7,6 +7,26 @@ const TIMEOUT_MS = 3000;
+ const MAX_BYTES = 64 * 1024; // 64 KiB
+ const VERSION_REGEX = /^\d+\.\d+\.\d+(-[\w.]+)?(\+[\w.]+)?$/;
+ 
++function exceedsMaxSize(response: Response): boolean {
++	const contentLength = response.headers.get('content-length');
++	if (contentLength !== null && Number(contentLength) > MAX_BYTES) return true;
++	return false;
++}
++
++function extractVersion(text: string): null | string {
++	let parsed: unknown;
++	try {
++		parsed = JSON.parse(text);
++	} catch {
++		return null;
++	}
++	if (parsed === null || typeof parsed !== 'object') return null;
++	const version = (parsed as Record<string, unknown>)['version'];
++	if (typeof version !== 'string') return null;
++	if (!VERSION_REGEX.test(version)) return null;
++	return version;
++}
++
+ /**
+  * Fetches the latest published version of @windagency/valora from the npm
+  * registry. Returns null on any failure — never throws.
+@@ -22,52 +42,12 @@ export async function fetchLatestVersion(currentVersion: string): Promise<null |
+ 		});
+ 
+ 		if (!response.ok) return null;
++		if (exceedsMaxSize(response)) return null;
+ 
+-		const body = response.body;
+-		if (!body) return null;
+-
+-		const reader = body.getReader();
+-		const chunks: Uint8Array[] = [];
+-		let total = 0;
+-
+-		while (true) {
+-			const { done, value } = await reader.read();
+-			if (done) break;
+-			if (value) {
+-				total += value.byteLength;
+-				if (total > MAX_BYTES) {
+-					try {
+-						await reader.cancel();
+-					} catch {
+-						// ignore
+-					}
+-					return null;
+-				}
+-				chunks.push(value);
+-			}
+-		}
+-
+-		const merged = new Uint8Array(total);
+-		let offset = 0;
+-		for (const chunk of chunks) {
+-			merged.set(chunk, offset);
+-			offset += chunk.byteLength;
+-		}
+-		const text = new TextDecoder('utf-8').decode(merged);
+-
+-		let parsed: unknown;
+-		try {
+-			parsed = JSON.parse(text);
+-		} catch {
+-			return null;
+-		}
+-
+-		if (parsed === null || typeof parsed !== 'object') return null;
+-		const version = (parsed as { version?: unknown }).version;
+-		if (typeof version !== 'string') return null;
+-		if (!VERSION_REGEX.test(version)) return null;
++		const text = await response.text();
++		if (text.length > MAX_BYTES) return null;
+ 
+-		return version;
++		return extractVersion(text);
+ 	} catch {
+ 		return null;
+ 	}

@@ -139,7 +139,7 @@ Extend Valora with **self-contained plugin directories**:
 | `agent-context` | Markdown injected into agent system prompts         |
 | `code`          | TypeScript modules registered via `PluginAPI` hooks |
 
-Plugins are discovered from three locations (later takes precedence): `data/plugins/` (built-in), `~/.valora/plugins/` (global), `.valora/plugins/` (project). npm packages named `@windagency/valora-plugin-*` are auto-discovered from `node_modules/` — install with npm/pnpm/yarn and add to `plugins.enabled`. No restart required.
+Plugins are discovered from four locations (later takes precedence): `data/plugins/` (built-in), `~/.valora/plugins/` (user), `.valora/plugins/` (project), `node_modules/@windagency/valora-plugin-*` (npm). Install an official plugin with `valora plugin add <name>` and add its short name to `plugins.enabled` in `.valora/config.json`. No restart required. See [Plugins guide](./documentation/user-guide/plugins.md).
 
 17 built-in compression strategies (git, tsc, eslint, vitest, pytest, docker, …) ship as three **code plugins** and are the canonical example of the `code` contribution type.
 
@@ -335,6 +335,7 @@ export LOCAL_DEFAULT_MODEL=llama3.1
 | `create-pr`         | @lead            | Generate pull request                                |
 | `feedback`          | @product-manager | Capture outcomes                                     |
 | `consolidate`       | @lead            | Consolidate and prune memory stores _(experimental)_ |
+| `update`            | —                | Install the latest version of Valora                 |
 
 ### Command Categories
 

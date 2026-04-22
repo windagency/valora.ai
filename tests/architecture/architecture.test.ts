@@ -66,7 +66,7 @@ function getTypeScriptFiles(dir: string): string[] {
 }
 
 // Initialize the project to analyze
-const srcProject = new TypeScriptProject(RelativePath.of('src'));
+const srcProject = new TypeScriptProject(RelativePath.of('src'), '**/*.test.ts', '**/*.spec.ts');
 
 describe('Architecture Tests', () => {
 	describe('Layering Rules', () => {
@@ -246,14 +246,24 @@ describe('Architecture Tests', () => {
 
 	describe('Test Organization', () => {
 		it('test files can be colocated or in tests directory', () => {
-			// Test files can be anywhere - this is just a soft guideline
-			// Skip this test as it's not a hard requirement
-			const testClasses = srcProject
-				.allClasses()
-				.get()
-				.filter((c) => c.getSimpleName().includes('.test') || c.getSimpleName().includes('.spec'));
-			// All test files should exist (trivially true)
-			expect(testClasses.length).toBeGreaterThan(0);
+			// Test files are excluded from TypeScriptProject to avoid arch-unit-ts false positives
+			// (vitest imports in test files trigger di.. pattern matches). We verify distribution
+			// directly via the filesystem: both src/ co-location and tests/ must contain test files.
+			function countTestFiles(dir: string): number {
+				if (!fs.existsSync(dir)) return 0;
+				return fs.readdirSync(dir, { withFileTypes: true }).reduce((total, entry) => {
+					const full = path.join(dir, entry.name);
+					if (entry.isDirectory() && entry.name !== 'node_modules') return total + countTestFiles(full);
+					if (entry.isFile() && (entry.name.includes('.test.') || entry.name.includes('.spec.'))) return total + 1;
+					return total;
+				}, 0);
+			}
+
+			const srcTestCount = countTestFiles(path.join(__dirname, '../../src'));
+			const testsTestCount = countTestFiles(path.join(__dirname, '..'));
+
+			expect(srcTestCount).toBeGreaterThan(0);
+			expect(testsTestCount).toBeGreaterThan(0);
 		});
 	});
 

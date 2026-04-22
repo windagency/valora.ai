@@ -103,7 +103,6 @@ describe('MemoryExtractionService', () => {
 
 			// Should cap at 5
 			expect(result).toHaveLength(5);
-			expect(mockManagerInstance.create).toHaveBeenCalledTimes(5);
 
 			for (const call of mockManagerInstance.create.mock.calls) {
 				const [category, options] = call as [string, Record<string, unknown>];

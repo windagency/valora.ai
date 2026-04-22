@@ -6,13 +6,16 @@
  */
 
 import * as fs from 'fs/promises';
+import { existsSync } from 'node:fs';
 import * as path from 'path';
 import { execa } from 'execa';
 import { getDataSanitizer } from 'utils/data-sanitizer';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { TestcontainersHelper } from '../utils/testcontainers-helper';
 
-describe('User Workflow Acceptance Tests', () => {
+const cliBuilt = existsSync(path.join(process.cwd(), 'dist', 'cli', 'index.js'));
+
+describe.skipIf(!cliBuilt)('User Workflow Acceptance Tests', () => {
 	let testcontainersHelper: TestcontainersHelper;
 	let tempDir: string;
 	let aiBinaryPath: string;
@@ -24,119 +27,24 @@ describe('User Workflow Acceptance Tests', () => {
 		testcontainersHelper = new TestcontainersHelper();
 		await testcontainersHelper.startSharedContainers();
 
-		// Use mock URLs if testcontainers are skipped
-		if (process.env.SKIP_TESTCONTAINERS === 'true') {
-			databaseUrl = 'postgresql://test:test@localhost:5432/test';
-			redisUrl = 'redis://localhost:6379';
-		} else {
-			databaseUrl = await testcontainersHelper.getDatabaseUrl();
-			redisUrl = await testcontainersHelper.getRedisUrl();
+		databaseUrl = await testcontainersHelper.getDatabaseUrl();
+		redisUrl = await testcontainersHelper.getRedisUrl();
+
+		// Resolve the real compiled CLI binary
+		const realBin = path.resolve(process.cwd(), 'dist', 'cli', 'index.js');
+		const binExists = await fs
+			.access(realBin)
+			.then(() => true)
+			.catch(() => false);
+		if (!binExists) {
+			throw new Error(`Acceptance tests require a built binary at ${realBin}. Run 'pnpm build' first.`);
 		}
+		aiBinaryPath = realBin;
 
 		// Create temporary directory for testing
 		tempDir = await fs.mkdtemp(path.join('/tmp', 'ai-acceptance-test-'));
-
-		// Set up project structure
 		await fs.mkdir(path.join(tempDir, '.valora'), { recursive: true });
-		await fs.mkdir(path.join(tempDir, 'bin'), { recursive: true });
-
-		// Copy or create binary
-		const binDir = path.join(tempDir, 'bin');
-		const destBin = path.join(binDir, 'ai.js');
-
-		// For now, always use mock CLI to avoid build/execution issues
-		await fs.mkdir(binDir, { recursive: true });
-		const mockCli = `#!/usr/bin/env node
-const fs = require('fs');
-const path = require('path');
-
-const command = process.argv[2];
-const args = process.argv.slice(3);
-
-if (command === 'config' && args[0] === 'init') {
-	const configDir = path.join(process.cwd(), '.valora', 'config');
-	fs.mkdirSync(configDir, { recursive: true });
-	fs.writeFileSync(path.join(configDir, 'config.json'), JSON.stringify({
-		providers: {},
-		defaults: { interactive: false, log_level: 'info' },
-		paths: { config_file: 'config.json' },
-		logging: { enabled: true, level: 'info' },
-		sessions: { enabled: true }
-	}, null, 2));
-	console.log('Configuration initialized');
-} else if (command === 'session' && args[0] === 'create') {
-	const sessionId = args[1];
-	const sessionDir = path.join(process.cwd(), '.valora', 'sessions');
-	fs.mkdirSync(sessionDir, { recursive: true });
-	fs.writeFileSync(path.join(sessionDir, \`\${sessionId}.json\`), JSON.stringify({
-		id: sessionId,
-		created: new Date().toISOString(),
-		status: 'active'
-	}));
-	console.log(\`Session \${sessionId} created successfully\`);
-} else if (command === 'session' && args[0] === 'delete') {
-	const sessionId = args[1];
-	const sessionDir = path.join(process.cwd(), '.valora', 'sessions');
-	const sessionFile = path.join(sessionDir, \`\${sessionId}.json\`);
-	try {
-		fs.unlinkSync(sessionFile);
-		console.log(\`Session \${sessionId} deleted\`);
-	} catch (e) {
-		console.log(\`Session \${sessionId} not found\`);
-	}
-} else if (command === 'session' && args[0] === 'show') {
-	const sessionId = args[1];
-	const sessionDir = path.join(process.cwd(), '.valora', 'sessions');
-	const sessionFile = path.join(sessionDir, \`\${sessionId}.json\`);
-	try {
-		const content = fs.readFileSync(sessionFile, 'utf-8');
-		console.log(content);
-	} catch (e) {
-		console.log(\`Session \${sessionId} not found\`);
-	}
-} else if (command === 'session' && args[0] === 'list') {
-	const sessionDir = path.join(process.cwd(), '.valora', 'sessions');
-	let sessions = [];
-	try {
-		const files = fs.readdirSync(sessionDir).filter(f => f.endsWith('.json'));
-		sessions = files.map(f => {
-			const content = fs.readFileSync(path.join(sessionDir, f), 'utf-8');
-			return JSON.parse(content);
-		});
-	} catch (e) {
-		// No sessions directory or files
-	}
-	console.log(JSON.stringify(sessions));
-} else if (command === 'exec') {
-	const workflowName = args[0];
-	console.log(\`Executing \${workflowName}...\`);
-	setTimeout(() => {
-		console.log(\`\${workflowName} completed successfully\`);
-		process.exit(0);
-	}, 100);
-} else if (command === '--help' || command === '-h') {
-	console.log('AI-Assisted Development Workflow Orchestration Engine');
-	console.log('');
-	console.log('Usage: valora [options] [command]');
-	console.log('');
-	console.log('Options:');
-	console.log('  -h, --help     display help for command');
-	console.log('  -v, --version  output the version number');
-} else if (command === 'config' && args[0] === 'show') {
-	console.log('Configuration:');
-	console.log(JSON.stringify({
-		providers: { openai: { apiKey: 'sk-1234567890abcdef', configured: true } },
-		defaults: { log_level: 'info' }
-	}, null, 2));
-} else {
-	console.error(\`error: unknown command '\${command}'\`);
-	process.exit(1);
-}
-			`;
-		await fs.writeFile(destBin, mockCli);
-		await fs.chmod(destBin, 0o755);
-		aiBinaryPath = destBin;
-	}, 60000);
+	}, 120000);
 
 	afterAll(async () => {
 		await testcontainersHelper.stopAllContainers();

@@ -218,7 +218,7 @@ describe('CLI Commands E2E', () => {
 			});
 
 			expect(exitCode).not.toBe(0);
-			expect(stderr || stdout).toContain('error' || 'invalid' || 'unknown');
+			expect(stderr || stdout).toMatch(/error|invalid|unknown/i);
 		}, 30000);
 
 		it('should handle missing required arguments', async () => {
@@ -234,7 +234,7 @@ describe('CLI Commands E2E', () => {
 			);
 
 			expect(exitCode).not.toBe(0);
-			expect(stderr || stdout).toContain('error' || 'required' || 'missing');
+			expect(stderr || stdout).toMatch(/error|required|missing/i);
 		}, 30000);
 	});
 

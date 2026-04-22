@@ -113,7 +113,7 @@ describe('MemoryConsolidationService', () => {
 
 	// ------------------------------------------------------------------ 1
 	describe('consolidate()', () => {
-		it('calls manager.prune() and returns the pruned count', async () => {
+		it('prunes expired entries and returns the pruned count', async () => {
 			mockManagerInstance.prune.mockResolvedValue(5);
 
 			const service = new MemoryConsolidationService();
@@ -164,7 +164,7 @@ describe('MemoryConsolidationService', () => {
 
 	// ------------------------------------------------------------------ 4
 	describe('Git invalidation', () => {
-		it('calls invalidateByPaths with changed files from git log output', async () => {
+		it('invalidates memories whose source files changed since last consolidation', async () => {
 			const gitOutput = [
 				'COMMIT:abc123 fix: update auth module',
 				'src/auth/login.ts',

@@ -33,35 +33,29 @@ import {
 } from './constants';
 
 // Provider configuration schema
-export const PROVIDER_CONFIG_SCHEMA = z.object({
-	apiKey: z.string().optional(),
-	baseUrl: z.string().url().optional(),
-	default_model: z.string().optional(),
-	max_retries: z.number().min(0).max(10).optional(),
-	prompt_caching: z.boolean().optional(),
-	rate_limit: z
-		.object({
-			requests_per_minute: z.number().optional(),
-			tokens_per_minute: z.number().optional()
-		})
-		.optional(),
-	timeout_ms: z.number().min(0).optional(),
-	// Vertex AI specific fields
-	vertexAI: z.boolean().optional(),
-	vertexProjectId: z.string().optional(),
-	vertexRegion: z.string().optional()
-});
+export const PROVIDER_CONFIG_SCHEMA = z
+	.object({
+		apiKey: z.string().optional(),
+		baseUrl: z.string().url().optional(),
+		default_model: z.string().optional(),
+		max_retries: z.number().min(0).max(10).optional(),
+		prompt_caching: z.boolean().optional(),
+		rate_limit: z
+			.object({
+				requests_per_minute: z.number().optional(),
+				tokens_per_minute: z.number().optional()
+			})
+			.optional(),
+		timeout_ms: z.number().min(0).optional(),
+		// Vertex AI specific fields
+		vertexAI: z.boolean().optional(),
+		vertexProjectId: z.string().optional(),
+		vertexRegion: z.string().optional()
+	})
+	.passthrough(); // preserve provider-specific keys
 
 // Providers configuration schema
-export const PROVIDERS_CONFIG_SCHEMA = z.object({
-	anthropic: PROVIDER_CONFIG_SCHEMA.optional(),
-	cursor: PROVIDER_CONFIG_SCHEMA.optional(),
-	google: PROVIDER_CONFIG_SCHEMA.optional(),
-	local: PROVIDER_CONFIG_SCHEMA.optional(),
-	moonshot: PROVIDER_CONFIG_SCHEMA.optional(),
-	openai: PROVIDER_CONFIG_SCHEMA.optional(),
-	xai: PROVIDER_CONFIG_SCHEMA.optional()
-});
+export const PROVIDERS_CONFIG_SCHEMA = z.record(z.string(), PROVIDER_CONFIG_SCHEMA.optional());
 
 // Defaults configuration schema
 export const DEFAULTS_CONFIG_SCHEMA = z.object({

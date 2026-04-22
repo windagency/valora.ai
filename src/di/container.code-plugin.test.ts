@@ -160,7 +160,122 @@ describe('initializePlugins — compression strategy registration', () => {
 		await initializePlugins(container);
 
 		const strategy = getStrategy('mytesttool');
-		expect(strategy).toBeDefined();
 		expect(strategy?.('hello world', 'mytesttool run')).toBe('compressed:hello');
+	});
+});
+
+describe('initializePlugins — provider descriptor registration', () => {
+	let tmpDir: string;
+
+	beforeEach(() => {
+		tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'valora-descriptor-test-'));
+	});
+
+	afterEach(async () => {
+		fs.rmSync(tmpDir, { recursive: true, force: true });
+		const { resetProviderRegistry } = await import('llm/registry');
+		resetProviderRegistry();
+		vi.resetModules();
+	});
+
+	it('stores the descriptor when a plugin registers a provider with one', async () => {
+		const entrypointPath = path.join(tmpDir, 'descriptor-plugin.mjs');
+		fs.writeFileSync(
+			entrypointPath,
+			[
+				'export function register(api) {',
+				'  api.providers.register("test-provider", class P {',
+				'    constructor() {}',
+				'    get name() { return "test-provider"; }',
+				'    isConfigured() { return true; }',
+				'    async complete() { return { content: "", role: "assistant" }; }',
+				'    async streamComplete(_o, onChunk) { onChunk(""); return { content: "", role: "assistant" }; }',
+				'    getAlternativeModels() { return []; }',
+				'    validateModel() { return Promise.resolve(true); }',
+				'  }, { label: "Test", defaultModel: "test-model", modelModes: [], requiresApiKey: false });',
+				'}'
+			].join('\n')
+		);
+
+		const { PluginLoaderService } = await import('plugins/plugin-loader.service');
+		vi.mocked(PluginLoaderService).mockImplementation(
+			() =>
+				({
+					loadAll: vi.fn().mockReturnValue([
+						{
+							codeEntrypoint: entrypointPath,
+							manifest: { name: 'descriptor-plugin', version: '1.0.0' },
+							pluginDir: tmpDir,
+							status: 'enabled'
+						}
+					])
+				}) as never
+		);
+
+		const { createContainer, initializePlugins } = await import('di/container');
+		const { getProviderRegistry } = await import('llm/registry');
+
+		const container = createContainer();
+		await initializePlugins(container);
+
+		const descriptor = getProviderRegistry().getDescriptor('test-provider');
+		expect(descriptor).toBeDefined();
+		expect(descriptor?.label).toBe('Test');
+		expect(descriptor?.defaultModel).toBe('test-model');
+		expect(descriptor?.requiresApiKey).toBe(false);
+	});
+
+	it('returns undefined from getDescriptor for an unregistered provider name', async () => {
+		const { createContainer, initializePlugins } = await import('di/container');
+		const { getProviderRegistry } = await import('llm/registry');
+
+		const container = createContainer();
+		await initializePlugins(container);
+
+		expect(getProviderRegistry().getDescriptor('no-such-provider')).toBeUndefined();
+	});
+
+	it('does not break existing registration path when no descriptor is supplied', async () => {
+		const entrypointPath = path.join(tmpDir, 'nodesc-plugin.mjs');
+		fs.writeFileSync(
+			entrypointPath,
+			[
+				'export function register(api) {',
+				'  api.providers.register("nodesc-provider", class P {',
+				'    constructor() {}',
+				'    get name() { return "nodesc-provider"; }',
+				'    isConfigured() { return true; }',
+				'    async complete() { return { content: "", role: "assistant" }; }',
+				'    async streamComplete(_o, onChunk) { onChunk(""); return { content: "", role: "assistant" }; }',
+				'    getAlternativeModels() { return []; }',
+				'    validateModel() { return Promise.resolve(true); }',
+				'  });',
+				'}'
+			].join('\n')
+		);
+
+		const { PluginLoaderService } = await import('plugins/plugin-loader.service');
+		vi.mocked(PluginLoaderService).mockImplementation(
+			() =>
+				({
+					loadAll: vi.fn().mockReturnValue([
+						{
+							codeEntrypoint: entrypointPath,
+							manifest: { name: 'nodesc-plugin', version: '1.0.0' },
+							pluginDir: tmpDir,
+							status: 'enabled'
+						}
+					])
+				}) as never
+		);
+
+		const { createContainer, initializePlugins } = await import('di/container');
+		const { getProviderRegistry } = await import('llm/registry');
+
+		const container = createContainer();
+		await initializePlugins(container);
+
+		expect(getProviderRegistry().hasProvider('nodesc-provider')).toBe(true);
+		expect(getProviderRegistry().getDescriptor('nodesc-provider')).toBeUndefined();
 	});
 });
