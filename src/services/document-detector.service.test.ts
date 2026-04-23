@@ -9,7 +9,7 @@
  * - Multiple status-tracking sections are handled correctly
  */
 
-import { DocumentDetectorService } from 'services/document-detector.service';
+import { DocumentDetectorService } from './document-detector.service';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('output/logger', () => ({

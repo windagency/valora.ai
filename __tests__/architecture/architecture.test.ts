@@ -268,25 +268,21 @@ describe('Architecture Tests', () => {
 	});
 
 	describe('Provider Interface Compliance', () => {
-		it('LLM providers should depend on base provider', () => {
-			// Manual check since haveSimpleName() is not available in arch-unit-ts
-			const providers = srcProject
-				.allClasses()
-				.get()
-				.filter(
-					(c) =>
-						c.packagePath.toString().startsWith('llm.providers') &&
-						c.getSimpleName().endsWith('Provider') &&
-						!c.getSimpleName().includes('Base')
-				);
+		it('LLM providers should extend BaseLLMProvider from llm/provider.interface', () => {
+			const providersDir = path.join(__dirname, '../../src/llm/providers');
+			const providerFiles = getTypeScriptFiles(providersDir);
 
-			// Check that each provider has a dependency on BaseLLMProvider
-			providers.forEach((provider) => {
-				const hasBaseDependency = provider.dependencies.some(
-					(dep) => dep.typeScriptClass.getSimpleName() === 'base-llm.provider'
-				);
-				expect(hasBaseDependency).toBe(true);
+			const violations = providerFiles.filter((file) => {
+				const content = fs.readFileSync(file, 'utf-8');
+				return !content.includes('BaseLLMProvider');
 			});
+
+			if (violations.length > 0) {
+				const violationList = violations.map((f) => path.relative(path.join(__dirname, '../..'), f)).join('\n  - ');
+				throw new Error(
+					`All LLM provider implementations must extend BaseLLMProvider from 'llm/provider.interface'.\nViolations:\n  - ${violationList}`
+				);
+			}
 		});
 	});
 

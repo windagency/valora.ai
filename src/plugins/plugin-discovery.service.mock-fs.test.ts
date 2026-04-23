@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as path from 'path';
-import { PluginDiscoveryService } from 'plugins/plugin-discovery.service';
+import { PluginDiscoveryService } from './plugin-discovery.service';
 
 vi.mock('fs');
 

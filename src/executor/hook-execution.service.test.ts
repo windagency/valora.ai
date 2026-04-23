@@ -14,7 +14,7 @@
  * - Async hooks fire-and-forget
  */
 
-import { HookExecutionService } from 'executor/hook-execution.service';
+import { HookExecutionService } from './hook-execution.service';
 import type { HookCommand, HookInput, HookMatcher } from 'types/hook.types';
 import type { LLMToolCall } from 'types/llm.types';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';

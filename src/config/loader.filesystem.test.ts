@@ -7,8 +7,8 @@
 
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { ConfigLoader } from 'config/loader';
-import { DEFAULT_CONFIG } from 'config/schema';
+import { ConfigLoader } from './loader';
+import { DEFAULT_CONFIG } from './schema';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock paths to isolate from system configs

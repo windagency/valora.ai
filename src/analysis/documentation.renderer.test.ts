@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { DocumentationRenderer } from 'analysis/documentation.renderer';
-import type { CodebaseGraph } from 'analysis/analysis.types';
+import { DocumentationRenderer } from './documentation.renderer';
+import type { CodebaseGraph } from './analysis.types';
 
 const GRAPH: CodebaseGraph = {
 	generatedAt: new Date('2026-04-17'),

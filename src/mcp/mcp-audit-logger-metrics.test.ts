@@ -13,7 +13,7 @@
  * - Duration trend values
  */
 
-import { MCPAuditLoggerService, resetMCPAuditLogger } from 'mcp/mcp-audit-logger.service';
+import { MCPAuditLoggerService, resetMCPAuditLogger } from './mcp-audit-logger.service';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('output/logger', () => ({

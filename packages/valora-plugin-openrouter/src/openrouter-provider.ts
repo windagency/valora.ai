@@ -3,7 +3,7 @@ import type { Stream } from 'openai/streaming';
 
 import OpenAI from 'openai';
 
-import type { LLMCompletionOptions, LLMCompletionResult, LLMProvider, LLMRole } from 'types/llm.types';
+import type { LLMCompletionOptions, LLMCompletionResult, LLMProvider } from 'types/llm.types';
 
 import { OPENROUTER_MODELS } from './models.js';
 
@@ -131,8 +131,10 @@ export class OpenRouterProvider implements LLMProvider {
 		return this.client;
 	}
 
-	private mapMessages(options: LLMCompletionOptions): Array<{ content: string; role: LLMRole }> {
-		return options.messages.map((m) => ({ content: m.content, role: m.role }));
+	private mapMessages(
+		options: LLMCompletionOptions
+	): Array<{ content: string; role: 'assistant' | 'system' | 'user' }> {
+		return options.messages.map((m) => ({ content: m.content, role: m.role as 'assistant' | 'system' | 'user' }));
 	}
 
 	private parseArgs(raw: string): Record<string, unknown> {

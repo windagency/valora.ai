@@ -5,7 +5,7 @@
  * and regex-special-character escaping.
  */
 
-import { checkReDoSRisk, escapeRegExp, safeRegexTest } from 'utils/safe-regex';
+import { checkReDoSRisk, escapeRegExp, safeRegexTest } from './safe-regex';
 import { describe, expect, it } from 'vitest';
 
 describe('checkReDoSRisk', () => {

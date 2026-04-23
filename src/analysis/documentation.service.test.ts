@@ -3,10 +3,10 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 vi.mock('fs');
 import * as fs from 'fs';
 
-import { DocumentationService } from 'analysis/documentation.service';
-import type { CodebaseGraphBuilder } from 'analysis/codebase-graph.builder';
-import type { DocumentationRenderer } from 'analysis/documentation.renderer';
-import type { CodebaseGraph } from 'analysis/analysis.types';
+import { DocumentationService } from './documentation.service';
+import type { CodebaseGraphBuilder } from './codebase-graph.builder';
+import type { DocumentationRenderer } from './documentation.renderer';
+import type { CodebaseGraph } from './analysis.types';
 
 const EMPTY_GRAPH: CodebaseGraph = {
 	modules: [{ name: 'ast', path: 'src/ast', dependsOn: [] }],

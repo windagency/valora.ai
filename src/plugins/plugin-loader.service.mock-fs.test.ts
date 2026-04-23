@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { PluginLoaderService } from 'plugins/plugin-loader.service';
-import { PluginDiscoveryService } from 'plugins/plugin-discovery.service';
+import { PluginLoaderService } from './plugin-loader.service';
+import { PluginDiscoveryService } from './plugin-discovery.service';
 
 vi.mock('fs');
 

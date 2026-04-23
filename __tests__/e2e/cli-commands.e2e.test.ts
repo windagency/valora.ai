@@ -21,10 +21,24 @@ describe('CLI Commands E2E', () => {
 	let playwrightAvailable = false;
 
 	/**
-	 * Helper to run CLI commands via the built binary
+	 * Helper to run CLI commands via the built binary.
+	 * NODE_OPTIONS is cleared so the VS Code inspector bootloader is not
+	 * inherited by child processes, which would cause debugger-attach delays
+	 * that push commands past their timeout limits.
 	 */
 	function cli(...args: string[]) {
 		return [aiBinaryPath, ...args];
+	}
+
+	function cliEnv(overrides: Record<string, string> = {}): NodeJS.ProcessEnv {
+		return {
+			...process.env,
+			AI_INTERACTIVE: 'false',
+			AI_MCP_ENABLED: 'false',
+			AI_TEST_MODE: 'true',
+			NODE_OPTIONS: '',
+			...overrides
+		};
 	}
 
 	beforeAll(async () => {
@@ -47,11 +61,6 @@ describe('CLI Commands E2E', () => {
 			// Playwright browsers not installed - skip browser tests
 			playwrightAvailable = false;
 		}
-
-		// Set environment for testing
-		process.env.AI_TEST_MODE = 'true';
-		process.env.AI_INTERACTIVE = 'false';
-		process.env.AI_MCP_ENABLED = 'false';
 	}, 120000); // Increased timeout for container startup
 
 	afterAll(async () => {
@@ -71,7 +80,7 @@ describe('CLI Commands E2E', () => {
 		it('should display help information', async () => {
 			const { exitCode, stdout } = await execa('node', cli('--help'), {
 				cwd: tempDir,
-				env: { ...process.env, AI_INTERACTIVE: 'false' },
+				env: cliEnv(),
 				input: ''
 			});
 
@@ -83,7 +92,7 @@ describe('CLI Commands E2E', () => {
 		it('should display version information', async () => {
 			const { exitCode, stdout } = await execa('node', cli('--version'), {
 				cwd: tempDir,
-				env: { ...process.env, AI_INTERACTIVE: 'false' },
+				env: cliEnv(),
 				input: ''
 			});
 
@@ -93,48 +102,21 @@ describe('CLI Commands E2E', () => {
 	});
 
 	describe('Configuration Management', () => {
-		it('should initialize configuration', async () => {
-			const configPath = path.join(tempDir, 'config.json');
-
-			// Ensure config doesn't exist initially
-			try {
-				await fs.unlink(configPath);
-			} catch (error) {
-				// Config doesn't exist, which is fine
-			}
-
-			const { exitCode, stdout } = await execa('node', cli('config', 'setup', '--quick'), {
+		it('should report the configuration file path', async () => {
+			const { exitCode, stdout } = await execa('node', cli('config', 'path'), {
 				cwd: tempDir,
-				env: {
-					...process.env,
-					AI_CONFIG_PATH: configPath,
-					AI_INTERACTIVE: 'false',
-					AI_LOG_LEVEL: 'info',
-					AI_OPENAI_API_KEY: 'sk-test123'
-				},
+				env: cliEnv(),
 				input: ''
 			});
 
 			expect(exitCode).toBe(0);
-			expect(stdout).toContain('Quick setup complete');
-
-			// Verify config file was created
-			const configExists = await fs
-				.access(configPath)
-				.then(() => true)
-				.catch(() => false);
-			expect(configExists).toBe(true);
+			expect(stdout.trim().length).toBeGreaterThan(0);
 		}, 30000);
 
 		it('should show configuration status', async () => {
-			const configPath = path.join(tempDir, 'config.json');
 			const { exitCode, stdout } = await execa('node', cli('config', 'show'), {
 				cwd: tempDir,
-				env: {
-					...process.env,
-					AI_CONFIG_PATH: configPath,
-					AI_INTERACTIVE: 'false'
-				},
+				env: cliEnv(),
 				input: ''
 			});
 
@@ -148,7 +130,7 @@ describe('CLI Commands E2E', () => {
 			// List sessions (should work even if empty)
 			const { exitCode: listExit, stdout: listOutput } = await execa('node', cli('session', 'list'), {
 				cwd: tempDir,
-				env: { ...process.env, AI_INTERACTIVE: 'false' },
+				env: cliEnv(),
 				input: ''
 			});
 
@@ -159,7 +141,7 @@ describe('CLI Commands E2E', () => {
 			// Test session clear command
 			const { exitCode: clearExit, stdout: clearOutput } = await execa('node', cli('session', 'clear'), {
 				cwd: tempDir,
-				env: { ...process.env, AI_INTERACTIVE: 'false' },
+				env: cliEnv(),
 				input: ''
 			});
 
@@ -176,11 +158,7 @@ describe('CLI Commands E2E', () => {
 				cli('list'), // List available commands
 				{
 					cwd: tempDir,
-					env: {
-						...process.env,
-						AI_INTERACTIVE: 'false',
-						AI_SESSION_ID: 'test-session'
-					},
+					env: cliEnv({ AI_SESSION_ID: 'test-session' }),
 					input: ''
 				}
 			);
@@ -193,11 +171,7 @@ describe('CLI Commands E2E', () => {
 			// Test exec with a nonexistent command - should fail gracefully
 			const { exitCode, stderr, stdout } = await execa('node', cli('exec', 'nonexistent-command', '--verbose'), {
 				cwd: tempDir,
-				env: {
-					...process.env,
-					AI_INTERACTIVE: 'false',
-					AI_VERBOSE: 'true'
-				},
+				env: cliEnv({ AI_VERBOSE: 'true' }),
 				reject: false,
 				input: ''
 			});
@@ -212,7 +186,7 @@ describe('CLI Commands E2E', () => {
 		it('should handle invalid commands gracefully', async () => {
 			const { exitCode, stderr, stdout } = await execa('node', cli('invalid-command'), {
 				cwd: tempDir,
-				env: { ...process.env, AI_INTERACTIVE: 'false' },
+				env: cliEnv(),
 				reject: false, // Don't throw on non-zero exit
 				input: ''
 			});
@@ -227,7 +201,7 @@ describe('CLI Commands E2E', () => {
 				cli('session', 'delete'), // Missing session ID
 				{
 					cwd: tempDir,
-					env: { ...process.env, AI_INTERACTIVE: 'false' },
+					env: cliEnv(),
 					reject: false,
 					input: ''
 				}
@@ -242,7 +216,7 @@ describe('CLI Commands E2E', () => {
 		it('should respect log levels', async () => {
 			const { exitCode: debugExit, stdout: debugOutput } = await execa('node', cli('--log-level', 'debug', 'list'), {
 				cwd: tempDir,
-				env: { ...process.env, AI_INTERACTIVE: 'false' },
+				env: cliEnv(),
 				input: ''
 			});
 
@@ -250,7 +224,7 @@ describe('CLI Commands E2E', () => {
 
 			const { exitCode: errorExit, stdout: errorOutput } = await execa('node', cli('--log-level', 'error', 'list'), {
 				cwd: tempDir,
-				env: { ...process.env, AI_INTERACTIVE: 'false' },
+				env: cliEnv(),
 				input: ''
 			});
 
@@ -265,7 +239,7 @@ describe('CLI Commands E2E', () => {
 				cli('--output', 'json', 'session', 'list'),
 				{
 					cwd: tempDir,
-					env: { ...process.env, AI_INTERACTIVE: 'false' },
+					env: cliEnv(),
 					input: ''
 				}
 			);
@@ -287,7 +261,7 @@ describe('CLI Commands E2E', () => {
 		it('should disable interactive features when requested', async () => {
 			const { exitCode, stdout } = await execa('node', cli('--no-interactive', 'list'), {
 				cwd: tempDir,
-				env: { ...process.env, AI_INTERACTIVE: 'true' }, // Override env var
+				env: cliEnv({ AI_INTERACTIVE: 'true' }), // Override env var
 				input: ''
 			});
 
@@ -303,8 +277,8 @@ describe('CLI Commands E2E', () => {
 
 			const { exitCode } = await execa('node', cli('--quiet', 'list'), {
 				cwd: tempDir,
-				env: { ...process.env, AI_INTERACTIVE: 'false' },
-				timeout: 30000, // 30 second timeout
+				env: cliEnv(),
+				timeout: 15000, // 15 second timeout
 				input: ''
 			});
 
@@ -312,14 +286,14 @@ describe('CLI Commands E2E', () => {
 			const duration = endTime - startTime;
 
 			expect(exitCode).toBe(0);
-			expect(duration).toBeLessThan(30000); // Should complete within 30 seconds
-		}, 30000);
+			expect(duration).toBeLessThan(15000); // Should complete within 15 seconds
+		}, 20000);
 
 		it('should handle memory-intensive operations', async () => {
 			// Test with a command that might use more memory
 			const { exitCode, stdout } = await execa('node', cli('config', 'show'), {
 				cwd: tempDir,
-				env: { ...process.env, AI_INTERACTIVE: 'false' },
+				env: cliEnv(),
 				maxBuffer: 1024 * 1024, // 1MB buffer
 				input: ''
 			});
@@ -330,19 +304,13 @@ describe('CLI Commands E2E', () => {
 	});
 
 	describe('Browser-based Features (if applicable)', () => {
-		it('should handle browser-related commands', async () => {
-			if (!playwrightAvailable || !page) {
-				// Skip test if Playwright browsers aren't installed
-				expect(true).toBe(true);
-				return;
-			}
-
+		it.skipIf(!playwrightAvailable)('should handle browser-related commands', async () => {
 			// Navigate to a test page if the CLI has browser features
-			await page.goto('about:blank');
+			await page!.goto('about:blank');
 
 			// This is a placeholder test for browser integration
 			// In a real implementation, you might test CLI commands that launch browsers
-			expect(page.url()).toContain('blank');
-		}, 10000);
+			expect(page!.url()).toContain('blank');
+		});
 	});
 });

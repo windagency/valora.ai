@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { ModuleDependencyAnalyser } from 'analysis/module-dependency.analyser';
+import { ModuleDependencyAnalyser } from './module-dependency.analyser';
 import type { CodebaseIndex } from 'ast/ast.types';
 
 function makeIndex(files: Record<string, string[]>): CodebaseIndex {

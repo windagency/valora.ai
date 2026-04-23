@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
-import { SymbolReferenceAnalyser } from 'analysis/symbol-reference.analyser';
+import { SymbolReferenceAnalyser } from './symbol-reference.analyser';
 import type { CodebaseIndex, IndexedSymbol } from 'ast/ast.types';
 
 vi.mock('ast/ast-query.service', () => ({

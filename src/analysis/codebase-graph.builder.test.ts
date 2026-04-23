@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { CodebaseGraphBuilder } from 'analysis/codebase-graph.builder';
-import type { FileDependencyAnalyser } from 'analysis/file-dependency.analyser';
-import type { ModuleDependencyAnalyser } from 'analysis/module-dependency.analyser';
-import type { SymbolReferenceAnalyser } from 'analysis/symbol-reference.analyser';
+import { CodebaseGraphBuilder } from './codebase-graph.builder';
+import type { FileDependencyAnalyser } from './file-dependency.analyser';
+import type { ModuleDependencyAnalyser } from './module-dependency.analyser';
+import type { SymbolReferenceAnalyser } from './symbol-reference.analyser';
 import type { ASTIndexService } from 'ast/ast-index.service';
 import type { CodebaseIndex } from 'ast/ast.types';
 

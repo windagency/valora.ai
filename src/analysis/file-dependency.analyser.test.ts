@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { FileDependencyAnalyser } from 'analysis/file-dependency.analyser';
+import { FileDependencyAnalyser } from './file-dependency.analyser';
 import type { CodebaseIndex } from 'ast/ast.types';
 
 function makeIndex(files: Record<string, { imports: string[] }>): CodebaseIndex {
