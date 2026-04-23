@@ -2,26 +2,27 @@
 
 A comprehensive, multi-layered test suite designed by combining the expertise of Lead Platform Engineer, Security Operations Engineer, QA Engineer, and TypeScript Software Engineer roles to ensure robust, secure, and performant AI-assisted workflow orchestration.
 
-## 📊 Current Test Results (2025-01-21)
+## 📊 Current Test Results (2026-04-23)
 
-### **OVERALL STATUS: ✅ ALL TESTS PASSING**
+### **OVERALL STATUS: ✅ ALL TESTS PASSING (1 skipped)**
 
-- **Total Tests**: 263/263
-- **Pass Rate**: 100%
-- **Test Categories**: 7 suites
+- **Total Tests**: 1942/1943
+- **Pass Rate**: 99.9% (1 skipped in E2E)
+- **Test Categories**: 8 suites
 - **Coverage Focus**: Behavior validation over arbitrary percentages
 
 ### 📈 Detailed Test Results
 
-| **Test Suite**           | **Status**     | **Tests** | **Coverage Focus**                         |
-| ------------------------ | -------------- | --------- | ------------------------------------------ |
-| **🔧 Unit Tests**        | ✅ **174/174** | 100%      | Core utilities, error handling, validation |
-| **🔗 Integration Tests** | ✅ **5/5**     | 100%      | Component interactions, data flow          |
-| **🌐 E2E Tests**         | ✅ **15/15**   | 100%      | Complete CLI workflows, user experience    |
-| **✅ Acceptance Tests**  | ✅ **10/10**   | 100%      | Business requirements, user journeys       |
-| **🔒 Security Tests**    | ✅ **19/19**   | 100%      | Vulnerability prevention, data protection  |
-| **⚡ Performance Tests** | ✅ **16/16**   | 100%      | Resource usage, scalability, timing        |
-| **🚨 Error Scenarios**   | ✅ **24/24**   | 100%      | Failure recovery, resilience               |
+| **Test Suite**            | **Status**       | **Tests** | **Coverage Focus**                         |
+| ------------------------- | ---------------- | --------- | ------------------------------------------ |
+| **🔧 Unit Tests**         | ✅ **1672/1672** | 100%      | Core utilities, error handling, validation |
+| **🔗 Integration Tests**  | ✅ **75/75**     | 100%      | Component interactions, data flow          |
+| **🌐 E2E Tests**          | ⚠️ **14/15**     | 93%       | Complete CLI workflows, user experience    |
+| **✅ Acceptance Tests**   | ✅ **13/13**     | 100%      | Business requirements, user journeys       |
+| **🔒 Security Tests**     | ✅ **49/49**     | 100%      | Vulnerability prevention, data protection  |
+| **⚡ Performance Tests**  | ✅ **19/19**     | 100%      | Resource usage, scalability, timing        |
+| **🚨 Error Scenarios**    | ✅ **7/7**       | 100%      | Failure recovery, resilience               |
+| **🏛️ Architecture Tests** | ✅ **93/93**     | 100%      | Module boundaries, dependency rules        |
 
 ---
 
@@ -45,33 +46,42 @@ The suite combines the expertise of multiple engineering disciplines to create a
 ## 🏗️ Test Suite Architecture
 
 ```plaintext
-┌─────────────────┐  E2E Tests (15/15 ✅)
+┌─────────────────┐  E2E Tests (14/15 ⚠️)
 │   End-to-End    │  Business Requirements
 │    Acceptance   │  User Journeys
 └─────────────────┘
 
-┌─────────────────┐  Integration Tests (5/5 ✅)
+┌─────────────────┐  Integration Tests (75/75 ✅)
 │  Integration    │  Module Interactions
 │   Tests         │  Data Flow
 └─────────────────┘
 
-┌─────────────────┐  Unit Tests (174/174 ✅)
+┌─────────────────┐  Unit Tests (1672/1672 ✅)
 │   Unit Tests    │  Functions, Classes
 │                 │  Error Handling
+└─────────────────┘
+
+┌─────────────────┐  Architecture Tests (93/93 ✅)
+│  Architecture   │  Module Boundaries
+│   Tests         │  Dependency Rules
 └─────────────────┘
 ```
 
 ### Directory Layout
 
 ```plaintext
-tests/
+__tests__/
 ├── utils/                          # Shared test utilities
+│   ├── agent-selection-test-helpers.ts
 │   ├── setup.ts                   # Global test setup
-│   ├── testcontainers-helper.ts   # Container management
-│   └── mocks/                     # Mock implementations
+│   └── testcontainers-helper.ts   # Container management
 ├── integration/                   # Integration tests
-│   └── __tests__/
-│       └── *-integration.test.ts
+│   ├── analysis/
+│   ├── cli/
+│   ├── exploration/
+│   ├── plugins/
+│   ├── services/
+│   └── utils/
 ├── e2e/                          # End-to-end tests
 │   └── *-e2e.test.ts
 ├── acceptance/                   # Acceptance tests
@@ -82,6 +92,10 @@ tests/
 │   └── *-performance.test.ts
 ├── error-scenarios/              # Error handling tests
 │   └── *-error.test.ts
+├── architecture/                 # Architectural constraint tests
+│   └── *.test.ts
+├── benchmarks/                   # Performance benchmarks
+│   └── compression/
 └── README.md                     # This file
 ```
 
@@ -111,47 +125,54 @@ Examples:
 - **Tools**: Vitest, mocks, spies, test doubles
 - **Coverage Focus**: Logic correctness, edge cases, error handling
 
-#### 🔗 **Integration Tests** (`tests/integration/`)
+#### 🔗 **Integration Tests** (`__tests__/integration/`)
 
 - **Purpose**: Validate interactions between modules and external dependencies
 - **Scope**: Database operations, file I/O, API calls, service communication
 - **Tools**: Testcontainers, Vitest, isolated environments
 - **Coverage Focus**: Data flow, contract testing, dependency management
 
-#### 🌐 **E2E Tests** (`tests/e2e/`)
+#### 🌐 **E2E Tests** (`__tests__/e2e/`)
 
 - **Purpose**: Validate complete user workflows from start to finish
 - **Scope**: CLI commands, MCP server interactions, browser automation
 - **Tools**: Playwright, Testcontainers, headless browsers
 - **Coverage Focus**: User experience, system integration, cross-platform compatibility
 
-#### ✅ **Acceptance Tests** (`tests/acceptance/`)
+#### ✅ **Acceptance Tests** (`__tests__/acceptance/`)
 
 - **Purpose**: Validate business requirements and user stories
 - **Scope**: Complete features, user workflows, business rules
 - **Tools**: Testcontainers, Vitest, behavioral scenarios
 - **Coverage Focus**: Business value, user satisfaction, functional completeness
 
-#### 🔒 **Security Tests** (`tests/security/`)
+#### 🔒 **Security Tests** (`__tests__/security/`)
 
 - **Purpose**: Validate security controls and prevent vulnerabilities
 - **Scope**: Input validation, authentication, data sanitization, access control
 - **Tools**: Security-focused mocks, vulnerability scanners
 - **Coverage Focus**: OWASP Top 10, data protection, secure defaults
 
-#### ⚡ **Performance Tests** (`tests/performance/`)
+#### ⚡ **Performance Tests** (`__tests__/performance/`)
 
 - **Purpose**: Validate performance requirements and resource usage
 - **Scope**: CPU usage, memory consumption, I/O operations, concurrent load
 - **Tools**: Performance profiling, load testing, resource monitoring
 - **Coverage Focus**: Response times, scalability, resource efficiency
 
-#### 🚨 **Error Scenario Tests** (`tests/error-scenarios/`)
+#### 🚨 **Error Scenario Tests** (`__tests__/error-scenarios/`)
 
 - **Purpose**: Validate system robustness and failure recovery
 - **Scope**: Network failures, timeouts, crashes, resource exhaustion
 - **Tools**: Chaos engineering, failure injection, recovery testing
 - **Coverage Focus**: Resilience, graceful degradation, error recovery
+
+#### 🏛️ **Architecture Tests** (`__tests__/architecture/`)
+
+- **Purpose**: Enforce architectural constraints and module boundaries
+- **Scope**: Dependency rules, circular dependency detection, module isolation, adapter pattern compliance
+- **Tools**: arch-unit-ts, Vitest
+- **Coverage Focus**: Module boundaries, dependency direction, third-party library isolation
 
 ---
 
@@ -197,6 +218,7 @@ pnpm test:suite:acceptance        # Acceptance tests
 pnpm test:suite:security          # Security tests
 pnpm test:suite:performance       # Performance tests
 pnpm test:suite:error-scenarios   # Error handling tests
+pnpm test:suite:architecture      # Architectural constraint tests
 
 # Development workflow
 pnpm test:dev:watch               # Watch mode for development
@@ -417,7 +439,7 @@ describe('Feature Name', () => {
 pnpm test file-utils.test.ts
 
 # Run tests in watch mode
-pnpm test:watch
+pnpm test:dev:watch
 
 # Debug with inspector
 pnpm test --inspect-brk file-utils.test.ts
@@ -443,7 +465,7 @@ pnpm test --reporter=junit --outputFile=test-results.xml
 
 ## 🎊 Summary
 
-The VALORA test suite represents a **monumental achievement** in software testing and reliability engineering. With **263 tests passing at 100% success rate**, the system is validated across:
+The VALORA test suite represents a **monumental achievement** in software testing and reliability engineering. With **1942 tests passing across 8 suites**, the system is validated across:
 
 - **Enterprise-grade error handling** with circuit breakers and retry logic
 - **Comprehensive security controls** preventing vulnerabilities and data leaks
@@ -463,3 +485,34 @@ The VALORA test suite represents a **monumental achievement** in software testin
 - [OWASP Testing Guide](https://owasp.org/www-project-web-security-testing-guide/)
 - [Node.js Security Best Practices](https://nodejs.org/en/docs/guides/security/)
 - [TypeScript Security Guidelines](https://github.com/microsoft/TypeScript/wiki/Security-and-TypeScript)
+
+---
+
+## Verification Summary
+
+Verified against codebase on **2026-04-23** by running all test suites and inspecting the file system.
+
+- **Total claims checked**: 28
+- **Confirmed**: 8 (file paths for `utils/setup.ts`, `utils/testcontainers-helper.ts`; test command scripts; tool dependencies for Vitest, Playwright, Testcontainers; naming convention examples for E2E/acceptance/security/performance/error test files)
+- **Corrections made**: 20
+  - Date updated from `2025-01-21` to `2026-04-23`
+  - Total test count: `263/263` → `1942/1943`
+  - Pass rate: `100%` → `99.9% (1 skipped in E2E)`
+  - Test category count: `7 suites` → `8 suites`
+  - Unit tests: `174/174` → `1672/1672`
+  - Integration tests: `5/5` → `75/75`
+  - E2E tests: `15/15 ✅` → `14/15 ⚠️ (1 skipped)`
+  - Acceptance tests: `10/10` → `13/13`
+  - Security tests: `19/19` → `49/49`
+  - Performance tests: `16/16` → `19/19`
+  - Error scenarios: `24/24` → `7/7`
+  - Architecture suite added to table: `93/93`
+  - ASCII diagram counts updated for all suites; architecture tier added
+  - Directory root: `tests/` → `__tests__/`
+  - Integration layout: `integration/__tests__/` → domain subdirectories (`analysis/`, `cli/`, `exploration/`, `plugins/`, `services/`, `utils/`)
+  - `utils/mocks/` removed (directory does not exist); `utils/agent-selection-test-helpers.ts` added
+  - `architecture/` and `benchmarks/` directories added to layout
+  - `pnpm test:suite:architecture` added to Running Tests section
+  - `pnpm test:watch` corrected to `pnpm test:dev:watch`
+  - Summary paragraph count: `263` → `1942`
+- **Unverifiable**: 0
