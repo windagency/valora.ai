@@ -14,10 +14,15 @@ import { getColorAdapter } from 'output/color-adapter.interface';
 import { formatError } from 'utils/error-handler';
 import { formatNumber } from 'utils/number-format';
 import {
+	type ActivityUsage,
+	type AgentUsage,
 	type CommandUsage,
+	type CsvSection,
 	type DailyUsage,
 	getUsageAnalytics,
 	type ModelUsage,
+	type ProjectUsage,
+	type SessionUsage,
 	type UsageAnalyticsOptions,
 	type UsageSummary
 } from 'utils/usage-analytics';
@@ -28,6 +33,58 @@ function buildBar(value: number, maxValue: number, width: number): string {
 	if (maxValue <= 0) return '░'.repeat(width);
 	const filled = Math.round((value / maxValue) * width);
 	return '█'.repeat(filled) + '░'.repeat(width - filled);
+}
+
+function displayActivityBreakdown(
+	activities: ActivityUsage[],
+	topN: number,
+	color: ReturnType<typeof getColorAdapter>
+): void {
+	const slice = activities.slice(0, topN);
+	const maxCost = slice.reduce((m, a) => Math.max(m, a.totalCostUsd), 0);
+
+	console.log(`\n${color.magenta('🎯 By Activity')}`);
+	console.log('═'.repeat(70));
+
+	if (slice.length === 0) {
+		console.log(color.dim('  No activity data found.'));
+		return;
+	}
+
+	console.log(
+		`  ${'Activity'.padEnd(16)} ${'Req'.padStart(5)}  ${'Cost'.padEnd(10)}  ${'One-shot'.padEnd(10)}  ${'Avg iter'.padEnd(8)}  Chart`
+	);
+	console.log('  ' + '─'.repeat(66));
+
+	for (const a of slice) {
+		const bar = buildBar(a.totalCostUsd, maxCost, 12);
+		const oneShot = a.oneShotRate !== null ? `${(a.oneShotRate * 100).toFixed(0)}%` : 'n/a';
+		const avgIter = a.avgIterations !== null ? a.avgIterations.toFixed(1) : 'n/a';
+		console.log(
+			`  ${color.cyan(a.activity.padEnd(16))} ${String(a.requestCount).padStart(5)}  $${a.totalCostUsd.toFixed(4).padEnd(9)}  ${oneShot.padEnd(10)}  ${avgIter.padEnd(8)}  ${color.dim(bar)}`
+		);
+	}
+}
+
+function displayAgentBreakdown(agents: AgentUsage[], topN: number, color: ReturnType<typeof getColorAdapter>): void {
+	const slice = agents.slice(0, topN);
+	const maxCost = slice.reduce((m, a) => Math.max(m, a.totalCostUsd), 0);
+
+	console.log(`\n${color.magenta('🤖 By Agent')}`);
+	console.log('═'.repeat(62));
+
+	if (slice.length === 0) {
+		console.log(color.dim('  No agent data found.'));
+		return;
+	}
+
+	for (const a of slice) {
+		const bar = buildBar(a.totalCostUsd, maxCost, 20);
+		console.log(
+			`  ${color.cyan(a.agent.padEnd(20))} ${String(a.requestCount).padStart(3)} req  $${a.totalCostUsd.toFixed(4)}  ${formatNumber(a.totalTokens)} tok`
+		);
+		console.log(`  ${color.dim(bar)}`);
+	}
 }
 
 function displayCommandBreakdown(
@@ -124,6 +181,56 @@ function displayModelBreakdown(models: ModelUsage[], topN: number, color: Return
 	});
 }
 
+function displayProjectBreakdown(
+	projects: ProjectUsage[],
+	topN: number,
+	color: ReturnType<typeof getColorAdapter>
+): void {
+	const slice = projects.slice(0, topN);
+	const maxCost = slice.reduce((m, p) => Math.max(m, p.totalCostUsd), 0);
+
+	console.log(`\n${color.magenta('📁 By Project')}`);
+	console.log('═'.repeat(70));
+
+	if (slice.length === 0) {
+		console.log(color.dim('  No project data found.'));
+		return;
+	}
+
+	for (const p of slice) {
+		const bar = buildBar(p.totalCostUsd, maxCost, 12);
+		const label = p.projectPath.length > 30 ? `...${p.projectPath.slice(-27)}` : p.projectPath;
+		console.log(
+			`  ${color.cyan(label.padEnd(32))} ${String(p.requestCount).padStart(3)} req  $${p.totalCostUsd.toFixed(4)}  ${color.dim(bar)}`
+		);
+	}
+}
+
+function displaySessionBreakdown(
+	sessions: SessionUsage[],
+	topN: number,
+	color: ReturnType<typeof getColorAdapter>
+): void {
+	const slice = sessions.slice(0, topN);
+	const maxCost = slice.reduce((m, s) => Math.max(m, s.totalCostUsd), 0);
+
+	console.log(`\n${color.magenta('📋 Top Sessions')}`);
+	console.log('═'.repeat(70));
+
+	if (slice.length === 0) {
+		console.log(color.dim('  No session data found.'));
+		return;
+	}
+
+	for (const [i, s] of slice.entries()) {
+		const bar = buildBar(s.totalCostUsd, maxCost, 12);
+		const from = s.from.slice(0, 16).replace('T', ' ');
+		console.log(
+			`  ${String(i + 1).padStart(2)}. ${color.cyan(s.sessionId.slice(0, 20).padEnd(20))} ${String(s.requestCount).padStart(3)} req  $${s.totalCostUsd.toFixed(4)}  ${color.dim(from)}  ${color.dim(bar)}`
+		);
+	}
+}
+
 function displaySummary(summary: UsageSummary, color: ReturnType<typeof getColorAdapter>): void {
 	const { avgDailyCost, period, totals } = summary;
 
@@ -152,8 +259,19 @@ function writeOutput(content: string, outputPath: string, color: ReturnType<type
 
 // ─── Subcommand configurator ──────────────────────────────────────────────────
 
-export function configureUsageSubcommand(monitoringCmd: CommandAdapter): void {
-	monitoringCmd
+interface TableFlags {
+	byActivity: boolean;
+	byAgent: boolean;
+	byCommand: boolean;
+	byModel: boolean;
+	byProject: boolean;
+	bySession: boolean;
+	daily: boolean;
+	topN: number;
+}
+
+export function configureUsageSubcommand(monitoringCmd: CommandAdapter): CommandAdapter {
+	const usageCmd = monitoringCmd
 		.command('usage')
 		.description('Show cross-session usage analytics')
 		.option('--since <date>', 'Filter records since date (ISO 8601)')
@@ -161,10 +279,23 @@ export function configureUsageSubcommand(monitoringCmd: CommandAdapter): void {
 		.option('--top <n>', 'Top N costliest requests to show', '10')
 		.option('--by-model', 'Show model breakdown only', false)
 		.option('--by-command', 'Show command breakdown only', false)
+		.option('--by-activity', 'Show activity breakdown only', false)
+		.option('--by-session', 'Show session breakdown only', false)
+		.option('--by-project', 'Show project breakdown only', false)
+		.option('--by-agent', 'Show agent breakdown only', false)
 		.option('--daily', 'Show daily breakdown only', false)
 		.option('--model <name>', 'Filter to a single model')
 		.option('--command <name>', 'Filter to a single command')
-		.option('--format <fmt>', 'Output format (json|table|markdown)', 'table')
+		.option('--activity <name>', 'Filter to a single activity')
+		.option('--session <id>', 'Filter to a single session')
+		.option('--project <path>', 'Filter to a single project path')
+		.option('--agent <name>', 'Filter to a single agent')
+		.option('--format <fmt>', 'Output format (json|table|markdown|csv)', 'table')
+		.option(
+			'--csv-section <section>',
+			'Section to export as CSV (byModel|byCommand|bySession|byActivity|byProject|byAgent|daily)',
+			'byModel'
+		)
 		.option('--output <path>', 'Write report to file path')
 		.action((options: Record<string, unknown>) => {
 			const color = getColorAdapter();
@@ -175,6 +306,7 @@ export function configureUsageSubcommand(monitoringCmd: CommandAdapter): void {
 				process.exit(1);
 			}
 		});
+	return usageCmd;
 }
 
 function emitReport(content: string, outputPath: string | undefined, color: ReturnType<typeof getColorAdapter>): void {
@@ -185,35 +317,33 @@ function emitReport(content: string, outputPath: string | undefined, color: Retu
 	}
 }
 
-function renderTableOutput(
-	summary: UsageSummary,
-	flags: { byCommand: boolean; byModel: boolean; daily: boolean; topN: number },
-	color: ReturnType<typeof getColorAdapter>
-): void {
-	const { byCommand, byModel, daily, topN } = flags;
-	const showAll = !byModel && !byCommand && !daily;
+function renderAllSections(summary: UsageSummary, topN: number, color: ReturnType<typeof getColorAdapter>): void {
+	displaySummary(summary, color);
+	displayModelBreakdown(summary.byModel, topN, color);
+	displayCommandBreakdown(summary.byCommand, topN, color);
+	displayActivityBreakdown(summary.byActivity, topN, color);
+	displaySessionBreakdown(summary.bySession, 5, color);
+	displayProjectBreakdown(summary.byProject, topN, color);
+	displayCostliestRequests(summary.costliestRequests, topN, color);
+	displayDailyBreakdown(summary.daily, color);
+}
+
+function renderTableOutput(summary: UsageSummary, flags: TableFlags, color: ReturnType<typeof getColorAdapter>): void {
+	const { byActivity, byAgent, byCommand, byModel, byProject, bySession, daily, topN } = flags;
+	const showAll = [byActivity, byAgent, byCommand, byModel, byProject, bySession, daily].every((f) => !f);
 
 	if (showAll) {
-		displaySummary(summary, color);
-		displayModelBreakdown(summary.byModel, topN, color);
-		displayCommandBreakdown(summary.byCommand, topN, color);
-		displayCostliestRequests(summary.costliestRequests, topN, color);
-		displayDailyBreakdown(summary.daily, color);
+		renderAllSections(summary, topN, color);
 		return;
 	}
 
-	if (byModel) {
-		displaySummary(summary, color);
-		displayModelBreakdown(summary.byModel, topN, color);
-	}
-	if (byCommand) {
-		displaySummary(summary, color);
-		displayCommandBreakdown(summary.byCommand, topN, color);
-	}
-	if (daily) {
-		displaySummary(summary, color);
-		displayDailyBreakdown(summary.daily, color);
-	}
+	if (byModel) displayModelBreakdown(summary.byModel, topN, color);
+	if (byCommand) displayCommandBreakdown(summary.byCommand, topN, color);
+	if (byActivity) displayActivityBreakdown(summary.byActivity, topN, color);
+	if (bySession) displaySessionBreakdown(summary.bySession, topN, color);
+	if (byProject) displayProjectBreakdown(summary.byProject, topN, color);
+	if (byAgent) displayAgentBreakdown(summary.byAgent, topN, color);
+	if (daily) displayDailyBreakdown(summary.daily, color);
 }
 
 function runUsageAction(options: Record<string, unknown>): void {
@@ -225,8 +355,12 @@ function runUsageAction(options: Record<string, unknown>): void {
 	const sinceDays = sinceDaysRaw ? parseInt(sinceDaysRaw, 10) : undefined;
 
 	const opts: UsageAnalyticsOptions = {
+		activity: options['activity'] as string | undefined,
+		agent: options['agent'] as string | undefined,
 		command: options['command'] as string | undefined,
 		model: options['model'] as string | undefined,
+		project: options['project'] as string | undefined,
+		session: options['session'] as string | undefined,
 		sinceDate: since,
 		sinceDays: since ? undefined : sinceDays
 	};
@@ -235,21 +369,26 @@ function runUsageAction(options: Record<string, unknown>): void {
 	const fmt = (options['format'] as string | undefined) ?? 'table';
 	const outputPath = options['output'] as string | undefined;
 
-	const reportGenerators: Partial<Record<string, () => string>> = {
-		json: () => analytics.generateJsonReport(opts),
-		markdown: () => analytics.generateMarkdownReport(opts)
+	const formatActions: Record<string, () => void> = {
+		csv: () => {
+			const csvSection = (options['csvSection'] as CsvSection | undefined) ?? 'byModel';
+			emitReport(analytics.generateCsvReport({ ...opts, section: csvSection }), outputPath, color);
+		},
+		json: () => emitReport(analytics.generateJsonReport(opts), outputPath, color),
+		markdown: () => emitReport(analytics.generateMarkdownReport(opts), outputPath, color),
+		table: () => {
+			const byModel = options['byModel'] === true;
+			const byCommand = options['byCommand'] === true;
+			const byActivity = options['byActivity'] === true;
+			const bySession = options['bySession'] === true;
+			const byProject = options['byProject'] === true;
+			const byAgent = options['byAgent'] === true;
+			const daily = options['daily'] === true;
+			const summary = analytics.analyze(opts);
+			renderTableOutput(summary, { byActivity, byAgent, byCommand, byModel, byProject, bySession, daily, topN }, color);
+			console.log('');
+		}
 	};
-	const generator = reportGenerators[fmt];
-	if (generator !== undefined) {
-		emitReport(generator(), outputPath, color);
-		return;
-	}
 
-	const byModel = options['byModel'] === true;
-	const byCommand = options['byCommand'] === true;
-	const daily = options['daily'] === true;
-	const summary = analytics.analyze(opts);
-
-	renderTableOutput(summary, { byCommand, byModel, daily, topN }, color);
-	console.log('');
+	(formatActions[fmt] ?? formatActions['table']!)();
 }

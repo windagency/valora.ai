@@ -47,6 +47,40 @@ jq '.earlyExit.confidenceDistribution' metrics.json
 jq '.qualityScores' metrics.json
 ```
 
+### LLM Cost Analytics
+
+Valora records every LLM request to `.valora/spending.jsonl` and exposes cross-session analytics via `valora monitoring usage`.
+
+```bash
+# Full analytics overview (last 7 days)
+valora monitoring usage
+
+# Drill into specific dimensions
+valora monitoring usage --by-activity      # Coding / Testing / Review / etc.
+valora monitoring usage --by-session       # Top sessions ranked by cost
+valora monitoring usage --by-project       # Cost per project root
+valora monitoring usage --by-agent         # Cost per agent
+
+# Export to CSV for spreadsheet analysis
+valora monitoring usage --format csv --csv-section byActivity > activity.csv
+valora monitoring usage --format csv --csv-section bySession  > sessions.csv
+
+# Run the waste-pattern scanner
+valora monitoring usage optimize
+valora monitoring usage optimize --since-days 30 --min-savings 0.01
+```
+
+The `optimize` subcommand runs six automated detectors and ranks findings by urgency:
+
+| Detector                      | Trigger condition                                            |
+| ----------------------------- | ------------------------------------------------------------ |
+| Unknown model pricing         | Any request priced at $0 due to unrecognised model name      |
+| Under-utilised prompt cache   | Command repeated ≥ 3× with cache savings below 5% of cost    |
+| High stage iterations         | Median iterations for a command exceeds 2 and overall median |
+| Progressive-disclosure thrash | High PD call count (>3) but context savings below 10%        |
+| Agent mis-routing             | Combined fallback + override rate exceeds 20%                |
+| Flaky MCP tools               | Tool with ≥ 10 calls has a success rate below 90%            |
+
 ## What Reports Are Generated
 
 The report file is written to `.valora/METRICS_REPORT.md` and contains:

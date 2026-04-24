@@ -3,6 +3,8 @@
  * Refactored to use smaller, focused classes for better maintainability
  */
 
+import { execFileSync } from 'child_process';
+
 import type { CommandResult, IsolatedExecutionOptions } from 'types/command.types';
 import type { DocumentOutputOptions } from 'types/document.types';
 import type { MCPSamplingService } from 'types/mcp.types';
@@ -32,6 +34,7 @@ import {
 import { SessionLifecycle } from 'session/lifecycle';
 import { SessionStore } from 'session/store';
 import { getPromptAdapter } from 'ui/prompt-adapter.interface';
+import { pluginToActivity } from 'utils/activity-taxonomy';
 import { formatErrorMessage } from 'utils/error-utils';
 import { incrementCounter, timeAsync } from 'utils/metrics-collector';
 import { getSpendingTracker } from 'utils/spending-tracker';
@@ -69,8 +72,8 @@ interface TokenUsage {
  * Token breakdown structure for tracking
  */
 interface TokenBreakdown {
-	cache_read?: number;
-	cache_write?: number;
+	cacheRead?: number;
+	cacheWrite?: number;
 	context: number;
 	generation: number;
 	total: number;
@@ -91,6 +94,21 @@ interface SuccessHandlingContext {
 	sessionManager: Awaited<ReturnType<CLISessionManager['getOrCreateSession']>>;
 	tokenBreakdown: TokenBreakdown;
 	totalSessionTokens: number;
+}
+
+let cachedProjectPath: string | undefined;
+
+function getProjectPath(): string {
+	if (cachedProjectPath !== undefined) return cachedProjectPath;
+	try {
+		cachedProjectPath = execFileSync('git', ['rev-parse', '--show-toplevel'], {
+			encoding: 'utf8',
+			stdio: ['ignore', 'pipe', 'ignore']
+		}).trim();
+	} catch {
+		cachedProjectPath = process.cwd();
+	}
+	return cachedProjectPath;
 }
 
 /**
@@ -345,7 +363,10 @@ export class CommandExecutor {
 						tokenBreakdown,
 						model,
 						duration,
-						result
+						result,
+						finalSessionManager.getSession().session_id,
+						resolvedCommand.command.agent,
+						result.success
 					);
 
 					// Step 6: Handle result (success or failure)
@@ -489,8 +510,8 @@ export class CommandExecutor {
 							? ((usage as Record<string, unknown>)['cache_creation_input_tokens'] as number)
 							: 0;
 					return {
-						cache_read: acc.cache_read + cacheRead,
-						cache_write: acc.cache_write + cacheWrite,
+						cacheRead: acc.cacheRead + cacheRead,
+						cacheWrite: acc.cacheWrite + cacheWrite,
 						context: acc.context + (usage.prompt_tokens ?? 0),
 						generation: acc.generation + (usage.completion_tokens ?? 0),
 						total: acc.total + (usage.total_tokens ?? 0)
@@ -498,13 +519,13 @@ export class CommandExecutor {
 				}
 				return acc;
 			},
-			{ cache_read: 0, cache_write: 0, context: 0, generation: 0, total: 0 }
+			{ cacheRead: 0, cacheWrite: 0, context: 0, generation: 0, total: 0 }
 		);
 
 		// Only include cache fields if they have values
 		return {
-			...(tokenUsage.cache_read > 0 ? { cache_read: tokenUsage.cache_read } : {}),
-			...(tokenUsage.cache_write > 0 ? { cache_write: tokenUsage.cache_write } : {}),
+			...(tokenUsage.cacheRead > 0 ? { cacheRead: tokenUsage.cacheRead } : {}),
+			...(tokenUsage.cacheWrite > 0 ? { cacheWrite: tokenUsage.cacheWrite } : {}),
 			context: tokenUsage.context,
 			generation: tokenUsage.generation,
 			total: tokenUsage.total
@@ -521,35 +542,46 @@ export class CommandExecutor {
 		tokenBreakdown: TokenBreakdown,
 		model: string | undefined,
 		duration: number,
-		result: CommandResult
+		result: CommandResult,
+		sessionId?: string,
+		agentName?: string,
+		success?: boolean
 	): { cacheSavings: number; totalCost: number } {
 		const costResult = calculateActualCost(
 			{
-				cache_creation_input_tokens: tokenBreakdown.cache_write ?? 0,
-				cache_read_input_tokens: tokenBreakdown.cache_read ?? 0,
+				cache_creation_input_tokens: tokenBreakdown.cacheWrite ?? 0,
+				cache_read_input_tokens: tokenBreakdown.cacheRead ?? 0,
 				completion_tokens: tokenBreakdown.generation,
 				prompt_tokens: tokenBreakdown.context,
 				total_tokens: tokenBreakdown.total
 			},
 			model
 		);
+		const plugin = this.commandLoader.getPluginFor(commandName);
 		getSpendingTracker().record({
+			activity: pluginToActivity(plugin),
+			agent: agentName,
 			batchDiscounted: options.flags['batch'] === true,
 			cacheReadCostUsd: costResult.cacheReadCost,
-			cacheReadTokens: tokenBreakdown.cache_read ?? 0,
+			cacheReadTokens: tokenBreakdown.cacheRead ?? 0,
 			cacheSavingsUsd: costResult.cacheSavings,
 			cacheWriteCostUsd: costResult.cacheWriteCost,
-			cacheWriteTokens: tokenBreakdown.cache_write ?? 0,
+			cacheWriteTokens: tokenBreakdown.cacheWrite ?? 0,
 			command: commandName,
 			completionTokens: tokenBreakdown.generation,
 			costUsd: costResult.totalCost,
 			durationMs: duration,
 			id: `${Date.now()}-${commandName}`,
 			inputCostUsd: costResult.inputCost,
+			iterations: result.stages.length,
 			model: model ?? 'unknown',
 			outputCostUsd: costResult.outputCost,
+			plugin,
+			projectPath: getProjectPath(),
 			promptTokens: tokenBreakdown.context,
+			sessionId,
 			stage: result.stages.map((s) => s.stage).join('+'),
+			success,
 			timestamp: new Date().toISOString(),
 			totalTokens: tokenBreakdown.total,
 			unknownModelPricing: costResult.unknownModel

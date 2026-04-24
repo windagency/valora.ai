@@ -1160,9 +1160,20 @@ valora monitoring usage
 valora monitoring usage --since-days 14
 valora monitoring usage --by-model
 valora monitoring usage --by-command
+valora monitoring usage --by-activity
+valora monitoring usage --by-session
+valora monitoring usage --by-project
+valora monitoring usage --by-agent
 valora monitoring usage --daily
 valora monitoring usage --format markdown --output usage-report.md
+valora monitoring usage --format csv --csv-section bySession --output sessions.csv
 valora monitoring usage --model claude-sonnet-4-6 --since 2026-04-01
+valora monitoring usage --activity Coding --since-days 7
+
+# Scan for waste patterns and cost-saving opportunities
+valora monitoring usage optimize
+valora monitoring usage optimize --since-days 14
+valora monitoring usage optimize --min-savings 0.01
 
 # Reset all in-process metrics
 valora monitoring reset
@@ -1179,18 +1190,34 @@ valora monitoring reset
 
 **`monitoring usage` flags:**
 
-| Flag               | Description                                   | Default |
-| ------------------ | --------------------------------------------- | ------- |
-| `--since <date>`   | Filter records on or after this ISO 8601 date | —       |
-| `--since-days <n>` | Show last N days of usage                     | `7`     |
-| `--top <n>`        | Top N costliest requests to display           | `10`    |
-| `--by-model`       | Show model breakdown only                     | `false` |
-| `--by-command`     | Show command breakdown only                   | `false` |
-| `--daily`          | Show daily breakdown only                     | `false` |
-| `--model <name>`   | Filter analytics to a single model            | —       |
-| `--command <name>` | Filter analytics to a single command          | —       |
-| `--format <fmt>`   | Output format: `table`, `json`, or `markdown` | `table` |
-| `--output <path>`  | Write report to file instead of stdout        | —       |
+| Flag                  | Description                                             | Default   |
+| --------------------- | ------------------------------------------------------- | --------- |
+| `--since <date>`      | Filter records on or after this ISO 8601 date           | —         |
+| `--since-days <n>`    | Show last N days of usage                               | `7`       |
+| `--top <n>`           | Top N costliest requests to display                     | `10`      |
+| `--by-model`          | Show model breakdown only                               | `false`   |
+| `--by-command`        | Show command breakdown only                             | `false`   |
+| `--by-activity`       | Show activity breakdown (Coding, Testing, etc.)         | `false`   |
+| `--by-session`        | Show per-session cost ranking                           | `false`   |
+| `--by-project`        | Show per-project cost breakdown                         | `false`   |
+| `--by-agent`          | Show per-agent cost breakdown                           | `false`   |
+| `--daily`             | Show daily breakdown only                               | `false`   |
+| `--model <name>`      | Filter analytics to a single model                      | —         |
+| `--command <name>`    | Filter analytics to a single command                    | —         |
+| `--activity <name>`   | Filter analytics to a single activity                   | —         |
+| `--session <id>`      | Filter analytics to a single session                    | —         |
+| `--project <path>`    | Filter analytics to a single project path               | —         |
+| `--agent <name>`      | Filter analytics to a single agent                      | —         |
+| `--format <fmt>`      | Output format: `table`, `json`, `markdown`, or `csv`    | `table`   |
+| `--csv-section <key>` | CSV section: `byModel`, `byCommand`, `byActivity`, etc. | `byModel` |
+| `--output <path>`     | Write report to file instead of stdout                  | —         |
+
+**`monitoring usage optimize` flags:**
+
+| Flag                  | Description                                              | Default |
+| --------------------- | -------------------------------------------------------- | ------- |
+| `--since-days <n>`    | Analyse last N days of spending history                  | `30`    |
+| `--min-savings <usd>` | Show only findings with estimated savings above this USD | `0`     |
 
 <details>
 <summary><strong>Spending ledger format and example output</strong></summary>

@@ -16,6 +16,26 @@ import {
 
 // ─── Public types ─────────────────────────────────────────────────────────────
 
+export interface ActivityUsage {
+	activity: string;
+	avgCostPerRequest: number;
+	avgIterations: null | number;
+	cacheSavingsUsd: number;
+	oneShotRate: null | number; // fraction of records where iterations === 1; null if no iterations data
+	requestCount: number;
+	totalCostUsd: number;
+	totalTokens: number;
+}
+
+export interface AgentUsage {
+	agent: string;
+	avgCostPerRequest: number;
+	cacheSavingsUsd: number;
+	requestCount: number;
+	totalCostUsd: number;
+	totalTokens: number;
+}
+
 export interface CommandUsage {
 	avgCostPerRequest: number;
 	cacheSavingsUsd: number;
@@ -51,9 +71,33 @@ export interface ModelUsage {
 	totalTokens: number;
 }
 
+export interface ProjectUsage {
+	avgCostPerRequest: number;
+	cacheSavingsUsd: number;
+	projectPath: string;
+	requestCount: number;
+	totalCostUsd: number;
+	totalTokens: number;
+}
+
+export interface SessionUsage {
+	avgCostPerRequest: number;
+	cacheSavingsUsd: number;
+	from: string;
+	requestCount: number;
+	sessionId: string;
+	to: string;
+	totalCostUsd: number;
+	totalTokens: number;
+}
+
 export interface UsageAnalyticsOptions {
+	activity?: string; // filter by activity
+	agent?: string; // filter by agent
 	command?: string; // filter by command
 	model?: string; // filter by model (exact match)
+	project?: string; // filter by projectPath
+	session?: string; // filter by sessionId
 	sinceDate?: string; // ISO 8601 absolute date
 	sinceDays?: number; // shorthand: last N days (converted to sinceDate internally)
 }
@@ -66,12 +110,18 @@ export interface UsagePeriod {
 export interface UsageSummary {
 	avgDailyCost: number;
 	avgDailyTokens: number;
+	byActivity: ActivityUsage[]; // sorted by totalCostUsd desc
+	byAgent: AgentUsage[]; // sorted by totalCostUsd desc
 	byCommand: CommandUsage[]; // sorted by totalCostUsd desc
 	byModel: ModelUsage[]; // sorted by totalCostUsd desc
+	byProject: ProjectUsage[]; // sorted by totalCostUsd desc
+	bySession: SessionUsage[]; // sorted by totalCostUsd desc
+	cacheHitRatio: number; // sum(cacheReadTokens) / sum(cacheReadTokens + promptTokens)
 	costliestRequests: SpendingRecord[]; // top 10 by costUsd
 	daily: DailyUsage[]; // sorted oldest-first
 	peakDay: DailyUsage | null; // day with highest cost (null if no data)
 	period: UsagePeriod;
+	sessionsCount: number;
 	totals: SpendingTotals;
 }
 
@@ -92,9 +142,11 @@ export class UsageAnalytics {
 	private fetchRecords(options?: UsageAnalyticsOptions): SpendingRecord[] {
 		const { model, recordsOpts } = this.resolveOptions(options);
 		let records = this.tracker.getRecords(recordsOpts);
-		if (model !== undefined) {
-			records = records.filter((r) => r.model === model);
-		}
+		if (model !== undefined) records = records.filter((r) => r.model === model);
+		if (options?.activity !== undefined) records = records.filter((r) => r.activity === options.activity);
+		if (options?.agent !== undefined) records = records.filter((r) => r.agent === options.agent);
+		if (options?.session !== undefined) records = records.filter((r) => r.sessionId === options.session);
+		if (options?.project !== undefined) records = records.filter((r) => r.projectPath === options.project);
 		return records;
 	}
 
@@ -119,6 +171,79 @@ export class UsageAnalytics {
 	}
 
 	// ── Private record-based helpers (avoid redundant fetches) ────────────────
+
+	private byActivityFromRecords(records: SpendingRecord[]): ActivityUsage[] {
+		const map = new Map<
+			string,
+			Omit<ActivityUsage, 'avgCostPerRequest' | 'avgIterations' | 'oneShotRate'> & {
+				iterationsCount: number;
+				iterationsSum: number;
+				oneShotCount: number;
+			}
+		>();
+
+		for (const r of records) {
+			const key = r.activity ?? 'Other';
+			const ex = map.get(key);
+			const hasIterations = r.iterations !== undefined;
+			if (ex) {
+				ex.totalCostUsd += r.costUsd;
+				ex.totalTokens += r.totalTokens;
+				ex.requestCount += 1;
+				ex.cacheSavingsUsd += r.cacheSavingsUsd;
+				if (hasIterations) {
+					ex.iterationsSum += r.iterations!;
+					ex.iterationsCount += 1;
+					if (r.iterations === 1) ex.oneShotCount += 1;
+				}
+			} else {
+				map.set(key, {
+					activity: key,
+					cacheSavingsUsd: r.cacheSavingsUsd,
+					iterationsCount: hasIterations ? 1 : 0,
+					iterationsSum: hasIterations ? r.iterations! : 0,
+					oneShotCount: r.iterations === 1 ? 1 : 0,
+					requestCount: 1,
+					totalCostUsd: r.costUsd,
+					totalTokens: r.totalTokens
+				});
+			}
+		}
+
+		return Array.from(map.values())
+			.sort((a, b) => b.totalCostUsd - a.totalCostUsd)
+			.map(({ iterationsCount, iterationsSum, oneShotCount, ...rest }) => ({
+				...rest,
+				avgCostPerRequest: rest.totalCostUsd / rest.requestCount,
+				avgIterations: iterationsCount > 0 ? iterationsSum / iterationsCount : null,
+				oneShotRate: iterationsCount > 0 ? oneShotCount / iterationsCount : null
+			}));
+	}
+
+	private byAgentFromRecords(records: SpendingRecord[]): AgentUsage[] {
+		const map = new Map<string, Omit<AgentUsage, 'avgCostPerRequest'>>();
+		for (const r of records) {
+			const key = r.agent ?? '(unknown)';
+			const ex = map.get(key);
+			if (ex) {
+				ex.totalCostUsd += r.costUsd;
+				ex.totalTokens += r.totalTokens;
+				ex.requestCount += 1;
+				ex.cacheSavingsUsd += r.cacheSavingsUsd;
+			} else {
+				map.set(key, {
+					agent: key,
+					cacheSavingsUsd: r.cacheSavingsUsd,
+					requestCount: 1,
+					totalCostUsd: r.costUsd,
+					totalTokens: r.totalTokens
+				});
+			}
+		}
+		return Array.from(map.values())
+			.sort((a, b) => b.totalCostUsd - a.totalCostUsd)
+			.map((e) => ({ ...e, avgCostPerRequest: e.totalCostUsd / e.requestCount }));
+	}
 
 	private byCommandFromRecords(records: SpendingRecord[]): CommandUsage[] {
 		const byCommand = new Map<string, CommandUsage & { modelSet: Set<string> }>();
@@ -188,6 +313,60 @@ export class UsageAnalytics {
 		return Array.from(byModel.values()).sort((a, b) => b.totalCostUsd - a.totalCostUsd);
 	}
 
+	private byProjectFromRecords(records: SpendingRecord[]): ProjectUsage[] {
+		const map = new Map<string, Omit<ProjectUsage, 'avgCostPerRequest'>>();
+		for (const r of records) {
+			const key = r.projectPath ?? '(unknown)';
+			const ex = map.get(key);
+			if (ex) {
+				ex.totalCostUsd += r.costUsd;
+				ex.totalTokens += r.totalTokens;
+				ex.requestCount += 1;
+				ex.cacheSavingsUsd += r.cacheSavingsUsd;
+			} else {
+				map.set(key, {
+					cacheSavingsUsd: r.cacheSavingsUsd,
+					projectPath: key,
+					requestCount: 1,
+					totalCostUsd: r.costUsd,
+					totalTokens: r.totalTokens
+				});
+			}
+		}
+		return Array.from(map.values())
+			.sort((a, b) => b.totalCostUsd - a.totalCostUsd)
+			.map((e) => ({ ...e, avgCostPerRequest: e.totalCostUsd / e.requestCount }));
+	}
+
+	private bySessionFromRecords(records: SpendingRecord[]): SessionUsage[] {
+		const map = new Map<string, Omit<SessionUsage, 'avgCostPerRequest'>>();
+		for (const r of records) {
+			const key = r.sessionId ?? '(unknown)';
+			const ex = map.get(key);
+			if (ex) {
+				ex.totalCostUsd += r.costUsd;
+				ex.totalTokens += r.totalTokens;
+				ex.requestCount += 1;
+				ex.cacheSavingsUsd += r.cacheSavingsUsd;
+				if (r.timestamp < ex.from) ex.from = r.timestamp;
+				if (r.timestamp > ex.to) ex.to = r.timestamp;
+			} else {
+				map.set(key, {
+					cacheSavingsUsd: r.cacheSavingsUsd,
+					from: r.timestamp,
+					requestCount: 1,
+					sessionId: key,
+					to: r.timestamp,
+					totalCostUsd: r.costUsd,
+					totalTokens: r.totalTokens
+				});
+			}
+		}
+		return Array.from(map.values())
+			.sort((a, b) => b.totalCostUsd - a.totalCostUsd)
+			.map((e) => ({ ...e, avgCostPerRequest: e.totalCostUsd / e.requestCount }));
+	}
+
 	private dailyBreakdownFromRecords(records: SpendingRecord[]): DailyUsage[] {
 		const byDate = new Map<string, DailyUsage>();
 
@@ -233,6 +412,18 @@ export class UsageAnalytics {
 		const daily = this.dailyBreakdownFromRecords(records);
 		const byModel = this.byModelFromRecords(records);
 		const byCommand = this.byCommandFromRecords(records);
+		const bySession = this.bySessionFromRecords(records);
+		const byActivity = this.byActivityFromRecords(records);
+		const byProject = this.byProjectFromRecords(records);
+		const byAgent = this.byAgentFromRecords(records);
+
+		const totalCacheReadTokens = records.reduce((s, r) => s + r.cacheReadTokens, 0);
+		const totalPromptTokens = records.reduce((s, r) => s + r.promptTokens, 0);
+		const cacheHitRatio =
+			totalCacheReadTokens + totalPromptTokens > 0
+				? totalCacheReadTokens / (totalCacheReadTokens + totalPromptTokens)
+				: 0;
+		const sessionsCount = records.length === 0 ? 0 : new Set(records.map((r) => r.sessionId ?? '(unknown)')).size;
 
 		// Only call getTotals when there is no model filter — getTotals doesn't
 		// support model filtering and reading the file again would be wasteful
@@ -292,14 +483,30 @@ export class UsageAnalytics {
 		return {
 			avgDailyCost,
 			avgDailyTokens,
+			byActivity,
+			byAgent,
 			byCommand,
 			byModel,
+			byProject,
+			bySession,
+			cacheHitRatio,
 			costliestRequests,
 			daily,
 			peakDay,
 			period: { from, to: now },
+			sessionsCount,
 			totals: effectiveTotals
 		};
+	}
+
+	generateCsvReport(
+		opts?: UsageAnalyticsOptions & {
+			section?: 'byActivity' | 'byAgent' | 'byCommand' | 'byModel' | 'byProject' | 'bySession' | 'daily';
+		}
+	): string {
+		const section = opts?.section ?? 'byModel';
+		const summary = this.analyze(opts);
+		return toCsv(summary, section);
 	}
 
 	generateJsonReport(options?: UsageAnalyticsOptions): string {
@@ -401,6 +608,164 @@ export class UsageAnalytics {
 	getDailyBreakdown(options?: UsageAnalyticsOptions): DailyUsage[] {
 		return this.dailyBreakdownFromRecords(this.fetchRecords(options));
 	}
+}
+
+// ─── CSV helper ───────────────────────────────────────────────────────────────
+
+export type CsvSection = 'byActivity' | 'byAgent' | 'byCommand' | 'byModel' | 'byProject' | 'bySession' | 'daily';
+
+type CsvRenderer = (summary: UsageSummary) => string[];
+
+const csvRenderers: Record<CsvSection, CsvRenderer> = {
+	byActivity: (s) => [
+		csvRow([
+			'activity',
+			'requestCount',
+			'totalCostUsd',
+			'totalTokens',
+			'avgCostPerRequest',
+			'cacheSavingsUsd',
+			'oneShotRate',
+			'avgIterations'
+		]),
+		...s.byActivity.map((a) =>
+			csvRow([
+				a.activity,
+				a.requestCount,
+				a.totalCostUsd,
+				a.totalTokens,
+				a.avgCostPerRequest,
+				a.cacheSavingsUsd,
+				a.oneShotRate,
+				a.avgIterations
+			])
+		)
+	],
+	byAgent: (s) => [
+		csvRow(['agent', 'requestCount', 'totalCostUsd', 'totalTokens', 'avgCostPerRequest', 'cacheSavingsUsd']),
+		...s.byAgent.map((a) =>
+			csvRow([a.agent, a.requestCount, a.totalCostUsd, a.totalTokens, a.avgCostPerRequest, a.cacheSavingsUsd])
+		)
+	],
+	byCommand: (s) => [
+		csvRow([
+			'command',
+			'requestCount',
+			'totalCostUsd',
+			'totalTokens',
+			'avgCostPerRequest',
+			'cacheSavingsUsd',
+			'models'
+		]),
+		...s.byCommand.map((c) =>
+			csvRow([
+				c.command,
+				c.requestCount,
+				c.totalCostUsd,
+				c.totalTokens,
+				c.avgCostPerRequest,
+				c.cacheSavingsUsd,
+				c.models.join(';')
+			])
+		)
+	],
+	byModel: (s) => [
+		csvRow([
+			'model',
+			'requestCount',
+			'totalCostUsd',
+			'totalTokens',
+			'avgCostPerRequest',
+			'cacheSavingsUsd',
+			'inputTokens',
+			'outputTokens',
+			'cacheReadTokens',
+			'cacheWriteTokens'
+		]),
+		...s.byModel.map((m) =>
+			csvRow([
+				m.model,
+				m.requestCount,
+				m.totalCostUsd,
+				m.totalTokens,
+				m.avgCostPerRequest,
+				m.cacheSavingsUsd,
+				m.inputTokens,
+				m.outputTokens,
+				m.cacheReadTokens,
+				m.cacheWriteTokens
+			])
+		)
+	],
+	byProject: (s) => [
+		csvRow(['projectPath', 'requestCount', 'totalCostUsd', 'totalTokens', 'avgCostPerRequest', 'cacheSavingsUsd']),
+		...s.byProject.map((p) =>
+			csvRow([p.projectPath, p.requestCount, p.totalCostUsd, p.totalTokens, p.avgCostPerRequest, p.cacheSavingsUsd])
+		)
+	],
+	bySession: (s) => [
+		csvRow([
+			'sessionId',
+			'requestCount',
+			'totalCostUsd',
+			'totalTokens',
+			'avgCostPerRequest',
+			'cacheSavingsUsd',
+			'from',
+			'to'
+		]),
+		...s.bySession.map((sess) =>
+			csvRow([
+				sess.sessionId,
+				sess.requestCount,
+				sess.totalCostUsd,
+				sess.totalTokens,
+				sess.avgCostPerRequest,
+				sess.cacheSavingsUsd,
+				sess.from,
+				sess.to
+			])
+		)
+	],
+	daily: (s) => [
+		csvRow([
+			'date',
+			'requestCount',
+			'totalCostUsd',
+			'totalTokens',
+			'cacheSavingsUsd',
+			'inputTokens',
+			'outputTokens',
+			'cacheReadTokens',
+			'cacheWriteTokens'
+		]),
+		...s.daily.map((d) =>
+			csvRow([
+				d.date,
+				d.requestCount,
+				d.totalCostUsd,
+				d.totalTokens,
+				d.cacheSavingsUsd,
+				d.inputTokens,
+				d.outputTokens,
+				d.cacheReadTokens,
+				d.cacheWriteTokens
+			])
+		)
+	]
+};
+
+export function toCsv(summary: UsageSummary, section: CsvSection): string {
+	return csvRenderers[section](summary).join('\n');
+}
+
+function csvCell(v: unknown): string {
+	const s = String(v ?? '');
+	return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+function csvRow(values: unknown[]): string {
+	return values.map(csvCell).join(',');
 }
 
 // ─── Singleton ────────────────────────────────────────────────────────────────

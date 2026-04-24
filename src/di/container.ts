@@ -256,7 +256,7 @@ export async function initializePlugins(container: DIContainer): Promise<void> {
 
 	for (const plugin of plugins) {
 		if (plugin.agentsDir) agentLoader.registerPluginDir(plugin.agentsDir);
-		if (plugin.commandsDir) commandLoader.registerPluginDir(plugin.commandsDir);
+		if (plugin.commandsDir) commandLoader.registerPluginDir(plugin.commandsDir, plugin.manifest.name);
 		if (plugin.promptsDir) promptLoader.registerPluginPromptsDir(plugin.promptsDir);
 		if (plugin.hooks) hookService.registerPluginHooks(plugin.hooks);
 		if (plugin.mcpsFile) registerPluginMcpsFile(plugin.mcpsFile);

@@ -13,6 +13,7 @@ import { handleCommandLoadError, validateCommandMetadata } from './command-valid
 
 export class CommandLoader {
 	private cache: Map<string, CommandDefinition> = new Map();
+	private pluginByCommand: Map<string, string> = new Map();
 	private pluginDirs = new Set<string>();
 
 	constructor(private commandsDir?: string) {
@@ -22,8 +23,20 @@ export class CommandLoader {
 	/**
 	 * Register an additional command directory contributed by a plugin.
 	 */
-	registerPluginDir(dir: string): void {
+	private pendingPluginDirNames: Map<string, string> = new Map();
+
+	registerPluginDir(dir: string, pluginName?: string): void {
 		this.pluginDirs.add(dir);
+		if (pluginName !== undefined) {
+			this.pendingPluginDirNames.set(dir, pluginName);
+		}
+	}
+
+	/**
+	 * Return the plugin name that owns the given command, if known.
+	 */
+	getPluginFor(commandName: string): string | undefined {
+		return this.pluginByCommand.get(commandName);
 	}
 
 	/**
@@ -63,6 +76,7 @@ export class CommandLoader {
 
 	/**
 	 * Resolve the file path for a command, checking plugin dirs if not in the primary dir.
+	 * Records the owning plugin name in pluginByCommand when the command is found in a plugin dir.
 	 */
 	private resolveCommandFilePath(commandName: string): string {
 		const primary = getCommandFilePath(commandName, this.commandsDir);
@@ -70,7 +84,13 @@ export class CommandLoader {
 
 		for (const pluginDir of this.pluginDirs) {
 			const candidate = getCommandFilePath(commandName, pluginDir);
-			if (fileExists(candidate)) return candidate;
+			if (fileExists(candidate)) {
+				const pluginName = this.pendingPluginDirNames.get(pluginDir);
+				if (pluginName !== undefined) {
+					this.pluginByCommand.set(commandName, pluginName);
+				}
+				return candidate;
+			}
 		}
 
 		return primary;

@@ -29,6 +29,8 @@ export interface GetRecordsOptions {
 }
 
 export interface SpendingRecord {
+	activity?: string;
+	agent?: string;
 	batchDiscounted: boolean;
 	cacheReadCostUsd: number;
 	cacheReadTokens: number;
@@ -44,11 +46,16 @@ export interface SpendingRecord {
 	durationMs: number;
 	id: string;
 	inputCostUsd: number;
+	iterations?: number;
 	model: string;
 	outputCostUsd: number;
+	plugin?: string;
 	progressiveDisclosureCalls?: number;
+	projectPath?: string;
 	promptTokens: number;
+	sessionId?: string;
 	stage: string;
+	success?: boolean;
 	timestamp: string;
 	totalTokens: number;
 	unknownModelPricing: boolean;
@@ -70,16 +77,18 @@ export interface SpendingTotals {
 	totalTokens: number;
 }
 
-const getSpendingFile = (): string => join(getRuntimeDataDir(), 'spending.jsonl');
+const getSpendingFile = (dataDir?: string): string => join(dataDir ?? getRuntimeDataDir(), 'spending.jsonl');
 
 export class SpendingTracker {
+	constructor(private readonly dataDir?: string) {}
+
 	/**
 	 * Append a spending record to the JSONL file
 	 */
 	record(r: SpendingRecord): void {
 		try {
-			ensureDir();
-			appendFileSync(getSpendingFile(), JSON.stringify(r) + '\n', 'utf8');
+			ensureDir(this.dataDir);
+			appendFileSync(getSpendingFile(this.dataDir), JSON.stringify(r) + '\n', 'utf8');
 		} catch {
 			// Non-fatal: spending tracking should not break the main flow
 		}
@@ -89,7 +98,7 @@ export class SpendingTracker {
 	 * Read all records, optionally filtered by command and/or date
 	 */
 	getRecords(opts?: GetRecordsOptions): SpendingRecord[] {
-		const file = getSpendingFile();
+		const file = getSpendingFile(this.dataDir);
 		if (!existsSync(file)) return [];
 
 		try {
@@ -198,8 +207,8 @@ export class SpendingTracker {
 	}
 }
 
-function ensureDir(): void {
-	const dir = getRuntimeDataDir();
+function ensureDir(dataDir?: string): void {
+	const dir = dataDir ?? getRuntimeDataDir();
 	if (!existsSync(dir)) {
 		mkdirSync(dir, { recursive: true });
 	}
