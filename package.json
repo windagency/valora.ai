@@ -105,6 +105,7 @@
 		"test:suite:architecture": "vitest run --config vitest.config.ts __tests__/architecture",
 		"bench:compression": "tsx scripts/bench-compression.ts",
 		"bench:compression:check": "vitest run --config vitest.config.ts __tests__/benchmarks/compression",
+		"gen:fixtures": "tsx scripts/gen-compression-fixtures.ts",
 		"test:light": "SKIP_TESTCONTAINERS=true pnpm test:suite:unit && SKIP_TESTCONTAINERS=true pnpm test:suite:security",
 		"test:coverage": "vitest run --coverage",
 		"test:ci": "pnpm test && pnpm test:coverage",

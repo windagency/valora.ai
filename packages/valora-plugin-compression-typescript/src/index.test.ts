@@ -15,11 +15,26 @@ function makeApi(): PluginAPI {
 }
 
 describe('valora-plugin-compression-typescript register()', () => {
-	it('registers all eight tool keys', () => {
+	it('registers all tool keys', () => {
 		const api = makeApi();
 		register(api);
 		const calls = vi.mocked(api.compression.registerStrategy).mock.calls.map(([tool]) => tool);
-		expect(calls).toEqual(expect.arrayContaining(['tsc', 'eslint', 'jest', 'vitest', 'pnpm', 'npm', 'npx', 'yarn']));
-		expect(calls).toHaveLength(8);
+		expect(calls).toEqual(
+			expect.arrayContaining([
+				'tsc',
+				'eslint',
+				'jest',
+				'vitest',
+				'pnpm',
+				'npm',
+				'npx',
+				'yarn',
+				'prettier',
+				'bun',
+				'bunx',
+				'biome'
+			])
+		);
+		expect(calls).toHaveLength(12);
 	});
 });

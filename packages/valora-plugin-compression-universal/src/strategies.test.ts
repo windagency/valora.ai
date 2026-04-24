@@ -1,6 +1,18 @@
 import { describe, expect, it } from 'vitest';
 
-import { filterDocker, filterGit, filterMake, filterRg } from './strategies';
+import {
+	filterCat,
+	filterCurl,
+	filterDiff,
+	filterDocker,
+	filterGh,
+	filterGit,
+	filterJson,
+	filterLog,
+	filterLs,
+	filterMake,
+	filterRg
+} from './strategies';
 
 function pad(str: string, targetLength: number): string {
 	return str.repeat(Math.ceil(targetLength / str.length)).slice(0, targetLength);
@@ -361,5 +373,244 @@ describe('filterMake', () => {
 		const result = filterMake(input, 'make all');
 		expect(result).not.toContain('Entering directory');
 		expect(result).toContain('gcc -o foo foo.c');
+	});
+});
+
+describe('filterLs', () => {
+	it('strips permissions, link count, owner, group, and timestamp from ls -la lines', () => {
+		const input = [
+			'total 48',
+			'-rw-r--r--  1 user group  1234 Apr 23 12:00 foo.ts',
+			'drwxr-xr-x  4 user group  4096 Apr 23 12:00 src'
+		].join('\n');
+		const result = filterLs(input, 'ls -la');
+		expect(result).not.toContain('drwxr-xr-x');
+		expect(result).not.toContain('user group');
+		expect(result).toContain('foo.ts');
+		expect(result).toContain('src');
+	});
+
+	it('skips . and .. entries', () => {
+		const input = [
+			'drwxr-xr-x  2 user group  4096 Apr 23 12:00 .',
+			'drwxr-xr-x  5 user group  4096 Apr 23 12:00 ..',
+			'-rw-r--r--  1 user group   512 Apr 23 12:00 file.ts'
+		].join('\n');
+		const result = filterLs(input, 'ls -la');
+		const lines = result.split('\n').filter(Boolean);
+		expect(lines).toHaveLength(1);
+		expect(lines[0]).toContain('file.ts');
+	});
+
+	it('caps entries at 50 and appends a summary when exceeded', () => {
+		const lines = Array.from({ length: 60 }, (_, i) => `-rw-r--r--  1 u g  100 Apr 23 12:00 file${i}.ts`);
+		const result = filterLs(lines.join('\n'), 'ls -la');
+		const fileLines = result.split('\n').filter((l) => l.includes('file'));
+		expect(fileLines).toHaveLength(50);
+		expect(result).toContain('[... 10 more entries]');
+	});
+
+	it('caps plain path output (find, tree) at 50 lines', () => {
+		const input = Array.from({ length: 80 }, (_, i) => `./src/file${i}.ts`).join('\n');
+		const result = filterLs(input, 'find . -name "*.ts"');
+		const kept = result.split('\n').filter((l) => l.startsWith('./src/'));
+		expect(kept.length).toBeLessThanOrEqual(50);
+		expect(result).toContain('[... ');
+	});
+});
+
+describe('filterCat', () => {
+	it('passes through files at or below 100 lines unchanged', () => {
+		const input = Array.from({ length: 100 }, (_, i) => `line ${i}`).join('\n');
+		expect(filterCat(input, 'cat README.md')).toBe(input);
+	});
+
+	it('truncates long files and appends a line-count summary', () => {
+		const input = Array.from({ length: 200 }, (_, i) => `line ${i}`).join('\n');
+		const result = filterCat(input, 'cat big-file.ts');
+		const lines = result.split('\n');
+		expect(lines).toHaveLength(101); // 100 content + 1 summary
+		expect(result).toContain('[... 100 more lines]');
+	});
+});
+
+describe('filterDiff', () => {
+	it('caps added lines per hunk and appends a summary', () => {
+		const input = [
+			'--- a/file.txt',
+			'+++ b/file.txt',
+			'@@ -0,0 +1,20 @@',
+			...Array.from({ length: 20 }, (_, i) => `+line ${i + 1}`)
+		].join('\n');
+		const result = filterDiff(input, 'diff -u a.txt b.txt');
+		const plusLines = result.split('\n').filter((l) => l.startsWith('+') && !l.startsWith('+++'));
+		expect(plusLines.length).toBeLessThanOrEqual(15);
+		expect(result).toContain('[... 5 more +lines]');
+	});
+
+	it('caps removed lines per hunk and appends a summary', () => {
+		const input = [
+			'--- a/file.txt',
+			'+++ b/file.txt',
+			'@@ -1,20 +0,0 @@',
+			...Array.from({ length: 20 }, (_, i) => `-line ${i + 1}`)
+		].join('\n');
+		const result = filterDiff(input, 'diff -u a.txt b.txt');
+		const minusLines = result.split('\n').filter((l) => l.startsWith('-') && !l.startsWith('---'));
+		expect(minusLines.length).toBeLessThanOrEqual(15);
+		expect(result).toContain('[... 5 more -lines]');
+	});
+
+	it('preserves hunk headers', () => {
+		const input = ['--- a/f.txt', '+++ b/f.txt', '@@ -1,2 +1,2 @@', '-old', '+new'].join('\n');
+		const result = filterDiff(input, 'diff -u a.txt b.txt');
+		expect(result).toContain('@@ -1,2 +1,2 @@');
+	});
+});
+
+describe('filterCurl', () => {
+	it('strips curl progress table header and download percentage lines', () => {
+		const input = [
+			'  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current',
+			'                                 Dload  Upload   Total   Spent    Left  Speed',
+			'100  1234  100  1234    0     0   5678      0 --:--:-- --:--:-- --:--:--  5678',
+			'{"ok": true}'
+		].join('\n');
+		const result = filterCurl(input, 'curl https://api.example.com');
+		expect(result).not.toContain('% Total');
+		expect(result).not.toContain('Dload');
+		expect(result).not.toMatch(/^\s*\d+\s+\d+\s+\d+/m);
+		expect(result).toContain('{"ok": true}');
+	});
+
+	it('strips wget progress bar lines', () => {
+		const input = [
+			'--2025-04-23 12:00:00--  https://example.com/file.zip',
+			'Resolving example.com... 1.2.3.4',
+			'file.zip            100%[=========================>]  12.06K  --.-KB/s    in 0.05s',
+			"2025-04-23 12:00:01 (215 KB/s) - 'file.zip' saved [12345/12345]"
+		].join('\n');
+		const result = filterCurl(input, 'wget https://example.com/file.zip');
+		expect(result).not.toMatch(/\[={5,}/);
+		expect(result).toContain('Resolving example.com');
+		expect(result).toContain("'file.zip' saved");
+	});
+
+	it('truncates long response bodies and appends a summary', () => {
+		const body = Array.from({ length: 200 }, (_, i) => `{"item": ${i}}`).join('\n');
+		const result = filterCurl(body, 'curl https://api.example.com/large');
+		expect(result.split('\n').length).toBeLessThanOrEqual(51);
+		expect(result).toContain('[... ');
+	});
+});
+
+describe('filterJson', () => {
+	it('passes through short JSON unchanged', () => {
+		const input = '{"name": "Alice", "age": 30}';
+		expect(filterJson(input, 'jq .')).toBe(input);
+	});
+
+	it('truncates long string values in-line', () => {
+		const longStr = 'a'.repeat(100);
+		const input = `{"key": "${longStr}"}`;
+		const result = filterJson(input, 'jq .');
+		expect(result).not.toContain(longStr);
+		expect(result).toContain('...');
+	});
+
+	it('caps output at 50 lines and appends a summary', () => {
+		const input = Array.from({ length: 200 }, (_, i) => `  "key${i}": "value"`).join('\n');
+		const result = filterJson(input, 'jq .');
+		expect(result.split('\n').length).toBeLessThanOrEqual(51);
+		expect(result).toContain('[... ');
+	});
+});
+
+describe('filterLog', () => {
+	it('collapses consecutive repeated log lines into a count', () => {
+		const input = [
+			'2025-04-23 12:00:00 INFO Request received',
+			'2025-04-23 12:00:01 INFO Request received',
+			'2025-04-23 12:00:02 INFO Request received',
+			'2025-04-23 12:00:03 INFO Response sent'
+		].join('\n');
+		const result = filterLog(input, 'tail -f app.log');
+		expect(result).toContain('[repeated 3 times]');
+		expect(result).toContain('Response sent');
+	});
+
+	it('does not collapse lines that differ', () => {
+		const input = ['2025-04-23 INFO Start', '2025-04-23 INFO Middle', '2025-04-23 INFO End'].join('\n');
+		const result = filterLog(input, 'tail app.log');
+		expect(result).not.toContain('[repeated');
+		expect(result.split('\n')).toHaveLength(3);
+	});
+
+	it('works with lines that have no timestamp prefix', () => {
+		const input = ['same line', 'same line', 'same line', 'different'].join('\n');
+		const result = filterLog(input, 'journalctl');
+		expect(result).toContain('[repeated 3 times]');
+		expect(result).toContain('different');
+	});
+});
+
+describe('filterGh', () => {
+	it('collapses successful run list entries into a count and preserves failures', () => {
+		const input = [
+			'completed\tsuccess\tCI\tci.yml\tmain\tpush\t1111\t10m',
+			'completed\tsuccess\tCI\tci.yml\tmain\tpush\t1110\t1h',
+			'completed\tsuccess\tCI\tci.yml\tmain\tpush\t1109\t2h',
+			'completed\tfailure\tCI\tci.yml\tfix\tpush\t1108\t3h'
+		].join('\n');
+		const result = filterGh(input, 'gh run list');
+		expect(result).toContain('[3 successful runs]');
+		expect(result).toContain('failure');
+		expect(result).not.toContain('\t1111\t');
+	});
+
+	it('passes through gh pr list unchanged', () => {
+		const input = '#123\tFix bug\tmain\tOPEN\t2h ago';
+		expect(filterGh(input, 'gh pr list')).toBe(input);
+	});
+
+	it('passes through gh issue list unchanged', () => {
+		const input = '#456\tUpdate deps\tOPEN\t1d ago';
+		expect(filterGh(input, 'gh issue list')).toBe(input);
+	});
+});
+
+describe('filterDocker (extended)', () => {
+	it('removes the COMMAND column from docker ps output', () => {
+		const input = [
+			'CONTAINER ID   IMAGE   COMMAND           CREATED    STATUS    PORTS     NAMES',
+			'a1b2c3d4e5f6   nginx   "/entrypoint.sh"  2h ago     Up 2h     80/tcp    web'
+		].join('\n');
+		const result = filterDocker(input, 'docker ps');
+		expect(result).not.toContain('"/entrypoint.sh"');
+		expect(result).toContain('nginx');
+		expect(result).toContain('web');
+	});
+
+	it('removes the IMAGE ID column from docker images output', () => {
+		const input = [
+			'REPOSITORY   TAG       IMAGE ID       CREATED      SIZE',
+			'nginx        latest    a1b2c3d4e5f6   2 days ago   187MB'
+		].join('\n');
+		const result = filterDocker(input, 'docker images');
+		expect(result).not.toMatch(/[0-9a-f]{12}/);
+		expect(result).toContain('nginx');
+		expect(result).toContain('187MB');
+	});
+
+	it('deduplicates repeated lines in docker logs', () => {
+		const input = [
+			'2025-04-23T12:00:00Z INFO health check ok',
+			'2025-04-23T12:00:05Z INFO health check ok',
+			'2025-04-23T12:00:10Z INFO health check ok',
+			'2025-04-23T12:00:15Z ERROR connection refused'
+		].join('\n');
+		const result = filterDocker(input, 'docker logs web');
+		expect(result).toContain('[repeated 3 times]');
+		expect(result).toContain('connection refused');
 	});
 });

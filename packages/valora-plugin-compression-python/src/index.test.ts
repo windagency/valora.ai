@@ -15,11 +15,11 @@ function makeApi(): PluginAPI {
 }
 
 describe('valora-plugin-compression-python register()', () => {
-	it('registers python and pytest tool keys', () => {
+	it('registers all tool keys', () => {
 		const api = makeApi();
 		register(api);
 		const calls = vi.mocked(api.compression.registerStrategy).mock.calls.map(([tool]) => tool);
-		expect(calls).toEqual(expect.arrayContaining(['python', 'pytest']));
-		expect(calls).toHaveLength(2);
+		expect(calls).toEqual(expect.arrayContaining(['python', 'pytest', 'pip', 'pip3', 'cargo', 'ruff']));
+		expect(calls).toHaveLength(6);
 	});
 });

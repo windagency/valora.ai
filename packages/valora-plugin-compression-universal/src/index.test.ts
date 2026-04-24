@@ -15,11 +15,31 @@ function makeApi(): PluginAPI {
 }
 
 describe('valora-plugin-compression-universal register()', () => {
-	it('registers all five tool keys', async () => {
+	it('registers all tool keys', async () => {
 		const api = makeApi();
 		register(api);
 		const calls = vi.mocked(api.compression.registerStrategy).mock.calls.map(([tool]) => tool);
-		expect(calls).toEqual(expect.arrayContaining(['git', 'grep', 'rg', 'docker', 'make']));
-		expect(calls).toHaveLength(5);
+		expect(calls).toEqual(
+			expect.arrayContaining([
+				'git',
+				'grep',
+				'rg',
+				'docker',
+				'make',
+				'ls',
+				'find',
+				'tree',
+				'cat',
+				'diff',
+				'curl',
+				'wget',
+				'jq',
+				'yq',
+				'tail',
+				'journalctl',
+				'gh'
+			])
+		);
+		expect(calls).toHaveLength(17);
 	});
 });

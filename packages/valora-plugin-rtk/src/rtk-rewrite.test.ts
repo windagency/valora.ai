@@ -87,7 +87,20 @@ describe('rtk-rewrite.sh', () => {
 		'tsc',
 		'eslint',
 		'vitest',
-		'jest'
+		'jest',
+		'pytest',
+		'ruff',
+		'go',
+		'rake',
+		'rspec',
+		'rubocop',
+		'bundle',
+		'prisma',
+		'aws',
+		'golangci-lint',
+		'playwright',
+		'next',
+		'biome'
 	])('rewrites %s commands', async (tool) => {
 		const { stdout } = await run({ tool_input: { command: `${tool} build` } }, { PATH: pathWithRtk });
 		const output = JSON.parse(stdout) as HookOutput;

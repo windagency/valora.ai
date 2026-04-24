@@ -1,0 +1,7 @@
+++++++++++
+dependencies:
++ is-array 1.0.1
++ is-even 1.0.0
++ is-number 7.0.0
++ is-odd 3.0.1
++ is-string 1.0.1 (1.1.1 is available)

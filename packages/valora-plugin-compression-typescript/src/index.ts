@@ -1,6 +1,13 @@
 import type { PluginAPI } from 'plugins/plugin-api.types';
 
-import { filterEslint, filterPackageManager, filterTestRunner, filterTsc } from './strategies';
+import {
+	filterBiome,
+	filterEslint,
+	filterPackageManager,
+	filterPrettier,
+	filterTestRunner,
+	filterTsc
+} from './strategies';
 
 export function register(api: PluginAPI): void {
 	api.compression.registerStrategy('tsc', filterTsc);
@@ -11,4 +18,8 @@ export function register(api: PluginAPI): void {
 	api.compression.registerStrategy('npm', filterPackageManager);
 	api.compression.registerStrategy('npx', filterPackageManager);
 	api.compression.registerStrategy('yarn', filterPackageManager);
+	api.compression.registerStrategy('prettier', filterPrettier);
+	api.compression.registerStrategy('bun', filterPackageManager);
+	api.compression.registerStrategy('bunx', filterPackageManager);
+	api.compression.registerStrategy('biome', filterBiome);
 }

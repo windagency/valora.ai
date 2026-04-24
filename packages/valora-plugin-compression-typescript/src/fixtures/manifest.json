@@ -6,7 +6,12 @@
 		"category": "typescript",
 		"preservation": {
 			"mustContainAll": ["Found 12 errors"],
-			"mustContainCount": { "error TS2345": 1, "error TS2339": 1, "error TS2454": 1 }
+			"mustContainCount": {
+				"error TS2345": 1,
+				"error TS2339": 1,
+				"error TS2454": 1
+			},
+			"skipForCombinations": ["rtk-only", "all-inner+rtk"]
 		},
 		"expectedRatioFloor": {
 			"raw": 0,
@@ -14,8 +19,8 @@
 			"typescript-only": 28,
 			"python-only": 0,
 			"all-inner": 28,
-			"rtk-only": 0,
-			"all-inner+rtk": 0
+			"rtk-only": 6,
+			"all-inner+rtk": 42
 		}
 	},
 	{
@@ -25,7 +30,11 @@
 		"category": "typescript",
 		"preservation": {
 			"mustContainAll": ["Found 14 errors"],
-			"mustContainCount": { "error TS2345": 1, "error TS2339": 1 }
+			"mustContainCount": {
+				"error TS2345": 1,
+				"error TS2339": 1
+			},
+			"skipForCombinations": ["rtk-only", "all-inner+rtk"]
 		},
 		"expectedRatioFloor": {
 			"raw": 0,
@@ -34,7 +43,7 @@
 			"python-only": 0,
 			"all-inner": 38,
 			"rtk-only": 0,
-			"all-inner+rtk": 0
+			"all-inner+rtk": 35
 		}
 	},
 	{
@@ -44,7 +53,8 @@
 		"category": "typescript",
 		"preservation": {
 			"mustContainAll": ["Module name 'tslib' was not resolved", "Found 1 error."],
-			"mustNotDrop": ["error TS2307"]
+			"mustNotDrop": ["error TS2307"],
+			"skipForCombinations": ["rtk-only", "all-inner+rtk"]
 		},
 		"expectedRatioFloor": {
 			"raw": 0,
@@ -52,8 +62,8 @@
 			"typescript-only": 84,
 			"python-only": 0,
 			"all-inner": 84,
-			"rtk-only": 0,
-			"all-inner+rtk": 0
+			"rtk-only": 86,
+			"all-inner+rtk": 86
 		}
 	},
 	{
@@ -63,7 +73,8 @@
 		"category": "typescript",
 		"preservation": {
 			"mustContainAll": ["10:00:14 AM", "Found 2 errors. Watching for file changes."],
-			"mustNotDrop": ["TS2345"]
+			"mustNotDrop": ["TS2345"],
+			"skipForCombinations": ["rtk-only", "all-inner+rtk"]
 		},
 		"expectedRatioFloor": {
 			"raw": 0,
@@ -71,8 +82,8 @@
 			"typescript-only": 70,
 			"python-only": 0,
 			"all-inner": 70,
-			"rtk-only": 0,
-			"all-inner+rtk": 0
+			"rtk-only": 63,
+			"all-inner+rtk": 63
 		}
 	},
 	{
@@ -82,7 +93,8 @@
 		"category": "test-runner",
 		"preservation": {
 			"mustContainAll": ["Test Files  6 passed", "82 passed"],
-			"mustNotDrop": ["Duration"]
+			"mustNotDrop": ["Duration"],
+			"skipForCombinations": ["rtk-only", "all-inner+rtk"]
 		},
 		"expectedRatioFloor": {
 			"raw": 0,
@@ -90,8 +102,8 @@
 			"typescript-only": 92,
 			"python-only": 0,
 			"all-inner": 92,
-			"rtk-only": 0,
-			"all-inner+rtk": 0
+			"rtk-only": 89,
+			"all-inner+rtk": 89
 		}
 	},
 	{
@@ -121,7 +133,8 @@
 		"category": "package-manager",
 		"preservation": {
 			"mustContainAll": ["Done in"],
-			"mustNotDrop": ["Done in 3.2s"]
+			"mustNotDrop": ["Done in 3.2s"],
+			"skipForCombinations": ["rtk-only", "all-inner+rtk"]
 		},
 		"expectedRatioFloor": {
 			"raw": 0,
@@ -129,8 +142,8 @@
 			"typescript-only": 92,
 			"python-only": 0,
 			"all-inner": 92,
-			"rtk-only": 0,
-			"all-inner+rtk": 0
+			"rtk-only": 78,
+			"all-inner+rtk": 78
 		}
 	},
 	{
@@ -140,7 +153,8 @@
 		"category": "package-manager",
 		"preservation": {
 			"mustContainAll": ["added 842 packages"],
-			"mustNotDrop": ["added 842 packages"]
+			"mustNotDrop": ["added 842 packages"],
+			"skipForCombinations": ["rtk-only", "all-inner+rtk"]
 		},
 		"expectedRatioFloor": {
 			"raw": 0,
@@ -148,8 +162,8 @@
 			"typescript-only": 89,
 			"python-only": 0,
 			"all-inner": 89,
-			"rtk-only": 0,
-			"all-inner+rtk": 0
+			"rtk-only": 77,
+			"all-inner+rtk": 77
 		}
 	},
 	{
@@ -159,7 +173,8 @@
 		"category": "eslint",
 		"preservation": {
 			"mustContainAll": ["52 problems", "no-unused-vars", "complexity"],
-			"mustNotDrop": ["✖ 52 problems"]
+			"mustNotDrop": ["✖ 52 problems"],
+			"skipForCombinations": ["rtk-only", "all-inner+rtk"]
 		},
 		"expectedRatioFloor": {
 			"raw": 0,
@@ -167,6 +182,26 @@
 			"typescript-only": 59,
 			"python-only": 0,
 			"all-inner": 59,
+			"rtk-only": 76,
+			"all-inner+rtk": 76
+		}
+	},
+	{
+		"id": "biome-check-violations",
+		"path": "biome/biome-check-violations.txt",
+		"originatingCommand": "biome check .",
+		"category": "biome",
+		"preservation": {
+			"mustContainAll": ["Found 5 diagnostics.", "noDoubleEquals", "noExplicitAny"],
+			"mustNotDrop": ["noDoubleEquals violations"],
+			"skipForCombinations": ["rtk-only", "all-inner+rtk"]
+		},
+		"expectedRatioFloor": {
+			"raw": 0,
+			"universal-only": 0,
+			"typescript-only": 75,
+			"python-only": 0,
+			"all-inner": 75,
 			"rtk-only": 0,
 			"all-inner+rtk": 0
 		}
@@ -178,7 +213,10 @@
 		"category": "mixed",
 		"preservation": {
 			"mustContainAll": ["Found 14 errors"],
-			"mustContainCount": { "error TS2345": 1 }
+			"mustContainCount": {
+				"error TS2345": 1
+			},
+			"skipForCombinations": ["rtk-only", "all-inner+rtk"]
 		},
 		"expectedRatioFloor": {
 			"raw": 0,
@@ -187,7 +225,7 @@
 			"python-only": 0,
 			"all-inner": 38,
 			"rtk-only": 0,
-			"all-inner+rtk": 0
+			"all-inner+rtk": 35
 		}
 	}
 ]

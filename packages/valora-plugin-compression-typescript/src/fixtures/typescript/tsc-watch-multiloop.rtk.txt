@@ -1,0 +1,5 @@
+src/executor/output-compression.service.ts(12,5): error TS2345: Argument of type 'string' is not assignable to parameter of type 'number'.
+src/session/store.ts(34,3): error TS2339: Property 'flush' does not exist on type 'SessionStore'.
+═══════════════════════════════════════
+TypeScript: 2 errors in 2 files (watching)
+Top codes: TS2345 (1x), TS2339 (1x)

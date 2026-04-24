@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { filterEslint, filterPackageManager, filterTestRunner, filterTsc } from './strategies';
+import {
+	filterBiome,
+	filterEslint,
+	filterPackageManager,
+	filterPrettier,
+	filterTestRunner,
+	filterTsc
+} from './strategies';
 
 function pad(str: string, targetLength: number): string {
 	return str.repeat(Math.ceil(targetLength / str.length)).slice(0, targetLength);
@@ -178,5 +185,73 @@ describe('filterPackageManager', () => {
 		expect(result).not.toContain('looking for funding');
 		expect(result).not.toContain('npm fund');
 		expect(result).toContain('added 10 packages');
+	});
+});
+
+describe('filterBiome', () => {
+	const makeHeader = (file: string, rule: string) => `${file} ${rule} ━━━━━━━━━━━━━━━━━━━━━━━━`;
+	const makeBlock = (file: string, rule: string) =>
+		[makeHeader(file, rule), '', '  ✖ Message.', '', '  > 1 │ code', '     │ ^^^', ''].join('\n');
+
+	it('groups violations by rule and caps at 2 examples per rule', () => {
+		const input = [
+			makeBlock('src/a.ts:1:1', 'lint/suspicious/noDoubleEquals'),
+			makeBlock('src/b.ts:2:2', 'lint/suspicious/noDoubleEquals'),
+			makeBlock('src/c.ts:3:3', 'lint/suspicious/noDoubleEquals'),
+			makeBlock('src/d.ts:4:4', 'lint/suspicious/noExplicitAny'),
+			'Found 4 diagnostics.'
+		].join('\n');
+		const result = filterBiome(input, 'biome check');
+		const noDoubleLines = result.split('\n').filter((l) => l.includes('noDoubleEquals'));
+		expect(noDoubleLines).toHaveLength(3); // 2 examples + ellipsis
+		expect(result).toContain('... (more noDoubleEquals violations)');
+		expect(result).toContain('src/d.ts:4:4 lint/suspicious/noExplicitAny');
+	});
+
+	it('strips code frame lines from diagnostic bodies', () => {
+		const input = makeBlock('src/a.ts:1:1', 'lint/suspicious/noDoubleEquals') + 'Found 1 diagnostic.';
+		const result = filterBiome(input, 'biome check');
+		expect(result).not.toContain('│');
+		expect(result).not.toContain('✖');
+	});
+
+	it('keeps summary lines outside diagnostic blocks', () => {
+		const input = makeBlock('src/a.ts:5:3', 'lint/suspicious/noDoubleEquals') + 'Found 1 diagnostic.';
+		const result = filterBiome(input, 'biome check');
+		expect(result).toContain('Found 1 diagnostic.');
+	});
+
+	it('passes through output with no diagnostics unchanged', () => {
+		const input = 'Checked 12 files in 45ms. No diagnostics found.';
+		const result = filterBiome(input, 'biome check');
+		expect(result).toBe(input);
+	});
+});
+
+describe('filterPrettier', () => {
+	it('removes the "Checking formatting..." header line', () => {
+		const input = ['Checking formatting...', '[warn] src/foo.ts', '[warn] Found 1 file.'].join('\n');
+		const result = filterPrettier(input, 'prettier --check .');
+		expect(result).not.toContain('Checking formatting');
+		expect(result).toContain('[warn] src/foo.ts');
+	});
+
+	it('preserves [warn] lines listing files that need formatting', () => {
+		const input = ['Checking formatting...', '[warn] src/a.ts', '[warn] src/b.ts'].join('\n');
+		const result = filterPrettier(input, 'prettier --check src/');
+		expect(result).toContain('[warn] src/a.ts');
+		expect(result).toContain('[warn] src/b.ts');
+	});
+
+	it('preserves the success message when all files are formatted', () => {
+		const input = ['Checking formatting...', 'All matched files use Prettier code style!'].join('\n');
+		const result = filterPrettier(input, 'prettier --check .');
+		expect(result).toContain('All matched files use Prettier code style!');
+	});
+
+	it('preserves error lines', () => {
+		const input = ['Checking formatting...', '[error] src/bad.ts: SyntaxError at line 5'].join('\n');
+		const result = filterPrettier(input, 'prettier --check .');
+		expect(result).toContain('[error] src/bad.ts');
 	});
 });

@@ -13,10 +13,15 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const SCRIPT_DIR = resolve(fileURLToPath(import.meta.url), '..');
-const FIXTURES_DIR = resolve(SCRIPT_DIR, '../__tests__/fixtures/compression');
+const ROOT_DIR = resolve(SCRIPT_DIR, '..');
+const FIXTURES_DIRS = [
+	resolve(ROOT_DIR, 'packages/valora-plugin-compression-universal/src/fixtures'),
+	resolve(ROOT_DIR, 'packages/valora-plugin-compression-typescript/src/fixtures'),
+	resolve(ROOT_DIR, 'packages/valora-plugin-compression-python/src/fixtures')
+];
 const REPORTS_DIR = resolve(SCRIPT_DIR, '../__tests__/benchmarks/compression/reports');
 
-const report = await runBenchmark({ fixturesDir: FIXTURES_DIR });
+const report = await runBenchmark({ fixturesDirs: FIXTURES_DIRS });
 
 // ── Tabular summary ───────────────────────────────────────────────────────────
 

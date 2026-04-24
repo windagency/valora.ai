@@ -1,5 +1,30 @@
 const TSC_MAX_EXAMPLES_PER_CODE = 3;
 const ESLINT_MAX_EXAMPLES_PER_RULE = 2;
+const BIOME_MAX_EXAMPLES_PER_RULE = 2;
+
+export function filterBiome(output: string, _command: string): string {
+	const lines = output.split('\n');
+	const byRule = new Map<string, string[]>();
+	const other: string[] = [];
+	let inBlock = false;
+
+	for (const line of lines) {
+		if (addBiomeViolation(byRule, line)) {
+			inBlock = true;
+			continue;
+		}
+		if (inBlock) {
+			if (line && !/^\s/.test(line)) {
+				inBlock = false;
+				other.push(line);
+			}
+			continue;
+		}
+		other.push(line);
+	}
+
+	return [...other, ...[...byRule.values()].flat()].join('\n');
+}
 
 export function filterEslint(output: string, _command: string): string {
 	const lines = output.split('\n');
@@ -50,6 +75,13 @@ export function filterPackageManager(output: string, _command: string): string {
 
 	flushAdded();
 	return result.join('\n');
+}
+
+export function filterPrettier(output: string, _command: string): string {
+	return output
+		.split('\n')
+		.filter((line) => !/^Checking formatting\.\.\./.test(line))
+		.join('\n');
 }
 
 export function filterTestRunner(output: string, _command: string): string {
@@ -112,6 +144,23 @@ export function filterTsc(output: string, _command: string): string {
 	}
 
 	return [...other, ...[...errorsByCode.values()].flat()].join('\n');
+}
+
+function addBiomeViolation(byRule: Map<string, string[]>, line: string): boolean {
+	const m = line.match(/^(\S+:\d+:\d+)\s+(\S+)\s+━/);
+	if (!m) return false;
+	const rule = m[2] ?? '';
+	const ruleShort = rule.split('/').pop() ?? rule;
+	const entry = `${m[1]} ${rule}`;
+	const bucket = byRule.get(ruleShort);
+	if (!bucket) {
+		byRule.set(ruleShort, [entry]);
+	} else if (bucket.length < BIOME_MAX_EXAMPLES_PER_RULE) {
+		bucket.push(entry);
+	} else if (bucket.length === BIOME_MAX_EXAMPLES_PER_RULE) {
+		bucket.push(`  ... (more ${ruleShort} violations)`);
+	}
+	return true;
 }
 
 function collapseCoverageTables(lines: string[]): string[] {

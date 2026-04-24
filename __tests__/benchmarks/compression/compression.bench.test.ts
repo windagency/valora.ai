@@ -6,8 +6,9 @@ import type { BenchmarkReport } from './lib/runner';
 import { runBenchmark } from './lib/runner';
 
 const FIXTURES_DIRS = [
-	resolve(import.meta.dirname, '../../../packages/valora-plugin-compression-universal/tests/fixtures'),
-	resolve(import.meta.dirname, '../../../packages/valora-plugin-compression-typescript/tests/fixtures')
+	resolve(import.meta.dirname, '../../../packages/valora-plugin-compression-universal/src/fixtures'),
+	resolve(import.meta.dirname, '../../../packages/valora-plugin-compression-typescript/src/fixtures'),
+	resolve(import.meta.dirname, '../../../packages/valora-plugin-compression-python/src/fixtures')
 ];
 const REPORTS_DIR = resolve(import.meta.dirname, 'reports');
 

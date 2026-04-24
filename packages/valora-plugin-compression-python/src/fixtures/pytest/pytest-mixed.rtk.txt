@@ -1,0 +1,25 @@
+Pytest: 15 passed, 3 failed
+═══════════════════════════════════════
+
+Failures:
+1. [FAIL] test_process_invalid
+     tests/test_service.py:31: in test_process_invalid
+     assert result == 0
+     E   AssertionError: assert 42 == 0
+
+2. [FAIL] test_validate_overflow
+     tests/test_service.py:45: in test_validate_overflow
+     assert value <= 100
+     E   AssertionError: assert 999 <= 100
+
+3. [FAIL] test_concurrent_writes_conflict
+     tests/test_db.py:67: in test_concurrent_writes_conflict
+     assert not deadlock
+     E   AssertionError: deadlock detected
+
+4. [FAIL] tests/test_service.py::test_process_invalid
+     AssertionError: assert 42 == 0
+5. [FAIL] tests/test_service.py::test_validate_overflow
+     AssertionError: assert 999 <= 100
+
+... +1 more failures

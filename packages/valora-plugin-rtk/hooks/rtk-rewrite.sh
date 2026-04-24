@@ -31,7 +31,7 @@ fi
 
 FIRST_TOKEN=$(echo "$COMMAND" | awk '{print $1}')
 
-RTK_TOOLS="git cargo npm docker kubectl make python pip yarn bun pnpm npx bunx tsc eslint vitest jest"
+RTK_TOOLS="git cargo npm docker kubectl make python pip yarn bun pnpm npx bunx tsc eslint vitest jest pytest ruff go rake rspec rubocop bundle prisma aws golangci-lint playwright next biome"
 
 for tool in $RTK_TOOLS; do
 	if [[ "$FIRST_TOKEN" == "$tool" ]]; then

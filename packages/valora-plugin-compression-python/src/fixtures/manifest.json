@@ -1,0 +1,42 @@
+[
+	{
+		"id": "pytest-allpass",
+		"path": "pytest/pytest-allpass.txt",
+		"originatingCommand": "pytest",
+		"category": "test-runner",
+		"preservation": {
+			"mustContainAll": ["45 passed in", "collected 45 items"],
+			"mustNotDrop": ["45 passed in"],
+			"skipForCombinations": ["rtk-only", "all-inner+rtk"]
+		},
+		"expectedRatioFloor": {
+			"raw": 0,
+			"universal-only": 0,
+			"typescript-only": 0,
+			"python-only": 78,
+			"all-inner": 78,
+			"rtk-only": 89,
+			"all-inner+rtk": 89
+		}
+	},
+	{
+		"id": "pytest-mixed",
+		"path": "pytest/pytest-mixed.txt",
+		"originatingCommand": "pytest",
+		"category": "test-runner",
+		"preservation": {
+			"mustContainAll": ["3 failed, 15 passed", "short test summary info", "AssertionError"],
+			"mustNotDrop": ["FAILED tests/test_service.py::test_process_invalid"],
+			"skipForCombinations": ["rtk-only", "all-inner+rtk"]
+		},
+		"expectedRatioFloor": {
+			"raw": 0,
+			"universal-only": 0,
+			"typescript-only": 0,
+			"python-only": 25,
+			"all-inner": 25,
+			"rtk-only": 54,
+			"all-inner+rtk": 54
+		}
+	}
+]
