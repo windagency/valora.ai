@@ -4,16 +4,16 @@ export interface CliSubcommandRegistration {
 	name: string;
 }
 
-const registry: CliSubcommandRegistration[] = [];
+const registry = new Map<string, CliSubcommandRegistration>();
 
 export function clearCliRegistry(): void {
-	registry.length = 0;
+	registry.clear();
 }
 
 export function getCliSubcommand(name: string): CliSubcommandRegistration | undefined {
-	return registry.find((r) => r.name === name);
+	return registry.get(name);
 }
 
 export function registerCliSubcommand(name: string, description: string, handler: () => Promise<void> | void): void {
-	registry.push({ description, handler, name });
+	registry.set(name, { description, handler, name });
 }
