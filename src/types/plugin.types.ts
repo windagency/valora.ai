@@ -44,6 +44,7 @@ export type PluginContributionType =
 export type PluginLocation = 'built-in' | 'global' | 'npm' | 'project' | 'user';
 
 export interface PluginManifest {
+	cli?: Array<{ description: string; name: string }>;
 	codeEntrypoint?: string;
 	contributes?: PluginContributionType[];
 	description?: string;

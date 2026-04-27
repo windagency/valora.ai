@@ -35,7 +35,13 @@ export const PLUGIN_BINARY_REQUIREMENT_SCHEMA = z.object({
 	version: z.string().optional()
 });
 
+export const PLUGIN_CLI_ENTRY_SCHEMA = z.object({
+	description: z.string(),
+	name: z.string().min(1)
+});
+
 export const PLUGIN_MANIFEST_SCHEMA = z.object({
+	cli: z.array(PLUGIN_CLI_ENTRY_SCHEMA).optional(),
 	codeEntrypoint: z.string().optional(),
 	contributes: z.array(PLUGIN_CONTRIBUTION_TYPE_SCHEMA).optional(),
 	description: z.string().optional(),
