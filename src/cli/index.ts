@@ -13,7 +13,9 @@ import type { UpdateCheckState } from 'updater/throttle';
 
 import { createRequire } from 'node:module';
 import * as path from 'node:path';
+import { getCliSubcommand } from 'plugins/cli-registry';
 import { PluginInstallerService } from 'plugins/plugin-installer.service';
+import { PluginLoaderService } from 'plugins/plugin-loader.service';
 import {
 	runAutoInstall,
 	scheduleUpdateCheck,
@@ -27,9 +29,11 @@ import { DEFAULT_STATE } from 'updater/state';
 import { autoInstallOutdatedPlugins } from 'cli/auto-plugin-install';
 import { silentSpawnRunner } from 'cli/spawn-runner';
 import { getConfigLoader, setGlobalCliOverrides } from 'config/loader';
+import { createContainer, initializePlugins } from 'di/container';
 import { getGlobalConfigDir, getRuntimeDataDir } from 'utils/paths';
 import { handlePromptCancellation, isPromptCancellation } from 'utils/prompt-handler';
 
+import type { CommandAdapter } from './command-adapter.interface';
 import type { CliOptions } from './types/cli-options.types';
 
 import { configureCompletionCommand } from './autocomplete';
@@ -272,6 +276,33 @@ function buildAndApplyCliOverrides(options: CliOptions): void {
 /**
  * Show command palette and execute selected command
  */
+function registerPluginCliStubs(prog: CommandAdapter, entries: Array<{ description: string; name: string }>): void {
+	for (const entry of entries) {
+		const parts = entry.name.split(' ');
+		const parentName = parts[0] as string;
+		const childName = parts[1];
+		const entryName = entry.name;
+		const entryDesc = entry.description;
+
+		const makeAction = () => async () => {
+			const container = createContainer();
+			await initializePlugins(container);
+			const reg = getCliSubcommand(entryName);
+			if (!reg) {
+				console.error(`Plugin subcommand '${entryName}' was declared in a manifest but no handler was registered.`);
+				process.exit(1);
+			}
+			await reg.handler();
+		};
+
+		if (childName) {
+			prog.command(parentName).command(childName).description(entryDesc).action(makeAction());
+		} else {
+			prog.command(parentName).description(entryDesc).action(makeAction());
+		}
+	}
+}
+
 async function showCommandPaletteIfNeeded(rawArgs: string[]): Promise<void> {
 	if (!rawArgs.length) {
 		const { showCommandPalette } = await import('./command-palette');
@@ -297,6 +328,14 @@ void (async () => {
 
 		// Initialize unified cleanup schedulers (log and session)
 		await initializeCleanupIfNeeded();
+
+		// Pre-parse: register Commander stubs for plugin-declared CLI subcommands
+		const pluginConfig = await getConfigLoader().load();
+		const pluginCliLoader = new PluginLoaderService();
+		const cliEntries = pluginCliLoader
+			.catalogAll(pluginConfig.plugins)
+			.flatMap((p) => (p.status === 'enabled' && p.manifest?.cli ? p.manifest.cli : []));
+		registerPluginCliStubs(program, cliEntries);
 
 		// Parse arguments
 		program.parse();
