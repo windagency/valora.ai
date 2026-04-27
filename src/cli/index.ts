@@ -273,18 +273,17 @@ function buildAndApplyCliOverrides(options: CliOptions): void {
 	}
 }
 
-/**
- * Show command palette and execute selected command
- */
 function registerPluginCliStubs(prog: CommandAdapter, entries: Array<{ description: string; name: string }>): void {
+	const parentStubs = new Map<string, CommandAdapter>();
+
 	for (const entry of entries) {
 		const parts = entry.name.split(' ');
-		const parentName = parts[0] as string;
+		const parentName = parts[0] ?? entry.name;
 		const childName = parts[1];
 		const entryName = entry.name;
 		const entryDesc = entry.description;
 
-		const makeAction = () => async () => {
+		const action = async () => {
 			const container = createContainer();
 			await initializePlugins(container);
 			const reg = getCliSubcommand(entryName);
@@ -296,13 +295,21 @@ function registerPluginCliStubs(prog: CommandAdapter, entries: Array<{ descripti
 		};
 
 		if (childName) {
-			prog.command(parentName).command(childName).description(entryDesc).action(makeAction());
+			let parentCmd = parentStubs.get(parentName);
+			if (!parentCmd) {
+				parentCmd = prog.command(parentName);
+				parentStubs.set(parentName, parentCmd);
+			}
+			parentCmd.command(childName).description(entryDesc).action(action);
 		} else {
-			prog.command(parentName).description(entryDesc).action(makeAction());
+			prog.command(parentName).description(entryDesc).action(action);
 		}
 	}
 }
 
+/**
+ * Show command palette and execute selected command
+ */
 async function showCommandPaletteIfNeeded(rawArgs: string[]): Promise<void> {
 	if (!rawArgs.length) {
 		const { showCommandPalette } = await import('./command-palette');

@@ -13,7 +13,7 @@ vi.mock('memory/vault/vault-store', () => ({
 }));
 
 vi.mock('memory/migration/json-to-vault', () => ({
-	migrateJsonToVault: vi.fn().mockResolvedValue({ migrated: 3, skipped: 0 })
+	migrateJsonToVault: vi.fn().mockReturnValue({ migrated: 3, skipped: 0 })
 }));
 
 vi.mock('memory/migration/vault-version', () => ({
