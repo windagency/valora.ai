@@ -1,0 +1,15 @@
+{
+	"name": "valora-plugin-obsidian",
+	"version": "1.0.0",
+	"description": "Bridges the Valora memory vault to Obsidian — sets up vault config and opens it.",
+	"engines": { "valora": ">=0.1.0" },
+	"contributes": ["code"],
+	"permissions": ["fs-write"],
+	"codeEntrypoint": "dist/index.js",
+	"cli": [
+		{
+			"name": "obsidian open",
+			"description": "Sync Obsidian config and open the Valora memory vault in Obsidian"
+		}
+	]
+}

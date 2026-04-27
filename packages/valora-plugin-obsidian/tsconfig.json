@@ -1,0 +1,38 @@
+{
+	"extends": "../../tsconfig.json",
+	"compilerOptions": {
+		"declaration": false,
+		"declarationMap": false,
+		"module": "ESNext",
+		"moduleResolution": "bundler",
+		"outDir": "dist",
+		"paths": {
+			"analysis/*": ["../../dist/analysis/*"],
+			"ast/*": ["../../dist/ast/*"],
+			"batch/*": ["../../dist/batch/*"],
+			"security/*": ["../../dist/security/*"],
+			"cleanup/*": ["../../dist/cleanup/*"],
+			"cli/*": ["../../dist/cli/*"],
+			"config/*": ["../../dist/config/*"],
+			"di/*": ["../../dist/di/*"],
+			"executor/*": ["../../dist/executor/*"],
+			"exploration/*": ["../../dist/exploration/*"],
+			"llm/*": ["../../dist/llm/*"],
+			"lsp/*": ["../../dist/lsp/*"],
+			"mcp/*": ["../../dist/mcp/*"],
+			"memory/*": ["../../dist/memory/*"],
+			"output/*": ["../../dist/output/*"],
+			"plugins/*": ["../../dist/plugins/*"],
+			"services/*": ["../../dist/services/*"],
+			"session/*": ["../../dist/session/*"],
+			"src/*": ["../../dist/*"],
+			"types/*": ["../../dist/types/*"],
+			"ui/*": ["../../dist/ui/*"],
+			"utils/*": ["../../dist/utils/*"]
+		},
+		"rootDir": "src",
+		"sourceMap": false
+	},
+	"include": ["src/**/*"],
+	"exclude": ["node_modules", "dist", "src/**/*.test.ts", "src/**/*.spec.ts"]
+}
