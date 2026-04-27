@@ -21,6 +21,18 @@ describe('resolveVaultDir', () => {
 		expect(resolveVaultDir(config)).toBe('/custom/vault');
 	});
 
+	it('returns the project-local .valora/memory when it exists', () => {
+		const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'valora-cwd-'));
+		const projectVault = path.join(tmpDir, '.valora', 'memory');
+		fs.mkdirSync(projectVault, { recursive: true });
+		try {
+			const config = { obsidian: { colors: { decisions: '#059669', episodic: '#4c9be8', semantic: '#7c3aed' } } };
+			expect(resolveVaultDir(config, tmpDir)).toBe(projectVault);
+		} finally {
+			fs.rmSync(tmpDir, { force: true, recursive: true });
+		}
+	});
+
 	it('returns ~/.valora/memory as the global fallback when no project vault exists', () => {
 		const config = { obsidian: { colors: { decisions: '#059669', episodic: '#4c9be8', semantic: '#7c3aed' } } };
 		const expected = path.join(os.homedir(), '.valora', 'memory');

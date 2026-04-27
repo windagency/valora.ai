@@ -11,24 +11,23 @@ import { buildWorkspaceConfig } from './templates/workspace.js';
 
 const CATEGORIES = ['episodic', 'semantic', 'decisions'] as const;
 
-export function resolveVaultDir(config: { obsidian: { vaultDir?: string } }): string {
+export function resolveVaultDir(config: { obsidian: { vaultDir?: string } }, cwd = process.cwd()): string {
 	if (config.obsidian.vaultDir) return config.obsidian.vaultDir;
-	const projectVault = path.join(process.cwd(), '.valora', 'memory');
+	const projectVault = path.join(cwd, '.valora', 'memory');
 	if (fs.existsSync(projectVault)) return projectVault;
 	return path.join(os.homedir(), '.valora', 'memory');
 }
 
 export async function setupObsidianVault(config: ObsidianConfig): Promise<void> {
 	const vaultDir = resolveVaultDir(config);
-
-	for (const category of CATEGORIES) {
-		fs.mkdirSync(path.join(vaultDir, category), { recursive: true });
-	}
-
 	const obsidianDir = path.join(vaultDir, '.obsidian');
-	fs.mkdirSync(obsidianDir, { recursive: true });
 
 	try {
+		for (const category of CATEGORIES) {
+			fs.mkdirSync(path.join(vaultDir, category), { recursive: true });
+		}
+		fs.mkdirSync(obsidianDir, { recursive: true });
+
 		writeJsonAtomic(path.join(obsidianDir, 'app.json'), buildAppConfig());
 		writeJsonAtomic(path.join(obsidianDir, 'core-plugins.json'), buildCorePluginsConfig());
 		writeJsonAtomic(path.join(obsidianDir, 'graph.json'), buildGraphConfig(config.obsidian.colors));
