@@ -2,7 +2,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { z } from 'zod';
 
-import { getPackageRoot } from 'utils/paths';
+import { getPackageRoot, getPluginRegistryPath } from 'utils/paths';
 
 const TIMEOUT_MS = 5000;
 const MAX_BYTES = 64 * 1024;
@@ -35,12 +35,13 @@ function getRemoteRegistryUrl(): null | string {
 
 /**
  * Fetches the plugin registry from GitHub (default) or a local file
- * when VALORA_PLUGIN_REGISTRY is set to a path. Returns null on any failure.
+ * when VALORA_PLUGIN_REGISTRY is set to a path. Falls back to the
+ * bundled registry when the remote fetch fails.
  */
 export async function fetchPluginRegistry(): Promise<null | RegistryEntry[]> {
 	const localPath = process.env['VALORA_PLUGIN_REGISTRY'];
 	if (localPath) return readLocalRegistry(localPath);
-	return fetchRemoteRegistry();
+	return (await fetchRemoteRegistry()) ?? readLocalRegistry(getPluginRegistryPath());
 }
 
 async function fetchRemoteRegistry(): Promise<null | RegistryEntry[]> {

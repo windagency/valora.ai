@@ -2,10 +2,53 @@
  * Tests for validation helpers
  */
 
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+const mockPromptFn = vi.hoisted(() => vi.fn());
+const mockGetProviderMetadata = vi.hoisted(() =>
+	vi.fn<
+		[string],
+		ReturnType<ReturnType<(typeof import('config/provider-catalog'))['getProviderCatalog']>['getProviderMetadata']>
+	>()
+);
+
+vi.mock('config/provider-catalog', () => ({
+	getProviderCatalog: () => ({ getProviderMetadata: mockGetProviderMetadata })
+}));
+
+vi.mock('output/color-adapter.interface', () => ({
+	getColorAdapter: () => ({
+		cyan: (s: string) => s,
+		gray: (s: string) => s,
+		red: (s: string) => s,
+		green: (s: string) => s
+	})
+}));
+
+vi.mock('ui/prompt-adapter.interface', () => ({
+	getPromptAdapter: () => ({ prompt: mockPromptFn })
+}));
 
 import { BuiltinProviders } from './providers.config';
-import { DEFAULT_MODELS, PROVIDER_CHOICES, PROVIDER_LABELS, QUICK_SETUP_CHOICES } from './validation-helpers';
+import {
+	configureDefaults,
+	configureProvider,
+	DEFAULT_MODELS,
+	PROVIDER_CHOICES,
+	PROVIDER_LABELS,
+	QUICK_SETUP_CHOICES
+} from './validation-helpers';
+
+function makePluginDescriptor(overrides: Partial<{ requiresApiKey: boolean; helpText: string }> = {}) {
+	return {
+		defaultModel: 'plugin-default-model',
+		description: 'A plugin-contributed provider',
+		helpText: overrides.helpText,
+		label: 'My Plugin',
+		modelModes: [{ mode: 'default', model: 'plugin-default-model' }],
+		requiresApiKey: overrides.requiresApiKey ?? true
+	};
+}
 
 describe('validation-helpers', () => {
 	describe('PROVIDER_LABELS', () => {
@@ -85,5 +128,77 @@ describe('validation-helpers', () => {
 		it('should have at least 4 quick setup options', () => {
 			expect(QUICK_SETUP_CHOICES.length).toBeGreaterThanOrEqual(4);
 		});
+	});
+});
+
+describe('configureProvider', () => {
+	beforeEach(() => {
+		vi.spyOn(console, 'group').mockImplementation(() => undefined);
+		vi.spyOn(console, 'groupEnd').mockImplementation(() => undefined);
+		vi.spyOn(console, 'info').mockImplementation(() => undefined);
+	});
+
+	afterEach(() => {
+		vi.restoreAllMocks();
+	});
+
+	it('configures an API-key provider contributed by a plugin', async () => {
+		mockGetProviderMetadata.mockImplementation((key: string) =>
+			key === 'myplugin' ? makePluginDescriptor() : undefined
+		);
+		mockPromptFn.mockResolvedValueOnce({ apiKey: 'sk-test-123', defaultModel: 'plugin-default-model' });
+
+		const config = { providers: {} as Record<string, unknown>, defaults: {} };
+		await configureProvider('myplugin', config as never);
+
+		expect(config.providers['myplugin']).toEqual({ apiKey: 'sk-test-123', default_model: 'plugin-default-model' });
+	});
+
+	it('configures a no-API-key provider contributed by a plugin', async () => {
+		mockGetProviderMetadata.mockImplementation((key: string) =>
+			key === 'myplugin' ? makePluginDescriptor({ requiresApiKey: false }) : undefined
+		);
+		mockPromptFn.mockResolvedValueOnce({ defaultModel: 'plugin-default-model' });
+
+		const config = { providers: {} as Record<string, unknown>, defaults: {} };
+		await configureProvider('myplugin', config as never);
+
+		expect(config.providers['myplugin']).toEqual({ apiKey: '', default_model: 'plugin-default-model' });
+	});
+
+	it('throws Unknown provider when the provider is not in the catalog', async () => {
+		mockGetProviderMetadata.mockImplementation(() => undefined);
+
+		const config = { providers: {}, defaults: {} };
+		await expect(configureProvider('nonexistent', config as never)).rejects.toThrow('Unknown provider: nonexistent');
+	});
+});
+
+describe('configureDefaults', () => {
+	beforeEach(() => {
+		vi.spyOn(console, 'group').mockImplementation(() => undefined);
+		vi.spyOn(console, 'groupEnd').mockImplementation(() => undefined);
+	});
+
+	afterEach(() => {
+		vi.restoreAllMocks();
+	});
+
+	it('preserves existing fields on config.defaults such as default_provider', async () => {
+		mockPromptFn.mockResolvedValueOnce({
+			interactive: true,
+			log_level: 'info',
+			output_format: 'markdown',
+			session_mode: true
+		});
+
+		const config = {
+			defaults: { default_provider: 'ollama' },
+			providers: {}
+		};
+
+		await configureDefaults(config as never);
+
+		expect((config.defaults as Record<string, unknown>)['default_provider']).toBe('ollama');
 	});
 });

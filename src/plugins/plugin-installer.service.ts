@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -22,6 +23,36 @@ export class PluginInstallerService {
 
 	async install(pluginRef: string, scope: InstallScope): Promise<void> {
 		await this.installWithVisited(pluginRef, scope, new Set<string>());
+	}
+
+	async installFromTarball(tgzPath: string, scope: InstallScope): Promise<void> {
+		const stagingDir = fs.mkdtempSync(path.join(os.tmpdir(), 'valora-tgz-staging-'));
+		let targetDir: string | undefined;
+		try {
+			const code = await this.runner.run(['tar', '-xf', tgzPath, '--strip-components=1', '-C', stagingDir]);
+			if (code !== 0) throw new Error(`Failed to extract plugin from ${tgzPath}`);
+
+			const manifest = readPluginManifest(stagingDir);
+			if (!manifest.name) throw new Error('Plugin manifest is missing required field: name');
+			const shortName = manifest.name;
+
+			targetDir = resolveTargetDir(scope, shortName);
+			fs.rmSync(targetDir, { force: true, recursive: true });
+			fs.cpSync(stagingDir, targetDir, { recursive: true });
+
+			const visited = new Set<string>();
+			for (const dep of manifest.requires ?? []) {
+				await this.installWithVisited(dep, scope, visited);
+			}
+		} catch (err) {
+			if (targetDir) fs.rmSync(targetDir, { force: true, recursive: true });
+			if (scope === 'global' && isPermissionError(err)) {
+				throw new Error('global scope requires elevated privileges — re-run with sudo or use --scope user');
+			}
+			throw err;
+		} finally {
+			fs.rmSync(stagingDir, { force: true, recursive: true });
+		}
 	}
 
 	uninstall(pluginRef: string, scope: InstallScope): void {
@@ -96,6 +127,15 @@ export class PluginInstallerService {
 	}
 }
 
+export function peekTarballManifest(tgzPath: string): { name: string; version: string } {
+	const result = spawnSync('tar', ['-xOf', tgzPath, 'package/valora-plugin.json']);
+	if (result.status !== 0) throw new Error('Could not read manifest from tarball');
+	const manifest = JSON.parse(result.stdout.toString()) as Record<string, unknown>;
+	if (!manifest['name']) throw new Error('Manifest is missing required field: name');
+	if (!manifest['version']) throw new Error('Manifest is missing required field: version');
+	return { name: String(manifest['name']), version: String(manifest['version']) };
+}
+
 export function resolvePackageName(input: string): string {
 	if (input.startsWith('@')) return input;
 	const withPrefix = input.startsWith('valora-plugin-') ? input : `valora-plugin-${input}`;
@@ -119,9 +159,10 @@ function isPermissionError(error: unknown): boolean {
 	return code === 'EACCES' || code === 'EPERM';
 }
 
-function readPluginManifest(pluginDir: string): { requires?: string[] } {
+function readPluginManifest(pluginDir: string): { name?: string; requires?: string[] } {
 	try {
 		return JSON.parse(fs.readFileSync(path.join(pluginDir, PLUGIN_MANIFEST_FILE), 'utf-8')) as {
+			name?: string;
 			requires?: string[];
 		};
 	} catch {

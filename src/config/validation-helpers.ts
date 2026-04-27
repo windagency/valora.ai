@@ -2,6 +2,8 @@
  * Configuration validation helpers - handles input validation and provider configuration
  */
 
+import type { ProviderDescriptor } from 'plugins/plugin-api.types';
+
 import { getColorAdapter } from 'output/color-adapter.interface';
 import { getPromptAdapter } from 'ui/prompt-adapter.interface';
 import { isPromptCancellation } from 'utils/prompt-handler';
@@ -9,7 +11,7 @@ import { isPromptCancellation } from 'utils/prompt-handler';
 import type { Config } from './schema';
 
 import { getProviderCatalog } from './provider-catalog';
-import { BuiltinProviders, getAllProviderKeys, getProviderMetadata, PROVIDER_REGISTRY } from './providers.config';
+import { BuiltinProviders, getAllProviderKeys, PROVIDER_REGISTRY } from './providers.config';
 
 const prompt = getPromptAdapter();
 
@@ -112,10 +114,7 @@ export const QUICK_SETUP_CHOICES = [
 /**
  * Configure the local provider — prompts for base URL and default model
  */
-async function configureLocalProvider(
-	metadata: object & ReturnType<typeof getProviderMetadata>,
-	config: Config
-): Promise<void> {
+async function configureLocalProvider(metadata: ProviderDescriptor, config: Config): Promise<void> {
 	const color = getColorAdapter();
 	if (metadata.helpText) {
 		console.info(color.gray(`  ${metadata.helpText}`));
@@ -147,7 +146,7 @@ async function configureLocalProvider(
  * Returns true if Vertex AI was configured (caller should skip standard API key prompt)
  */
 async function configureAnthropicVertexOption(
-	metadata: object & ReturnType<typeof getProviderMetadata>,
+	metadata: ProviderDescriptor,
 	providerName: string,
 	config: Config
 ): Promise<boolean> {
@@ -205,7 +204,7 @@ async function configureAnthropicVertexOption(
  */
 export async function configureProvider(providerName: string, config: Config): Promise<void> {
 	const color = getColorAdapter();
-	const metadata = getProviderMetadata(providerName);
+	const metadata = getProviderCatalog().getProviderMetadata(providerName);
 	if (!metadata) {
 		throw new Error(`Unknown provider: ${providerName}`);
 	}
@@ -329,6 +328,7 @@ export async function configureDefaults(config: Config): Promise<void> {
 		]);
 
 		config.defaults = {
+			...config.defaults,
 			dry_run: false,
 			dry_run_estimate_tokens: true,
 			dry_run_show_diffs: true,

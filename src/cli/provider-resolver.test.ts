@@ -2,13 +2,23 @@
  * Tests for provider resolver alignment with config
  */
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { BuiltinProviders, ModelName } from 'config/providers.config';
 import { getProviderRegistry, resetProviderRegistry } from 'llm/registry';
 import { DEFAULT_MODELS } from 'config/validation-helpers';
 import { resetProviderCatalogForTests } from 'config/provider-catalog';
 import { CLIProviderResolver, MODEL_PROVIDER_SUGGESTIONS } from './provider-resolver';
+
+const mockConfigLoad = vi.hoisted(() => vi.fn());
+
+vi.mock('config/loader', () => ({
+	getConfigLoader: () => ({ load: mockConfigLoad })
+}));
+
+vi.mock('output/logger', () => ({
+	getLogger: () => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() })
+}));
 
 describe('provider-resolver', () => {
 	describe('MODEL_PROVIDER_SUGGESTIONS alignment', () => {
@@ -158,5 +168,91 @@ describe('provider-resolver', () => {
 			);
 			expect(result).toBe(BuiltinProviders.LOCAL);
 		});
+	});
+});
+
+describe('CLIProviderResolver — getConfiguredProviders', () => {
+	type Resolver = { getConfiguredProviders(config: unknown): string[] };
+
+	afterEach(() => {
+		resetProviderRegistry();
+		resetProviderCatalogForTests();
+	});
+
+	it('includes a plugin provider with requiresApiKey=false even when apiKey is empty string', () => {
+		getProviderRegistry().registerProvider(
+			'ollama',
+			() => ({ isConfigured: () => false, complete: async () => ({ content: '' }) }) as never,
+			{},
+			{
+				defaultModel: 'llama3.1',
+				label: 'Ollama',
+				modelModes: [{ mode: 'default', model: 'llama3.1' }],
+				requiresApiKey: false
+			}
+		);
+
+		const config = {
+			defaults: {},
+			providers: { ollama: { apiKey: '', default_model: 'llama3.1' } }
+		};
+		const resolver = new CLIProviderResolver() as unknown as Resolver;
+		const result = resolver.getConfiguredProviders(config);
+		expect(result).toContain('ollama');
+	});
+
+	it('excludes a provider whose apiKey is empty and is not in the catalog', () => {
+		const config = {
+			defaults: {},
+			providers: { unknown_provider: { apiKey: '', default_model: 'some-model' } }
+		};
+		const resolver = new CLIProviderResolver() as unknown as Resolver;
+		const result = resolver.getConfiguredProviders(config);
+		expect(result).not.toContain('unknown_provider');
+	});
+});
+
+describe('CLIProviderResolver — auto-fallback to default provider', () => {
+	beforeEach(() => {
+		getProviderRegistry().registerProvider(
+			'ollama',
+			() => ({ isConfigured: () => false, complete: async () => ({ content: '' }) }) as never,
+			{},
+			{
+				defaultModel: 'llama3.1',
+				label: 'Ollama',
+				modelModes: [{ mode: 'default', model: 'llama3.1' }],
+				requiresApiKey: false
+			}
+		);
+	});
+
+	afterEach(() => {
+		resetProviderRegistry();
+		resetProviderCatalogForTests();
+		vi.clearAllMocks();
+	});
+
+	it('resolves to the configured default_provider when the requested provider is not in config', async () => {
+		mockConfigLoad.mockResolvedValue({
+			defaults: { default_provider: 'ollama' },
+			providers: { ollama: { apiKey: '', default_model: 'llama3.1' } }
+		});
+
+		const resolver = new CLIProviderResolver();
+		const result = await resolver.resolveProvider('claude-opus-4.6', { flags: {} });
+
+		expect(result.providerName).toBe('ollama');
+		expect(result.model).toBe('llama3.1');
+	});
+
+	it('still calls handleMissingProvider when no default_provider is set', async () => {
+		mockConfigLoad.mockResolvedValue({
+			defaults: {},
+			providers: {}
+		});
+
+		const resolver = new CLIProviderResolver();
+		await expect(resolver.resolveProvider('claude-opus-4.6', { flags: {} })).rejects.toThrow();
 	});
 });

@@ -13,7 +13,11 @@ import {
 	DEFAULT_LOG_MAX_FILES,
 	DEFAULT_LOG_MAX_SIZE_MB,
 	DEFAULT_LOG_RETENTION_ENABLED,
+	DEFAULT_MEMORY_BACKEND,
 	DEFAULT_MEMORY_DECISION_HALF_LIFE_DAYS,
+	DEFAULT_MEMORY_EMBED_BATCH_SIZE,
+	DEFAULT_MEMORY_EMBED_DIM,
+	DEFAULT_MEMORY_EMBED_MODEL,
 	DEFAULT_MEMORY_ENABLED,
 	DEFAULT_MEMORY_EPISODIC_HALF_LIFE_DAYS,
 	DEFAULT_MEMORY_ERROR_HALF_LIFE_MULTIPLIER,
@@ -21,6 +25,10 @@ import {
 	DEFAULT_MEMORY_INJECTION_TOKEN_BUDGET,
 	DEFAULT_MEMORY_MAX_ENTRIES_PER_STORE,
 	DEFAULT_MEMORY_PRUNE_THRESHOLD,
+	DEFAULT_MEMORY_RECALL_CO_ACCESS_INCREMENT,
+	DEFAULT_MEMORY_RECALL_SEED_K,
+	DEFAULT_MEMORY_RECALL_WALK_DECAY,
+	DEFAULT_MEMORY_RECALL_WALK_DEPTH,
 	DEFAULT_MEMORY_RETRIEVAL_BOOST_DAYS,
 	DEFAULT_MEMORY_SEMANTIC_HALF_LIFE_DAYS,
 	DEFAULT_SESSION_CLEANUP_INTERVAL_HOURS,
@@ -147,9 +155,25 @@ export const PATHS_CONFIG_SCHEMA = z.object({
 	sessions_dir: z.string().optional()
 });
 
+const MEMORY_EMBEDDING_SCHEMA = z.object({
+	batch_size: z.number().min(1).max(256).default(DEFAULT_MEMORY_EMBED_BATCH_SIZE),
+	dim: z.number().min(1).default(DEFAULT_MEMORY_EMBED_DIM),
+	model: z.string().default(DEFAULT_MEMORY_EMBED_MODEL),
+	provider: z.string().default('auto')
+});
+
+const MEMORY_RECALL_SCHEMA = z.object({
+	co_access_increment: z.number().min(0).default(DEFAULT_MEMORY_RECALL_CO_ACCESS_INCREMENT),
+	seed_k: z.number().min(1).max(100).default(DEFAULT_MEMORY_RECALL_SEED_K),
+	walk_decay: z.number().min(0).max(1).default(DEFAULT_MEMORY_RECALL_WALK_DECAY),
+	walk_depth: z.number().min(0).max(10).default(DEFAULT_MEMORY_RECALL_WALK_DEPTH)
+});
+
 // Memory configuration schema
 export const MEMORY_CONFIG_SCHEMA = z.object({
+	backend: z.enum(['json', 'vault']).default(DEFAULT_MEMORY_BACKEND),
 	decision_half_life_days: z.number().min(1).max(365).default(DEFAULT_MEMORY_DECISION_HALF_LIFE_DAYS),
+	embedding: MEMORY_EMBEDDING_SCHEMA.optional(),
 	enabled: z.boolean().default(DEFAULT_MEMORY_ENABLED),
 	episodic_half_life_days: z.number().min(1).max(365).default(DEFAULT_MEMORY_EPISODIC_HALF_LIFE_DAYS),
 	error_half_life_multiplier: z.number().min(1).max(10).default(DEFAULT_MEMORY_ERROR_HALF_LIFE_MULTIPLIER),
@@ -157,6 +181,7 @@ export const MEMORY_CONFIG_SCHEMA = z.object({
 	injection_token_budget: z.number().min(100).max(10000).default(DEFAULT_MEMORY_INJECTION_TOKEN_BUDGET),
 	max_entries_per_store: z.number().min(10).max(10000).default(DEFAULT_MEMORY_MAX_ENTRIES_PER_STORE),
 	prune_threshold: z.number().min(0).max(1).default(DEFAULT_MEMORY_PRUNE_THRESHOLD),
+	recall: MEMORY_RECALL_SCHEMA.optional(),
 	retrieval_boost_days: z.number().min(0).max(30).default(DEFAULT_MEMORY_RETRIEVAL_BOOST_DAYS),
 	semantic_half_life_days: z.number().min(1).max(365).default(DEFAULT_MEMORY_SEMANTIC_HALF_LIFE_DAYS)
 });

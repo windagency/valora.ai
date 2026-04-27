@@ -89,6 +89,76 @@ describe('OllamaProvider', () => {
 		});
 	});
 
+	describe('embed()', () => {
+		it('returns one vector per input string with correct dimensionality', async () => {
+			const OpenAI = (await import('openai')).default;
+			vi.mocked(OpenAI).mockImplementationOnce(
+				() =>
+					({
+						embeddings: {
+							create: vi.fn().mockResolvedValue({
+								data: [
+									{ embedding: [0.1, 0.2, 0.3], index: 0 },
+									{ embedding: [0.4, 0.5, 0.6], index: 1 }
+								],
+								model: 'nomic-embed-text'
+							})
+						}
+					}) as never
+			);
+
+			const provider = new OllamaProvider({}, doubles);
+			const result = await provider.embed!({ input: ['hello', 'world'] });
+
+			expect(result.vectors).toHaveLength(2);
+			expect(result.dim).toBe(3);
+			expect(result.model).toBe('nomic-embed-text');
+			expect(result.vectors[0]).toEqual([0.1, 0.2, 0.3]);
+		});
+
+		it('calls ensureReady before sending embedding request', async () => {
+			const OpenAI = (await import('openai')).default;
+			vi.mocked(OpenAI).mockImplementationOnce(
+				() =>
+					({
+						embeddings: {
+							create: vi.fn().mockResolvedValue({
+								data: [{ embedding: [0.1], index: 0 }],
+								model: 'nomic-embed-text'
+							})
+						}
+					}) as never
+			);
+
+			const provider = new OllamaProvider({}, doubles);
+			await provider.embed!({ input: ['test'] });
+
+			expect(mockBinaryManager.assertInstalled).toHaveBeenCalledOnce();
+			expect(mockProcessManager.ensureRunning).toHaveBeenCalledOnce();
+			expect(mockModelManager.ensureModel).toHaveBeenCalledWith('http://localhost:11434', 'nomic-embed-text');
+		});
+
+		it('uses model from request when provided', async () => {
+			const OpenAI = (await import('openai')).default;
+			vi.mocked(OpenAI).mockImplementationOnce(
+				() =>
+					({
+						embeddings: {
+							create: vi.fn().mockResolvedValue({
+								data: [{ embedding: [0.9], index: 0 }],
+								model: 'mxbai-embed-large'
+							})
+						}
+					}) as never
+			);
+
+			const provider = new OllamaProvider({}, doubles);
+			await provider.embed!({ input: ['test'], model: 'mxbai-embed-large' });
+
+			expect(mockModelManager.ensureModel).toHaveBeenCalledWith(expect.any(String), 'mxbai-embed-large');
+		});
+	});
+
 	it('streamComplete() calls ensureReady and streams content', async () => {
 		const OpenAI = (await import('openai')).default;
 		const chunks = [

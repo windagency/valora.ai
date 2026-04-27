@@ -23,8 +23,11 @@ export interface LoadedPlugin {
 }
 
 export interface PluginBinaryRequirement {
+	autoInstall?: boolean;
 	install?: string;
+	installCommand?: string;
 	name: string;
+	postInstallCommand?: string;
 	version?: string;
 }
 

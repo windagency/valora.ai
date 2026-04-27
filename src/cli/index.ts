@@ -12,6 +12,7 @@
 import type { UpdateCheckState } from 'updater/throttle';
 
 import { createRequire } from 'node:module';
+import * as path from 'node:path';
 import { PluginInstallerService } from 'plugins/plugin-installer.service';
 import {
 	runAutoInstall,
@@ -26,7 +27,7 @@ import { DEFAULT_STATE } from 'updater/state';
 import { autoInstallOutdatedPlugins } from 'cli/auto-plugin-install';
 import { silentSpawnRunner } from 'cli/spawn-runner';
 import { getConfigLoader, setGlobalCliOverrides } from 'config/loader';
-import { getGlobalConfigDir } from 'utils/paths';
+import { getGlobalConfigDir, getRuntimeDataDir } from 'utils/paths';
 import { handlePromptCancellation, isPromptCancellation } from 'utils/prompt-handler';
 
 import type { CliOptions } from './types/cli-options.types';
@@ -49,6 +50,7 @@ import { configureExploreCommand } from './commands/explore';
 import { configureHelpCommand } from './commands/help';
 import { configureInitCommand } from './commands/init';
 import { configureMapCommand } from './commands/map';
+import { configureMemoryCommand } from './commands/memory.command';
 import { configureMonitoringCommand } from './commands/monitoring';
 import { configurePluginCommand } from './commands/plugin.command';
 import { configureSessionCommand } from './commands/session';
@@ -149,6 +151,8 @@ configureTemplateCommand(program);
 configureInitCommand(program);
 configureBatchCommand(program);
 configureMapCommand(program);
+const memoryDir = path.join(getRuntimeDataDir(), 'memory');
+configureMemoryCommand(program, { jsonDir: memoryDir, vaultDir: memoryDir });
 configurePluginCommand(program);
 
 const rawProgram = (program as CommanderCommandContract).getUnderlyingCommand();

@@ -11,7 +11,8 @@ import type {
 	MemoryCreateOptions,
 	MemoryEntry,
 	MemoryQueryOptions,
-	MemoryQueryResult
+	MemoryQueryResult,
+	MemoryStorePort
 } from 'types/memory.types';
 
 import {
@@ -19,24 +20,35 @@ import {
 	DEFAULT_MEMORY_EPISODIC_HALF_LIFE_DAYS,
 	DEFAULT_MEMORY_ERROR_HALF_LIFE_MULTIPLIER,
 	DEFAULT_MEMORY_PRUNE_THRESHOLD,
+	DEFAULT_MEMORY_RECALL_SEED_K,
+	DEFAULT_MEMORY_RECALL_WALK_DECAY,
+	DEFAULT_MEMORY_RECALL_WALK_DEPTH,
 	DEFAULT_MEMORY_RETRIEVAL_BOOST_DAYS,
 	DEFAULT_MEMORY_SEMANTIC_HALF_LIFE_DAYS
 } from 'config/constants';
 import { generateMemoryId } from 'utils/id-generator';
 
+import type { EmbedderPort } from './embeddings/embedder.port';
 import type { MemoryStore } from './store';
+import type { VaultIndex } from './vault/vault-index';
 
 import { computeEffectiveHalfLife, computeStrength } from './decay';
+import { openVectorStore, type VectorStore } from './embeddings/vector-store';
+import { topKCosine } from './retrieval/cosine-ann';
+import { spreadActivation } from './retrieval/spreading-activation';
+import { VaultStore } from './vault/vault-store';
 
 const ALL_CATEGORIES: MemoryCategory[] = ['episodic', 'semantic', 'decisions'];
 
 export class MemoryManager {
 	private readonly config: MemoryRetentionConfig;
-	private readonly store: MemoryStore;
+	private readonly embedder?: EmbedderPort;
+	private readonly store: MemoryStorePort;
 
-	constructor(store: MemoryStore, config?: Partial<MemoryRetentionConfig>) {
+	constructor(store: MemoryStore | MemoryStorePort, config?: Partial<MemoryRetentionConfig>, embedder?: EmbedderPort) {
 		this.store = store;
 		this.config = resolveConfig(config);
+		this.embedder = embedder;
 	}
 
 	async create(category: MemoryCategory, options: MemoryCreateOptions): Promise<MemoryEntry> {
@@ -216,30 +228,10 @@ export class MemoryManager {
 	}
 
 	async query(options: MemoryQueryOptions): Promise<MemoryQueryResult[]> {
-		const categories = options.category !== undefined ? [options.category] : ALL_CATEGORIES;
 		const limit = options.limit ?? 50;
-		const allResults: MemoryQueryResult[] = [];
-
-		for (const category of categories) {
-			const entries = await this.store.getEntries(category);
-			for (const entry of entries) {
-				const strength = computeStrength(entry.createdAt, entry.halfLifeDays);
-				if (this.matchesQueryOptions(entry, options, strength)) {
-					allResults.push({ entry, strength });
-				}
-			}
-		}
-
-		allResults.sort((a, b) => b.strength - a.strength);
-		const limited = allResults.slice(0, limit);
-
-		if (options.strengthen !== false) {
-			for (const result of limited) {
-				await this.strengthenEntry(result.entry.category, result.entry);
-			}
-		}
-
-		return limited;
+		const results = await this.recall(options, limit);
+		await this.postProcess(results, options);
+		return results;
 	}
 
 	async update(
@@ -251,6 +243,29 @@ export class MemoryManager {
 		return this.store.updateEntry(category, id, { ...patch, updatedAt: now });
 	}
 
+	private buildSeeds(queryVec: Float32Array, vs: VectorStore, candidateIds: string[]): Map<string, number> {
+		const seeds = new Map<string, number>();
+		const k = this.config.recall?.seed_k ?? DEFAULT_MEMORY_RECALL_SEED_K;
+		for (const { id, score } of topKCosine(queryVec, vs, candidateIds, k)) seeds.set(id, Math.max(0, score));
+		if (seeds.size === 0) {
+			for (const id of candidateIds) seeds.set(id, 1.0);
+		}
+		return seeds;
+	}
+
+	private collectCandidates(index: VaultIndex, options: MemoryQueryOptions, minStrength: number): string[] {
+		const candidates: string[] = [];
+		for (const [id, record] of index.byId) {
+			const { entry } = record;
+			const strength = computeStrength(entry.createdAt, entry.halfLifeDays);
+			if (strength < minStrength) continue;
+			if (options.agentRole !== undefined && entry.agentRole !== options.agentRole) continue;
+			if (options.category !== undefined && entry.category !== options.category) continue;
+			candidates.push(id);
+		}
+		return candidates;
+	}
+
 	private getDefaultHalfLife(category: MemoryCategory): number {
 		switch (category) {
 			case 'decisions':
@@ -260,6 +275,74 @@ export class MemoryManager {
 			case 'semantic':
 				return this.config.semantic_half_life_days ?? DEFAULT_MEMORY_SEMANTIC_HALF_LIFE_DAYS;
 		}
+	}
+
+	private async incrementCoAccess(results: MemoryQueryResult[]): Promise<void> {
+		if (results.length < 2) return;
+		for (let i = 0; i < results.length; i++) {
+			for (let j = i + 1; j < results.length; j++) {
+				const a = results[i]!.entry;
+				const b = results[j]!.entry;
+				const coA = { ...a.coAccess, [b.id]: (a.coAccess?.[b.id] ?? 0) + 1 };
+				const coB = { ...b.coAccess, [a.id]: (b.coAccess?.[a.id] ?? 0) + 1 };
+				await this.store.updateEntry(a.category, a.id, { coAccess: coA });
+				await this.store.updateEntry(b.category, b.id, { coAccess: coB });
+			}
+		}
+	}
+
+	private async lexicalRecall(options: MemoryQueryOptions, limit: number): Promise<MemoryQueryResult[]> {
+		const categories = options.category !== undefined ? [options.category] : ALL_CATEGORIES;
+		const allResults: MemoryQueryResult[] = [];
+		for (const category of categories) {
+			const entries = await this.store.getEntries(category);
+			for (const entry of entries) {
+				const strength = computeStrength(entry.createdAt, entry.halfLifeDays);
+				if (this.matchesQueryOptions(entry, options, strength)) allResults.push({ entry, strength });
+			}
+		}
+		allResults.sort((a, b) => b.strength - a.strength);
+		return allResults.slice(0, limit);
+	}
+
+	private async postProcess(results: MemoryQueryResult[], options: MemoryQueryOptions): Promise<void> {
+		if (options.strengthen !== false) {
+			for (const result of results) await this.strengthenEntry(result.entry.category, result.entry);
+		}
+		await this.incrementCoAccess(results);
+	}
+
+	private rankResults(scores: Map<string, number>, index: VaultIndex, limit: number): MemoryQueryResult[] {
+		const sorted = [...scores.entries()].sort((a, b) => b[1] - a[1]).slice(0, limit);
+		const results: MemoryQueryResult[] = [];
+		for (const [id, score] of sorted) {
+			const record = index.byId.get(id);
+			if (!record) continue;
+			results.push({ entry: record.entry, strength: score });
+		}
+		return results;
+	}
+
+	private async recall(options: MemoryQueryOptions, limit: number): Promise<MemoryQueryResult[]> {
+		if (options.text && this.embedder && this.store instanceof VaultStore) {
+			return this.vaultRecall(options, limit);
+		}
+		return this.lexicalRecall(options, limit);
+	}
+
+	private async vaultRecall(options: MemoryQueryOptions, limit: number): Promise<MemoryQueryResult[]> {
+		const vaultStore = this.store as VaultStore;
+		const index = await vaultStore.getVaultIndex();
+		const embedResult = await this.embedder!.embed({ input: [options.text!] });
+		const queryVec = new Float32Array(embedResult.vectors[0] ?? []);
+		const vs = openVectorStore(vaultStore.getVaultDir(), embedResult.model, embedResult.dim);
+		const minStrength = options.minStrength ?? DEFAULT_MEMORY_PRUNE_THRESHOLD;
+		const candidateIds = this.collectCandidates(index, options, minStrength);
+		const seeds = this.buildSeeds(queryVec, vs, candidateIds);
+		const walkDepth = this.config.recall?.walk_depth ?? DEFAULT_MEMORY_RECALL_WALK_DEPTH;
+		const walkDecay = this.config.recall?.walk_decay ?? DEFAULT_MEMORY_RECALL_WALK_DECAY;
+		const scores = spreadActivation(seeds, index.byId, index.outEdges, index.inEdges, walkDepth, walkDecay);
+		return this.rankResults(scores, index, limit);
 	}
 
 	/** Returns true when the entry has at least one tag from the filter list (or no filter is set). */
@@ -297,6 +380,7 @@ export class MemoryManager {
 
 function resolveConfig(config?: Partial<MemoryRetentionConfig>): MemoryRetentionConfig {
 	const defaults: MemoryRetentionConfig = {
+		backend: 'vault',
 		decision_half_life_days: DEFAULT_MEMORY_DECISION_HALF_LIFE_DAYS,
 		enabled: true,
 		episodic_half_life_days: DEFAULT_MEMORY_EPISODIC_HALF_LIFE_DAYS,

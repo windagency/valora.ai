@@ -1,13 +1,8 @@
 /**
  * Lazy catalog wrapping the runtime provider registry.
  *
- * On first access, ensures plugins are loaded so plugin-contributed
- * providers are visible.
- *
- * TODO: Wire up real plugin initialisation once the dynamic.ts loading
- * patterns are better understood. Currently the catalog is created
- * immediately from the current registry state without triggering a
- * plugin-init cycle.
+ * Callers that need plugin-contributed providers (e.g. config setup) must
+ * call initializePlugins() before querying this catalog.
  */
 
 import type { ProviderDescriptor } from 'plugins/plugin-api.types';

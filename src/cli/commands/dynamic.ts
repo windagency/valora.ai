@@ -130,6 +130,7 @@ export function configureListCommand(program: CommandAdapter): void {
 			try {
 				const container = createContainer();
 				await initializePlugins(container);
+				getConfigLoader().warnUnknownProviders();
 				const plugins = getLoadedPlugins();
 
 				console.log(`${color.bold('Loaded plugins')}  (${String(plugins.length)})\n`);
@@ -284,6 +285,7 @@ export function configureExecCommand(program: CommandAdapter): void {
 				// Create container and resolve executor
 				const container = createContainer();
 				await initializePlugins(container);
+				getConfigLoader().warnUnknownProviders();
 				const executor = container.resolve(SERVICE_IDENTIFIERS.COMMAND_EXECUTOR) as CommandExecutor;
 
 				// Execute command
@@ -677,6 +679,7 @@ export function configureShortcutCommands(program: CommandAdapter): void {
 				// Create container and resolve executor
 				const container = createContainer();
 				await initializePlugins(container);
+				getConfigLoader().warnUnknownProviders();
 				const executor = container.resolve(SERVICE_IDENTIFIERS.COMMAND_EXECUTOR) as CommandExecutor;
 
 				// Execute command

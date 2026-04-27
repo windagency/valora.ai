@@ -1,3 +1,4 @@
+import * as child_process from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -7,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
 	type ProcessRunner,
 	PluginInstallerService,
+	peekTarballManifest,
 	resolvePackageName,
 	shortNameFromPackage
 } from './plugin-installer.service';
@@ -22,6 +24,7 @@ interface MockRunnerOptions {
 	packCodeByShortName?: Record<string, number>;
 	tarCode?: number;
 	manifests?: Record<string, object>;
+	tgzManifest?: object;
 }
 
 function makeMockRunner(overrides?: MockRunnerOptions): ProcessRunner & { packCalls: string[] } {
@@ -47,23 +50,68 @@ function makeMockRunner(overrides?: MockRunnerOptions): ProcessRunner & { packCa
 				return 0;
 			}
 			if (argv[0] === 'tar') {
-				if (overrides?.manifests) {
-					const cIdx = argv.indexOf('-C');
-					const targetDir = argv[cIdx + 1] as string | undefined;
-					if (targetDir) {
-						const shortName = path.basename(targetDir);
+				if ((overrides?.tarCode ?? 0) !== 0) return overrides!.tarCode!;
+
+				const cIdx = argv.indexOf('-C');
+				const destDir = argv[cIdx + 1] as string | undefined;
+				if (destDir) {
+					const isStaging = path.basename(destDir).startsWith('valora-tgz-staging-');
+					if (isStaging && overrides?.tgzManifest) {
+						fs.writeFileSync(path.join(destDir, 'valora-plugin.json'), JSON.stringify(overrides.tgzManifest));
+					} else if (!isStaging && overrides?.manifests) {
+						const shortName = path.basename(destDir);
 						const manifest = overrides.manifests[shortName];
 						if (manifest) {
-							fs.writeFileSync(path.join(targetDir, 'valora-plugin.json'), JSON.stringify(manifest));
+							fs.writeFileSync(path.join(destDir, 'valora-plugin.json'), JSON.stringify(manifest));
 						}
 					}
 				}
-				return overrides?.tarCode ?? 0;
+				return 0;
 			}
 			return 0;
 		})
 	};
 }
+
+describe('peekTarballManifest', () => {
+	let tmpDir: string;
+
+	beforeEach(() => {
+		tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'valora-peek-test-'));
+	});
+
+	afterEach(() => {
+		fs.rmSync(tmpDir, { recursive: true, force: true });
+	});
+
+	function makeTgz(manifest: object): string {
+		const pkgDir = path.join(tmpDir, 'package');
+		fs.mkdirSync(pkgDir, { recursive: true });
+		fs.writeFileSync(path.join(pkgDir, 'valora-plugin.json'), JSON.stringify(manifest));
+		const tgzPath = path.join(tmpDir, 'test-plugin.tgz');
+		child_process.spawnSync('tar', ['-czf', tgzPath, '-C', tmpDir, 'package']);
+		return tgzPath;
+	}
+
+	it('returns name and version from a valid tgz manifest', () => {
+		const tgzPath = makeTgz({ name: 'valora-plugin-docs', version: '1.2.3' });
+		expect(peekTarballManifest(tgzPath)).toEqual({ name: 'valora-plugin-docs', version: '1.2.3' });
+	});
+
+	it('throws when the tgz path does not exist on disk', () => {
+		expect(() => peekTarballManifest('/nonexistent/path.tgz')).toThrow('Could not read manifest from tarball');
+	});
+
+	it('throws when the manifest is missing the name field', () => {
+		const tgzPath = makeTgz({ version: '1.0.0' });
+		expect(() => peekTarballManifest(tgzPath)).toThrow('name');
+	});
+
+	it('throws when the manifest is missing the version field', () => {
+		const tgzPath = makeTgz({ name: 'valora-plugin-docs' });
+		expect(() => peekTarballManifest(tgzPath)).toThrow('version');
+	});
+});
 
 describe('resolvePackageName', () => {
 	it('expands a bare short name to the full scoped package', () => {
@@ -416,5 +464,83 @@ describe('PluginInstallerService', () => {
 			expect(fs.existsSync(path.join(tmpDepTarget, 'valora-plugin-a'))).toBe(true);
 			expect(fs.existsSync(path.join(tmpDepTarget, 'valora-plugin-b'))).toBe(true);
 		});
+	});
+});
+
+describe('PluginInstallerService.installFromTarball', () => {
+	let tmpTarget: string;
+
+	beforeEach(() => {
+		tmpTarget = fs.mkdtempSync(path.join(os.tmpdir(), 'valora-tgz-target-'));
+	});
+
+	afterEach(() => {
+		fs.rmSync(tmpTarget, { recursive: true, force: true });
+		vi.resetAllMocks();
+	});
+
+	it('extracts the tgz directly without invoking npm pack', async () => {
+		const { getGlobalPluginsDir } = await import('utils/paths');
+		vi.mocked(getGlobalPluginsDir).mockReturnValue(tmpTarget);
+
+		const runner = makeMockRunner({ tgzManifest: { name: 'valora-plugin-docs', version: '1.0.0' } });
+		await new PluginInstallerService(runner).installFromTarball('/path/to/plugin.tgz', 'user');
+
+		expect(runner.run).not.toHaveBeenCalledWith(expect.arrayContaining(['npm', 'pack']));
+		expect(runner.run).toHaveBeenCalledWith(expect.arrayContaining(['tar', '-xf', '/path/to/plugin.tgz']));
+	});
+
+	it('installs to the correct scope directory using the short name from the manifest', async () => {
+		const { getGlobalPluginsDir } = await import('utils/paths');
+		vi.mocked(getGlobalPluginsDir).mockReturnValue(tmpTarget);
+
+		const runner = makeMockRunner({ tgzManifest: { name: 'valora-plugin-docs', version: '1.0.0' } });
+		await new PluginInstallerService(runner).installFromTarball('/path/to/plugin.tgz', 'user');
+
+		expect(fs.existsSync(path.join(tmpTarget, 'valora-plugin-docs'))).toBe(true);
+	});
+
+	it('installs transitive dependencies declared in the manifest requires field', async () => {
+		const { getGlobalPluginsDir } = await import('utils/paths');
+		vi.mocked(getGlobalPluginsDir).mockReturnValue(tmpTarget);
+
+		const runner = makeMockRunner({
+			tgzManifest: { name: 'valora-plugin-docs', version: '1.0.0', requires: ['valora-plugin-rtk'] },
+			manifests: { 'valora-plugin-rtk': { name: 'valora-plugin-rtk', version: '1.0.0' } }
+		});
+		await new PluginInstallerService(runner, () => false).installFromTarball('/path/to/plugin.tgz', 'user');
+
+		expect(runner.packCalls).toContain('valora-plugin-rtk');
+		expect(fs.existsSync(path.join(tmpTarget, 'valora-plugin-rtk'))).toBe(true);
+	});
+
+	it('throws and cleans up the staging directory when extraction fails', async () => {
+		const { getGlobalPluginsDir } = await import('utils/paths');
+		vi.mocked(getGlobalPluginsDir).mockReturnValue(tmpTarget);
+
+		const runner = makeMockRunner({ tarCode: 1 });
+		await expect(new PluginInstallerService(runner).installFromTarball('/path/to/plugin.tgz', 'user')).rejects.toThrow(
+			'Failed to extract'
+		);
+
+		const stagingDirs = fs.readdirSync(os.tmpdir()).filter((d) => d.startsWith('valora-tgz-staging-'));
+		expect(stagingDirs).toHaveLength(0);
+	});
+
+	it('surfaces a permission error on global scope as an elevated-privileges message', async () => {
+		const { getSystemPluginsDir } = await import('utils/paths');
+		const readonlyDir = fs.mkdtempSync(path.join(os.tmpdir(), 'valora-readonly-'));
+		fs.chmodSync(readonlyDir, 0o555);
+		vi.mocked(getSystemPluginsDir).mockReturnValue(readonlyDir);
+
+		try {
+			const runner = makeMockRunner({ tgzManifest: { name: 'valora-plugin-docs', version: '1.0.0' } });
+			await expect(
+				new PluginInstallerService(runner).installFromTarball('/path/to/plugin.tgz', 'global')
+			).rejects.toThrow(/elevated privileges/);
+		} finally {
+			fs.chmodSync(readonlyDir, 0o755);
+			fs.rmSync(readonlyDir, { force: true, recursive: true });
+		}
 	});
 });

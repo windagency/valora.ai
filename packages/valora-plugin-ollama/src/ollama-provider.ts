@@ -1,6 +1,12 @@
 import OpenAI from 'openai';
 
-import type { LLMCompletionOptions, LLMCompletionResult, LLMProvider } from 'types/llm.types';
+import type {
+	EmbeddingRequest,
+	EmbeddingResult,
+	LLMCompletionOptions,
+	LLMCompletionResult,
+	LLMProvider
+} from 'types/llm.types';
 
 export interface OllamaManagers {
 	binary: { assertInstalled(): Promise<void> };
@@ -10,6 +16,7 @@ export interface OllamaManagers {
 
 const DEFAULT_OLLAMA_HOST = 'http://localhost:11434';
 const DEFAULT_MODEL = 'llama3.1';
+const DEFAULT_EMBED_MODEL = 'nomic-embed-text';
 
 export class OllamaProvider implements LLMProvider {
 	name = 'ollama';
@@ -61,6 +68,17 @@ export class OllamaProvider implements LLMProvider {
 					}
 				: undefined
 		};
+	}
+
+	async embed(req: EmbeddingRequest): Promise<EmbeddingResult> {
+		const model = req.model ?? DEFAULT_EMBED_MODEL;
+		await this.ensureReady(model);
+
+		const response = await this.getClient().embeddings.create({ input: req.input, model });
+		const vectors = response.data.map((d) => d.embedding);
+		const dim = vectors[0]?.length ?? 0;
+
+		return { dim, model: response.model, vectors };
 	}
 
 	getAlternativeModels(): string[] {

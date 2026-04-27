@@ -8,7 +8,8 @@ import { isPromptCancellation } from 'utils/prompt-handler';
 
 import type { ConfigLoader } from './loader';
 
-import { BuiltinProviders, getProviderMetadata } from './providers.config';
+import { getProviderCatalog } from './provider-catalog';
+import { BuiltinProviders } from './providers.config';
 import { type Config, DEFAULT_CONFIG } from './schema';
 import {
 	configureDefaults,
@@ -140,7 +141,7 @@ ${color.gray(`Config file: ${this.configLoader.getConfigPath()}`)}`);
 		// Single provider - use it automatically
 		if (validProviders.length === 1) {
 			const provider = validProviders[0]!;
-			const providerLabel = getProviderMetadata(provider)?.label ?? provider;
+			const providerLabel = getProviderCatalog().getProviderMetadata(provider)?.label ?? provider;
 			console.info(color.cyan(`\n✓ Set ${providerLabel} as default provider`));
 			return provider;
 		}
@@ -149,7 +150,7 @@ ${color.gray(`Config file: ${this.configLoader.getConfigPath()}`)}`);
 		const { defaultProvider } = await prompt.prompt([
 			{
 				choices: validProviders.map((provider) => ({
-					name: getProviderMetadata(provider)?.label ?? provider,
+					name: getProviderCatalog().getProviderMetadata(provider)?.label ?? provider,
 					value: provider
 				})),
 				message: 'Which provider would you like to use as default?',
@@ -387,7 +388,7 @@ ${color.gray('   Available when running in Cursor IDE.')}`);
 	private static hasValidProvider(providers: Record<string, unknown>): boolean {
 		return Object.keys(providers).some((key) => {
 			const providerConfig = providers[key] as undefined | { apiKey?: string };
-			const providerMetadata = getProviderMetadata(key);
+			const providerMetadata = getProviderCatalog().getProviderMetadata(key);
 
 			if (!providerMetadata) {
 				return false; // Unknown provider

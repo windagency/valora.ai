@@ -11,12 +11,18 @@
  * or as a post-feedback automatic maintenance step.
  */
 
+import type { EmbedderPort } from 'memory/embeddings/embedder.port';
+
+import { centroidSummary, cosineClusters } from 'memory/consolidation/cluster';
+import { openVectorStore } from 'memory/embeddings/vector-store';
 import { MemoryManager } from 'memory/manager';
 import { MemoryStore } from 'memory/store';
+import { VaultStore } from 'memory/vault/vault-store';
 
-import type { MemoryEntry } from 'types/memory.types';
+import type { Edge, MemoryEntry } from 'types/memory.types';
 
 import { getPipelineEmitter } from 'output/pipeline-emitter';
+import { generateMemoryId } from 'utils/id-generator';
 import { SafeExecutor } from 'utils/safe-exec';
 
 export interface ConsolidationOptions {
@@ -78,22 +84,18 @@ function parseGitLogOutput(output: string): ParsedCommit[] {
 	return commits;
 }
 
+const COSINE_CLUSTER_THRESHOLD = 0.82;
+
 /** Determine the confidence ranking (higher is better). */
 export class MemoryConsolidationService {
+	private readonly embedder?: EmbedderPort;
 	private readonly manager: MemoryManager;
-	private readonly store: MemoryStore;
+	private readonly store: MemoryStore | VaultStore;
 
-	constructor(manager?: MemoryManager) {
-		if (manager !== undefined) {
-			this.manager = manager;
-			// Reuse the same store instance that was passed in by creating a companion store.
-			// Since MemoryManager keeps its store private, we create our own store instance
-			// pointing to the same directory so setLastConsolidatedAt stays in sync.
-			this.store = new MemoryStore();
-		} else {
-			this.store = new MemoryStore();
-			this.manager = new MemoryManager(this.store);
-		}
+	constructor(store?: MemoryStore | VaultStore, embedder?: EmbedderPort) {
+		this.store = store ?? new MemoryStore();
+		this.manager = new MemoryManager(this.store, undefined, embedder);
+		this.embedder = embedder;
 	}
 
 	async consolidate(options: ConsolidationOptions = {}): Promise<ConsolidationResult> {
@@ -211,7 +213,73 @@ export class MemoryConsolidationService {
 		return groups;
 	}
 
+	private async mergeClusterCosine(cluster: MemoryEntry[], vaultStore: VaultStore): Promise<void> {
+		const now = new Date().toISOString();
+		const id = generateMemoryId();
+		const content = centroidSummary(cluster);
+		const tags = [...new Set(cluster.flatMap((e) => e.tags))];
+		const bestConfidence = cluster.reduce(
+			(best, e) => (confidenceRank(e.confidence) > confidenceRank(best) ? e.confidence : best),
+			cluster[0]!.confidence
+		);
+
+		const newEntry: MemoryEntry = {
+			accessCount: 0,
+			agentRole: cluster[0]!.agentRole,
+			category: 'semantic',
+			confidence: bestConfidence,
+			content,
+			createdAt: now,
+			halfLifeDays: 30,
+			id,
+			isError: false,
+			lastAccessedAt: now,
+			relatedPaths: [...new Set(cluster.flatMap((e) => e.relatedPaths))],
+			sessionId: cluster[0]!.sessionId,
+			source: cluster[0]!.source,
+			tags,
+			updatedAt: now
+		};
+
+		const links: Edge[] = cluster.map((m) => ({ fromId: id, kind: 'decays_from', toId: m.id }));
+		await vaultStore.appendEntryWithLinks('semantic', newEntry, links);
+
+		// Mark all cluster members as stale
+		for (const member of cluster) {
+			await vaultStore.updateEntry('episodic', member.id, { confidence: 'stale', supersededBy: id });
+		}
+	}
+
+	private async mergeCosine(dryRun: boolean): Promise<number> {
+		const vaultStore = this.store as VaultStore;
+		const vaultDir = vaultStore.getVaultDir();
+		const entries = await vaultStore.getEntries('episodic');
+
+		// Open the vector store; model/dim will be loaded from disk index if present
+		const vs = openVectorStore(vaultDir, 'stub', 2);
+		const clusters = cosineClusters(entries, vs, COSINE_CLUSTER_THRESHOLD);
+		let mergedCount = 0;
+
+		for (const cluster of clusters) {
+			if (dryRun) {
+				mergedCount++;
+				continue;
+			}
+			await this.mergeClusterCosine(cluster, vaultStore);
+			mergedCount++;
+		}
+
+		return mergedCount;
+	}
+
 	private async mergeEpisodicEntries(dryRun: boolean): Promise<number> {
+		if (this.embedder && this.store instanceof VaultStore) {
+			return this.mergeCosine(dryRun);
+		}
+		return this.mergeJaccard(dryRun);
+	}
+
+	private async mergeJaccard(dryRun: boolean): Promise<number> {
 		const entries = await this.store.getEntries('episodic');
 		const groups = this.buildTagGroups(entries);
 		let mergedCount = 0;

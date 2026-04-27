@@ -68,19 +68,43 @@ describe('fetchPluginRegistry', () => {
 		expect(fs.readFileSync).toHaveBeenCalledWith('/tmp/test-registry.json', 'utf-8');
 	});
 
-	it('returns null when the remote fetch fails', async () => {
+	it('falls back to the bundled registry when the remote fetch returns a non-ok response', async () => {
 		delete process.env['VALORA_PLUGIN_REGISTRY'];
+		process.env['VALORA_PLUGIN_REGISTRY_URL'] = 'https://example.com/registry.json';
 		vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 404 }));
+		vi.mocked(fs.readFileSync).mockImplementation(((filePath: unknown) => {
+			if (String(filePath).endsWith('registry.json')) return JSON.stringify(sampleEntries);
+			throw new Error(`Unexpected readFileSync: ${String(filePath)}`);
+		}) as typeof fs.readFileSync);
 
 		const { fetchPluginRegistry } = await import('./plugin-registry.service');
 		const result = await fetchPluginRegistry();
 
-		expect(result).toBeNull();
+		expect(result).toEqual(sampleEntries);
 	});
 
-	it('returns null when the remote fetch throws (network error)', async () => {
+	it('falls back to the bundled registry when the remote fetch throws a network error', async () => {
 		delete process.env['VALORA_PLUGIN_REGISTRY'];
+		process.env['VALORA_PLUGIN_REGISTRY_URL'] = 'https://example.com/registry.json';
 		vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network error')));
+		vi.mocked(fs.readFileSync).mockImplementation(((filePath: unknown) => {
+			if (String(filePath).endsWith('registry.json')) return JSON.stringify(sampleEntries);
+			throw new Error(`Unexpected readFileSync: ${String(filePath)}`);
+		}) as typeof fs.readFileSync);
+
+		const { fetchPluginRegistry } = await import('./plugin-registry.service');
+		const result = await fetchPluginRegistry();
+
+		expect(result).toEqual(sampleEntries);
+	});
+
+	it('returns null when both the remote fetch and the bundled registry cannot be read', async () => {
+		delete process.env['VALORA_PLUGIN_REGISTRY'];
+		process.env['VALORA_PLUGIN_REGISTRY_URL'] = 'https://example.com/registry.json';
+		vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 404 }));
+		vi.mocked(fs.readFileSync).mockImplementation((() => {
+			throw new Error('ENOENT');
+		}) as typeof fs.readFileSync);
 
 		const { fetchPluginRegistry } = await import('./plugin-registry.service');
 		const result = await fetchPluginRegistry();

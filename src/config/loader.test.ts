@@ -435,6 +435,7 @@ describe('ConfigLoader', () => {
 			});
 
 			await loader.load();
+			loader.warnUnknownProviders();
 
 			expect(warnMock).toHaveBeenCalledWith(
 				expect.stringContaining('"myplugin" is configured but no plugin registers it')
@@ -466,7 +467,9 @@ describe('ConfigLoader', () => {
 
 			// Load twice (simulating two load calls within the same process)
 			await loader.load();
+			loader.warnUnknownProviders();
 			await loader.reload();
+			loader.warnUnknownProviders();
 
 			const warningCalls = warnMock.mock.calls.filter((call) => String(call[0]).includes('"unknownprovider"'));
 			expect(warningCalls).toHaveLength(1);

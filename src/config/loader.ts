@@ -74,7 +74,6 @@ export class ConfigLoader {
 
 		try {
 			this.config = CONFIG_SCHEMA.parse(mergedConfig);
-			this.warnUnknownProviders();
 			this.autoMigrateDefaultProvider();
 			return this.config;
 		} catch (error) {
@@ -138,8 +137,9 @@ export class ConfigLoader {
 
 	/**
 	 * Emit a one-time warning for any provider key in config that has no registered descriptor.
+	 * Call this after plugin initialisation so plugin-contributed providers are already registered.
 	 */
-	private warnUnknownProviders(): void {
+	warnUnknownProviders(): void {
 		if (!this.config?.providers) {
 			return;
 		}

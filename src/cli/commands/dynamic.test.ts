@@ -40,7 +40,7 @@ vi.mock('cleanup/coordinator', () => ({
 }));
 
 vi.mock('config/loader', () => ({
-	getConfigLoader: vi.fn(() => ({ get: vi.fn(() => ({})) }))
+	getConfigLoader: vi.fn(() => ({ get: vi.fn(() => ({})), warnUnknownProviders: vi.fn() }))
 }));
 
 vi.mock('config/wizard', () => ({

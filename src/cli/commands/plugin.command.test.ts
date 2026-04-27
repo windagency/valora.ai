@@ -10,12 +10,18 @@ vi.mock('plugins/plugin-loader.service', () => ({
 	}))
 }));
 
+vi.mock('node:readline', () => ({
+	createInterface: vi.fn()
+}));
+
 vi.mock('plugins/plugin-installer.service', async (importOriginal) => {
 	const actual = await importOriginal<typeof import('plugins/plugin-installer.service')>();
 	return {
 		...actual,
+		peekTarballManifest: vi.fn(),
 		PluginInstallerService: vi.fn().mockImplementation(() => ({
 			install: vi.fn(),
+			installFromTarball: vi.fn(),
 			uninstall: vi.fn()
 		}))
 	};
@@ -46,7 +52,8 @@ vi.mock('output/color-adapter.interface', () => ({
 	}))
 }));
 
-import { PluginInstallerService } from 'plugins/plugin-installer.service';
+import * as readline from 'node:readline';
+import { PluginInstallerService, peekTarballManifest } from 'plugins/plugin-installer.service';
 import { PluginLoaderService } from 'plugins/plugin-loader.service';
 import { fetchPluginRegistry } from 'plugins/plugin-registry.service';
 import { fetchLatestVersionFor } from 'updater/registry';
@@ -69,10 +76,10 @@ function makePlugin(partial: Partial<CataloguedPlugin>): CataloguedPlugin {
 	};
 }
 
-function makeProgram(): Command {
+function makeProgram(hooks?: Parameters<typeof configurePluginCommand>[1]): Command {
 	const program = new Command();
 	program.exitOverride();
-	configurePluginCommand(program as never);
+	configurePluginCommand(program as never, hooks);
 	return program;
 }
 
@@ -609,5 +616,570 @@ describe('plugin remove', () => {
 
 		expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('Invalid scope'));
 		expect(exitSpy).toHaveBeenCalledWith(1);
+	});
+});
+
+describe('plugin add — binary requirement warnings', () => {
+	let consoleSpy: ReturnType<typeof vi.spyOn>;
+	let consoleWarnSpy: ReturnType<typeof vi.spyOn>;
+	let exitSpy: ReturnType<typeof vi.spyOn>;
+
+	beforeEach(() => {
+		consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+		consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+		exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never);
+	});
+
+	afterEach(() => {
+		consoleSpy.mockRestore();
+		consoleWarnSpy.mockRestore();
+		exitSpy.mockRestore();
+		vi.clearAllMocks();
+	});
+
+	it('warns with install URL when a required binary is not on PATH after npm install', async () => {
+		(PluginInstallerService as ReturnType<typeof vi.fn>).mockImplementationOnce(() => ({
+			install: vi.fn().mockResolvedValue(undefined)
+		}));
+		(PluginLoaderService as ReturnType<typeof vi.fn>).mockImplementationOnce(() => ({
+			catalogAll: makeCatalogAll([
+				makePlugin({
+					dir: '/plugins/valora-plugin-ollama',
+					manifest: {
+						name: 'valora-plugin-ollama',
+						requiresBinary: [{ install: 'https://ollama.com', name: 'ollama' }],
+						version: '1.0.0'
+					},
+					status: 'enabled'
+				})
+			])
+		}));
+
+		const program = makeProgram({ binaryChecker: vi.fn().mockResolvedValue(false) });
+		await runCommand(program, ['plugin', 'add', 'ollama']);
+
+		const warnOutput = consoleWarnSpy.mock.calls.map((c) => c.join(' ')).join('\n');
+		expect(warnOutput).toContain('ollama');
+		expect(warnOutput).toContain('https://ollama.com');
+	});
+
+	it('does not warn when all required binaries are present', async () => {
+		(PluginInstallerService as ReturnType<typeof vi.fn>).mockImplementationOnce(() => ({
+			install: vi.fn().mockResolvedValue(undefined)
+		}));
+		(PluginLoaderService as ReturnType<typeof vi.fn>).mockImplementationOnce(() => ({
+			catalogAll: makeCatalogAll([
+				makePlugin({
+					manifest: {
+						name: 'valora-plugin-ollama',
+						requiresBinary: [{ name: 'node' }],
+						version: '1.0.0'
+					},
+					status: 'enabled'
+				})
+			])
+		}));
+
+		const program = makeProgram({ binaryChecker: vi.fn().mockResolvedValue(true) });
+		await runCommand(program, ['plugin', 'add', 'ollama']);
+
+		expect(consoleWarnSpy).not.toHaveBeenCalled();
+	});
+
+	it('warns after tgz install when required binary is absent', async () => {
+		vi.mocked(peekTarballManifest).mockReturnValue({ name: 'valora-plugin-ollama', version: '1.0.0' });
+		(PluginLoaderService as ReturnType<typeof vi.fn>).mockImplementationOnce(() => ({
+			catalogAll: makeCatalogAll([])
+		}));
+		(PluginLoaderService as ReturnType<typeof vi.fn>).mockImplementationOnce(() => ({
+			catalogAll: makeCatalogAll([
+				makePlugin({
+					manifest: {
+						name: 'valora-plugin-ollama',
+						requiresBinary: [{ install: 'https://ollama.com', name: 'ollama' }],
+						version: '1.0.0'
+					},
+					status: 'enabled'
+				})
+			])
+		}));
+		(PluginInstallerService as ReturnType<typeof vi.fn>).mockImplementationOnce(() => ({
+			install: vi.fn(),
+			installFromTarball: vi.fn().mockResolvedValue(undefined)
+		}));
+
+		const program = makeProgram({ binaryChecker: vi.fn().mockResolvedValue(false) });
+		await runCommand(program, ['plugin', 'add', '/path/to/plugin.tgz']);
+
+		const warnOutput = consoleWarnSpy.mock.calls.map((c) => c.join(' ')).join('\n');
+		expect(warnOutput).toContain('ollama');
+		expect(warnOutput).toContain('https://ollama.com');
+	});
+
+	it('runs the installCommand and reports success when user confirms', async () => {
+		(PluginInstallerService as ReturnType<typeof vi.fn>).mockImplementationOnce(() => ({
+			install: vi.fn().mockResolvedValue(undefined)
+		}));
+		(PluginLoaderService as ReturnType<typeof vi.fn>).mockImplementationOnce(() => ({
+			catalogAll: makeCatalogAll([
+				makePlugin({
+					manifest: {
+						name: 'valora-plugin-ollama',
+						requiresBinary: [{ installCommand: 'curl -fsSL https://ollama.com/install.sh | sh', name: 'ollama' }],
+						version: '1.0.0'
+					},
+					status: 'enabled'
+				})
+			])
+		}));
+		const mockBinaryInstaller = vi.fn().mockResolvedValue(0);
+
+		const program = makeProgram({
+			binaryChecker: vi.fn().mockResolvedValue(false),
+			binaryInstaller: mockBinaryInstaller,
+			promptInstall: vi.fn().mockResolvedValue(true)
+		});
+		await runCommand(program, ['plugin', 'add', 'ollama']);
+
+		expect(mockBinaryInstaller).toHaveBeenCalledWith('curl -fsSL https://ollama.com/install.sh | sh');
+		const logOutput = consoleSpy.mock.calls.map((c) => c.join(' ')).join('\n');
+		expect(logOutput).toContain('ollama');
+	});
+
+	it('shows URL warning when user declines the install prompt', async () => {
+		(PluginInstallerService as ReturnType<typeof vi.fn>).mockImplementationOnce(() => ({
+			install: vi.fn().mockResolvedValue(undefined)
+		}));
+		(PluginLoaderService as ReturnType<typeof vi.fn>).mockImplementationOnce(() => ({
+			catalogAll: makeCatalogAll([
+				makePlugin({
+					manifest: {
+						name: 'valora-plugin-ollama',
+						requiresBinary: [
+							{
+								install: 'https://ollama.com',
+								installCommand: 'curl -fsSL https://ollama.com/install.sh | sh',
+								name: 'ollama'
+							}
+						],
+						version: '1.0.0'
+					},
+					status: 'enabled'
+				})
+			])
+		}));
+		const mockBinaryInstaller = vi.fn();
+
+		const program = makeProgram({
+			binaryChecker: vi.fn().mockResolvedValue(false),
+			binaryInstaller: mockBinaryInstaller,
+			promptInstall: vi.fn().mockResolvedValue(false)
+		});
+		await runCommand(program, ['plugin', 'add', 'ollama']);
+
+		expect(mockBinaryInstaller).not.toHaveBeenCalled();
+		const warnOutput = consoleWarnSpy.mock.calls.map((c) => c.join(' ')).join('\n');
+		expect(warnOutput).toContain('https://ollama.com');
+	});
+});
+
+describe('plugin add — autoInstall binary requirement', () => {
+	let consoleSpy: ReturnType<typeof vi.spyOn>;
+	let consoleWarnSpy: ReturnType<typeof vi.spyOn>;
+	let exitSpy: ReturnType<typeof vi.spyOn>;
+
+	beforeEach(() => {
+		consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+		consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+		exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never);
+	});
+
+	afterEach(() => {
+		consoleSpy.mockRestore();
+		consoleWarnSpy.mockRestore();
+		exitSpy.mockRestore();
+		vi.clearAllMocks();
+	});
+
+	it('installs binary without prompting when autoInstall is true', async () => {
+		(PluginInstallerService as ReturnType<typeof vi.fn>).mockImplementationOnce(() => ({
+			install: vi.fn().mockResolvedValue(undefined)
+		}));
+		(PluginLoaderService as ReturnType<typeof vi.fn>).mockImplementationOnce(() => ({
+			catalogAll: makeCatalogAll([
+				makePlugin({
+					manifest: {
+						name: 'valora-plugin-ollama',
+						requiresBinary: [
+							{
+								autoInstall: true,
+								installCommand: 'curl -fsSL https://example.com/ollama.tgz | sudo tar -xz -C /usr/local/',
+								name: 'ollama'
+							}
+						],
+						version: '1.0.0'
+					},
+					status: 'enabled'
+				})
+			])
+		}));
+		const mockPromptInstall = vi.fn();
+		const mockBinaryInstaller = vi.fn().mockResolvedValue(0);
+
+		const program = makeProgram({
+			binaryChecker: vi.fn().mockResolvedValue(false),
+			binaryInstaller: mockBinaryInstaller,
+			promptInstall: mockPromptInstall
+		});
+		await runCommand(program, ['plugin', 'add', 'ollama']);
+
+		expect(mockPromptInstall).not.toHaveBeenCalled();
+		expect(mockBinaryInstaller).toHaveBeenCalledWith(
+			'curl -fsSL https://example.com/ollama.tgz | sudo tar -xz -C /usr/local/'
+		);
+	});
+
+	it('logs a message instead of prompting when auto-installing', async () => {
+		(PluginInstallerService as ReturnType<typeof vi.fn>).mockImplementationOnce(() => ({
+			install: vi.fn().mockResolvedValue(undefined)
+		}));
+		(PluginLoaderService as ReturnType<typeof vi.fn>).mockImplementationOnce(() => ({
+			catalogAll: makeCatalogAll([
+				makePlugin({
+					manifest: {
+						name: 'valora-plugin-ollama',
+						requiresBinary: [
+							{
+								autoInstall: true,
+								installCommand: 'curl -fsSL https://example.com/ollama.tgz | sudo tar -xz -C /usr/local/',
+								name: 'ollama'
+							}
+						],
+						version: '1.0.0'
+					},
+					status: 'enabled'
+				})
+			])
+		}));
+		const mockBinaryInstaller = vi.fn().mockResolvedValue(0);
+
+		const program = makeProgram({
+			binaryChecker: vi.fn().mockResolvedValue(false),
+			binaryInstaller: mockBinaryInstaller
+		});
+		await runCommand(program, ['plugin', 'add', 'ollama']);
+
+		const logOutput = consoleSpy.mock.calls.map((c) => c.join(' ')).join('\n');
+		expect(logOutput).toContain('ollama');
+	});
+
+	it('still prompts when autoInstall is not set', async () => {
+		(PluginInstallerService as ReturnType<typeof vi.fn>).mockImplementationOnce(() => ({
+			install: vi.fn().mockResolvedValue(undefined)
+		}));
+		(PluginLoaderService as ReturnType<typeof vi.fn>).mockImplementationOnce(() => ({
+			catalogAll: makeCatalogAll([
+				makePlugin({
+					manifest: {
+						name: 'valora-plugin-ollama',
+						requiresBinary: [
+							{
+								installCommand: 'curl -fsSL https://example.com/ollama.tgz | sudo tar -xz -C /usr/local/',
+								name: 'ollama'
+							}
+						],
+						version: '1.0.0'
+					},
+					status: 'enabled'
+				})
+			])
+		}));
+		const mockPromptInstall = vi.fn().mockResolvedValue(false);
+
+		const program = makeProgram({
+			binaryChecker: vi.fn().mockResolvedValue(false),
+			promptInstall: mockPromptInstall
+		});
+		await runCommand(program, ['plugin', 'add', 'ollama']);
+
+		expect(mockPromptInstall).toHaveBeenCalled();
+	});
+});
+
+describe('plugin add — postInstallCommand', () => {
+	let consoleSpy: ReturnType<typeof vi.spyOn>;
+	let consoleWarnSpy: ReturnType<typeof vi.spyOn>;
+	let exitSpy: ReturnType<typeof vi.spyOn>;
+
+	beforeEach(() => {
+		consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+		consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+		exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never);
+	});
+
+	afterEach(() => {
+		consoleSpy.mockRestore();
+		consoleWarnSpy.mockRestore();
+		exitSpy.mockRestore();
+		vi.clearAllMocks();
+	});
+
+	it('runs postInstallCommand after successful binary installation', async () => {
+		(PluginInstallerService as ReturnType<typeof vi.fn>).mockImplementationOnce(() => ({
+			install: vi.fn().mockResolvedValue(undefined)
+		}));
+		(PluginLoaderService as ReturnType<typeof vi.fn>).mockImplementationOnce(() => ({
+			catalogAll: makeCatalogAll([
+				makePlugin({
+					manifest: {
+						name: 'valora-plugin-ollama',
+						requiresBinary: [
+							{
+								installCommand: 'curl -fsSL https://example.com/ollama -o ~/.local/bin/ollama',
+								name: 'ollama',
+								postInstallCommand: 'ollama serve & ollama pull llama3.1'
+							}
+						],
+						version: '1.0.0'
+					},
+					status: 'enabled'
+				})
+			])
+		}));
+		const mockBinaryInstaller = vi.fn().mockResolvedValue(0);
+
+		const program = makeProgram({
+			binaryChecker: vi.fn().mockResolvedValue(false),
+			binaryInstaller: mockBinaryInstaller,
+			promptInstall: vi.fn().mockResolvedValue(true)
+		});
+		await runCommand(program, ['plugin', 'add', 'ollama']);
+
+		expect(mockBinaryInstaller).toHaveBeenCalledWith('curl -fsSL https://example.com/ollama -o ~/.local/bin/ollama');
+		expect(mockBinaryInstaller).toHaveBeenCalledWith('ollama serve & ollama pull llama3.1');
+		expect(mockBinaryInstaller).toHaveBeenCalledTimes(2);
+	});
+
+	it('does not run postInstallCommand when binary installation fails', async () => {
+		(PluginInstallerService as ReturnType<typeof vi.fn>).mockImplementationOnce(() => ({
+			install: vi.fn().mockResolvedValue(undefined)
+		}));
+		(PluginLoaderService as ReturnType<typeof vi.fn>).mockImplementationOnce(() => ({
+			catalogAll: makeCatalogAll([
+				makePlugin({
+					manifest: {
+						name: 'valora-plugin-ollama',
+						requiresBinary: [
+							{
+								installCommand: 'curl -fsSL https://example.com/ollama -o ~/.local/bin/ollama',
+								name: 'ollama',
+								postInstallCommand: 'ollama pull llama3.1'
+							}
+						],
+						version: '1.0.0'
+					},
+					status: 'enabled'
+				})
+			])
+		}));
+		const mockBinaryInstaller = vi.fn().mockResolvedValueOnce(1).mockResolvedValue(0);
+
+		const program = makeProgram({
+			binaryChecker: vi.fn().mockResolvedValue(false),
+			binaryInstaller: mockBinaryInstaller,
+			promptInstall: vi.fn().mockResolvedValue(true)
+		});
+		await runCommand(program, ['plugin', 'add', 'ollama']);
+
+		expect(mockBinaryInstaller).toHaveBeenCalledTimes(1);
+		expect(mockBinaryInstaller).not.toHaveBeenCalledWith('ollama pull llama3.1');
+	});
+
+	it('does not run postInstallCommand when user declines binary installation', async () => {
+		(PluginInstallerService as ReturnType<typeof vi.fn>).mockImplementationOnce(() => ({
+			install: vi.fn().mockResolvedValue(undefined)
+		}));
+		(PluginLoaderService as ReturnType<typeof vi.fn>).mockImplementationOnce(() => ({
+			catalogAll: makeCatalogAll([
+				makePlugin({
+					manifest: {
+						name: 'valora-plugin-ollama',
+						requiresBinary: [
+							{
+								installCommand: 'curl -fsSL https://example.com/ollama -o ~/.local/bin/ollama',
+								name: 'ollama',
+								postInstallCommand: 'ollama pull llama3.1'
+							}
+						],
+						version: '1.0.0'
+					},
+					status: 'enabled'
+				})
+			])
+		}));
+		const mockBinaryInstaller = vi.fn();
+
+		const program = makeProgram({
+			binaryChecker: vi.fn().mockResolvedValue(false),
+			binaryInstaller: mockBinaryInstaller,
+			promptInstall: vi.fn().mockResolvedValue(false)
+		});
+		await runCommand(program, ['plugin', 'add', 'ollama']);
+
+		expect(mockBinaryInstaller).not.toHaveBeenCalled();
+	});
+
+	it('does not run postInstallCommand when binary is already on PATH', async () => {
+		(PluginInstallerService as ReturnType<typeof vi.fn>).mockImplementationOnce(() => ({
+			install: vi.fn().mockResolvedValue(undefined)
+		}));
+		(PluginLoaderService as ReturnType<typeof vi.fn>).mockImplementationOnce(() => ({
+			catalogAll: makeCatalogAll([
+				makePlugin({
+					manifest: {
+						name: 'valora-plugin-ollama',
+						requiresBinary: [
+							{
+								installCommand: 'curl -fsSL https://example.com/ollama -o ~/.local/bin/ollama',
+								name: 'ollama',
+								postInstallCommand: 'ollama pull llama3.1'
+							}
+						],
+						version: '1.0.0'
+					},
+					status: 'enabled'
+				})
+			])
+		}));
+		const mockBinaryInstaller = vi.fn();
+
+		const program = makeProgram({
+			binaryChecker: vi.fn().mockResolvedValue(true),
+			binaryInstaller: mockBinaryInstaller,
+			promptInstall: vi.fn().mockResolvedValue(true)
+		});
+		await runCommand(program, ['plugin', 'add', 'ollama']);
+
+		expect(mockBinaryInstaller).not.toHaveBeenCalled();
+	});
+});
+
+describe('plugin add (local tgz)', () => {
+	let consoleSpy: ReturnType<typeof vi.spyOn>;
+	let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
+	let exitSpy: ReturnType<typeof vi.spyOn>;
+
+	beforeEach(() => {
+		consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+		consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+		exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never);
+	});
+
+	afterEach(() => {
+		consoleSpy.mockRestore();
+		consoleErrorSpy.mockRestore();
+		exitSpy.mockRestore();
+		vi.clearAllMocks();
+	});
+
+	it('calls installFromTarball without prompting when the plugin is not currently installed', async () => {
+		vi.mocked(peekTarballManifest).mockReturnValue({ name: 'valora-plugin-docs', version: '1.0.0' });
+		(PluginLoaderService as ReturnType<typeof vi.fn>).mockImplementationOnce(() => ({
+			catalogAll: makeCatalogAll([])
+		}));
+		const mockInstallFromTarball = vi.fn().mockResolvedValue(undefined);
+		(PluginInstallerService as ReturnType<typeof vi.fn>).mockImplementationOnce(() => ({
+			install: vi.fn(),
+			installFromTarball: mockInstallFromTarball
+		}));
+
+		const program = makeProgram();
+		await runCommand(program, ['plugin', 'add', '/path/to/plugin.tgz']);
+
+		expect(mockInstallFromTarball).toHaveBeenCalledWith('/path/to/plugin.tgz', 'user');
+		expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('installed'));
+	});
+
+	it('prints "already installed" and skips when the installed version matches the tgz', async () => {
+		vi.mocked(peekTarballManifest).mockReturnValue({ name: 'valora-plugin-docs', version: '1.0.0' });
+		(PluginLoaderService as ReturnType<typeof vi.fn>).mockImplementationOnce(() => ({
+			catalogAll: makeCatalogAll([
+				makePlugin({ manifest: { name: 'valora-plugin-docs', version: '1.0.0' }, status: 'enabled' })
+			])
+		}));
+		const mockInstallFromTarball = vi.fn().mockResolvedValue(undefined);
+		(PluginInstallerService as ReturnType<typeof vi.fn>).mockImplementationOnce(() => ({
+			install: vi.fn(),
+			installFromTarball: mockInstallFromTarball
+		}));
+
+		const program = makeProgram();
+		await runCommand(program, ['plugin', 'add', '/path/to/plugin.tgz']);
+
+		expect(mockInstallFromTarball).not.toHaveBeenCalled();
+		const output = consoleSpy.mock.calls.map((c) => c.join(' ')).join('\n');
+		expect(output).toContain('already installed');
+	});
+
+	it('prompts and installs when the installed version differs and the user answers y', async () => {
+		vi.mocked(peekTarballManifest).mockReturnValue({ name: 'valora-plugin-docs', version: '1.1.0' });
+		(PluginLoaderService as ReturnType<typeof vi.fn>).mockImplementationOnce(() => ({
+			catalogAll: makeCatalogAll([
+				makePlugin({ manifest: { name: 'valora-plugin-docs', version: '1.0.0' }, status: 'enabled' })
+			])
+		}));
+		vi.mocked(readline.createInterface).mockReturnValueOnce({
+			question: (_q: string, cb: (answer: string) => void) => cb('y'),
+			close: vi.fn()
+		} as never);
+		const mockInstallFromTarball = vi.fn().mockResolvedValue(undefined);
+		(PluginInstallerService as ReturnType<typeof vi.fn>).mockImplementationOnce(() => ({
+			install: vi.fn(),
+			installFromTarball: mockInstallFromTarball
+		}));
+
+		const program = makeProgram();
+		await runCommand(program, ['plugin', 'add', '/path/to/plugin.tgz']);
+
+		expect(mockInstallFromTarball).toHaveBeenCalledWith('/path/to/plugin.tgz', 'user');
+		expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('installed'));
+	});
+
+	it('exits cleanly without installing when the user declines the update prompt', async () => {
+		vi.mocked(peekTarballManifest).mockReturnValue({ name: 'valora-plugin-docs', version: '1.1.0' });
+		(PluginLoaderService as ReturnType<typeof vi.fn>).mockImplementationOnce(() => ({
+			catalogAll: makeCatalogAll([
+				makePlugin({ manifest: { name: 'valora-plugin-docs', version: '1.0.0' }, status: 'enabled' })
+			])
+		}));
+		vi.mocked(readline.createInterface).mockReturnValueOnce({
+			question: (_q: string, cb: (answer: string) => void) => cb('n'),
+			close: vi.fn()
+		} as never);
+		const mockInstallFromTarball = vi.fn().mockResolvedValue(undefined);
+		(PluginInstallerService as ReturnType<typeof vi.fn>).mockImplementationOnce(() => ({
+			install: vi.fn(),
+			installFromTarball: mockInstallFromTarball
+		}));
+
+		const program = makeProgram();
+		await runCommand(program, ['plugin', 'add', '/path/to/plugin.tgz']);
+
+		expect(mockInstallFromTarball).not.toHaveBeenCalled();
+		expect(exitSpy).not.toHaveBeenCalled();
+	});
+
+	it('falls through to the npm flow when the argument does not end in .tgz', async () => {
+		const mockInstall = vi.fn().mockResolvedValue(undefined);
+		(PluginInstallerService as ReturnType<typeof vi.fn>).mockImplementationOnce(() => ({
+			install: mockInstall,
+			installFromTarball: vi.fn()
+		}));
+
+		const program = makeProgram();
+		await runCommand(program, ['plugin', 'add', 'rtk']);
+
+		expect(mockInstall).toHaveBeenCalledWith('rtk', 'user');
+		expect(vi.mocked(peekTarballManifest)).not.toHaveBeenCalled();
 	});
 });

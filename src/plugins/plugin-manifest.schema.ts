@@ -27,8 +27,11 @@ export const PLUGIN_PERMISSION_SCHEMA = z.enum([
 ]);
 
 export const PLUGIN_BINARY_REQUIREMENT_SCHEMA = z.object({
+	autoInstall: z.boolean().optional(),
 	install: z.string().optional(),
+	installCommand: z.string().optional(),
 	name: z.string().min(1),
+	postInstallCommand: z.string().optional(),
 	version: z.string().optional()
 });
 

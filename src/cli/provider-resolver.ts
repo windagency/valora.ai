@@ -213,14 +213,13 @@ export class CLIProviderResolver {
 		providerName: string,
 		requestedModel?: string
 	): Promise<{ config: ProviderConfig; resolvedModel?: string; resolvedProviderName?: string }> {
-		const logger = getLogger();
 		const configLoader = getConfigLoader();
 
 		try {
 			const config = await configLoader.load();
 
 			if (!config.providers || typeof config.providers !== 'object') {
-				logger.warn(`No provider configuration found. Will attempt cursor/guided fallback.`, {
+				getLogger().warn(`No provider configuration found. Will attempt cursor/guided fallback.`, {
 					provider: providerName
 				});
 				throw new ExecutionError(`No provider configuration found. Run 'valora config setup' to configure providers.`, {
@@ -230,22 +229,45 @@ export class CLIProviderResolver {
 
 			const providerConfig = config.providers[providerName as keyof typeof config.providers];
 			if (!providerConfig) {
-				return await this.handleMissingProvider(providerName, requestedModel, config);
+				return await this.resolveUnconfiguredProvider(providerName, requestedModel, config);
 			}
 
 			return { config: providerConfig };
 		} catch (error) {
-			// Re-throw ExecutionError as-is
 			if (error instanceof ExecutionError) {
 				throw error;
 			}
-			// Wrap other errors
-			const logger = getLogger();
-			logger.error(`Failed to load provider config for ${providerName}`, error as Error);
+			getLogger().error(`Failed to load provider config for ${providerName}`, error as Error);
 			throw new ExecutionError(`Failed to load provider configuration: ${(error as Error).message}`, {
 				provider: providerName
 			});
 		}
+	}
+
+	/**
+	 * Resolve a provider that is not directly in the config.
+	 * Silently falls back to default_provider when one is configured; otherwise triggers the mismatch handler.
+	 */
+	private async resolveUnconfiguredProvider(
+		providerName: string,
+		requestedModel: string | undefined,
+		config: Config
+	): Promise<{ config: ProviderConfig; resolvedModel?: string; resolvedProviderName?: string }> {
+		const defaultProvider = config.defaults?.default_provider;
+		if (defaultProvider && defaultProvider !== providerName) {
+			const defaultConfig = config.providers[defaultProvider as keyof typeof config.providers];
+			if (defaultConfig) {
+				getLogger().info(`Provider '${providerName}' not in config — falling back to default '${defaultProvider}'`, {
+					originalModel: requestedModel
+				});
+				return {
+					config: defaultConfig,
+					resolvedModel: defaultConfig.default_model ?? getDefaultModel(defaultProvider) ?? requestedModel,
+					resolvedProviderName: defaultProvider
+				};
+			}
+		}
+		return this.handleMissingProvider(providerName, requestedModel, config);
 	}
 
 	/**
@@ -341,7 +363,7 @@ export class CLIProviderResolver {
 	/**
 	 * Get list of configured providers
 	 */
-	private getConfiguredProviders(config: Config): string[] {
+	getConfiguredProviders(config: Config): string[] {
 		if (!config.providers || typeof config.providers !== 'object') {
 			return [];
 		}
@@ -362,13 +384,9 @@ export class CLIProviderResolver {
 				return true;
 			}
 
-			// Cursor provider doesn't need API key
-			if (providerName === BuiltinProviders.CURSOR) {
-				return true;
-			}
-
-			// Local provider doesn't need API key
-			if (providerName === BuiltinProviders.LOCAL) {
+			// Providers registered in the catalog that don't require an API key are always valid
+			const descriptor = getProviderCatalog().getProviderMetadata(providerName);
+			if (descriptor && !descriptor.requiresApiKey) {
 				return true;
 			}
 

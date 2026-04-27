@@ -15,6 +15,15 @@ export interface ConsolidationResult {
 	staleMarked: number;
 }
 
+export interface Edge {
+	fromId: string;
+	kind: EdgeKind;
+	toId: string;
+	weight?: number;
+}
+
+export type EdgeKind = 'co_accessed' | 'decays_from' | 'related' | 'supersedes';
+
 export type MemoryCategory = 'decisions' | 'episodic' | 'semantic';
 
 export interface MemoryCreateOptions {
@@ -69,6 +78,14 @@ export interface MemoryEntry {
 	supersededBy?: string;
 	/** Whether this memory originated from an error (gets errorHalfLifeMultiplier × halfLife) */
 	isError: boolean;
+	/** SHA-256 hash of content — used to detect stale embeddings */
+	contentHash?: string;
+	/** Embedding model used to produce the stored vector (e.g. 'nomic-embed-text') */
+	embeddingModel?: string;
+	/** Dimension of the stored embedding vector */
+	embeddingDim?: number;
+	/** Hebbian co-access counts: maps co-retrieved memory ID to retrieval-pair count */
+	coAccess?: Record<string, number>;
 }
 
 export interface MemoryQueryOptions {
@@ -86,6 +103,8 @@ export interface MemoryQueryOptions {
 	limit?: number;
 	/** Whether to strengthen (update access metadata) on retrieval (default true) */
 	strengthen?: boolean;
+	/** Free-text query for semantic (ANN) recall — used when an EmbedderPort is configured */
+	text?: string;
 }
 
 export interface MemoryQueryResult {
@@ -112,4 +131,19 @@ export interface MemoryStoreFile {
 	lastConsolidatedAt?: string;
 	/** The memory entries */
 	entries: MemoryEntry[];
+}
+
+export interface MemoryStorePort {
+	appendEntry(category: MemoryCategory, entry: MemoryEntry): Promise<void>;
+	flush(): Promise<void>;
+	getEntries(category: MemoryCategory): Promise<MemoryEntry[]>;
+	getMetadata(
+		category: MemoryCategory
+	): Promise<{ lastConsolidatedAt?: string; lastWrittenAt: string; version: number }>;
+	removeEntries(category: MemoryCategory, ids: Set<string>): Promise<number>;
+	removeEntry(category: MemoryCategory, id: string): Promise<boolean>;
+	save(category: MemoryCategory, immediate?: boolean): void;
+	setEntries(category: MemoryCategory, entries: MemoryEntry[]): Promise<void>;
+	setLastConsolidatedAt(timestamp: string): Promise<void>;
+	updateEntry(category: MemoryCategory, id: string, patch: Partial<MemoryEntry>): Promise<boolean>;
 }
