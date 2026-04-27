@@ -7,6 +7,8 @@ import { getLogger } from 'output/logger';
 
 import type { PluginAPI } from './plugin-api.types';
 
+import { registerCliSubcommand } from './cli-registry';
+
 export interface PluginLifecycleRegistry {
 	activateHooks: Array<() => Promise<void>>;
 	deactivateHooks: Array<() => Promise<void>>;
@@ -21,6 +23,11 @@ export function createPluginAPI(
 	const logger = getLogger();
 
 	return {
+		cli: {
+			addSubcommand(name, description, handler) {
+				registerCliSubcommand(name, description, handler);
+			}
+		},
 		compression: {
 			registerStrategy(tool, fn) {
 				registerStrategy(tool, fn);

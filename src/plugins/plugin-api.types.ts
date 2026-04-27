@@ -11,6 +11,9 @@ export interface CodePluginModule {
 }
 
 export interface PluginAPI {
+	cli: {
+		addSubcommand(name: string, description: string, handler: () => Promise<void> | void): void;
+	};
 	compression: {
 		registerStrategy(tool: string, fn: CompressionStrategy): void;
 	};
