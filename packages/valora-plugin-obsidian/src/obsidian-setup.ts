@@ -44,5 +44,10 @@ export async function setupObsidianVault(config: ObsidianConfig): Promise<void> 
 function writeJsonAtomic(filePath: string, content: unknown): void {
 	const tmp = `${filePath}.tmp`;
 	fs.writeFileSync(tmp, JSON.stringify(content, null, 2), 'utf-8');
-	fs.renameSync(tmp, filePath);
+	try {
+		fs.renameSync(tmp, filePath);
+	} catch {
+		fs.rmSync(tmp, { force: true });
+		throw new Error(`Failed to write ${filePath}`);
+	}
 }

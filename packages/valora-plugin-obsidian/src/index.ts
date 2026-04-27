@@ -7,6 +7,7 @@ import { resolveVaultDir, setupObsidianVault } from './obsidian-setup.js';
 export function register(api: PluginAPI): void {
 	api.config.extend(obsidianConfigSchema);
 
+	// TODO: read live user config once api.config.extend is implemented (currently a stub)
 	const config: ObsidianConfig = obsidianConfigSchema.parse({});
 
 	api.lifecycle.onActivate(async () => {

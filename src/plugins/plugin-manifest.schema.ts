@@ -37,7 +37,9 @@ export const PLUGIN_BINARY_REQUIREMENT_SCHEMA = z.object({
 
 export const PLUGIN_CLI_ENTRY_SCHEMA = z.object({
 	description: z.string(),
-	name: z.string().min(1)
+	name: z
+		.string()
+		.regex(/^[a-z][a-z0-9-]*( [a-z][a-z0-9-]*)?$/, 'CLI entry name must be one or two lowercase kebab-case words')
 });
 
 export const PLUGIN_MANIFEST_SCHEMA = z.object({

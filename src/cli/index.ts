@@ -278,7 +278,8 @@ function registerPluginCliStubs(prog: CommandAdapter, entries: Array<{ descripti
 
 	for (const entry of entries) {
 		const parts = entry.name.split(' ');
-		const parentName = parts[0] ?? entry.name;
+		// Zod regex guarantees at least one word so parts[0] is always defined
+		const parentName = parts[0]!;
 		const childName = parts[1];
 		const entryName = entry.name;
 		const entryDesc = entry.description;
