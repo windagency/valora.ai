@@ -12,7 +12,7 @@ import {
 	filterLs,
 	filterMake,
 	filterRg
-} from './strategies';
+} from './strategies.js';
 
 export function register(api: PluginAPI): void {
 	api.compression.registerStrategy('git', filterGit);

@@ -7,7 +7,7 @@ import {
 	filterPrettier,
 	filterTestRunner,
 	filterTsc
-} from './strategies';
+} from './strategies.js';
 
 export function register(api: PluginAPI): void {
 	api.compression.registerStrategy('tsc', filterTsc);

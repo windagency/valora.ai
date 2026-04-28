@@ -1,6 +1,6 @@
 import type { PluginAPI } from 'plugins/plugin-api.types';
 
-import { filterCargo, filterPip, filterPython, filterRuff } from './strategies';
+import { filterCargo, filterPip, filterPython, filterRuff } from './strategies.js';
 
 export function register(api: PluginAPI): void {
 	api.compression.registerStrategy('python', filterPython);
