@@ -80,8 +80,11 @@ export function getProjectConfigDir(): null | string {
 /**
  * Get the global user configuration directory.
  * Returns ~/.valora/ on Unix or %APPDATA%/valora/ on Windows.
+ * Override with VALORA_GLOBAL_CONFIG_DIR for testing or custom deployments.
  */
 export function getGlobalConfigDir(): string {
+	const envOverride = process.env['VALORA_GLOBAL_CONFIG_DIR'];
+	if (envOverride) return envOverride;
 	if (process.platform === 'win32') {
 		const appData = process.env['APPDATA'] ?? path.join(os.homedir(), 'AppData', 'Roaming');
 		return path.join(appData, 'valora');
@@ -141,4 +144,15 @@ export function getSystemPluginsDir(): string {
 export function getProjectPluginsDir(): null | string {
 	const projectDir = getProjectConfigDir();
 	return projectDir ? path.join(projectDir, 'plugins') : null;
+}
+
+/**
+ * Returns true if a Valora configuration directory exists in any scope
+ * (project, user, or system). Used to detect a first-time install.
+ */
+export function hasAnyValoraConfig(): boolean {
+	if (getProjectConfigDir() !== null) return true;
+	if (fs.existsSync(getGlobalConfigDir())) return true;
+	if (fs.existsSync(getSystemPluginsDir())) return true;
+	return false;
 }

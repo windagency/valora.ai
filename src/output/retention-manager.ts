@@ -71,6 +71,7 @@ export class RetentionManager extends BaseRetentionManager<RetentionPolicy, Clea
 			// Sort by modification time (oldest first)
 			return files.sort((a, b) => a.modifiedTime.getTime() - b.modifiedTime.getTime());
 		} catch (error) {
+			if ((error as NodeJS.ErrnoException).code === 'ENOENT') return [];
 			this.logger.error('Failed to analyze log directory', error instanceof Error ? error : undefined, { logDir });
 			throw error;
 		}

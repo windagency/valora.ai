@@ -16,7 +16,7 @@ import { RetentionManager, type RetentionPolicy } from 'output/retention-manager
 import { type SessionCleanupSchedule, SessionCleanupScheduler } from 'session/cleanup-scheduler';
 import { SessionRetentionManager, type SessionRetentionPolicy } from 'session/retention-manager';
 import { SessionStore } from 'session/store';
-import { getRuntimeDataDir } from 'utils/paths';
+import { getRuntimeDataDir, hasAnyValoraConfig } from 'utils/paths';
 
 // Global scheduler instances
 let logCleanupScheduler: CleanupScheduler | null = null;
@@ -46,16 +46,18 @@ export async function initializeCleanupSchedulers(): Promise<void> {
 			const configLoader = getConfigLoader();
 			const config = await configLoader.load();
 
-			// Initialize log cleanup scheduler
-			if (config.logging?.enabled) {
-				initializeLogCleanupScheduler(config);
-				logger.debug('Log cleanup scheduler initialized');
-			}
+			if (hasAnyValoraConfig()) {
+				// Initialize log cleanup scheduler
+				if (config.logging?.enabled) {
+					initializeLogCleanupScheduler(config);
+					logger.debug('Log cleanup scheduler initialized');
+				}
 
-			// Initialize session cleanup scheduler
-			if (config.sessions?.enabled) {
-				initializeSessionCleanupScheduler(config);
-				logger.debug('Session cleanup scheduler initialized');
+				// Initialize session cleanup scheduler
+				if (config.sessions?.enabled) {
+					initializeSessionCleanupScheduler(config);
+					logger.debug('Session cleanup scheduler initialized');
+				}
 			}
 
 			isInitialized = true;
