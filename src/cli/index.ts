@@ -284,7 +284,7 @@ function registerPluginCliStubs(prog: CommandAdapter, entries: Array<{ descripti
 		const entryName = entry.name;
 		const entryDesc = entry.description;
 
-		const action = async () => {
+		const action = async (): Promise<void> => {
 			const container = createContainer();
 			await initializePlugins(container);
 			const reg = getCliSubcommand(entryName);
