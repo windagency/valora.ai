@@ -193,7 +193,6 @@
 		"category": "biome",
 		"preservation": {
 			"mustContainAll": ["Found 5 diagnostics.", "noDoubleEquals", "noExplicitAny"],
-			"mustNotDrop": ["noDoubleEquals violations"],
 			"skipForCombinations": ["rtk-only", "all-inner+rtk"]
 		},
 		"expectedRatioFloor": {

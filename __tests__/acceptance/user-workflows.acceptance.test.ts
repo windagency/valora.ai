@@ -73,7 +73,8 @@ describe.skipIf(!cliBuilt)('User Workflow Acceptance Tests', () => {
 		it('should display help and expose the configuration path', async () => {
 			const { exitCode: helpExit, stdout: helpOutput } = await execa('node', [aiBinaryPath, '--help'], {
 				cwd: tempDir,
-				env: cliEnv()
+				env: cliEnv(),
+				input: ''
 			});
 
 			expect(helpExit).toBe(0);
@@ -83,7 +84,8 @@ describe.skipIf(!cliBuilt)('User Workflow Acceptance Tests', () => {
 			// Verify configuration path is reachable
 			const { exitCode: configExit, stdout: configOutput } = await execa('node', [aiBinaryPath, 'config', 'path'], {
 				cwd: tempDir,
-				env: cliEnv({ AI_LOG_LEVEL: 'info' })
+				env: cliEnv({ AI_LOG_LEVEL: 'info' }),
+				input: ''
 			});
 
 			expect(configExit).toBe(0);
@@ -96,7 +98,8 @@ describe.skipIf(!cliBuilt)('User Workflow Acceptance Tests', () => {
 			// List sessions — works even when there are none
 			const { exitCode: listExit, stdout: listOutput } = await execa('node', [aiBinaryPath, 'session', 'list'], {
 				cwd: tempDir,
-				env: cliEnv()
+				env: cliEnv(),
+				input: ''
 			});
 
 			expect(listExit).toBe(0);
@@ -105,7 +108,8 @@ describe.skipIf(!cliBuilt)('User Workflow Acceptance Tests', () => {
 			// Clear any inactive sessions
 			const { exitCode: clearExit, stdout: clearOutput } = await execa('node', [aiBinaryPath, 'session', 'clear'], {
 				cwd: tempDir,
-				env: cliEnv()
+				env: cliEnv(),
+				input: ''
 			});
 
 			expect(clearExit).toBe(0);
@@ -115,7 +119,8 @@ describe.skipIf(!cliBuilt)('User Workflow Acceptance Tests', () => {
 		it('should expose delete subcommand with --force option', async () => {
 			const { exitCode, stdout } = await execa('node', [aiBinaryPath, 'session', 'delete', '--help'], {
 				cwd: tempDir,
-				env: cliEnv()
+				env: cliEnv(),
+				input: ''
 			});
 
 			expect(exitCode).toBe(0);
@@ -127,7 +132,8 @@ describe.skipIf(!cliBuilt)('User Workflow Acceptance Tests', () => {
 		it('should list available commands and plugins', async () => {
 			const { exitCode, stdout } = await execa('node', [aiBinaryPath, 'list'], {
 				cwd: tempDir,
-				env: cliEnv()
+				env: cliEnv(),
+				input: ''
 			});
 
 			expect(exitCode).toBe(0);
@@ -138,6 +144,7 @@ describe.skipIf(!cliBuilt)('User Workflow Acceptance Tests', () => {
 			const { exitCode, stderr } = await execa('node', [aiBinaryPath, 'exec', 'nonexistent-command', '--dry-run'], {
 				cwd: tempDir,
 				env: cliEnv({ AI_DRY_RUN: 'true' }),
+				input: '',
 				reject: false
 			});
 
@@ -150,7 +157,8 @@ describe.skipIf(!cliBuilt)('User Workflow Acceptance Tests', () => {
 		it('should display current configuration', async () => {
 			const { exitCode: showExit, stdout: showOutput } = await execa('node', [aiBinaryPath, 'config', 'show'], {
 				cwd: tempDir,
-				env: cliEnv()
+				env: cliEnv(),
+				input: ''
 			});
 
 			expect(showExit).toBe(0);
@@ -160,7 +168,8 @@ describe.skipIf(!cliBuilt)('User Workflow Acceptance Tests', () => {
 		it('should report the configuration file path', async () => {
 			const { exitCode, stdout } = await execa('node', [aiBinaryPath, 'config', 'path'], {
 				cwd: tempDir,
-				env: cliEnv()
+				env: cliEnv(),
+				input: ''
 			});
 
 			expect(exitCode).toBe(0);
@@ -174,6 +183,7 @@ describe.skipIf(!cliBuilt)('User Workflow Acceptance Tests', () => {
 			const { exitCode: invalidExit } = await execa('node', [aiBinaryPath, 'invalid-command-12345'], {
 				cwd: tempDir,
 				env: cliEnv(),
+				input: '',
 				reject: false
 			});
 
@@ -182,7 +192,8 @@ describe.skipIf(!cliBuilt)('User Workflow Acceptance Tests', () => {
 			// System should still be functional after error
 			const { exitCode: helpExit, stdout: helpOutput } = await execa('node', [aiBinaryPath, '--help'], {
 				cwd: tempDir,
-				env: cliEnv()
+				env: cliEnv(),
+				input: ''
 			});
 
 			expect(helpExit).toBe(0);
@@ -193,6 +204,7 @@ describe.skipIf(!cliBuilt)('User Workflow Acceptance Tests', () => {
 			const { exitCode } = await execa('node', [aiBinaryPath, 'exec', 'unknown-command'], {
 				cwd: tempDir,
 				env: cliEnv({ AI_NETWORK_TIMEOUT: '5000' }),
+				input: '',
 				reject: false
 			});
 
@@ -214,6 +226,7 @@ describe.skipIf(!cliBuilt)('User Workflow Acceptance Tests', () => {
 				const { exitCode } = await execa('node', [aiBinaryPath, ...operation.command], {
 					cwd: tempDir,
 					env: cliEnv(),
+					input: '',
 					timeout: 20000
 				});
 
@@ -269,7 +282,8 @@ describe.skipIf(!cliBuilt)('User Workflow Acceptance Tests', () => {
 			const operations = Array.from({ length: operationCount }, () =>
 				execa('node', [aiBinaryPath, 'session', 'list'], {
 					cwd: tempDir,
-					env: cliEnv()
+					env: cliEnv(),
+					input: ''
 				})
 			);
 
@@ -289,7 +303,8 @@ describe.skipIf(!cliBuilt)('User Workflow Acceptance Tests', () => {
 				.map(() =>
 					execa('node', [aiBinaryPath, 'config', 'show'], {
 						cwd: tempDir,
-						env: cliEnv()
+						env: cliEnv(),
+						input: ''
 					})
 				);
 
