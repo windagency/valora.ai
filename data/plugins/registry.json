@@ -112,6 +112,14 @@
 		"version": "1.0.0"
 	},
 	{
+		"contributes": ["code"],
+		"description": "Bridges the Valora memory vault to Obsidian — sets up vault config and opens it.",
+		"name": "valora-plugin-obsidian",
+		"package": "@windagency/valora-plugin-obsidian",
+		"path": "packages/valora-plugin-obsidian",
+		"version": "1.0.0"
+	},
+	{
 		"contributes": ["agents"],
 		"description": "Security Operations Engineer agent for threat detection, vulnerability management, and incident response.",
 		"name": "valora-plugin-secops",
