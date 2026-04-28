@@ -374,11 +374,20 @@ describe('PluginInstallerService', () => {
 			);
 		});
 
-		it('throws when not inside a Valora project context', async () => {
+		it('bootstraps .valora/plugins/ in cwd and installs there when no project dir exists', async () => {
 			const { getProjectPluginsDir } = await import('utils/paths');
 			vi.mocked(getProjectPluginsDir).mockReturnValue(null);
 
-			await expect(new PluginInstallerService(makeMockRunner()).install('rtk', 'project')).rejects.toThrow('.valora/');
+			const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'valora-bootstrap-'));
+			const originalCwd = process.cwd();
+			try {
+				process.chdir(projectDir);
+				await new PluginInstallerService(makeMockRunner()).install('rtk', 'project');
+				expect(fs.existsSync(path.join(projectDir, '.valora', 'plugins', 'valora-plugin-rtk'))).toBe(true);
+			} finally {
+				process.chdir(originalCwd);
+				fs.rmSync(projectDir, { recursive: true, force: true });
+			}
 		});
 	});
 
@@ -525,6 +534,23 @@ describe('PluginInstallerService.installFromTarball', () => {
 
 		const stagingDirs = fs.readdirSync(os.tmpdir()).filter((d) => d.startsWith('valora-tgz-staging-'));
 		expect(stagingDirs).toHaveLength(0);
+	});
+
+	it('bootstraps .valora/plugins/ in cwd when installing from tarball with project scope and no existing project dir', async () => {
+		const { getProjectPluginsDir } = await import('utils/paths');
+		vi.mocked(getProjectPluginsDir).mockReturnValue(null);
+
+		const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'valora-bootstrap-tgz-'));
+		const originalCwd = process.cwd();
+		try {
+			process.chdir(projectDir);
+			const runner = makeMockRunner({ tgzManifest: { name: 'valora-plugin-docs', version: '1.0.0' } });
+			await new PluginInstallerService(runner).installFromTarball('/path/to/plugin.tgz', 'project');
+			expect(fs.existsSync(path.join(projectDir, '.valora', 'plugins', 'valora-plugin-docs'))).toBe(true);
+		} finally {
+			process.chdir(originalCwd);
+			fs.rmSync(projectDir, { recursive: true, force: true });
+		}
 	});
 
 	it('surfaces a permission error on global scope as an elevated-privileges message', async () => {

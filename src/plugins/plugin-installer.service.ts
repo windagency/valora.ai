@@ -37,6 +37,7 @@ export class PluginInstallerService {
 			const shortName = manifest.name;
 
 			targetDir = resolveTargetDir(scope, shortName);
+			fs.mkdirSync(path.dirname(targetDir), { recursive: true });
 			fs.rmSync(targetDir, { force: true, recursive: true });
 			fs.cpSync(stagingDir, targetDir, { recursive: true });
 
@@ -194,9 +195,6 @@ function resolveTargetDir(scope: InstallScope, shortName: string): string {
 	if (scope === 'user') {
 		return path.join(getGlobalPluginsDir(), shortName);
 	}
-	const projectDir = getProjectPluginsDir();
-	if (!projectDir) {
-		throw new Error('No .valora/ project directory found — run from inside a Valora project or use --scope user');
-	}
+	const projectDir = getProjectPluginsDir() ?? path.join(process.cwd(), '.valora', 'plugins');
 	return path.join(projectDir, shortName);
 }
