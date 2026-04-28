@@ -272,7 +272,7 @@ export function configurePluginCommand(program: CommandAdapter, hooks: PluginCom
 			const catalogMap = buildCatalogMap(catalog);
 			const refs = allInstalled.filter(isUpdatablePlugin).map(toInstalledPluginRef);
 
-			const normalised = nameArg ? (nameArg.startsWith('valora-plugin-') ? nameArg : `valora-plugin-${nameArg}`) : null;
+			const normalised = nameArg ? shortNameFromPackage(resolvePackageName(nameArg)) : null;
 			const filtered = normalised ? refs.filter((r) => r.name === normalised) : refs;
 
 			const missingFromCatalog = filtered.filter((r) => !catalogMap.has(r.name));

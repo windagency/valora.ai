@@ -129,6 +129,14 @@ describe('resolvePackageName', () => {
 	it('leaves an arbitrary third-party scoped package unchanged', () => {
 		expect(resolvePackageName('@other/some-plugin')).toBe('@other/some-plugin');
 	});
+
+	it('scopes a valora- prefixed name directly without adding valora-plugin-', () => {
+		expect(resolvePackageName('valora-core-product')).toBe('@windagency/valora-core-product');
+	});
+
+	it('scopes a valora-plugin- prefixed name directly', () => {
+		expect(resolvePackageName('valora-plugin-core-product')).toBe('@windagency/valora-plugin-core-product');
+	});
 });
 
 describe('shortNameFromPackage', () => {

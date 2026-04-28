@@ -139,8 +139,8 @@ export function peekTarballManifest(tgzPath: string): { name: string; version: s
 
 export function resolvePackageName(input: string): string {
 	if (input.startsWith('@')) return input;
-	const withPrefix = input.startsWith('valora-plugin-') ? input : `valora-plugin-${input}`;
-	return `@windagency/${withPrefix}`;
+	if (input.startsWith('valora-')) return `@windagency/${input}`;
+	return `@windagency/valora-plugin-${input}`;
 }
 
 export function shortNameFromPackage(packageName: string): string {

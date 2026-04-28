@@ -486,6 +486,47 @@ describe('plugin update (install)', () => {
 		expect(mockInstall).toHaveBeenCalledWith('valora-plugin-rtk', 'user');
 	});
 
+	it('matches a plugin when the name uses the valora- package prefix', async () => {
+		const mockInstall = vi.fn().mockResolvedValue(undefined);
+		(PluginInstallerService as ReturnType<typeof vi.fn>).mockImplementation(() => ({
+			install: mockInstall,
+			uninstall: vi.fn()
+		}));
+		(PluginLoaderService as ReturnType<typeof vi.fn>).mockImplementationOnce(() => ({
+			catalogAll: makeCatalogAll([
+				makePlugin({ manifest: { name: 'valora-plugin-rtk', version: '1.0.0' }, location: 'user', status: 'enabled' }),
+				makePlugin({
+					dir: '/plugins/valora-core-product',
+					manifest: { name: 'valora-core-product', version: '2.0.0' },
+					location: 'user',
+					status: 'enabled'
+				})
+			])
+		}));
+		vi.mocked(fetchPluginRegistry).mockResolvedValue([
+			{
+				name: 'valora-plugin-rtk',
+				package: '@windagency/valora-plugin-rtk',
+				version: '1.1.0',
+				contributes: [],
+				description: ''
+			},
+			{
+				name: 'valora-core-product',
+				package: '@windagency/valora-core-product',
+				version: '2.1.0',
+				contributes: [],
+				description: ''
+			}
+		]);
+
+		const program = makeProgram();
+		await runCommand(program, ['plugin', 'update', 'valora-core-product']);
+
+		expect(mockInstall).toHaveBeenCalledTimes(1);
+		expect(mockInstall).toHaveBeenCalledWith('valora-core-product', 'user');
+	});
+
 	it('warns and skips npm-scope plugins without installing', async () => {
 		const mockInstall = vi.fn().mockResolvedValue(undefined);
 		(PluginInstallerService as ReturnType<typeof vi.fn>).mockImplementation(() => ({
