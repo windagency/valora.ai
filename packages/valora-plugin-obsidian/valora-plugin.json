@@ -3,13 +3,19 @@
 	"version": "1.0.0",
 	"description": "Bridges the Valora memory vault to Obsidian — sets up vault config and opens it.",
 	"engines": { "valora": ">=0.1.0" },
-	"contributes": ["code"],
-	"permissions": ["code-exec", "fs-write"],
-	"codeEntrypoint": "dist/index.js",
 	"cli": [
+		{ "name": "obsidian open", "description": "Sync Obsidian config and open the Valora memory vault in Obsidian" }
+	],
+	"contributes": ["code"],
+	"permissions": ["code-exec", "fs-write", "network"],
+	"requiresBinary": [
 		{
-			"name": "obsidian open",
-			"description": "Sync Obsidian config and open the Valora memory vault in Obsidian"
+			"autoInstall": true,
+			"checkCommand": "which obsidian 2>/dev/null || test -d /Applications/Obsidian.app",
+			"install": "https://obsidian.md/download",
+			"installCommand": "OS=$(uname -s 2>/dev/null); ARCH=$(uname -m 2>/dev/null); if [ \"$OS\" = \"Darwin\" ]; then brew install --cask obsidian; elif [ \"$OS\" = \"Linux\" ]; then curl -fsSL https://api.github.com/repos/obsidianmd/obsidian-releases/releases/latest -o /tmp/obsidian-release.json; if [ \"$ARCH\" = \"aarch64\" ] || [ \"$ARCH\" = \"arm64\" ]; then URL=$(python3 -c \"import json; assets=json.load(open('/tmp/obsidian-release.json'))['assets']; urls=[a['browser_download_url'] for a in assets if a['name'].endswith('arm64.AppImage')]; print(urls[0] if urls else '')\"); [ -n \"$URL\" ] && curl -fsSL \"$URL\" -o /tmp/obsidian.AppImage && chmod +x /tmp/obsidian.AppImage && sudo mv /tmp/obsidian.AppImage /usr/local/bin/obsidian; else URL=$(python3 -c \"import json; assets=json.load(open('/tmp/obsidian-release.json'))['assets']; urls=[a['browser_download_url'] for a in assets if a['name'].endswith('amd64.deb')]; print(urls[0] if urls else '')\"); [ -n \"$URL\" ] && curl -fsSL \"$URL\" -o /tmp/obsidian.deb && sudo dpkg -i /tmp/obsidian.deb; fi; fi",
+			"name": "obsidian"
 		}
-	]
+	],
+	"codeEntrypoint": "dist/index.js"
 }

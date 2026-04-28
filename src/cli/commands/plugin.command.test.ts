@@ -1062,6 +1062,71 @@ describe('plugin add — postInstallCommand', () => {
 
 		expect(mockBinaryInstaller).not.toHaveBeenCalled();
 	});
+
+	it('uses checkCommand result instead of binaryChecker when checkCommand exits 0', async () => {
+		(PluginInstallerService as ReturnType<typeof vi.fn>).mockImplementationOnce(() => ({
+			install: vi.fn().mockResolvedValue(undefined)
+		}));
+		(PluginLoaderService as ReturnType<typeof vi.fn>).mockImplementationOnce(() => ({
+			catalogAll: makeCatalogAll([
+				makePlugin({
+					manifest: {
+						name: 'valora-plugin-obsidian',
+						requiresBinary: [
+							{
+								checkCommand: 'node -e "process.exit(0)"',
+								installCommand: 'brew install --cask obsidian',
+								name: 'obsidian'
+							}
+						],
+						version: '1.0.0'
+					},
+					status: 'enabled'
+				})
+			])
+		}));
+		const mockBinaryInstaller = vi.fn().mockResolvedValue(0);
+		const mockBinaryChecker = vi.fn().mockResolvedValue(false);
+
+		const program = makeProgram({ binaryChecker: mockBinaryChecker, binaryInstaller: mockBinaryInstaller });
+		await runCommand(program, ['plugin', 'add', 'obsidian']);
+
+		expect(mockBinaryInstaller).toHaveBeenCalledWith('node -e "process.exit(0)"');
+		expect(mockBinaryChecker).not.toHaveBeenCalled();
+		expect(mockBinaryInstaller).toHaveBeenCalledTimes(1);
+	});
+
+	it('runs installCommand when checkCommand exits non-zero', async () => {
+		(PluginInstallerService as ReturnType<typeof vi.fn>).mockImplementationOnce(() => ({
+			install: vi.fn().mockResolvedValue(undefined)
+		}));
+		(PluginLoaderService as ReturnType<typeof vi.fn>).mockImplementationOnce(() => ({
+			catalogAll: makeCatalogAll([
+				makePlugin({
+					manifest: {
+						name: 'valora-plugin-obsidian',
+						requiresBinary: [
+							{
+								autoInstall: true,
+								checkCommand: 'exit 1',
+								installCommand: 'brew install --cask obsidian',
+								name: 'obsidian'
+							}
+						],
+						version: '1.0.0'
+					},
+					status: 'enabled'
+				})
+			])
+		}));
+		const mockBinaryInstaller = vi.fn().mockResolvedValueOnce(1).mockResolvedValue(0);
+
+		const program = makeProgram({ binaryInstaller: mockBinaryInstaller });
+		await runCommand(program, ['plugin', 'add', 'obsidian']);
+
+		expect(mockBinaryInstaller).toHaveBeenNthCalledWith(1, 'exit 1');
+		expect(mockBinaryInstaller).toHaveBeenNthCalledWith(2, 'brew install --cask obsidian');
+	});
 });
 
 describe('plugin add (local tgz)', () => {

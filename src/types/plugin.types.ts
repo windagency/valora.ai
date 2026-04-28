@@ -24,6 +24,7 @@ export interface LoadedPlugin {
 
 export interface PluginBinaryRequirement {
 	autoInstall?: boolean;
+	checkCommand?: string;
 	install?: string;
 	installCommand?: string;
 	name: string;

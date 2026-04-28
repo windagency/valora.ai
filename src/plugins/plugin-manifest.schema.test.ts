@@ -1,6 +1,25 @@
 import { describe, expect, it } from 'vitest';
 
-import { PLUGIN_CLI_ENTRY_SCHEMA } from './plugin-manifest.schema';
+import { PLUGIN_BINARY_REQUIREMENT_SCHEMA, PLUGIN_CLI_ENTRY_SCHEMA } from './plugin-manifest.schema';
+
+describe('PLUGIN_BINARY_REQUIREMENT_SCHEMA', () => {
+	it('accepts a minimal requirement with only a name', () => {
+		expect(PLUGIN_BINARY_REQUIREMENT_SCHEMA.safeParse({ name: 'obsidian' }).success).toBe(true);
+	});
+
+	it('accepts checkCommand as an optional string', () => {
+		const result = PLUGIN_BINARY_REQUIREMENT_SCHEMA.safeParse({
+			name: 'obsidian',
+			checkCommand: 'node -e "process.exit(0)"'
+		});
+		expect(result.success).toBe(true);
+	});
+
+	it('rejects checkCommand that is not a string', () => {
+		const result = PLUGIN_BINARY_REQUIREMENT_SCHEMA.safeParse({ name: 'obsidian', checkCommand: 42 });
+		expect(result.success).toBe(false);
+	});
+});
 
 describe('PLUGIN_CLI_ENTRY_SCHEMA', () => {
 	describe('name validation', () => {

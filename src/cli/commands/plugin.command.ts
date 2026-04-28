@@ -42,7 +42,8 @@ async function checkBinaryRequirements(
 	const plugin = new PluginLoaderService().catalogAll().find((p) => p.manifest?.name === shortName);
 	const requirements = plugin?.manifest?.requiresBinary ?? [];
 	for (const req of requirements) {
-		if (await checker(req.name)) continue;
+		const isPresent = req.checkCommand ? (await installer(req.checkCommand)) === 0 : await checker(req.name);
+		if (isPresent) continue;
 		if (await tryInstallBinary(req, installer, promptFn)) continue;
 		console.warn(`⚠ Plugin requires '${req.name}' which was not found on PATH.`);
 		if (req.install) {
