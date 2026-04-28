@@ -132,7 +132,15 @@ export class PluginLoaderService {
 	}
 
 	private resolveCodeEntrypoint(pluginDir: string, manifest: PluginManifest): string | undefined {
-		if (!manifest.permissions?.includes('code-exec')) return undefined;
+		if (!manifest.permissions?.includes('code-exec')) {
+			if (manifest.contributes?.includes('code')) {
+				this.logger.warn(
+					`Plugin "${manifest.name}" contributes 'code' but is missing the 'code-exec' permission — register() will not be called`,
+					{ name: manifest.name }
+				);
+			}
+			return undefined;
+		}
 		if (!manifest.codeEntrypoint) return undefined;
 
 		const entrypoint = path.join(pluginDir, manifest.codeEntrypoint);
@@ -182,13 +190,29 @@ export class PluginLoaderService {
 	}
 
 	private resolveHooks(pluginDir: string, manifest: PluginManifest): HooksConfig | undefined {
-		if (!manifest.permissions?.includes('shell-hooks')) return undefined;
+		if (!manifest.permissions?.includes('shell-hooks')) {
+			if (manifest.contributes?.includes('hooks')) {
+				this.logger.warn(
+					`Plugin "${manifest.name}" contributes 'hooks' but is missing the 'shell-hooks' permission — hooks will not be registered`,
+					{ name: manifest.name }
+				);
+			}
+			return undefined;
+		}
 		const hooks = this.loadHooksFile(pluginDir);
 		return hooks ? this.resolveHookCommandPaths(hooks, pluginDir) : undefined;
 	}
 
 	private resolveMcpsFile(pluginDir: string, manifest: PluginManifest): string | undefined {
-		if (!manifest.permissions?.includes('mcp-connect')) return undefined;
+		if (!manifest.permissions?.includes('mcp-connect')) {
+			if (manifest.contributes?.includes('mcps')) {
+				this.logger.warn(
+					`Plugin "${manifest.name}" contributes 'mcps' but is missing the 'mcp-connect' permission — MCP servers will not be registered`,
+					{ name: manifest.name }
+				);
+			}
+			return undefined;
+		}
 
 		const mcpsPath = path.join(pluginDir, PLUGIN_MCPS_FILE);
 		return fs.existsSync(mcpsPath) ? mcpsPath : undefined;

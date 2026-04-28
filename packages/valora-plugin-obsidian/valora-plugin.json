@@ -4,7 +4,7 @@
 	"description": "Bridges the Valora memory vault to Obsidian — sets up vault config and opens it.",
 	"engines": { "valora": ">=0.1.0" },
 	"contributes": ["code"],
-	"permissions": ["fs-write"],
+	"permissions": ["code-exec", "fs-write"],
 	"codeEntrypoint": "dist/index.js",
 	"cli": [
 		{

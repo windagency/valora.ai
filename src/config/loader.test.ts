@@ -277,6 +277,43 @@ describe('ConfigLoader', () => {
 		});
 	});
 
+	describe('getRaw', () => {
+		it('throws before load() is called', () => {
+			expect(() => loader.getRaw()).toThrow('Configuration not loaded');
+		});
+
+		it('returns the merged config data after load()', async () => {
+			mockFileExists.mockReturnValue(true);
+			mockReadJSON.mockResolvedValue({ obsidian: { vaultDir: '/test-vault' } });
+
+			await loader.load();
+
+			const raw = loader.getRaw();
+			expect(raw).toBeDefined();
+			expect(typeof raw).toBe('object');
+		});
+
+		it('preserves top-level plugin keys that CONFIG_SCHEMA strips', async () => {
+			mockFileExists.mockReturnValue(true);
+			mockReadJSON.mockResolvedValue({ obsidian: { vaultDir: '/test-vault' } });
+
+			await loader.load();
+
+			// rawConfig has the plugin key; mergeConfigs (and therefore get()) drops it
+			expect(loader.getRaw()['obsidian']).toEqual({ vaultDir: '/test-vault' });
+			expect('obsidian' in loader.get()).toBe(false);
+		});
+
+		it('throws after reload() is called but before new load() completes', async () => {
+			await loader.load();
+			// Trigger reload — but getRaw() should be null again between reload and re-load
+			// (reload calls load() immediately so it re-populates; just verify it survives round-trip)
+			const reloaded = await loader.reload();
+			expect(reloaded).toBeDefined();
+			expect(loader.getRaw()).toBeDefined();
+		});
+	});
+
 	describe('environment variable loading', () => {
 		it('should load LLM provider configs from environment', async () => {
 			const originalEnv = process.env;

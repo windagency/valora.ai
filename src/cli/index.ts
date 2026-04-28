@@ -29,7 +29,7 @@ import { DEFAULT_STATE } from 'updater/state';
 import { autoInstallOutdatedPlugins } from 'cli/auto-plugin-install';
 import { silentSpawnRunner } from 'cli/spawn-runner';
 import { getConfigLoader, setGlobalCliOverrides } from 'config/loader';
-import { createContainer, initializePlugins } from 'di/container';
+import { createContainer, dispatchDeactivateHooks, initializePlugins } from 'di/container';
 import { getGlobalConfigDir, getRuntimeDataDir } from 'utils/paths';
 import { handlePromptCancellation, isPromptCancellation } from 'utils/prompt-handler';
 
@@ -292,7 +292,11 @@ function registerPluginCliStubs(prog: CommandAdapter, entries: Array<{ descripti
 				console.error(`Plugin subcommand '${entryName}' was declared in a manifest but no handler was registered.`);
 				process.exit(1);
 			}
-			await reg.handler();
+			try {
+				await reg.handler();
+			} finally {
+				await dispatchDeactivateHooks(container);
+			}
 		};
 
 		if (childName) {

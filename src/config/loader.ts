@@ -34,6 +34,7 @@ const ENV_PARSERS = {
 export class ConfigLoader {
 	private config: Config | null = null;
 	private configPath: string;
+	private rawConfig: null | Record<string, unknown> = null;
 
 	constructor(configPath?: string) {
 		this.configPath =
@@ -60,6 +61,15 @@ export class ConfigLoader {
 		const globalConfig = await this.loadGlobalConfig();
 		const projectConfig = await this.loadProjectConfig();
 		const envConfig = this.loadFromEnv();
+
+		// Capture unknown top-level keys (e.g. plugin config) before mergeConfigs drops them.
+		// Uses package → global → project precedence (last-wins), matching mergeConfigs priority.
+		this.rawConfig = Object.assign(
+			{},
+			packageConfig as Record<string, unknown>,
+			globalConfig as Record<string, unknown>,
+			projectConfig as Record<string, unknown>
+		);
 
 		const globalCliFlags = getGlobalCliOverrides();
 		const mergedConfig = this.mergeConfigs(
@@ -499,6 +509,17 @@ export class ConfigLoader {
 	}
 
 	/**
+	 * Get the merged config before schema validation — preserves keys that CONFIG_SCHEMA strips.
+	 * Intended for plugin config consumption via api.config.extend().
+	 */
+	getRaw(): Record<string, unknown> {
+		if (!this.rawConfig) {
+			throw new ConfigurationError('Configuration not loaded. Call load() first.');
+		}
+		return this.rawConfig;
+	}
+
+	/**
 	 * Check if configuration file exists
 	 */
 	exists(): boolean {
@@ -552,6 +573,7 @@ export class ConfigLoader {
 	 */
 	async reload(): Promise<Config> {
 		this.config = null;
+		this.rawConfig = null;
 		return this.load();
 	}
 }

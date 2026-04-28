@@ -1,6 +1,9 @@
+import type { ZodType } from 'zod';
+
 import type { DIContainer } from 'di/container';
 import type { LoadedPlugin } from 'types/plugin.types';
 
+import { getConfigLoader } from 'config/loader';
 import { registerStrategy } from 'executor/output-compression.service';
 import { getProviderRegistry } from 'llm/registry';
 import { getLogger } from 'output/logger';
@@ -34,8 +37,23 @@ export function createPluginAPI(
 			}
 		},
 		config: {
-			extend(_schema) {
-				// Stubbed: config schema extension is defined in the interface for future use
+			extend<TOutput>(schema: ZodType<TOutput>): () => TOutput {
+				return () => {
+					let raw: Record<string, unknown>;
+					try {
+						raw = getConfigLoader().getRaw();
+					} catch {
+						raw = {};
+					}
+					const result = schema.safeParse(raw);
+					if (!result.success) {
+						logger.warn(`Plugin "${plugin.manifest.name}" config is invalid; using defaults`, {
+							errors: result.error.flatten()
+						});
+						return schema.parse({});
+					}
+					return result.data;
+				};
 			}
 		},
 		lifecycle: {

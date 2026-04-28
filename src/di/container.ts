@@ -223,6 +223,27 @@ export function createContainer(): DIContainer {
  */
 let loadedPlugins: LoadedPlugin[] = [];
 
+export async function dispatchDeactivateHooks(container: DIContainer): Promise<void> {
+	try {
+		const registries = container.resolve<Map<string, PluginLifecycleRegistry>>(
+			SERVICE_IDENTIFIERS.PLUGIN_LIFECYCLE_REGISTRIES
+		);
+		for (const [pluginName, registry] of registries) {
+			for (const hook of registry.deactivateHooks) {
+				try {
+					await hook();
+				} catch (err) {
+					getLogger().warn(`Plugin "${pluginName}" deactivate hook failed`, {
+						error: (err as Error).message
+					});
+				}
+			}
+		}
+	} catch {
+		// Registry not initialized — initializePlugins was never called
+	}
+}
+
 export function getLoadedPlugins(): LoadedPlugin[] {
 	return loadedPlugins;
 }
@@ -261,6 +282,22 @@ export async function initializePlugins(container: DIContainer): Promise<void> {
 		if (plugin.hooks) hookService.registerPluginHooks(plugin.hooks);
 		if (plugin.mcpsFile) registerPluginMcpsFile(plugin.mcpsFile);
 		if (plugin.codeEntrypoint) await loadCodePlugin(container, plugin, lifecycleRegistries);
+	}
+
+	await dispatchActivateHooks(lifecycleRegistries);
+}
+
+async function dispatchActivateHooks(registries: Map<string, PluginLifecycleRegistry>): Promise<void> {
+	for (const [pluginName, registry] of registries) {
+		for (const hook of registry.activateHooks) {
+			try {
+				await hook();
+			} catch (err) {
+				getLogger().warn(`Plugin "${pluginName}" activate hook failed`, {
+					error: (err as Error).message
+				});
+			}
+		}
 	}
 }
 

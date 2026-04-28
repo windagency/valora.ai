@@ -29,6 +29,67 @@ function importsFrom(content: string, pattern: RegExp): boolean {
 	return pattern.test(content);
 }
 
+const DATA_PLUGINS_DIR = path.join(ROOT, 'data', 'plugins');
+
+const PERMISSION_REQUIRED_FOR: Record<string, string> = {
+	code: 'code-exec',
+	hooks: 'shell-hooks',
+	mcps: 'mcp-connect'
+};
+
+function findPluginManifests(): string[] {
+	const manifests: string[] = [];
+
+	if (fs.existsSync(PACKAGES_DIR)) {
+		for (const entry of fs.readdirSync(PACKAGES_DIR, { withFileTypes: true })) {
+			if (!entry.isDirectory() || !entry.name.startsWith('valora-plugin-')) continue;
+			const manifestPath = path.join(PACKAGES_DIR, entry.name, 'valora-plugin.json');
+			if (fs.existsSync(manifestPath)) manifests.push(manifestPath);
+		}
+	}
+
+	if (fs.existsSync(DATA_PLUGINS_DIR)) {
+		for (const entry of fs.readdirSync(DATA_PLUGINS_DIR, { withFileTypes: true })) {
+			if (!entry.isDirectory()) continue;
+			const manifestPath = path.join(DATA_PLUGINS_DIR, entry.name, 'valora-plugin.json');
+			if (fs.existsSync(manifestPath)) manifests.push(manifestPath);
+		}
+	}
+
+	return manifests;
+}
+
+describe('Plugin manifest contributes ↔ permissions contract', () => {
+	it('every plugin with a gated contribute declares the required permission', () => {
+		const violations: string[] = [];
+
+		for (const manifestPath of findPluginManifests()) {
+			const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8')) as {
+				contributes?: string[];
+				name?: string;
+				permissions?: string[];
+			};
+
+			const contributes = manifest.contributes ?? [];
+			const permissions = manifest.permissions ?? [];
+			const name = manifest.name ?? path.relative(ROOT, manifestPath);
+
+			for (const [contrib, requiredPerm] of Object.entries(PERMISSION_REQUIRED_FOR)) {
+				if (contributes.includes(contrib) && !permissions.includes(requiredPerm)) {
+					violations.push(`"${name}" contributes '${contrib}' but is missing the '${requiredPerm}' permission`);
+				}
+			}
+		}
+
+		if (violations.length > 0) {
+			throw new Error(
+				`Plugin manifests have mismatched contributes/permissions:\n  - ${violations.join('\n  - ')}\n\n` +
+					`Each 'code' contribution requires 'code-exec', 'hooks' requires 'shell-hooks', 'mcps' requires 'mcp-connect'.`
+			);
+		}
+	});
+});
+
 describe('Plugin package boundaries', () => {
 	it('no packages/valora-plugin-* source file imports directly from src/cli/', () => {
 		if (!fs.existsSync(PACKAGES_DIR)) return;

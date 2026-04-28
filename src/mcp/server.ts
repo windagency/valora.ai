@@ -15,6 +15,7 @@ import { getConfigLoader, setGlobalCliOverrides } from 'config/loader';
 import {
 	createContainer,
 	type DIContainer,
+	dispatchDeactivateHooks,
 	initializePlugins,
 	SERVICE_IDENTIFIERS,
 	setupMCPServices
@@ -53,10 +54,9 @@ export class MCPOrchestratorServer implements MCPSamplingService {
 
 	// @ts-expect-error — kept for service lifecycle; assigned but only consumed externally
 	private requestHandler: MCPRequestHandler;
-	private systemMonitor: SystemMonitorService;
-
-	// @ts-expect-error — planned for future use; declared but not yet referenced
 	private shutdownManager: ShutdownManager;
+
+	private systemMonitor: SystemMonitorService;
 
 	constructor(logger?: Logger, version?: string) {
 		this.logger = logger ?? getLogger(); // Fallback to default logger if none provided
@@ -116,6 +116,7 @@ export class MCPOrchestratorServer implements MCPSamplingService {
 
 		// Load plugins before any commands are registered
 		await initializePlugins(this.container);
+		this.shutdownManager.registerCleanup(() => dispatchDeactivateHooks(this.container));
 
 		// Start system monitoring
 		this.systemMonitor.startMonitoring();

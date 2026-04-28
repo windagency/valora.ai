@@ -279,3 +279,207 @@ describe('initializePlugins — provider descriptor registration', () => {
 		expect(getProviderRegistry().getDescriptor('nodesc-provider')).toBeUndefined();
 	});
 });
+
+describe('initializePlugins — lifecycle activate hook dispatch', () => {
+	let tmpDir: string;
+
+	beforeEach(() => {
+		tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'valora-activate-test-'));
+	});
+
+	afterEach(() => {
+		fs.rmSync(tmpDir, { recursive: true, force: true });
+		vi.resetModules();
+	});
+
+	it('invokes activate hooks registered via api.lifecycle.onActivate()', async () => {
+		const flagFile = path.join(tmpDir, 'activate-called.txt');
+		const entrypointPath = path.join(tmpDir, 'lifecycle-plugin.mjs');
+		fs.writeFileSync(
+			entrypointPath,
+			[
+				'import * as nodefs from "node:fs";',
+				'export async function register(api) {',
+				`  api.lifecycle.onActivate(async () => { nodefs.writeFileSync(${JSON.stringify(flagFile)}, "1"); });`,
+				'}'
+			].join('\n')
+		);
+
+		const { PluginLoaderService } = await import('plugins/plugin-loader.service');
+		vi.mocked(PluginLoaderService).mockImplementation(
+			() =>
+				({
+					loadAll: vi.fn().mockReturnValue([
+						{
+							codeEntrypoint: entrypointPath,
+							manifest: { name: 'lifecycle-plugin', version: '1.0.0' },
+							pluginDir: tmpDir,
+							status: 'enabled'
+						}
+					])
+				}) as never
+		);
+
+		const { createContainer, initializePlugins } = await import('di/container');
+		const container = createContainer();
+		await initializePlugins(container);
+
+		expect(fs.existsSync(flagFile)).toBe(true);
+	});
+
+	it('continues dispatching remaining activate hooks when one plugin hook throws', async () => {
+		const flagFile = path.join(tmpDir, 'plugin-b-activated.txt');
+		const entryA = path.join(tmpDir, 'plugin-a.mjs');
+		const entryB = path.join(tmpDir, 'plugin-b.mjs');
+		fs.writeFileSync(
+			entryA,
+			[
+				'export async function register(api) {',
+				'  api.lifecycle.onActivate(async () => { throw new Error("activate error"); });',
+				'}'
+			].join('\n')
+		);
+		fs.writeFileSync(
+			entryB,
+			[
+				'import * as nodefs from "node:fs";',
+				'export async function register(api) {',
+				`  api.lifecycle.onActivate(async () => { nodefs.writeFileSync(${JSON.stringify(flagFile)}, "1"); });`,
+				'}'
+			].join('\n')
+		);
+
+		const { PluginLoaderService } = await import('plugins/plugin-loader.service');
+		vi.mocked(PluginLoaderService).mockImplementation(
+			() =>
+				({
+					loadAll: vi.fn().mockReturnValue([
+						{
+							codeEntrypoint: entryA,
+							manifest: { name: 'plugin-a', version: '1.0.0' },
+							pluginDir: tmpDir,
+							status: 'enabled'
+						},
+						{
+							codeEntrypoint: entryB,
+							manifest: { name: 'plugin-b', version: '1.0.0' },
+							pluginDir: tmpDir,
+							status: 'enabled'
+						}
+					])
+				}) as never
+		);
+
+		const { createContainer, initializePlugins } = await import('di/container');
+		const container = createContainer();
+		await expect(initializePlugins(container)).resolves.toBeUndefined();
+
+		expect(fs.existsSync(flagFile)).toBe(true);
+	});
+});
+
+describe('dispatchDeactivateHooks', () => {
+	let tmpDir: string;
+
+	beforeEach(() => {
+		tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'valora-deactivate-test-'));
+	});
+
+	afterEach(() => {
+		fs.rmSync(tmpDir, { recursive: true, force: true });
+		vi.resetModules();
+	});
+
+	it('invokes deactivate hooks registered via api.lifecycle.onDeactivate()', async () => {
+		const flagFile = path.join(tmpDir, 'deactivate-called.txt');
+		const entrypointPath = path.join(tmpDir, 'deactivate-plugin.mjs');
+		fs.writeFileSync(
+			entrypointPath,
+			[
+				'import * as nodefs from "node:fs";',
+				'export async function register(api) {',
+				`  api.lifecycle.onDeactivate(async () => { nodefs.writeFileSync(${JSON.stringify(flagFile)}, "1"); });`,
+				'}'
+			].join('\n')
+		);
+
+		const { PluginLoaderService } = await import('plugins/plugin-loader.service');
+		vi.mocked(PluginLoaderService).mockImplementation(
+			() =>
+				({
+					loadAll: vi.fn().mockReturnValue([
+						{
+							codeEntrypoint: entrypointPath,
+							manifest: { name: 'deactivate-plugin', version: '1.0.0' },
+							pluginDir: tmpDir,
+							status: 'enabled'
+						}
+					])
+				}) as never
+		);
+
+		const { createContainer, dispatchDeactivateHooks, initializePlugins } = await import('di/container');
+		const container = createContainer();
+		await initializePlugins(container);
+		await dispatchDeactivateHooks(container);
+
+		expect(fs.existsSync(flagFile)).toBe(true);
+	});
+
+	it('continues dispatching remaining deactivate hooks when one throws', async () => {
+		const flagFile = path.join(tmpDir, 'plugin-b-deactivated.txt');
+		const entryA = path.join(tmpDir, 'plugin-a.mjs');
+		const entryB = path.join(tmpDir, 'plugin-b.mjs');
+		fs.writeFileSync(
+			entryA,
+			[
+				'export async function register(api) {',
+				'  api.lifecycle.onDeactivate(async () => { throw new Error("deactivate error"); });',
+				'}'
+			].join('\n')
+		);
+		fs.writeFileSync(
+			entryB,
+			[
+				'import * as nodefs from "node:fs";',
+				'export async function register(api) {',
+				`  api.lifecycle.onDeactivate(async () => { nodefs.writeFileSync(${JSON.stringify(flagFile)}, "1"); });`,
+				'}'
+			].join('\n')
+		);
+
+		const { PluginLoaderService } = await import('plugins/plugin-loader.service');
+		vi.mocked(PluginLoaderService).mockImplementation(
+			() =>
+				({
+					loadAll: vi.fn().mockReturnValue([
+						{
+							codeEntrypoint: entryA,
+							manifest: { name: 'plugin-a', version: '1.0.0' },
+							pluginDir: tmpDir,
+							status: 'enabled'
+						},
+						{
+							codeEntrypoint: entryB,
+							manifest: { name: 'plugin-b', version: '1.0.0' },
+							pluginDir: tmpDir,
+							status: 'enabled'
+						}
+					])
+				}) as never
+		);
+
+		const { createContainer, dispatchDeactivateHooks, initializePlugins } = await import('di/container');
+		const container = createContainer();
+		await initializePlugins(container);
+		await expect(dispatchDeactivateHooks(container)).resolves.toBeUndefined();
+
+		expect(fs.existsSync(flagFile)).toBe(true);
+	});
+
+	it('is a no-op when initializePlugins has not been called', async () => {
+		const { createContainer, dispatchDeactivateHooks } = await import('di/container');
+		const container = createContainer();
+		await expect(dispatchDeactivateHooks(container)).resolves.toBeUndefined();
+	});
+});

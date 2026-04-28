@@ -328,6 +328,95 @@ describe('PluginLoaderService — code plugin bundle', () => {
 	});
 });
 
+describe('PluginLoaderService — permission/contribute mismatch warnings', () => {
+	let tmpDir: string;
+
+	beforeEach(() => {
+		tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'valora-warn-test-'));
+	});
+
+	afterEach(() => {
+		fs.rmSync(tmpDir, { recursive: true, force: true });
+	});
+
+	it('logs a warning when contributes code but code-exec permission is absent', async () => {
+		const { getLogger } = await import('output/logger');
+		const mockWarn = vi.fn();
+		vi.mocked(getLogger).mockReturnValueOnce({
+			warn: mockWarn,
+			info: vi.fn(),
+			debug: vi.fn(),
+			error: vi.fn()
+		} as never);
+
+		const loader = new PluginLoaderService({
+			discoverWithSource: () => [{ dir: tmpDir, location: 'built-in' as const }]
+		} as never);
+
+		writeJson(path.join(tmpDir, 'valora-plugin.json'), {
+			name: 'code-plugin-no-perm',
+			version: '1.0.0',
+			contributes: ['code'],
+			codeEntrypoint: 'index.js'
+		});
+		writeFile(path.join(tmpDir, 'index.js'), '');
+
+		loader.loadAll();
+
+		expect(mockWarn).toHaveBeenCalledWith(expect.stringContaining('code-exec'), expect.anything());
+	});
+
+	it('logs a warning when contributes hooks but shell-hooks permission is absent', async () => {
+		const { getLogger } = await import('output/logger');
+		const mockWarn = vi.fn();
+		vi.mocked(getLogger).mockReturnValueOnce({
+			warn: mockWarn,
+			info: vi.fn(),
+			debug: vi.fn(),
+			error: vi.fn()
+		} as never);
+
+		const loader = new PluginLoaderService({
+			discoverWithSource: () => [{ dir: tmpDir, location: 'built-in' as const }]
+		} as never);
+
+		writeJson(path.join(tmpDir, 'valora-plugin.json'), {
+			name: 'hooks-plugin-no-perm',
+			version: '1.0.0',
+			contributes: ['hooks']
+		});
+
+		loader.loadAll();
+
+		expect(mockWarn).toHaveBeenCalledWith(expect.stringContaining('shell-hooks'), expect.anything());
+	});
+
+	it('logs a warning when contributes mcps but mcp-connect permission is absent', async () => {
+		const { getLogger } = await import('output/logger');
+		const mockWarn = vi.fn();
+		vi.mocked(getLogger).mockReturnValueOnce({
+			warn: mockWarn,
+			info: vi.fn(),
+			debug: vi.fn(),
+			error: vi.fn()
+		} as never);
+
+		const loader = new PluginLoaderService({
+			discoverWithSource: () => [{ dir: tmpDir, location: 'built-in' as const }]
+		} as never);
+
+		writeJson(path.join(tmpDir, 'valora-plugin.json'), {
+			name: 'mcps-plugin-no-perm',
+			version: '1.0.0',
+			contributes: ['mcps']
+		});
+
+		loader.loadAll();
+
+		expect(mockWarn).toHaveBeenCalledWith(expect.stringContaining('mcp-connect'), expect.anything());
+	});
+});
+
 describe('PluginLoaderService — requires dependency ordering', () => {
 	let tmpDirA: string;
 	let tmpDirB: string;

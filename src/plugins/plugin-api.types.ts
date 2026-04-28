@@ -1,4 +1,4 @@
-import type { ZodTypeAny } from 'zod';
+import type { ZodType, ZodTypeAny } from 'zod';
 
 import type { CompressionStrategy } from 'executor/output-compression.service';
 import type { Logger } from 'output/logger';
@@ -18,7 +18,7 @@ export interface PluginAPI {
 		registerStrategy(tool: string, fn: CompressionStrategy): void;
 	};
 	config: {
-		extend(schema: ZodTypeAny): void;
+		extend<TOutput>(schema: ZodType<TOutput>): () => TOutput;
 	};
 	lifecycle: PluginLifecycleHooks;
 	logger: Pick<Logger, 'debug' | 'error' | 'info' | 'warn'>;

@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import type { PluginAPI } from 'plugins/plugin-api.types';
 
+import { obsidianConfigSchema } from './config.schema.js';
 import { register } from './index.js';
 
 function makeApi() {
@@ -15,7 +16,7 @@ function makeApi() {
 			}
 		},
 		compression: { registerStrategy: vi.fn() },
-		config: { extend: vi.fn() },
+		config: { extend: vi.fn(() => () => obsidianConfigSchema.parse({})) },
 		lifecycle: {
 			onActivate: (fn) => {
 				activateHooks.push(fn);
@@ -30,10 +31,12 @@ function makeApi() {
 }
 
 describe('valora-plugin-obsidian register()', () => {
-	it('calls api.config.extend once', () => {
+	it('calls api.config.extend once and uses the returned getter', () => {
 		const { api } = makeApi();
+		const getter = api.config.extend as ReturnType<typeof vi.fn>;
 		register(api);
-		expect(api.config.extend).toHaveBeenCalledOnce();
+		expect(getter).toHaveBeenCalledOnce();
+		expect(typeof getter.mock.results[0]?.value).toBe('function');
 	});
 
 	it('registers exactly one activate hook via api.lifecycle.onActivate', () => {

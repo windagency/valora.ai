@@ -4,7 +4,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { PROVIDERS_CONFIG_SCHEMA } from './schema';
+import { CONFIG_SCHEMA, PROVIDERS_CONFIG_SCHEMA } from './schema';
 
 describe('PROVIDERS_CONFIG_SCHEMA — dynamic provider keys', () => {
 	it('accepts a known provider key without error', () => {
@@ -48,6 +48,20 @@ describe('PROVIDERS_CONFIG_SCHEMA — dynamic provider keys', () => {
 		expect(result.success).toBe(true);
 		if (result.success) {
 			expect((result.data['openrouter'] as Record<string, unknown>)?.['httpReferer']).toBe('https://example.com');
+		}
+	});
+});
+
+describe('CONFIG_SCHEMA — unknown key stripping', () => {
+	it('strips unknown top-level keys from parsed config', () => {
+		const result = CONFIG_SCHEMA.safeParse({
+			defaults: {},
+			providers: {},
+			obsidian: { vaultDir: '/custom-vault' }
+		});
+		expect(result.success).toBe(true);
+		if (result.success) {
+			expect('obsidian' in result.data).toBe(false);
 		}
 	});
 });
