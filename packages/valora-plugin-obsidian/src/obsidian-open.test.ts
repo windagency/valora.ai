@@ -12,7 +12,33 @@ vi.mock('node:fs', async (importOriginal) => {
 import { spawn, spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
 
-import { buildObsidianUri, openObsidian } from './obsidian-open.js';
+import { buildBrowserUrl, buildObsidianUri, openObsidian } from './obsidian-open.js';
+
+describe('buildBrowserUrl', () => {
+	afterEach(() => {
+		vi.mocked(fs.existsSync).mockReset();
+	});
+
+	it('returns the noVNC URL when running inside a container', () => {
+		vi.mocked(fs.existsSync).mockReturnValue(true);
+		const url = buildBrowserUrl('/home/user/.valora/memory');
+		expect(url).toBe('http://localhost:6080');
+	});
+
+	it('produces a file:// URL when not in a container', () => {
+		vi.mocked(fs.existsSync).mockReturnValue(false);
+		const url = buildBrowserUrl('/home/user/.valora/memory');
+		expect(url).toMatch(/^file:\/\//);
+	});
+
+	it('includes the resolved vault path in the file:// URL when not in a container', () => {
+		vi.mocked(fs.existsSync).mockReturnValue(false);
+		const url = buildBrowserUrl('/home/user/.valora/memory');
+		expect(url).toContain('home');
+		expect(url).toContain('valora');
+		expect(url).toContain('memory');
+	});
+});
 
 describe('buildObsidianUri', () => {
 	it('produces an obsidian:// URI starting with the scheme', () => {
@@ -39,7 +65,10 @@ describe('openObsidian', () => {
 	}
 
 	function mockVaultExists(exists = true) {
-		vi.mocked(fs.existsSync).mockReturnValue(exists);
+		vi.mocked(fs.existsSync).mockImplementation((p: fs.PathLike) => {
+			if (String(p) === '/.dockerenv') return false;
+			return exists;
+		});
 	}
 
 	function mockSpawnSyncSuccess() {
@@ -75,6 +104,7 @@ describe('openObsidian', () => {
 		setPlatform('darwin');
 		mockVaultExists();
 		mockSpawnSyncSuccess();
+		vi.spyOn(console, 'log').mockImplementation(() => {});
 		openObsidian('/tmp/vault');
 		expect(spawnSync).toHaveBeenCalledWith(
 			'open',
@@ -87,6 +117,7 @@ describe('openObsidian', () => {
 		setPlatform('win32');
 		mockVaultExists();
 		mockSpawnSyncSuccess();
+		vi.spyOn(console, 'log').mockImplementation(() => {});
 		openObsidian('/tmp/vault');
 		expect(spawnSync).toHaveBeenCalledWith('cmd', expect.arrayContaining(['/c', 'start']), expect.anything());
 	});
@@ -96,6 +127,7 @@ describe('openObsidian', () => {
 		mockVaultExists();
 		mockSpawnSyncSuccess(); // which obsidian → found
 		const child = mockSpawnDetached();
+		vi.spyOn(console, 'log').mockImplementation(() => {});
 		openObsidian('/tmp/vault');
 		expect(spawnSync).toHaveBeenCalledWith('which', ['obsidian'], expect.anything());
 		expect(spawn).toHaveBeenCalledWith(
@@ -150,6 +182,7 @@ describe('openObsidian', () => {
 		setPlatform('darwin');
 		mockVaultExists();
 		mockSpawnSyncSuccess();
+		vi.spyOn(console, 'log').mockImplementation(() => {});
 		const result = openObsidian('/tmp/vault');
 		expect(result.success).toBe(true);
 	});
@@ -159,7 +192,54 @@ describe('openObsidian', () => {
 		mockVaultExists();
 		mockSpawnSyncSuccess(); // which obsidian → found
 		mockSpawnDetached();
+		vi.spyOn(console, 'log').mockImplementation(() => {});
 		const result = openObsidian('/tmp/vault');
 		expect(result.success).toBe(true);
+	});
+
+	it('prints the obsidian:// URI on successful launch on macOS', () => {
+		setPlatform('darwin');
+		mockVaultExists();
+		mockSpawnSyncSuccess();
+		const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+		openObsidian('/tmp/vault');
+		const allOutput = logSpy.mock.calls.flat().join('\n');
+		expect(allOutput).toContain('obsidian://');
+	});
+
+	it('prints the file:// browser URL on successful launch on macOS', () => {
+		setPlatform('darwin');
+		mockVaultExists();
+		mockSpawnSyncSuccess();
+		const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+		openObsidian('/tmp/vault');
+		const allOutput = logSpy.mock.calls.flat().join('\n');
+		expect(allOutput).toContain('file://');
+	});
+
+	it('prints both URLs on successful launch on Linux', () => {
+		setPlatform('linux');
+		mockVaultExists();
+		mockSpawnSyncSuccess(); // which obsidian → found
+		mockSpawnDetached();
+		const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+		openObsidian('/tmp/vault');
+		const allOutput = logSpy.mock.calls.flat().join('\n');
+		expect(allOutput).toContain('obsidian://');
+		expect(allOutput).toContain('file://');
+	});
+
+	it('prints the noVNC URL when launching inside a container', () => {
+		setPlatform('darwin');
+		vi.mocked(fs.existsSync).mockImplementation((p: fs.PathLike) => {
+			if (String(p) === '/.dockerenv') return true;
+			return true; // vault also exists
+		});
+		mockSpawnSyncSuccess();
+		const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+		openObsidian('/tmp/vault');
+		const allOutput = logSpy.mock.calls.flat().join('\n');
+		expect(allOutput).toContain('http://localhost:6080');
+		expect(allOutput).toContain('obsidian://');
 	});
 });
