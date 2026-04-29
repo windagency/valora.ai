@@ -63,7 +63,7 @@ describe('PluginDiscoveryService — npm plugin discovery', () => {
 		expect(dirs).not.toContain(nonPluginDir);
 	});
 
-	it('ignores packages in the scope not prefixed with valora-plugin-', () => {
+	it('ignores packages in the scope not prefixed with valora-plugin- or valora-core-', () => {
 		const nonPluginDir = path.join(tmpDir, 'node_modules', '@windagency', 'some-other-package');
 		writeJson(path.join(nonPluginDir, 'valora-plugin.json'), {
 			name: 'some-other-package',
@@ -73,6 +73,18 @@ describe('PluginDiscoveryService — npm plugin discovery', () => {
 		const dirs = discovery.discoverPluginDirs();
 
 		expect(dirs).not.toContain(nonPluginDir);
+	});
+
+	it('discovers a valid plugin from node_modules/@windagency/valora-core-*', () => {
+		const pluginDir = path.join(tmpDir, 'node_modules', '@windagency', 'valora-core-engineering');
+		writeJson(path.join(pluginDir, 'valora-plugin.json'), {
+			name: 'valora-core-engineering',
+			version: '1.0.0'
+		});
+
+		const dirs = discovery.discoverPluginDirs();
+
+		expect(dirs).toContain(pluginDir);
 	});
 
 	it('returns empty array when node_modules/@windagency does not exist', () => {

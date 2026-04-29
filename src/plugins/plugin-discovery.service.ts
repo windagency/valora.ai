@@ -9,7 +9,7 @@ import { getGlobalPluginsDir, getPackagePluginsDir, getProjectPluginsDir, getSys
 import { PLUGIN_MANIFEST_FILE } from './plugin-manifest.schema';
 
 const NPM_PACKAGE_SCOPE = '@windagency';
-const NPM_PLUGIN_PREFIX = 'valora-plugin-';
+const NPM_PLUGIN_PREFIXES = ['valora-plugin-', 'valora-core-'] as const;
 
 export class PluginDiscoveryService {
 	private readonly logger = getLogger();
@@ -46,7 +46,7 @@ export class PluginDiscoveryService {
 		try {
 			return fs
 				.readdirSync(scopeDir, { withFileTypes: true })
-				.filter((entry) => entry.isDirectory() && entry.name.startsWith(NPM_PLUGIN_PREFIX))
+				.filter((entry) => entry.isDirectory() && NPM_PLUGIN_PREFIXES.some((prefix) => entry.name.startsWith(prefix)))
 				.map((entry) => path.join(scopeDir, entry.name))
 				.filter((pluginDir) => fs.existsSync(path.join(pluginDir, PLUGIN_MANIFEST_FILE)));
 		} catch (error) {

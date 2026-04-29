@@ -14,8 +14,6 @@ model_requirements:
   recommended:
     - gpt-5-thinking-high
     - gpt-o1-high
-agents:
-  - lead
 dependencies:
   requires:
     - context.use-modern-cli-tools
