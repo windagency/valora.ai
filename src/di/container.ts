@@ -13,6 +13,7 @@ import { preloadConflictResolutions, resolveProviderConflict } from 'plugins/con
 import { createPluginAPI, type PluginLifecycleRegistry } from 'plugins/plugin-api.factory';
 import { PluginLoaderService } from 'plugins/plugin-loader.service';
 
+import type { DeterministicValidator } from 'executor/validators/types';
 import type { LoadedPlugin, PluginsConfig } from 'types/plugin.types';
 
 import { CommandExecutor } from 'cli/command-executor';
@@ -28,6 +29,7 @@ import { getHookExecutionService } from 'executor/hook-execution.service';
 import { PipelineExecutor } from 'executor/pipeline';
 import { PromptLoader } from 'executor/prompt-loader';
 import { StageExecutor } from 'executor/stage-executor';
+import { registerValidator } from 'executor/validators/registry';
 import { getProviderRegistry, ProviderConflictError } from 'llm/registry';
 import { ExternalMCPIntegrator } from 'mcp/external-mcp-integrator';
 import { MCPApprovalWorkflow } from 'mcp/mcp-approval-workflow';
@@ -275,13 +277,18 @@ export async function initializePlugins(container: DIContainer): Promise<void> {
 	const promptLoader = container.resolve<PromptLoader>(SERVICE_IDENTIFIERS.PROMPT_LOADER);
 	const hookService = getHookExecutionService();
 
-	for (const plugin of plugins) {
+	const activatePlugin = async (plugin: LoadedPlugin): Promise<void> => {
 		if (plugin.agentsDir) agentLoader.registerPluginDir(plugin.agentsDir);
 		if (plugin.commandsDir) commandLoader.registerPluginDir(plugin.commandsDir, plugin.manifest.name);
 		if (plugin.promptsDir) promptLoader.registerPluginPromptsDir(plugin.promptsDir);
 		if (plugin.hooks) hookService.registerPluginHooks(plugin.hooks);
 		if (plugin.mcpsFile) registerPluginMcpsFile(plugin.mcpsFile);
 		if (plugin.codeEntrypoint) await loadCodePlugin(container, plugin, lifecycleRegistries);
+		if (plugin.validatorModules) await loadPluginValidators(plugin);
+	};
+
+	for (const plugin of plugins) {
+		await activatePlugin(plugin);
 	}
 
 	await dispatchActivateHooks(lifecycleRegistries);
@@ -340,6 +347,28 @@ async function loadCodePlugin(
 			error: (error as Error).message,
 			plugin: plugin.manifest.name
 		});
+	}
+}
+
+async function loadPluginValidators(plugin: LoadedPlugin): Promise<void> {
+	const logger = getLogger();
+	for (const { modulePath, stage } of plugin.validatorModules ?? []) {
+		try {
+			const mod = (await import(modulePath)) as { default?: DeterministicValidator };
+			if (!mod.default || typeof mod.default.validate !== 'function') {
+				logger.warn(`Plugin "${plugin.manifest.name}" validator module has no default DeterministicValidator export`, {
+					modulePath
+				});
+				continue;
+			}
+			registerValidator(stage, mod.default);
+			logger.info(`Plugin validator registered: stage="${stage}" from ${plugin.manifest.name}`);
+		} catch (error) {
+			logger.warn(`Failed to load plugin validator: ${modulePath}`, {
+				error: (error as Error).message,
+				plugin: plugin.manifest.name
+			});
+		}
 	}
 }
 

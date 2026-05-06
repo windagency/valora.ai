@@ -137,10 +137,18 @@ export class AnthropicProvider extends BaseLLMProvider implements BatchableProvi
 				model: resolvedModel,
 				stop_sequences: options.stop,
 				system,
-				temperature: options.temperature,
+				// Extended thinking requires temperature=1
+				temperature: options.requires_thinking_trace ? 1 : options.temperature,
 				tools: formattedTools,
 				top_p: options.top_p
 			};
+
+			if (options.requires_thinking_trace) {
+				(messageParams as unknown as Record<string, unknown>)['thinking'] = {
+					budget_tokens: 8000,
+					type: 'enabled'
+				};
+			}
 
 			// Apply cache breakpoints if prompt caching is enabled
 			this.applyCacheBreakpoints(messageParams);
@@ -153,7 +161,7 @@ export class AnthropicProvider extends BaseLLMProvider implements BatchableProvi
 			const usage = this.extractUsage(response.usage);
 
 			return {
-				content: this.extractContent(response),
+				content: this.extractContent(response, options.requires_thinking_trace),
 				finish_reason: response.stop_reason ?? undefined,
 				model: response.model,
 				role: 'assistant' as const,
@@ -458,10 +466,15 @@ export class AnthropicProvider extends BaseLLMProvider implements BatchableProvi
 	/**
 	 * Resolve the actual Anthropic model name based on model and mode
 	 */
-	private extractContent(response: Anthropic.Message): string {
+	private extractContent(response: Anthropic.Message, includeThinking = false): string {
 		return response.content
-			.filter((block) => block.type === 'text')
-			.map((block) => (block as Anthropic.TextBlock).text)
+			.filter((block) => block.type === 'text' || (includeThinking && block.type === 'thinking'))
+			.map((block) => {
+				if (block.type === 'thinking') {
+					return `<thinking>\n${(block as unknown as { thinking: string }).thinking}\n</thinking>`;
+				}
+				return (block as Anthropic.TextBlock).text;
+			})
 			.join('');
 	}
 

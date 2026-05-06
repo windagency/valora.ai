@@ -34,6 +34,7 @@ export interface AgentContextRequirements {
 export interface AgentDecisionMaking {
 	autonomy_level: AutonomyLevel;
 	escalation_criteria?: string[];
+	requires_thinking_trace?: boolean;
 }
 
 export interface AgentDefinition extends AgentMetadata {
@@ -46,12 +47,17 @@ export interface AgentMetadata {
 	context_requirements?: AgentContextRequirements;
 	decision_making?: AgentDecisionMaking;
 	description: string;
+	escalation_contact?: string;
 	experimental?: boolean;
 	expertise?: string[];
+	expires?: string; // ISO date YYYY-MM-DD — agent should be reviewed/renewed after this date
 	output_format?: AgentOutputFormat;
+	owner?: string; // Primary owner email
 	responsibilities?: string[];
 	role: string;
 	specialization: string;
+	succession_owner?: string;
+	team?: string;
 	tone: ToneStyle;
 	version: string;
 }

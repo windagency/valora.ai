@@ -14,7 +14,8 @@ export const PLUGIN_CONTRIBUTION_TYPE_SCHEMA = z.enum([
 	'hooks',
 	'mcps',
 	'prompts',
-	'templates'
+	'templates',
+	'validators'
 ]);
 
 export const PLUGIN_PERMISSION_SCHEMA = z.enum([
@@ -58,6 +59,7 @@ export const PLUGIN_MANIFEST_SCHEMA = z.object({
 	permissions: z.array(PLUGIN_PERMISSION_SCHEMA).optional(),
 	requires: z.array(z.string()).optional(),
 	requiresBinary: z.array(PLUGIN_BINARY_REQUIREMENT_SCHEMA).optional(),
+	validators: z.array(z.object({ module: z.string().min(1), stage: z.string().min(1) })).optional(),
 	version: z.string().regex(/^\d+\.\d+\.\d+$/, 'Version must follow semver (major.minor.patch)')
 });
 

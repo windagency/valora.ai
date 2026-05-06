@@ -1,6 +1,12 @@
 {
+	"budgets": {
+		"policy": "strict"
+	},
 	"defaults": {
 		"log_level": "warn"
+	},
+	"observability": {
+		"trace_retention_days": 90
 	},
 	"features": {
 		"agent_selection_analytics": false,

@@ -29,6 +29,7 @@ export interface GlobalFlags {
 	mockInputs: OptionAdapter;
 	mode: OptionAdapter;
 	model: OptionAdapter;
+	noDisclosure: OptionAdapter;
 	noDocumentOutput: OptionAdapter;
 	noInteractive: OptionAdapter;
 	noRetention: OptionAdapter;
@@ -98,6 +99,8 @@ export const globalFlags: GlobalFlags = {
 	mode: createOption('--mode <mode>', 'Override default AI model mode'),
 
 	model: createOption('--model <name>', 'Override default AI model'),
+
+	noDisclosure: createOption('--no-disclosure', 'Suppress the EU AI Act Art. 50 disclosure footer from output'),
 
 	noDocumentOutput: createOption('--no-document-output', 'Disable document output to knowledge-base'),
 

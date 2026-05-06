@@ -5,9 +5,11 @@
  * due to insufficient or invalid input data.
  */
 
+import { getValidator, hasValidator } from 'executor/validators/registry';
 import { getColorAdapter } from 'output/color-adapter.interface';
 import { getConsoleOutput } from 'output/console-output';
 import { getRenderer } from 'output/markdown';
+import 'executor/validators/built-in/index';
 import { isNonEmptyArray } from 'utils/type-guards';
 
 /**
@@ -63,6 +65,7 @@ export class StageValidationService {
 	 * Check if a stage requires validation
 	 */
 	requiresValidation(stageName: string): boolean {
+		if (hasValidator(stageName)) return true;
 		return (
 			VALIDATED_STAGES.includes(stageName) ||
 			Object.keys(this.stageValidators).some((pattern) => stageName.includes(pattern))
@@ -70,12 +73,25 @@ export class StageValidationService {
 	}
 
 	/**
-	 * Validate stage outputs and determine if pipeline should continue
+	 * Validate stage outputs and determine if pipeline should continue.
+	 * Registry validators (Track-Two) run first; if they fail the result is
+	 * returned immediately without running the legacy built-in validators.
 	 */
 	validate(stageName: string, outputs: Record<string, unknown>): StageValidationResult {
-		// Find matching validator using object lookup
-		const matchingPattern = Object.keys(this.stageValidators).find((pattern) => stageName.includes(pattern));
+		const registryValidator = getValidator(stageName);
+		if (registryValidator) {
+			const result = registryValidator.validate(outputs, { stageName });
+			if (!result.passed) {
+				return {
+					isValid: false,
+					reasons: result.violations,
+					shouldStopPipeline: result.shouldStopPipeline,
+					summary: undefined
+				};
+			}
+		}
 
+		const matchingPattern = Object.keys(this.stageValidators).find((pattern) => stageName.includes(pattern));
 		if (matchingPattern) {
 			return this.stageValidators[matchingPattern]!(outputs);
 		}

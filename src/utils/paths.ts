@@ -147,6 +147,19 @@ export function getProjectPluginsDir(): null | string {
 }
 
 /**
+ * Get the current package version from package.json at the package root.
+ */
+export function getValoraVersion(): string {
+	const pkgPath = path.join(getPackageRoot(), 'package.json');
+	try {
+		const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8')) as { version?: string };
+		return pkg.version ?? '0.0.0';
+	} catch {
+		return '0.0.0';
+	}
+}
+
+/**
  * Returns true if a Valora configuration directory exists in any scope
  * (project, user, or system). Used to detect a first-time install.
  */

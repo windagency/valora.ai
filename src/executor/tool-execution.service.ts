@@ -48,6 +48,7 @@ import { getLSPToolsService, type LSPToolsService } from 'lsp/lsp-tools.service'
 import { dirname, resolve } from 'path';
 import { getCommandGuard } from 'security/command-guard';
 import { getCredentialGuard } from 'security/credential-guard';
+import { type EffectivePermissions, getPermissionPropagationService } from 'security/permission-propagation.service';
 import { fileURLToPath } from 'url';
 import { promisify } from 'util';
 
@@ -613,6 +614,17 @@ export class ToolExecutionService {
 	 */
 	private dryRunSimulator: DryRunToolSimulator | null = null;
 
+	/**
+	 * Effective permission constraints propagated from the parent execution context.
+	 * Writes and deletes are blocked for paths in forbidden_paths; paths matching
+	 * requires_approval_for are queued for human confirmation.
+	 */
+	private effectiveConstraints: EffectivePermissions = {
+		delegationDepth: 0,
+		forbidden_paths: [],
+		requires_approval_for: []
+	};
+
 	constructor(workingDir: string = process.cwd()) {
 		this.workingDir = workingDir;
 		this.idempotencyStore = getIdempotencyStore();
@@ -700,6 +712,14 @@ export class ToolExecutionService {
 	 */
 	isDryRunMode(): boolean {
 		return this.dryRunMode;
+	}
+
+	/**
+	 * Set the effective permission constraints for this execution context.
+	 * Must be called before any tool execution to enforce path restrictions.
+	 */
+	setEffectiveConstraints(constraints: EffectivePermissions): void {
+		this.effectiveConstraints = constraints;
 	}
 
 	/**
@@ -1165,6 +1185,12 @@ export class ToolExecutionService {
 
 		const fullPath = this.validateAndResolvePath(path, 'write to');
 
+		// Enforce effective permission constraints: block writes to forbidden paths
+		const permSvc = getPermissionPropagationService();
+		if (permSvc.isForbidden(fullPath, this.effectiveConstraints.forbidden_paths)) {
+			return `Cannot write to forbidden path: ${path}. This path is restricted by the active permission constraints.`;
+		}
+
 		// Check if this is a protected file that already exists
 		const fileName = path.split('/').pop() ?? path;
 		const isProtectedFile = ToolExecutionService.PROTECTED_FILES.some(
@@ -1181,10 +1207,18 @@ export class ToolExecutionService {
 			);
 		}
 
-		// Check if this path requires confirmation
-		const requiresConfirmation = ToolExecutionService.CONFIRM_WRITE_PATHS.some(
-			(confirmPath) => path.includes(confirmPath) || fullPath.includes(confirmPath)
+		// Check if this path requires approval per effective constraints (requires_approval_for)
+		const requiresConstraintApproval = permSvc.requiresApproval(
+			fullPath,
+			this.effectiveConstraints.requires_approval_for
 		);
+
+		// Check if this path requires confirmation via static config paths
+		const requiresConfirmation =
+			requiresConstraintApproval ||
+			ToolExecutionService.CONFIRM_WRITE_PATHS.some(
+				(confirmPath) => path.includes(confirmPath) || fullPath.includes(confirmPath)
+			);
 
 		if (requiresConfirmation) {
 			// Queue the write for confirmation at the end of pipeline
@@ -1449,6 +1483,14 @@ export class ToolExecutionService {
 
 		try {
 			const fullPath = this.validateAndResolvePath(path, 'delete');
+
+			// Enforce effective permission constraints: block deletes to forbidden paths
+			const permSvc = getPermissionPropagationService();
+			if (permSvc.isForbidden(fullPath, this.effectiveConstraints.forbidden_paths)) {
+				return Promise.resolve(
+					`Cannot delete forbidden path: ${path}. This path is restricted by the active permission constraints.`
+				);
+			}
 
 			if (!existsSync(fullPath)) {
 				return Promise.resolve(`File not found: ${path} (nothing to delete)`);

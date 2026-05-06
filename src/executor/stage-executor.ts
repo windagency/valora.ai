@@ -27,6 +27,7 @@ import type { PromptDefinition } from 'types/prompt.types';
 import { getASTIndexService } from 'ast/ast-index.service';
 import { generateCodebaseMap } from 'ast/ast-query.service';
 import { DEFAULT_MAX_TOKENS, DEFAULT_TEMPERATURE } from 'config/constants';
+import { getConfigLoader } from 'config/loader';
 import { BuiltinProviders } from 'config/providers.config';
 import { MCPApprovalCacheService } from 'mcp/mcp-approval-cache.service';
 import { MCPApprovalWorkflow } from 'mcp/mcp-approval-workflow';
@@ -34,11 +35,13 @@ import { MCPAuditLoggerService } from 'mcp/mcp-audit-logger.service';
 import { MCPAvailabilityService } from 'mcp/mcp-availability.service';
 import { MCPClientManagerService } from 'mcp/mcp-client-manager.service';
 import { getMCPToolHandler, type MCPToolHandler } from 'mcp/mcp-tool-handler';
+import { ReasoningTraceRecorder } from 'observability/reasoning-trace-recorder';
 import { getLogger } from 'output/logger';
 import { ResolutionPath } from 'types/provider.types';
 import { formatErrorMessage } from 'utils/error-utils';
 import { readFile } from 'utils/file-utils';
 import { getMetricsCollector } from 'utils/metrics-collector';
+import { getSpendingTracker } from 'utils/spending-tracker';
 import { getModelPricing } from 'utils/token-estimator';
 
 import type { AgentLoader } from './agent-loader';
@@ -52,6 +55,7 @@ import { getCompressionStats, stripAnsiCodes } from './output-compression.servic
 import { getOutputParsingService, type OutputParsingService } from './output-parsing.service';
 import { getPipelineEmitter, type PipelineEventEmitter } from './pipeline-events';
 import { loadAvailableAgents, loadProjectGuidance, loadProjectKnowledge } from './project-guidance-loader';
+import { getSessionBudgetService, type SessionBudgetService } from './session-budget.service';
 import { getStageOutputCache, type StageOutputCache } from './stage-output-cache';
 import { getStageValidationService, type StageValidationService } from './stage-validation.service';
 import { getToolExecutionService, type ToolExecutionService } from './tool-execution.service';
@@ -185,6 +189,7 @@ interface ExecutionSummary {
 }
 
 export class StageExecutor {
+	private currentTracer?: ReasoningTraceRecorder;
 	private escalationDetectionService: EscalationDetectionService;
 	private escalationHandlerService: EscalationHandlerService;
 	private eventEmitter: PipelineEventEmitter;
@@ -192,6 +197,7 @@ export class StageExecutor {
 	private mcpToolHandler: MCPToolHandler;
 	private messageBuilderService: MessageBuilderService;
 	private outputParsingService: OutputParsingService;
+	private sessionBudgetService: SessionBudgetService;
 	private stageOutputCache: StageOutputCache;
 	private toolExecutionService: ToolExecutionService;
 	private validationService: StageValidationService;
@@ -209,6 +215,8 @@ export class StageExecutor {
 		this.outputParsingService = getOutputParsingService();
 		this.messageBuilderService = getMessageBuilderService();
 		this.stageOutputCache = getStageOutputCache();
+		const appConfig = getConfigLoader().get();
+		this.sessionBudgetService = getSessionBudgetService(getSpendingTracker(), appConfig.budgets);
 
 		// Initialize MCP services for external tool calls
 		const approvalCache = new MCPApprovalCacheService();
@@ -509,6 +517,22 @@ export class StageExecutor {
 			logger.info('Dry-run mode enabled - tools will be simulated');
 		}
 
+		// Propagate effective permission constraints to tool execution service
+		this.toolExecutionService.setEffectiveConstraints(executionContext.effectiveConstraints);
+
+		// Budget circuit-breaker — halt before LLM call if session budget is exhausted
+		const sessionId = executionContext.sessionInfo?.sessionId;
+		if (sessionId) {
+			const budgetBreach = this.checkBudget(
+				sessionId,
+				`${stage.stage}.${stage.prompt}`,
+				startTime,
+				enrichedInputs,
+				logger
+			);
+			if (budgetBreach) return budgetBreach;
+		}
+
 		// Emit LLM request event
 		this.eventEmitter.emitLLMRequest({
 			model: config.modelOverride ?? executionContext.model,
@@ -528,6 +552,7 @@ export class StageExecutor {
 			logger
 		);
 		const duration = Date.now() - startTime;
+		this.recordStageComplete(completion, summary, duration);
 
 		// Emit LLM response event - prefer actual model returned by provider over configured model
 		const model = completion.model ?? config.modelOverride ?? executionContext.model ?? 'default';
@@ -865,6 +890,12 @@ export class StageExecutor {
 		stage: PipelineStage,
 		logger: ReturnType<typeof getLogger>
 	): Promise<{ completion: LLMCompletionResult; summary: ExecutionSummary }> {
+		const stageId = `${stage.stage}.${stage.prompt}`;
+		const sessionId = executionContext.sessionInfo?.sessionId;
+		if (sessionId) {
+			this.currentTracer = new ReasoningTraceRecorder(sessionId, stageId);
+		}
+
 		const maxToolIterations = stage.max_tool_iterations ?? 20;
 		const messages: LLMMessage[] = [
 			{ content: systemMessage, role: 'system' },
@@ -1016,6 +1047,11 @@ export class StageExecutor {
 			toolCount: tools?.length ?? 0,
 			toolNames: tools?.map((t) => t.name)
 		});
+		this.currentTracer?.record('llm_request', {
+			iteration,
+			toolCount: tools?.length ?? 0,
+			toolNames: tools?.map((t) => t.name) ?? []
+		});
 	}
 
 	/**
@@ -1045,12 +1081,39 @@ export class StageExecutor {
 	 * Log LLM response information
 	 */
 	private logLLMResponse(logger: ReturnType<typeof getLogger>, completion: LLMCompletionResult): void {
+		const contentLength = completion.content?.length ?? 0;
+		const finishReason = completion.finish_reason ?? null;
+		const toolCalls = completion.tool_calls;
+		const toolCallCount = toolCalls?.length ?? 0;
+		const toolCallNames = toolCalls?.map((tc) => tc.name) ?? [];
+
 		logger.info('LLM response received', {
-			contentLength: completion.content?.length ?? 0,
-			finishReason: completion.finish_reason,
-			hasToolCalls: !!completion.tool_calls,
-			toolCallCount: completion.tool_calls?.length ?? 0
+			contentLength,
+			finishReason,
+			hasToolCalls: toolCalls != null,
+			toolCallCount
 		});
+		this.currentTracer?.record('llm_response', {
+			contentLength,
+			finishReason,
+			model: completion.model ?? null,
+			toolCallCount,
+			toolCallNames
+		});
+	}
+
+	private recordStageComplete(
+		completion: LLMCompletionResult,
+		summary: { wasLoopExhausted: boolean },
+		durationMs: number
+	): void {
+		this.currentTracer?.record('stage_complete', {
+			durationMs,
+			finishReason: completion.finish_reason ?? null,
+			model: completion.model ?? null,
+			wasLoopExhausted: summary.wasLoopExhausted
+		});
+		this.currentTracer = undefined;
 	}
 
 	/**
@@ -1080,6 +1143,15 @@ export class StageExecutor {
 			tool_calls: toolCalls
 		});
 
+		// Record planned tool calls before execution
+		for (const tc of toolCalls) {
+			this.currentTracer?.record('tool_call', {
+				arguments: tc.arguments,
+				toolCallId: tc.id,
+				toolName: tc.name
+			});
+		}
+
 		// Execute tools and add results (with prompt injection scanning)
 		const toolResults = await this.toolExecutionService.executeTools(toolCalls);
 		const injectionDetector = getPromptInjectionDetector();
@@ -1089,6 +1161,12 @@ export class StageExecutor {
 			const result = toolResults[i]!;
 			const toolName = toolCalls[i]?.name ?? result.tool_call_id;
 			const formatted = this.formatToolResult(result);
+
+			this.currentTracer?.record('tool_result', {
+				contentLength: formatted.length,
+				toolCallId: result.tool_call_id,
+				toolName
+			});
 			const sanitised = injectionDetector.sanitiseToolResult(result.tool_call_id, formatted);
 
 			const hashKey = `${toolName}:${djb2(sanitised)}`;
@@ -1646,6 +1724,43 @@ Summarize ALL changes you made during tool execution. Output ONLY the JSON code 
 		return enriched;
 	}
 	// Output parsing methods extracted to OutputParsingService (see output-parsing.service.ts)
+
+	private checkBudget(
+		sessionId: string,
+		stageName: string,
+		startTime: number,
+		resolvedInputs: Record<string, unknown>,
+		logger: ReturnType<typeof getLogger>
+	): null | StageOutput {
+		const { totalCostUsd } = this.sessionBudgetService.getSessionTotal(sessionId);
+		const budgetConfig = getConfigLoader().get().budgets;
+		const limit = budgetConfig?.per_session_usd;
+
+		if (!this.sessionBudgetService.wouldExceed(sessionId, { estimatedCostUsd: 0 })) return null;
+
+		logger.warn('Session budget exceeded — halting before LLM call', { sessionId, stageName, totalCostUsd });
+
+		const signal = this.sessionBudgetService.buildBudgetEscalationSignal(
+			totalCostUsd,
+			limit ?? totalCostUsd,
+			stageName
+		);
+		const [stageKey, promptKey] = stageName.split('.');
+		return {
+			duration_ms: Date.now() - startTime,
+			error: signal.proposed_action,
+			metadata: {
+				resolutionPath: 'budget_halt',
+				stageContext: { inputs: resolvedInputs, stage: stageName },
+				stopPipeline: true
+			},
+			outputs: { escalationSignal: signal },
+			prompt: promptKey ?? stageName,
+			stage: stageKey ?? stageName,
+			success: false
+		};
+	}
+
 	/**
 	 * Process escalation for a stage response
 	 * Returns StageOutput if escalation results in abort or needs to stop pipeline

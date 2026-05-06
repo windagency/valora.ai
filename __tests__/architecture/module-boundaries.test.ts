@@ -123,11 +123,12 @@ describe('Module Boundaries', () => {
 					'ast..',
 					'lsp..',
 					'batch..',
-					'security..'
+					'security..',
+					'observability..'
 				)
 				.orShould()
 				.because(
-					'Executor orchestrates workflow and can use limited CLI utilities, UI adapters, MCP infrastructure, and logging'
+					'Executor orchestrates workflow and can use limited CLI utilities, UI adapters, MCP infrastructure, and logging. Observability is also allowed for forensic trace recording.'
 				)
 				.check(srcProject.allClasses());
 		});

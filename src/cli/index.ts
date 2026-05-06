@@ -11,7 +11,6 @@
 
 import type { UpdateCheckState } from 'updater/throttle';
 
-import { createRequire } from 'node:module';
 import * as path from 'node:path';
 import { getCliSubcommand } from 'plugins/cli-registry';
 import { PluginInstallerService } from 'plugins/plugin-installer.service';
@@ -30,7 +29,7 @@ import { autoInstallOutdatedPlugins } from 'cli/auto-plugin-install';
 import { silentSpawnRunner } from 'cli/spawn-runner';
 import { getConfigLoader, setGlobalCliOverrides } from 'config/loader';
 import { createContainer, dispatchDeactivateHooks, initializePlugins } from 'di/container';
-import { getGlobalConfigDir, getRuntimeDataDir } from 'utils/paths';
+import { getGlobalConfigDir, getRuntimeDataDir, getValoraVersion } from 'utils/paths';
 import { handlePromptCancellation, isPromptCancellation } from 'utils/prompt-handler';
 
 import type { CommandAdapter } from './command-adapter.interface';
@@ -39,6 +38,7 @@ import type { CliOptions } from './types/cli-options.types';
 import { configureCompletionCommand } from './autocomplete';
 import { configureTemplateCommand } from './command-templates';
 import { type CommanderCommandContract, createCommand } from './commander-adapter';
+import { configureAgentsAuditCommand } from './commands/agents-audit';
 import { configureBatchCommand } from './commands/batch.command';
 import { configureConfigCommand } from './commands/config';
 import { configureDashboardCommand } from './commands/dashboard';
@@ -57,7 +57,9 @@ import { configureMapCommand } from './commands/map';
 import { configureMemoryCommand } from './commands/memory.command';
 import { configureMonitoringCommand } from './commands/monitoring';
 import { configurePluginCommand } from './commands/plugin.command';
+import { configureSecurityCommand } from './commands/security.command';
 import { configureSessionCommand } from './commands/session';
+import { configureTraceCommand } from './commands/trace-explain';
 import { configureUpdateCommand, persistUpdateSuccess } from './commands/update.command';
 import { CliConfigBuilder } from './config-builder';
 import { checkAndRunFirstTimeSetup, shouldTriggerFirstRun } from './first-run-setup';
@@ -65,8 +67,7 @@ import { globalFlags } from './flags';
 import { schedulePluginUpdateCheck, settlePluginUpdateCheck } from './plugin-update-orchestrator';
 import { printUpdateBanner } from './update-banner';
 
-const require = createRequire(import.meta.url);
-const packageJson = require('../../package.json') as { version: string };
+const packageVersion = getValoraVersion();
 
 const CORE_UPDATE_SETTLE_MS = 200;
 const PLUGIN_UPDATE_SETTLE_MS = 500;
@@ -80,10 +81,7 @@ if (hasNoInteractiveFlag) {
 
 const program = createCommand();
 
-program
-	.name('valora')
-	.description('VALORA - AI-Assisted Development Workflow Orchestration')
-	.version(packageJson.version);
+program.name('valora').description('VALORA - AI-Assisted Development Workflow Orchestration').version(packageVersion);
 
 // Add global options
 program.addOption(globalFlags.interactive);
@@ -137,6 +135,9 @@ program.addOption(globalFlags.documentPath);
 // Batch processing flag
 program.addOption(globalFlags.batch);
 
+// EU AI Act disclosure
+program.addOption(globalFlags.noDisclosure);
+
 // Configure all command modules
 configureConfigCommand(program);
 configureSessionCommand(program);
@@ -158,6 +159,9 @@ configureMapCommand(program);
 const memoryDir = path.join(getRuntimeDataDir(), 'memory');
 configureMemoryCommand(program, { jsonDir: memoryDir, vaultDir: memoryDir });
 configurePluginCommand(program);
+configureAgentsAuditCommand(program);
+configureTraceCommand(program);
+configureSecurityCommand(program);
 
 const rawProgram = (program as CommanderCommandContract).getUnderlyingCommand();
 configureUpdateCommand(rawProgram);
@@ -166,12 +170,12 @@ const isUpdateCommand = rawArgs[0] === 'update';
 
 async function handleAutoInstall(state: UpdateCheckState): Promise<void> {
 	const { latestVersion } = state;
-	if (!latestVersion || !shouldAutoUpdate(state, packageJson.version)) return;
+	if (!latestVersion || !shouldAutoUpdate(state, packageVersion)) return;
 	process.stderr.write(`Updating Valora to v${latestVersion}…\n`);
 	const result = await runAutoInstall();
 	if (result === 'success') {
 		process.stderr.write(`✓ Updated to v${latestVersion}.\n`);
-		await persistUpdateSuccess(getGlobalConfigDir(), packageJson.version, latestVersion);
+		await persistUpdateSuccess(getGlobalConfigDir(), packageVersion, latestVersion);
 	}
 }
 
@@ -188,10 +192,10 @@ async function handleReminderMode(
 	state: null | UpdateCheckState,
 	outdatedPlugins: Awaited<ReturnType<typeof settlePluginUpdateCheck>>
 ): Promise<void> {
-	const hasCoreUpdate = state !== null && shouldShowReminder(state, packageJson.version, 'reminder');
+	const hasCoreUpdate = state !== null && shouldShowReminder(state, packageVersion, 'reminder');
 	const hasPluginUpdates = outdatedPlugins.length > 0;
 	if (!hasCoreUpdate && !hasPluginUpdates) return;
-	printUpdateBanner(state ?? { ...DEFAULT_STATE }, packageJson.version, outdatedPlugins);
+	printUpdateBanner(state ?? { ...DEFAULT_STATE }, packageVersion, outdatedPlugins);
 	if (state) {
 		await writeUpdateState(getGlobalConfigDir(), { ...state, remindedForVersion: state.latestVersion });
 	}
@@ -359,8 +363,8 @@ void (async () => {
 				const mode = config.autoUpdate?.mode ?? 'reminder';
 				if (mode === 'disabled') return;
 				const frequencyDays = config.autoUpdate?.frequencyDays ?? 1;
-				scheduleUpdateCheck(getGlobalConfigDir(), packageJson.version, frequencyDays);
-				schedulePluginUpdateCheck(getGlobalConfigDir(), packageJson.version, frequencyDays);
+				scheduleUpdateCheck(getGlobalConfigDir(), packageVersion, frequencyDays);
+				schedulePluginUpdateCheck(getGlobalConfigDir(), packageVersion, frequencyDays);
 			})();
 		}
 

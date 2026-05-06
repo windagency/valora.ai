@@ -3,6 +3,7 @@
  */
 
 import { getColorAdapter } from 'output/color-adapter.interface';
+// eslint-disable-next-line valora-local/import-layer-remedy
 import { getPromptAdapter } from 'ui/prompt-adapter.interface';
 import { isPromptCancellation } from 'utils/prompt-handler';
 

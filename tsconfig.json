@@ -48,6 +48,11 @@
 			"ui/*": ["./src/ui/*"],
 			"updater/*": ["./src/updater/*"],
 			"utils/*": ["./src/utils/*"],
+			"lint/*": ["./src/lint/*"],
+			"observability/*": ["./src/observability/*"],
+			"maintenance/*": ["./src/maintenance/*"],
+			"registry/*": ["./src/registry/*"],
+			"regression/*": ["./src/regression/*"],
 			"@windagency/valora-plugin-compression-python/src/index": [
 				"./packages/valora-plugin-compression-python/src/index"
 			],

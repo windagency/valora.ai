@@ -8,6 +8,7 @@ import type { ToolCallArgs, ToolResult } from 'types/mcp.types';
 
 import { getConfigLoader } from 'config/loader';
 import { BuiltinProviders } from 'config/providers.config';
+import { getDisclosureFooterAuto } from 'output/disclosure';
 import { getLogger } from 'output/logger';
 import { generateId } from 'utils/id-generator';
 import { validateToolCallArgs, type ValidationResult } from 'utils/input-validator';
@@ -171,82 +172,71 @@ export class MCPRequestHandler {
 	/**
 	 * Format a successful tool result
 	 */
+	private formatGuidedCompletionResult(args: ToolCallArgs, result: CommandResult): ToolResult {
+		const logger = getLogger();
+		const guided = result.outputs!['guidedCompletion'] as {
+			context: Record<string, unknown>;
+			instruction: string;
+			systemPrompt: string;
+			userPrompt: string;
+		};
+		logger.always('Returning guided completion prompts for Cursor AI processing', {
+			context: guided.context,
+			requestId: args.requestId
+		});
+		const formattedPrompt = this.formatGuidedCompletionForCursor(guided, result.outputs!['result'] as string);
+		return {
+			content: [{ text: formattedPrompt, type: 'text' }],
+			isError: false,
+			metadata: {
+				mode: 'guided_completion',
+				provider: BuiltinProviders.CURSOR,
+				requiresManualProcessing: true,
+				useCursorSubscription: true
+			}
+		};
+	}
+
+	private formatRegularResult(result: CommandResult): ToolResult {
+		const output = (result.outputs?.['result'] as string) ?? 'Command completed successfully';
+		const disclosureFooter = getDisclosureFooterAuto();
+		return {
+			content: [
+				{ text: output, type: 'text' },
+				...(disclosureFooter !== null ? [{ text: disclosureFooter, type: 'text' as const }] : [])
+			],
+			isError: false
+		};
+	}
+
 	private formatToolResult(commandName: string, result: CommandResult, args: ToolCallArgs): ToolResult {
 		const logger = getLogger();
 
-		if (result.success) {
-			logger.info(`Tool call completed: ${commandName}`, {
-				hasOutput: !!result.outputs,
-				isGuidedCompletion: !!result.outputs?.['guidedCompletion'],
-				requestId: args.requestId,
-				sessionId: args.sessionId,
-				stageCount: result.stages?.length ?? 0
-			});
-
-			// Handle guided completion specifically - return formatted prompt for Cursor AI
-			if (result.outputs?.['guidedCompletion']) {
-				const guided = result.outputs['guidedCompletion'] as {
-					context: Record<string, unknown>;
-					instruction: string;
-					systemPrompt: string;
-					userPrompt: string;
-				};
-
-				logger.always('Returning guided completion prompts for Cursor AI processing', {
-					context: guided.context,
-					requestId: args.requestId
-				});
-
-				// Return the pre-formatted content from cursor provider
-				// It already has nice visual separators and instructions
-				const formattedPrompt = this.formatGuidedCompletionForCursor(guided, result.outputs['result'] as string);
-
-				return {
-					content: [
-						{
-							text: formattedPrompt,
-							type: 'text'
-						}
-					],
-					isError: false,
-					metadata: {
-						mode: 'guided_completion',
-						provider: BuiltinProviders.CURSOR,
-						requiresManualProcessing: true,
-						useCursorSubscription: true
-					}
-				};
-			}
-
-			// Regular command output
-			const output = (result.outputs?.['result'] as string) ?? 'Command completed successfully';
-
-			return {
-				content: [
-					{
-						text: output,
-						type: 'text'
-					}
-				],
-				isError: false
-			};
-		} else {
+		if (!result.success) {
 			logger.warn(`Tool call failed: ${commandName}`, {
 				error: result.error,
 				requestId: args.requestId,
 				sessionId: args.sessionId
 			});
-
 			return {
-				content: [
-					{
-						text: `Command failed: ${result.error ?? 'Unknown error'}`,
-						type: 'text'
-					}
-				],
+				content: [{ text: `Command failed: ${result.error ?? 'Unknown error'}`, type: 'text' }],
 				isError: true
 			};
 		}
+
+		logger.info(`Tool call completed: ${commandName}`, {
+			hasOutput: !!result.outputs,
+			isGuidedCompletion: !!result.outputs?.['guidedCompletion'],
+			requestId: args.requestId,
+			sessionId: args.sessionId,
+			stageCount: result.stages?.length ?? 0
+		});
+
+		if (result.outputs?.['guidedCompletion']) {
+			return this.formatGuidedCompletionResult(args, result);
+		}
+
+		return this.formatRegularResult(result);
 	}
 
 	/**

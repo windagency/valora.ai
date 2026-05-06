@@ -31,6 +31,11 @@ export default defineConfig({
 			ui: path.resolve(__dirname, './src/ui'),
 			updater: path.resolve(__dirname, './src/updater'),
 			utils: path.resolve(__dirname, './src/utils'),
+			lint: path.resolve(__dirname, './src/lint'),
+			maintenance: path.resolve(__dirname, './src/maintenance'),
+			observability: path.resolve(__dirname, './src/observability'),
+			registry: path.resolve(__dirname, './src/registry'),
+			regression: path.resolve(__dirname, './src/regression'),
 			'@windagency/valora-plugin-compression-python/src/index': path.resolve(
 				__dirname,
 				'./packages/valora-plugin-compression-python/src/index'

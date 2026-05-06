@@ -339,10 +339,11 @@ describe('Architecture Tests', () => {
 					'ast..',
 					'lsp..',
 					'batch..',
-					'security..'
+					'security..',
+					'observability..'
 				)
 				.because(
-					'Executor orchestrates workflow and can use logging, CLI utilities, MCP infrastructure, and UI adapters for prompting'
+					'Executor orchestrates workflow and can use logging, CLI utilities, MCP infrastructure, and UI adapters for prompting. Observability is allowed for forensic trace recording.'
 				)
 				.check(srcProject.allClasses());
 		});

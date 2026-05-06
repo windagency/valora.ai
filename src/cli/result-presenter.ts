@@ -6,6 +6,7 @@
  */
 
 import { getConsoleOutput } from 'output/console-output';
+import { getDisclosureFooterAuto } from 'output/disclosure';
 import { getLogger } from 'output/logger';
 import { getRenderer } from 'output/markdown';
 import { sanitizeData } from 'utils/data-sanitizer';
@@ -72,6 +73,11 @@ export class ResultPresenter {
 		this.displayTokenUsage(tokenBreakdown, totalSessionTokens, costUsd, cacheSavingsUsd);
 
 		this.console.success('Command completed successfully');
+
+		const footer = getDisclosureFooterAuto();
+		if (footer !== null) {
+			this.console.print(footer);
+		}
 		this.console.blank();
 	}
 

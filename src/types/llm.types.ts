@@ -20,6 +20,7 @@ export interface LLMCompletionOptions {
 	messages: LLMMessage[];
 	mode?: string;
 	model?: string;
+	requires_thinking_trace?: boolean;
 	stop?: string[];
 	stream?: boolean;
 	temperature?: number;

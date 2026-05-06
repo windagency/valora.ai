@@ -5,8 +5,6 @@
  * Exposes orchestration commands as MCP tools for Cursor integration
  */
 
-import path from 'path';
-
 import type { CommandExecutor } from 'cli/command-executor';
 import type { CommandLoader } from 'executor/command-loader';
 import type { MCPSamplingOptions, MCPSamplingResult, MCPSamplingService } from 'types/mcp.types';
@@ -21,8 +19,7 @@ import {
 	setupMCPServices
 } from 'di/container';
 import { getLogger, type Logger } from 'output/logger';
-import { readJSON } from 'utils/file-utils';
-import { getPackageRoot } from 'utils/paths';
+import { getValoraVersion } from 'utils/paths';
 
 import type { MCPRequestHandler } from './request-handler';
 import type { MCPSamplingServiceImpl } from './sampling-service';
@@ -38,9 +35,6 @@ process.env['AI_INTERACTIVE'] = 'false';
 // Mark that we're running in MCP/Cursor context
 process.env['AI_MCP_ENABLED'] = 'true';
 
-/**
- * Get the version from package.json
- */
 export class MCPOrchestratorServer implements MCPSamplingService {
 	private serverManager: MCPServerManager;
 	// @ts-expect-error - Kept for service lifecycle
@@ -153,22 +147,6 @@ export class MCPOrchestratorServer implements MCPSamplingService {
 		} else {
 			this.logger.debug('Client capabilities pending (will be available after first request)');
 		}
-	}
-}
-
-async function getPackageVersion(): Promise<string> {
-	try {
-		// Read version from the package root's package.json
-		const packageRoot = getPackageRoot();
-		const packageJsonPath = path.join(packageRoot, 'package.json');
-
-		const packageJson = await readJSON<{ version: string }>(packageJsonPath);
-		return packageJson.version;
-	} catch (error) {
-		// Fallback to hardcoded version if package.json can't be read
-
-		console.warn('Failed to read package.json version, using fallback:', error);
-		return '1.0.0';
 	}
 }
 
@@ -286,7 +264,7 @@ async function startMCPServer(): Promise<void> {
 	await configLoader.load();
 
 	const logger = getLogger();
-	const version = await getPackageVersion();
+	const version = getValoraVersion();
 	const server = new MCPOrchestratorServer(logger, version);
 
 	// Only auto-start server in production/development, not in tests

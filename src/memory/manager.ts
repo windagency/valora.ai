@@ -40,6 +40,19 @@ import { VaultStore } from './vault/vault-store';
 
 const ALL_CATEGORIES: MemoryCategory[] = ['episodic', 'semantic', 'decisions'];
 
+export interface PurgeCriteria {
+	all?: boolean;
+	categories?: MemoryCategory[];
+	dryRun?: boolean;
+	olderThanMs?: number;
+}
+
+export interface PurgeResult {
+	dryRun: boolean;
+	totalDeleted: number;
+	totalWouldDelete: number;
+}
+
 export class MemoryManager {
 	private readonly config: MemoryRetentionConfig;
 	private readonly embedder?: EmbedderPort;
@@ -225,6 +238,35 @@ export class MemoryManager {
 		}
 
 		return this.store.removeEntries(category, idsToRemove);
+	}
+
+	async purge(criteria: PurgeCriteria): Promise<PurgeResult> {
+		const { all, categories, dryRun, olderThanMs } = criteria;
+		const targetCategories: MemoryCategory[] = all ? [...ALL_CATEGORIES] : (categories ?? [...ALL_CATEGORIES]);
+
+		let totalDeleted = 0;
+		let totalWouldDelete = 0;
+
+		for (const category of targetCategories) {
+			const entries = await this.store.getEntries(category);
+			const idsToRemove = new Set<string>();
+
+			for (const entry of entries) {
+				if (olderThanMs !== undefined) {
+					const ageMs = Date.now() - new Date(entry.createdAt).getTime();
+					if (ageMs < olderThanMs) continue;
+				}
+				idsToRemove.add(entry.id);
+			}
+
+			if (dryRun) {
+				totalWouldDelete += idsToRemove.size;
+			} else {
+				totalDeleted += await this.store.removeEntries(category, idsToRemove);
+			}
+		}
+
+		return { dryRun: dryRun ?? false, totalDeleted, totalWouldDelete };
 	}
 
 	async query(options: MemoryQueryOptions): Promise<MemoryQueryResult[]> {

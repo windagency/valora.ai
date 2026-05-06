@@ -200,14 +200,30 @@ export const PLUGINS_CONFIG_SCHEMA = z.object({
 	sources: z.array(PLUGIN_SOURCE_SCHEMA).optional()
 });
 
+// Observability configuration schema
+export const OBSERVABILITY_CONFIG_SCHEMA = z.object({
+	thinking_required_for: z.array(z.string()).optional(),
+	trace_retention_days: z.number().int().min(1).max(365).default(90)
+});
+
+// Budgets configuration schema
+export const BUDGETS_CONFIG_SCHEMA = z.object({
+	per_command_usd: z.number().positive().optional(),
+	per_session_usd: z.number().positive().optional(),
+	per_stage_tokens: z.number().int().positive().optional(),
+	policy: z.enum(['strict', 'tolerant']).default('strict')
+});
+
 // Main configuration schema
 export const CONFIG_SCHEMA = z.object({
 	autoUpdate: AUTO_UPDATE_CONFIG_SCHEMA.optional(),
+	budgets: BUDGETS_CONFIG_SCHEMA.optional(),
 	defaults: DEFAULTS_CONFIG_SCHEMA,
 	features: FEATURE_FLAGS_SCHEMA.optional(),
 	hooks: HOOKS_CONFIG_SCHEMA.optional(),
 	logging: LOGGING_RETENTION_CONFIG_SCHEMA.optional(),
 	memory: MEMORY_CONFIG_SCHEMA.optional(),
+	observability: OBSERVABILITY_CONFIG_SCHEMA.optional(),
 	paths: PATHS_CONFIG_SCHEMA.optional(),
 	plugins: PLUGINS_CONFIG_SCHEMA.optional(),
 	providers: PROVIDERS_CONFIG_SCHEMA,
@@ -216,12 +232,14 @@ export const CONFIG_SCHEMA = z.object({
 
 // Type inference from schemas
 export type AutoUpdateConfig = z.infer<typeof AUTO_UPDATE_CONFIG_SCHEMA>;
+export type BudgetsConfig = z.infer<typeof BUDGETS_CONFIG_SCHEMA>;
 export type Config = z.infer<typeof CONFIG_SCHEMA>;
 export type DefaultsConfig = z.infer<typeof DEFAULTS_CONFIG_SCHEMA>;
 export type FeatureFlags = z.infer<typeof FEATURE_FLAGS_SCHEMA>;
 export type HooksConfigSchema = z.infer<typeof HOOKS_CONFIG_SCHEMA>;
 export type LoggingRetentionConfig = z.infer<typeof LOGGING_RETENTION_CONFIG_SCHEMA>;
 export type MemoryRetentionConfig = z.infer<typeof MEMORY_CONFIG_SCHEMA>;
+export type ObservabilityConfig = z.infer<typeof OBSERVABILITY_CONFIG_SCHEMA>;
 export type PathsConfig = z.infer<typeof PATHS_CONFIG_SCHEMA>;
 export type PluginsConfigSchema = z.infer<typeof PLUGINS_CONFIG_SCHEMA>;
 export type ProviderConfig = z.infer<typeof PROVIDER_CONFIG_SCHEMA>;

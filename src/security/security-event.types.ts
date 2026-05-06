@@ -16,6 +16,7 @@ export type SecurityEventType =
 	| 'command_blocked'
 	| 'credential_redacted'
 	| 'mcp_arg_credential_detected'
+	| 'memory_purged'
 	| 'prompt_injection_detected'
 	| 'sensitive_file_blocked'
 	| 'tool_definition_suspicious'

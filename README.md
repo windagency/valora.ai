@@ -559,6 +559,22 @@ Resources in `.valora/` take precedence over built-in `data/` resources.
 
 ---
 
+## 🛡️ Compliance
+
+Valora operates at the **Limited Risk** tier of the EU AI Act (Regulation (EU) 2024/1689).
+
+| Document                                                                        | Description                                                               |
+| ------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| [System Card](./documentation/architecture/system-card.md)                      | Technical documentation for auditors (Annex IV)                           |
+| [Instructions for Use](./documentation/user-guide/eu-ai-act-compliance.md)      | Intended purpose, out-of-scope domains, deployer obligations (Article 13) |
+| [GPAI Upstream Policy](./documentation/developer-guide/gpai-upstream-policy.md) | Upstream provider obligations (Article 25)                                |
+| [Memory Data Governance](./documentation/user-guide/memory-data-governance.md)  | What is stored, retention, and how to purge (Article 10)                  |
+| [SECURITY.md](./SECURITY.md)                                                    | Responsible disclosure and incident reporting                             |
+
+**Audit export:** `valora security audit-export --out audit.json`
+
+---
+
 ## 📄 Licence
 
 MIT © Damien TIVELET

@@ -20,6 +20,7 @@ export interface LoadedPlugin {
 	promptsDir?: string;
 	status: PluginStatus;
 	templatesDir?: string;
+	validatorModules?: Array<{ modulePath: string; stage: string }>;
 }
 
 export interface PluginBinaryRequirement {
@@ -40,7 +41,8 @@ export type PluginContributionType =
 	| 'hooks'
 	| 'mcps'
 	| 'prompts'
-	| 'templates';
+	| 'templates'
+	| 'validators';
 
 export type PluginLocation = 'built-in' | 'global' | 'npm' | 'project' | 'user';
 
@@ -56,6 +58,7 @@ export interface PluginManifest {
 	permissions?: PluginPermission[];
 	requires?: string[];
 	requiresBinary?: PluginBinaryRequirement[];
+	validators?: Array<{ module: string; stage: string }>;
 	version: string;
 }
 

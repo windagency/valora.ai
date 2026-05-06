@@ -153,7 +153,14 @@ export class PluginLoaderService {
 	): Partial<
 		Pick<
 			LoadedPlugin,
-			'agentsDir' | 'codeEntrypoint' | 'commandsDir' | 'hooks' | 'mcpsFile' | 'promptsDir' | 'templatesDir'
+			| 'agentsDir'
+			| 'codeEntrypoint'
+			| 'commandsDir'
+			| 'hooks'
+			| 'mcpsFile'
+			| 'promptsDir'
+			| 'templatesDir'
+			| 'validatorModules'
 		>
 	> {
 		const contrib = manifest.contributes ?? [];
@@ -166,7 +173,8 @@ export class PluginLoaderService {
 			...(has('prompts') && { promptsDir: this.resolveSubdir(pluginDir, 'prompts') }),
 			...(has('templates') && { templatesDir: this.resolveSubdir(pluginDir, 'templates') }),
 			...(has('hooks') && { hooks: this.resolveHooks(pluginDir, manifest) }),
-			...(has('mcps') && { mcpsFile: this.resolveMcpsFile(pluginDir, manifest) })
+			...(has('mcps') && { mcpsFile: this.resolveMcpsFile(pluginDir, manifest) }),
+			...(has('validators') && { validatorModules: this.resolveValidatorModules(pluginDir, manifest) })
 		};
 	}
 
@@ -221,6 +229,33 @@ export class PluginLoaderService {
 	private resolveSubdir(pluginDir: string, name: string): string | undefined {
 		const full = path.join(pluginDir, name);
 		return fs.existsSync(full) ? full : undefined;
+	}
+
+	private resolveValidatorModules(
+		pluginDir: string,
+		manifest: PluginManifest
+	): Array<{ modulePath: string; stage: string }> | undefined {
+		if (!manifest.permissions?.includes('code-exec')) {
+			this.logger.warn(
+				`Plugin "${manifest.name}" contributes 'validators' but is missing the 'code-exec' permission — validators will not be registered`,
+				{ name: manifest.name }
+			);
+			return undefined;
+		}
+		if (!manifest.validators?.length) return undefined;
+
+		return manifest.validators
+			.map(({ module, stage }) => {
+				const modulePath = path.resolve(pluginDir, module);
+				if (!fs.existsSync(modulePath)) {
+					this.logger.warn(`Plugin "${manifest.name}" validator module not found: ${modulePath}`, {
+						name: manifest.name
+					});
+					return null;
+				}
+				return { modulePath, stage };
+			})
+			.filter((entry): entry is { modulePath: string; stage: string } => entry !== null);
 	}
 
 	private sortByDependencies(plugins: LoadedPlugin[]): LoadedPlugin[] {

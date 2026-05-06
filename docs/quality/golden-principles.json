@@ -1,0 +1,26 @@
+[
+	{
+		"id": "GP-001",
+		"description": "Parse at system boundaries — use Zod or similar at entry points only",
+		"pattern": "JSON.parse(",
+		"remedy": "Use a Zod schema and parse/safeParse instead of raw JSON.parse in production code paths. Only parse at I/O boundaries."
+	},
+	{
+		"id": "GP-002",
+		"description": "No hand-rolled concurrency — use existing async primitives (Promise.all, p-limit)",
+		"pattern": "new Promise((resolve",
+		"remedy": "Replace hand-rolled Promise constructors with async/await + Promise.all or p-limit for concurrency control."
+	},
+	{
+		"id": "GP-003",
+		"description": "Structured logging only — no bare console.log in src/",
+		"pattern": "console.log(",
+		"remedy": "Replace console.log with getLogger().info() or getLogger().debug(). Only CLI entry points may use console.log for user-facing output."
+	},
+	{
+		"id": "GP-004",
+		"description": "No `as any` type assertions — use typed interfaces or unknown",
+		"pattern": " as any",
+		"remedy": "Replace `as any` with a typed assertion (`as MyType`) or use `unknown` and narrow the type explicitly."
+	}
+]
