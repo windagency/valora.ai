@@ -1,3 +1,7 @@
+---
+updated: 2026-05-07
+---
+
 # ADR-014: Plugin Capability Gating
 
 > **Decision**: Valora will close the manifest-vs-runtime trust gap left open by ADR-012 by isolating code plugins in per-plugin Worker threads with a proxied `fs`/`net` API surface gated on the manifest's `permissions` field. Until the Worker model lands, the unenforced permission tokens (`fs-read`, `fs-write`, `network`) remain informational and are surfaced via `valora doctor` for audit.

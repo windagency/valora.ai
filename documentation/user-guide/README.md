@@ -1,3 +1,7 @@
+---
+updated: 2026-05-07
+---
+
 # User Guide
 
 Getting started with Valora for everyday development tasks.

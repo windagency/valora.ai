@@ -1,3 +1,7 @@
+---
+updated: 2026-05-07
+---
+
 # Codebase Overview
 
 > Walkthrough of the VALORA source structure.

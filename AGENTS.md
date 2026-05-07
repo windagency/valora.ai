@@ -1,5 +1,5 @@
 ---
-updated: 2026-05-06
+updated: 2026-05-07
 ---
 
 # AGENTS.md
@@ -32,7 +32,7 @@ Valora is a TypeScript CLI/MCP orchestration platform for multi-agent AI workflo
 ## Non-negotiable rules
 
 1. **TDD always.** Write the failing test before any implementation code.
-2. **Layer direction: `Types → Config → Repo → Service → Runtime → UI`.** Cross-cutting concerns (auth, telemetry, feature flags) enter through `Providers` only. Enforced by arch-unit-ts tests in `__tests__/architecture/`.
+2. **Layer direction: `Types → Config → LLM/Services → Executor + MCP → CLI`.** Cross-cutting concerns (output, observability, memory, utils, registry) are leaves: every layer may import them, they may import only `Types`. The `Executor` and `MCP` layers form one orchestration ring (see [ADR-015](documentation/adr/015-executor-mcp-coupling.md)) — `executor/` may import concrete `mcp/` classes, but `mcp/` may import `executor/` only at the type level. Enforced by arch-unit-ts tests in `__tests__/architecture/`.
 3. **No mock-based integration tests.** Use Testcontainers.
 4. **Language:** American English in code identifiers. British English in documentation.
 5. **Every doc file must have `updated: YYYY-MM-DD` frontmatter.** Run `pnpm docs:validate` to check.
@@ -53,15 +53,15 @@ pnpm maintenance:gc        # prune stale memory and trace data
 
 1. Run `pnpm docs:validate` — it surfaces stale or broken documentation.
 2. Search `documentation/adr/` for prior architectural decisions.
-3. Read `docs/quality/grades.json` for known gaps and technical debt.
-4. Check `docs/superpowers/plans/` for active implementation plans.
+3. Read `documentation/quality/grades.json` for known gaps and technical debt.
+4. Check `.claude/plans/` for active implementation plans.
 5. If a Slack discussion or design decision shaped current code, it belongs in a doc — add it so future agents can reason over it.
 
 ## Verification Summary
 
-Verified 2026-05-06 against `package.json` scripts, `documentation/`, `data/`, and `SECURITY.md`.
+Verified 2026-05-07 against `package.json` scripts, `documentation/`, `data/`, `src/`, and `__tests__/architecture/`.
 
 - Claims checked: 4 (navigation table entries, dev-loop commands, rule statements, file/directory paths referenced)
 - Confirmed: 2 (existing entries and rules are accurate; all referenced paths exist)
-- Updated: 2 — added 4 navigation entries for Phase 2–4 governance docs (eu-ai-act-compliance.md, gpai-upstream-policy.md, memory-data-governance.md, system-card.md); added `pnpm regression`, `pnpm maintenance:grade`, `pnpm maintenance:gc` to the dev loop (all confirmed in `package.json`)
+- Corrected: 2 — (a) Layer rule rewritten from the fictional `Types → Config → Repo → Service → Runtime → UI` (no `repo/` or `runtime/` directories existed) to the actually-enforced `Types → Config → LLM/Services → Executor + MCP → CLI` with cross-cutting leaves listed; ADR-015 cross-referenced for the executor↔MCP direction. (b) "When you are stuck" stale paths `docs/quality/grades.json` and `docs/superpowers/plans/` corrected to `documentation/quality/grades.json` and `.claude/plans/` — `docs/` does not exist at the repo root.
 - Unverifiable: 0

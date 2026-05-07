@@ -1,3 +1,7 @@
+---
+updated: 2026-05-07
+---
+
 # ADR-003: Session-Based State Management
 
 > **Decision**: Valora persists execution state in file-based sessions under `.valora/sessions/`, automatically propagating outputs from each command into the context of subsequent commands in the same workflow.
@@ -219,6 +223,6 @@ valora session clear
 
 ## References
 
-- [Session Service](../../src/session/session.service.ts)
-- [Session Repository](../../src/session/session.repository.ts)
+- [Session Lifecycle](../../src/session/lifecycle.ts)
+- [Session Store](../../src/session/store.ts)
 - [Data Flow - Session](../architecture/data-flow.md)

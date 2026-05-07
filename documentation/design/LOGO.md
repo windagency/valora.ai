@@ -1,3 +1,7 @@
+---
+updated: 2026-05-07
+---
+
 # Logo
 
 The Valora logo is an indigo/cyan gradient hexagonal badge enclosing a tapered V shape, with the wordmark "VALORA" in a geometric sans-serif and a monospace tagline. See `assets/` for logo files.

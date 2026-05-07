@@ -1,3 +1,7 @@
+---
+updated: 2026-05-07
+---
+
 # ADR-002: Guidance vs Knowledge Separation
 
 > **Decision**: Guidance files (AI behaviour instructions) are always loaded for every command, while project knowledge files (PRD, FUNCTIONAL, BACKLOG) are loaded selectively per command via `knowledge_files` configuration.
@@ -149,5 +153,5 @@ const knowledge = await loadProjectKnowledge(['PRD.md', 'FUNCTIONAL.md']);
 ## References
 
 - [ADR-001: Multi-Agent Architecture](./001-multi-agent-architecture.md)
-- [Command Registry](../../commands/registry.json)
+- [Command Registry](../../data/commands/registry.json)
 - [Project Guidance Loader](../../src/executor/project-guidance-loader.ts)

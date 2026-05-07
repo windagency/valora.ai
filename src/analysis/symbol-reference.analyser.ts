@@ -7,10 +7,10 @@ import type { CodebaseIndex } from 'ast/ast.types';
 
 import { findReferences } from 'ast/ast-query.service';
 
-export class SymbolReferenceAnalyser {
+export class SymbolReferenceAnalyzer {
 	constructor(private readonly lsp: LSPToolsService | null) {}
 
-	async analyse(index: CodebaseIndex, projectRoot: string): Promise<SymbolReference[]> {
+	async analyze(index: CodebaseIndex, projectRoot: string): Promise<SymbolReference[]> {
 		const refs: SymbolReference[] = [];
 
 		for (const symbol of Object.values(index.symbols)) {

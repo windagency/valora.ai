@@ -1,3 +1,7 @@
+---
+updated: 2026-05-07
+---
+
 # VALORA Documentation
 
 Valora is a TypeScript CLI tool that orchestrates 11 specialised AI agents across 24 commands to automate the software development lifecycle.

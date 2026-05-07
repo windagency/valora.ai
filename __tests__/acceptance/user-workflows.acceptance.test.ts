@@ -11,12 +11,10 @@ import * as path from 'path';
 import { execa } from 'execa';
 import { getDataSanitizer } from 'utils/data-sanitizer';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { TestcontainersHelper } from '../utils/testcontainers-helper';
 
 const cliBuilt = existsSync(path.join(process.cwd(), 'dist', 'cli', 'index.js'));
 
 describe.skipIf(!cliBuilt)('User Workflow Acceptance Tests', () => {
-	let testcontainersHelper: TestcontainersHelper;
 	let tempDir: string;
 	let aiBinaryPath: string;
 
@@ -38,9 +36,6 @@ describe.skipIf(!cliBuilt)('User Workflow Acceptance Tests', () => {
 	}
 
 	beforeAll(async () => {
-		testcontainersHelper = new TestcontainersHelper();
-		await testcontainersHelper.startSharedContainers();
-
 		const realBin = path.resolve(process.cwd(), 'dist', 'cli', 'index.js');
 		const binExists = await fs
 			.access(realBin)
@@ -53,11 +48,9 @@ describe.skipIf(!cliBuilt)('User Workflow Acceptance Tests', () => {
 
 		tempDir = await fs.mkdtemp(path.join('/tmp', 'ai-acceptance-test-'));
 		await fs.mkdir(path.join(tempDir, '.valora'), { recursive: true });
-	}, 120000);
+	}, 30000);
 
 	afterAll(async () => {
-		await testcontainersHelper.stopAllContainers();
-
 		try {
 			await fs.rm(tempDir, { force: true, recursive: true });
 		} catch (error) {
@@ -66,7 +59,7 @@ describe.skipIf(!cliBuilt)('User Workflow Acceptance Tests', () => {
 	}, 30000);
 
 	beforeEach(async () => {
-		await testcontainersHelper.resetState();
+		// Nothing to reset — no containers in use
 	});
 
 	describe('First-Time User Setup', () => {

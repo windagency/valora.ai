@@ -3,8 +3,8 @@ import * as path from 'path';
 import type { FileNode } from 'analysis/analysis.types';
 import type { CodebaseIndex } from 'ast/ast.types';
 
-export class FileDependencyAnalyser {
-	analyse(index: CodebaseIndex, projectRoot: string): FileNode[] {
+export class FileDependencyAnalyzer {
+	analyze(index: CodebaseIndex, projectRoot: string): FileNode[] {
 		const allPaths = new Set(Object.keys(index.files));
 		const nodes: FileNode[] = [];
 

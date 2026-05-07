@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
-import { SymbolReferenceAnalyser } from './symbol-reference.analyser';
+import { SymbolReferenceAnalyzer } from './symbol-reference.analyser';
 import type { CodebaseIndex, IndexedSymbol } from 'ast/ast.types';
 
 vi.mock('ast/ast-query.service', () => ({
@@ -39,11 +39,11 @@ function makeIndex(symbols: IndexedSymbol[]): CodebaseIndex {
 }
 
 describe('SymbolReferenceAnalyser', () => {
-	let analyser: SymbolReferenceAnalyser;
+	let analyser: SymbolReferenceAnalyzer;
 
 	beforeEach(() => {
 		vi.clearAllMocks();
-		analyser = new SymbolReferenceAnalyser(null);
+		analyser = new SymbolReferenceAnalyzer(null);
 	});
 
 	it('maps exported symbol with its reference files', async () => {
@@ -53,7 +53,7 @@ describe('SymbolReferenceAnalyser', () => {
 			{ filePath: 'src/di/container.ts', line: 20, symbolId: 'sym1', symbolName: 'MyService' }
 		]);
 
-		const refs = await analyser.analyse(makeIndex([sym]), '/proj');
+		const refs = await analyser.analyze(makeIndex([sym]), '/proj');
 
 		expect(refs).toHaveLength(1);
 		expect(refs[0]!.name).toBe('MyService');
@@ -67,33 +67,33 @@ describe('SymbolReferenceAnalyser', () => {
 			{ filePath: 'src/cli/index.ts', line: 5, symbolId: 'sym1', symbolName: 'MyService' }
 		]);
 
-		const refs = await analyser.analyse(makeIndex([sym]), '/proj');
+		const refs = await analyser.analyze(makeIndex([sym]), '/proj');
 		expect(refs[0]!.usedIn).not.toContain('src/ast/my.service.ts');
 	});
 
 	it('skips non-exported symbols', async () => {
 		const sym = makeSymbol({ exported: false });
-		const refs = await analyser.analyse(makeIndex([sym]), '/proj');
+		const refs = await analyser.analyze(makeIndex([sym]), '/proj');
 		expect(refs).toHaveLength(0);
 	});
 
 	it('degrades gracefully when LSP is unavailable', async () => {
 		const mockLsp = { executeGetTypeInfo: vi.fn().mockRejectedValue(new Error('LSP offline')) };
-		const analyserWithLsp = new SymbolReferenceAnalyser(mockLsp as never);
+		const analyserWithLsp = new SymbolReferenceAnalyzer(mockLsp as never);
 		const sym = makeSymbol();
 		mockFindRefs.mockReturnValue([]);
 
-		const refs = await analyserWithLsp.analyse(makeIndex([sym]), '/proj');
+		const refs = await analyserWithLsp.analyze(makeIndex([sym]), '/proj');
 		expect(refs[0]!.typeSignature).toBeUndefined();
 	});
 
 	it('attaches typeSignature from LSP when available', async () => {
 		const mockLsp = { executeGetTypeInfo: vi.fn().mockResolvedValue('class MyService {}') };
-		const analyserWithLsp = new SymbolReferenceAnalyser(mockLsp as never);
+		const analyserWithLsp = new SymbolReferenceAnalyzer(mockLsp as never);
 		const sym = makeSymbol();
 		mockFindRefs.mockReturnValue([]);
 
-		const refs = await analyserWithLsp.analyse(makeIndex([sym]), '/proj');
+		const refs = await analyserWithLsp.analyze(makeIndex([sym]), '/proj');
 		expect(refs[0]!.typeSignature).toBe('class MyService {}');
 	});
 });

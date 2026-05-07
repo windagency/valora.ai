@@ -1444,6 +1444,14 @@ export class ToolExecutionService {
 
 		const fullPath = this.validateAndResolvePath(path, 'modify');
 
+		// Enforce effective permission constraints: block edits to forbidden paths.
+		// Same guard as `write` and `delete_file`; a child agent's narrowed
+		// forbidden_paths must apply to all mutating tools.
+		const permSvc = getPermissionPropagationService();
+		if (permSvc.isForbidden(fullPath, this.effectiveConstraints.forbidden_paths)) {
+			return `Cannot modify forbidden path: ${path}. This path is restricted by the active permission constraints.`;
+		}
+
 		if (!existsSync(fullPath)) {
 			return (
 				`File not found: ${path}\n\n` +
@@ -1646,7 +1654,7 @@ export class ToolExecutionService {
 		try {
 			const { stderr, stdout } = await execAsync(command, {
 				cwd: this.workingDir,
-				env: { ...credentialGuard.sanitiseEnvironment(process.env), PATH: this.buildAugmentedPath() },
+				env: { ...credentialGuard.sanitizeEnvironment(process.env), PATH: this.buildAugmentedPath() },
 				timeout: timeoutMs
 			});
 
@@ -1664,12 +1672,17 @@ export class ToolExecutionService {
 			return compressed || 'Command completed successfully (no output)';
 		} catch (error) {
 			const execError = error as { code?: number; stderr?: string; stdout?: string };
-			const output = [execError.stdout, execError.stderr].filter(Boolean).join('');
+			const rawOutput = [execError.stdout, execError.stderr].filter(Boolean).join('');
+			// Redact before either returning guidance or throwing — both surface
+			// directly to the LLM and an unredacted credential here is a leak.
+			const safeOutput = credentialGuard.scanOutput(rawOutput);
 
 			const guidance = exitCodeOneGuidance(execError.code, command);
 			if (guidance) return guidance;
 
-			throw new Error(`Command failed: ${compressTerminalOutput(command, output) || (error as Error).message}`);
+			throw new Error(
+				`Command failed: ${compressTerminalOutput(command, safeOutput) || credentialGuard.scanOutput((error as Error).message)}`
+			);
 		}
 	}
 

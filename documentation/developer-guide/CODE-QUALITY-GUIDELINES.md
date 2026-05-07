@@ -1,3 +1,7 @@
+---
+updated: 2026-05-07
+---
+
 # TypeScript Code Quality Standards & Enforcement Guide
 
 > Consolidated TypeScript coding standards enforced through automated tooling, code reviews, and architectural testing in Valora.

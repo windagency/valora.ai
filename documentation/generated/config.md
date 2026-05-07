@@ -1,3 +1,7 @@
+---
+updated: 2026-05-07
+---
+
 # Module: `config`
 
 _Generated: 2026-04-18_

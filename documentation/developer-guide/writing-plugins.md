@@ -1,3 +1,7 @@
+---
+updated: 2026-05-07
+---
+
 # Writing Plugins
 
 > Package agents, commands, hooks, prompts, templates, MCP bundles, and code modules as a self-contained Valora plugin.

@@ -6,7 +6,7 @@ import type { LLMToolCall } from 'types/llm.types';
 
 import { existsSync, mkdirSync, rmSync } from 'fs';
 import { join } from 'path';
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { IdempotencyStoreService, resetIdempotencyStore } from './idempotency-store.service';
 
@@ -156,6 +156,14 @@ describe('IdempotencyStoreService', () => {
 	});
 
 	describe('store and check integration', () => {
+		beforeEach(() => {
+			vi.useFakeTimers();
+		});
+
+		afterEach(() => {
+			vi.useRealTimers();
+		});
+
 		it('should store and retrieve idempotency records', async () => {
 			const toolCall: LLMToolCall = {
 				id: 'call-1',
@@ -213,7 +221,7 @@ describe('IdempotencyStoreService', () => {
 			expect(result1.found).toBe(true);
 
 			// Wait for expiration
-			await new Promise((resolve) => setTimeout(resolve, 600));
+			await vi.advanceTimersByTimeAsync(600);
 
 			// Should be expired
 			const result2 = await shortTtlService.check(toolCall);
@@ -312,6 +320,14 @@ describe('IdempotencyStoreService', () => {
 	});
 
 	describe('cleanup', () => {
+		beforeEach(() => {
+			vi.useFakeTimers();
+		});
+
+		afterEach(() => {
+			vi.useRealTimers();
+		});
+
 		it('should remove expired records', async () => {
 			const shortTtlService = new IdempotencyStoreService({
 				store_dir: TEST_STORE_DIR,
@@ -335,7 +351,7 @@ describe('IdempotencyStoreService', () => {
 			await shortTtlService.store(toolCall1, { success: true, output: 'done' });
 
 			// Wait for first to expire
-			await new Promise((resolve) => setTimeout(resolve, 600));
+			await vi.advanceTimersByTimeAsync(600);
 
 			// Store second with longer TTL so it doesn't expire during cleanup
 			await shortTtlService.store(toolCall2, { success: true, output: 'done' }, { ttl_ms: 5000 });

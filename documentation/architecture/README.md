@@ -1,3 +1,7 @@
+---
+updated: 2026-05-07
+---
+
 # Architecture
 
 > Modular, layered architecture reference for VALORA — covering system design, component responsibilities, data flow, session optimisation, and the metrics system.

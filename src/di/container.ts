@@ -471,10 +471,7 @@ function setupDefaultServices(container: DIContainer): void {
 	// Command executor depends on multiple services
 	container.registerFactory(SERVICE_IDENTIFIERS.COMMAND_EXECUTOR, () => {
 		const commandLoader = container.resolve(SERVICE_IDENTIFIERS.COMMAND_LOADER) as CommandLoader;
-		const promptLoader = container.resolve(SERVICE_IDENTIFIERS.PROMPT_LOADER) as PromptLoader;
 		const agentLoader = container.resolve(SERVICE_IDENTIFIERS.AGENT_LOADER) as AgentLoader;
-		const pipelineExecutor = container.resolve(SERVICE_IDENTIFIERS.PIPELINE_EXECUTOR) as PipelineExecutor;
-		const isolationExecutor = container.resolve(SERVICE_IDENTIFIERS.ISOLATION_EXECUTOR) as CommandIsolationExecutor;
 		const sessionLifecycle = container.resolve(SERVICE_IDENTIFIERS.SESSION_LIFECYCLE) as SessionLifecycle;
 		const sessionManager = container.resolve(SERVICE_IDENTIFIERS.SESSION_MANAGER) as CLISessionManager;
 		const providerResolver = container.resolve(SERVICE_IDENTIFIERS.PROVIDER_RESOLVER) as CLIProviderResolver;
@@ -525,11 +522,8 @@ function setupDefaultServices(container: DIContainer): void {
 			commandLoader,
 			documentOutputProcessor,
 			dynamicAgentResolver,
-			isolationExecutor,
 			logger: container.resolve(SERVICE_IDENTIFIERS.LOGGER),
 			mcpSampling,
-			pipelineExecutor,
-			promptLoader,
 			providerResolver,
 			sessionLifecycle,
 			sessionManager

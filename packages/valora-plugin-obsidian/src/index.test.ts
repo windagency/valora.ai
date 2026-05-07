@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import type { PluginAPI } from 'plugins/plugin-api.types';
+import type { PluginAPI } from '@windagency/valora-plugin-api';
 
 import { obsidianConfigSchema } from './config.schema.js';
 import { register } from './index.js';

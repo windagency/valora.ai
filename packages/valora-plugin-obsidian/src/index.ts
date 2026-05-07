@@ -1,4 +1,4 @@
-import type { PluginAPI } from 'plugins/plugin-api.types';
+import type { PluginAPI } from '@windagency/valora-plugin-api';
 
 import { obsidianConfigSchema } from './config.schema.js';
 import { openObsidian } from './obsidian-open.js';

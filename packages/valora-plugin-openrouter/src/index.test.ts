@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import type { PluginAPI, ProviderDescriptor } from 'plugins/plugin-api.types';
+import type { PluginAPI, ProviderDescriptor } from '@windagency/valora-plugin-api';
 
 import { register } from './index.js';
 

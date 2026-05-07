@@ -4,7 +4,7 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
 	resolve: {
 		alias: {
-			'plugins/plugin-api.types': path.resolve(__dirname, '../../dist/plugins/plugin-api.types')
+			'@windagency/valora-plugin-api': path.resolve(__dirname, '../../packages/valora-plugin-api/src/index')
 		}
 	},
 	test: {

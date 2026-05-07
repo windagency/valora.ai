@@ -1,3 +1,7 @@
+---
+updated: 2026-05-07
+---
+
 # lazygit reference
 
 > When to use lazygit versus direct Git commands, and structured alternatives for non-interactive agent workflows.

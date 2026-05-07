@@ -306,12 +306,55 @@ describe('Circular Dependencies', () => {
 				.check(srcProject.allClasses());
 		});
 
-		it('MCP should not create circular dependency with executor', () => {
-			// MCP and executor are both at the application layer.
-			// MCP server code depends on executor (command-loader) for tool registration,
-			// and executor depends on MCP client infrastructure for external tool execution.
-			// This bidirectional dependency is acceptable at the same architectural layer.
-			// The important constraint is that neither should depend on the domain layer incorrectly.
+		it('mcp/ may only import executor/ at the type level (per ADR-015)', async () => {
+			// ADR-015 records that executor and mcp form a co-located orchestration ring.
+			// `executor/` may import concrete classes from `mcp/`, but `mcp/` may only
+			// import `executor/` at the type level. Any runtime `import { Foo } from
+			// 'executor/...'` inside `src/mcp/` reverses the orchestration direction
+			// and triggers this check.
+			const { promises: fs } = await import('node:fs');
+			const path = await import('node:path');
+
+			const mcpDir = path.resolve(process.cwd(), 'src', 'mcp');
+			const offenders: string[] = [];
+
+			async function walk(dir: string): Promise<void> {
+				const entries = await fs.readdir(dir, { withFileTypes: true });
+				for (const entry of entries) {
+					const full = path.join(dir, entry.name);
+					if (entry.isDirectory()) {
+						await walk(full);
+						continue;
+					}
+					if (!entry.name.endsWith('.ts') || entry.name.endsWith('.test.ts')) continue;
+
+					const content = await fs.readFile(full, 'utf8');
+					// Strip comments before scanning; matters for ADR cross-references.
+					const stripped = content
+						.replace(/\/\*[\s\S]*?\*\//g, '')
+						.replace(/\/\/[^\n]*/g, '');
+					// Match `import` statements that mention `executor/` and are NOT
+					// of the form `import type { ... } from 'executor/...'`.
+					const importLines = stripped.match(/^[ \t]*import\b[^;]*;/gm) ?? [];
+					for (const line of importLines) {
+						if (!/['"]executor\//.test(line)) continue;
+						if (/^\s*import\s+type\b/.test(line)) continue;
+						// Per-specifier `import { type X }` form is also allowed:
+						// rejected only when there is at least one runtime specifier.
+						const specifierBlock = line.match(/\{([^}]*)\}/)?.[1];
+						if (specifierBlock !== undefined) {
+							const specs = specifierBlock.split(',').map((s) => s.trim()).filter(Boolean);
+							const allTypeOnly = specs.every((s) => s.startsWith('type '));
+							if (allTypeOnly) continue;
+						}
+						offenders.push(`${path.relative(process.cwd(), full)}: ${line.trim()}`);
+					}
+				}
+			}
+
+			await walk(mcpDir);
+
+			expect(offenders, `mcp/ has runtime imports of executor/ — violates ADR-015 direction:\n${offenders.join('\n')}`).toEqual([]);
 		});
 
 		it('output should not create circular dependencies', () => {

@@ -1,18 +1,20 @@
 /**
- * Worktree Manager - Git worktree CRUD operations
+ * Worktree Manager — git worktree CRUD operations.
  *
- * Manages git worktrees for parallel explorations with safety checks
+ * Uses spawn (no shell) and validates branch names, refs, and paths via
+ * InputValidator so untrusted input cannot reach the git command line.
+ * Path arguments are constrained to repoRoot; branch names reject shell
+ * metacharacters. createMultipleWorktrees rolls back partial failures.
  */
 
-import { exec } from 'child_process';
-import { promises as fs } from 'fs';
 import * as path from 'path';
-import { promisify } from 'util';
 
-const execAsync = promisify(exec);
+import { DEFAULT_TIMEOUT_MS } from 'config/constants';
+import { InputValidator } from 'utils/input-validator';
+import { RetryExecutor, SafeExecutor } from 'utils/safe-exec';
 
 export interface CreateWorktreeOptions {
-	baseRef?: string; // Default: HEAD
+	baseRef?: string;
 	branch: string;
 	force?: boolean;
 	path: string;
@@ -32,99 +34,73 @@ export class WorktreeManager {
 		this.repoRoot = repoRoot ?? process.cwd();
 	}
 
-	/**
-	 * Create a new git worktree
-	 */
 	async createWorktree(options: CreateWorktreeOptions): Promise<WorktreeInfo> {
 		const { baseRef = 'HEAD', branch, force = false, path: worktreePath } = options;
 
-		// Validate inputs
-		this.validateWorktreeOptions(worktreePath, branch);
+		InputValidator.validateBranchName(branch);
+		InputValidator.validateGitRef(baseRef);
+		const validatedPath = InputValidator.validatePath(worktreePath, this.repoRoot);
 
-		// Check if path already exists
-		await this.checkPathAvailability(worktreePath, force);
-
-		// Build git worktree add command
-		const command = this.buildWorktreeCommand(worktreePath, branch, baseRef, force);
+		const args = ['worktree', 'add'];
+		if (force) {
+			args.push('--force');
+		}
+		args.push('-b', branch, validatedPath, baseRef);
 
 		try {
-			const { stderr } = await execAsync(command, {
-				cwd: this.repoRoot
-			});
+			await RetryExecutor.withRetry(async () => {
+				const result = await SafeExecutor.executeGit(args, {
+					cwd: this.repoRoot,
+					timeout: DEFAULT_TIMEOUT_MS
+				});
 
-			// Git worktree add can output to stderr even on success
-			if (stderr && !stderr.includes('Preparing worktree')) {
-				console.warn('Git worktree warning:', stderr);
-			}
+				// `git worktree add` writes its progress narrative to stderr even on success.
+				if (result.stderr && !result.stderr.includes('Preparing worktree')) {
+					console.warn('Git worktree warning:', result.stderr);
+				}
 
-			// Get worktree info
-			return await this.getWorktreeInfo(worktreePath);
+				return result;
+			}, 3);
+
+			return await this.getWorktreeInfo(validatedPath);
 		} catch (error) {
 			const typedError = error as Error;
 			throw new Error(`Failed to create worktree: ${typedError.message}`);
 		}
 	}
 
-	/**
-	 * Validate worktree creation options
-	 */
-	private validateWorktreeOptions(path: string, branch: string): void {
-		if (!path) {
-			throw new Error('Worktree path is required');
-		}
-		if (!branch) {
-			throw new Error('Branch name is required');
-		}
-	}
+	async deleteBranch(branchName: string, force: boolean = false): Promise<void> {
+		// `git branch` expects a short name; refs/heads/ prefix is stripped if present.
+		const shortName = branchName.replace(/^refs\/heads\//, '');
 
-	/**
-	 * Check if path is available for worktree creation
-	 */
-	private async checkPathAvailability(worktreePath: string, force: boolean): Promise<void> {
+		InputValidator.validateBranchName(shortName);
+
+		const args = ['branch', force ? '-D' : '-d', shortName];
+
 		try {
-			await fs.access(worktreePath);
-			if (!force) {
-				throw new Error(`Path ${worktreePath} already exists`);
-			}
-		} catch (error) {
-			const nodeError = error as NodeJS.ErrnoException;
-			if (nodeError.code !== 'ENOENT') {
-				throw error;
-			}
-			// Path doesn't exist, which is good
-		}
-	}
-
-	/**
-	 * Build git worktree add command
-	 */
-	private buildWorktreeCommand(worktreePath: string, branch: string, baseRef: string, force: boolean): string {
-		const forceFlag = force ? '--force' : '';
-		return `git worktree add ${forceFlag} -b ${branch} ${worktreePath} ${baseRef}`.trim();
-	}
-
-	/**
-	 * List all git worktrees
-	 */
-	async listWorktrees(): Promise<WorktreeInfo[]> {
-		try {
-			const { stdout } = await execAsync('git worktree list --porcelain', {
+			await SafeExecutor.executeGit(args, {
 				cwd: this.repoRoot
 			});
-
-			return this.parseWorktreeList(stdout);
 		} catch (error) {
 			const typedError = error as Error;
-			throw new Error(`Failed to list worktrees: ${typedError.message}`);
+			if (typedError.message.includes('not found')) {
+				console.warn(`Branch ${shortName} does not exist, skipping deletion`);
+				return;
+			}
+			throw new Error(`Failed to delete branch: ${typedError.message}`);
 		}
 	}
 
-	/**
-	 * Get information about a specific worktree
-	 */
+	async getExplorationWorktrees(): Promise<WorktreeInfo[]> {
+		const allWorktrees = await this.listWorktrees();
+		return allWorktrees.filter((wt) => wt.branch.includes('exploration/'));
+	}
+
 	async getWorktreeInfo(worktreePath: string): Promise<WorktreeInfo> {
+		const validatedPath = InputValidator.validatePath(worktreePath, this.repoRoot);
+
 		const worktrees = await this.listWorktrees();
-		const absolutePath = path.resolve(worktreePath);
+		const absolutePath = path.resolve(validatedPath);
 
 		const worktree = worktrees.find((wt) => path.resolve(wt.path) === absolutePath);
 
@@ -135,109 +111,40 @@ export class WorktreeManager {
 		return worktree;
 	}
 
-	/**
-	 * Remove a git worktree
-	 */
-	async removeWorktree(worktreePath: string, force: boolean = false): Promise<void> {
-		const forceFlag = force ? '--force' : '';
-		const command = `git worktree remove ${forceFlag} ${worktreePath}`.trim();
-
-		try {
-			await execAsync(command, {
-				cwd: this.repoRoot
-			});
-		} catch (error) {
-			const typedError = error as Error;
-			// If worktree doesn't exist, that's okay
-			if (typedError.message.includes('not a working tree')) {
-				console.warn(`Worktree ${worktreePath} does not exist, skipping removal`);
-				return;
-			}
-			throw new Error(`Failed to remove worktree: ${typedError.message}`);
-		}
-	}
-
-	/**
-	 * Prune stale worktree administrative files
-	 */
-	async pruneWorktrees(): Promise<void> {
-		try {
-			await execAsync('git worktree prune', {
-				cwd: this.repoRoot
-			});
-		} catch (error) {
-			const typedError = error as Error;
-			throw new Error(`Failed to prune worktrees: ${typedError.message}`);
-		}
-	}
-
-	/**
-	 * Check if a worktree exists
-	 */
-	async worktreeExists(worktreePath: string): Promise<boolean> {
-		try {
-			await this.getWorktreeInfo(worktreePath);
-			return true;
-		} catch {
-			return false;
-		}
-	}
-
-	/**
-	 * Check if a branch name is available
-	 */
 	async isBranchNameAvailable(branchName: string): Promise<boolean> {
+		InputValidator.validateBranchName(branchName);
+
 		try {
-			const { stdout } = await execAsync(`git branch --list ${branchName}`, {
+			const result = await SafeExecutor.executeGit(['branch', '--list', branchName], {
 				cwd: this.repoRoot
 			});
-			return stdout.trim() === '';
+			return result.stdout.trim() === '';
 		} catch {
 			return false;
 		}
 	}
 
-	/**
-	 * Get all exploration worktrees (prefixed with exploration/)
-	 */
-	async getExplorationWorktrees(): Promise<WorktreeInfo[]> {
-		const allWorktrees = await this.listWorktrees();
-		return allWorktrees.filter((wt) => wt.branch.startsWith('exploration/'));
-	}
-
-	/**
-	 * Delete branch after worktree removal
-	 */
-	async deleteBranch(branchName: string, force: boolean = false): Promise<void> {
-		// Strip refs/heads/ prefix if present — git branch expects short names
-		const shortName = branchName.replace(/^refs\/heads\//, '');
-		const forceFlag = force ? '-D' : '-d';
-		const command = `git branch ${forceFlag} ${shortName}`;
-
+	async listWorktrees(): Promise<WorktreeInfo[]> {
 		try {
-			await execAsync(command, {
+			const result = await SafeExecutor.executeGit(['worktree', 'list', '--porcelain'], {
 				cwd: this.repoRoot
 			});
+
+			return this.parseWorktreeList(result.stdout);
 		} catch (error) {
 			const typedError = error as Error;
-			// If branch doesn't exist, that's okay
-			if (typedError.message.includes('not found')) {
-				console.warn(`Branch ${shortName} does not exist, skipping deletion`);
-				return;
-			}
-			throw new Error(`Failed to delete branch: ${typedError.message}`);
+			throw new Error(`Failed to list worktrees: ${typedError.message}`);
 		}
 	}
 
-	/**
-	 * Lock a worktree to prevent automatic pruning
-	 */
 	async lockWorktree(worktreePath: string, reason?: string): Promise<void> {
-		const lockReason = reason ?? 'Locked by exploration system';
-		const command = `git worktree lock "${worktreePath}" --reason "${lockReason}"`;
+		const validatedPath = InputValidator.validatePath(worktreePath, this.repoRoot);
+		const sanitizedReason = InputValidator.validateReasonText(reason ?? 'Locked by exploration system');
+
+		const args = ['worktree', 'lock', validatedPath, '--reason', sanitizedReason];
 
 		try {
-			await execAsync(command, {
+			await SafeExecutor.executeGit(args, {
 				cwd: this.repoRoot
 			});
 		} catch (error) {
@@ -246,28 +153,67 @@ export class WorktreeManager {
 		}
 	}
 
-	/**
-	 * Unlock a worktree
-	 */
-	async unlockWorktree(worktreePath: string): Promise<void> {
-		const command = `git worktree unlock "${worktreePath}"`;
-
+	async pruneWorktrees(): Promise<void> {
 		try {
-			await execAsync(command, {
+			await SafeExecutor.executeGit(['worktree', 'prune'], {
 				cwd: this.repoRoot
 			});
 		} catch (error) {
 			const typedError = error as Error;
-			// Ignore if worktree is not locked
+			throw new Error(`Failed to prune worktrees: ${typedError.message}`);
+		}
+	}
+
+	async removeWorktree(worktreePath: string, force: boolean = false): Promise<void> {
+		const validatedPath = InputValidator.validatePath(worktreePath, this.repoRoot);
+
+		const args = ['worktree', 'remove'];
+		if (force) {
+			args.push('--force');
+		}
+		args.push(validatedPath);
+
+		try {
+			await SafeExecutor.executeGit(args, {
+				cwd: this.repoRoot
+			});
+		} catch (error) {
+			const typedError = error as Error;
+			if (typedError.message.includes('not a working tree')) {
+				console.warn(`Worktree ${worktreePath} does not exist, skipping removal`);
+				return;
+			}
+			throw new Error(`Failed to remove worktree: ${typedError.message}`);
+		}
+	}
+
+	async unlockWorktree(worktreePath: string): Promise<void> {
+		const validatedPath = InputValidator.validatePath(worktreePath, this.repoRoot);
+
+		const args = ['worktree', 'unlock', validatedPath];
+
+		try {
+			await SafeExecutor.executeGit(args, {
+				cwd: this.repoRoot
+			});
+		} catch (error) {
+			const typedError = error as Error;
 			if (!typedError.message.includes('not locked')) {
 				throw new Error(`Failed to unlock worktree: ${typedError.message}`);
 			}
 		}
 	}
 
-	/**
-	 * Parse git worktree list --porcelain output
-	 */
+	async worktreeExists(worktreePath: string): Promise<boolean> {
+		try {
+			const validatedPath = InputValidator.validatePath(worktreePath, this.repoRoot);
+			await this.getWorktreeInfo(validatedPath);
+			return true;
+		} catch {
+			return false;
+		}
+	}
+
 	private parseWorktreeList(output: string): WorktreeInfo[] {
 		const worktrees: WorktreeInfo[] = [];
 		const entries = output.split('\n\n').filter((entry) => entry.trim());
@@ -290,7 +236,6 @@ export class WorktreeManager {
 				}
 			}
 
-			// Only add if we have the required fields
 			if (worktree.path && worktree.commit) {
 				worktrees.push(worktree as WorktreeInfo);
 			}
@@ -300,34 +245,54 @@ export class WorktreeManager {
 	}
 
 	/**
-	 * Create multiple worktrees in parallel
+	 * Sequential creation with rollback on partial failure: a single failed
+	 * worktree leaves the previously created ones removed and their branches
+	 * deleted, so callers see all-or-nothing semantics.
 	 */
 	async createMultipleWorktrees(optionsArray: CreateWorktreeOptions[]): Promise<WorktreeInfo[]> {
-		const promises = optionsArray.map((options) => this.createWorktree(options));
-		return Promise.all(promises);
-	}
+		const created: WorktreeInfo[] = [];
+		const createdPaths: string[] = [];
 
-	/**
-	 * Remove multiple worktrees in parallel
-	 */
-	async removeMultipleWorktrees(paths: string[], force: boolean = false): Promise<void> {
-		const promises = paths.map((path) => this.removeWorktree(path, force));
-		await Promise.all(promises);
-	}
-
-	/**
-	 * Get worktree status (clean, dirty, etc.)
-	 */
-	async getWorktreeStatus(worktreePath: string): Promise<{ clean: boolean; uncommitted_changes: number }> {
 		try {
-			const { stdout } = await execAsync('git status --porcelain', {
-				cwd: worktreePath
+			for (const options of optionsArray) {
+				const info = await this.createWorktree(options);
+				created.push(info);
+				createdPaths.push(info.path);
+			}
+
+			return created;
+		} catch (error) {
+			console.error(`Worktree creation failed, rolling back ${createdPaths.length} worktrees...`);
+
+			for (const worktreePath of createdPaths) {
+				try {
+					await this.removeWorktree(worktreePath, true);
+					const worktree = created.find((w) => w.path === worktreePath);
+					if (worktree) {
+						await this.deleteBranch(worktree.branch, true);
+					}
+				} catch (cleanupError) {
+					console.error(`Failed to cleanup worktree ${worktreePath}: ${(cleanupError as Error).message}`);
+				}
+			}
+
+			throw error;
+		}
+	}
+
+	async getWorktreeStatus(worktreePath: string): Promise<{ clean: boolean; uncommitted_changes: number }> {
+		const validatedPath = InputValidator.validatePath(worktreePath, this.repoRoot);
+
+		try {
+			const result = await SafeExecutor.executeGit(['status', '--porcelain'], {
+				cwd: validatedPath
 			});
 
-			const lines = stdout
+			const lines = result.stdout
 				.trim()
 				.split('\n')
 				.filter((line) => line);
+
 			return {
 				clean: lines.length === 0,
 				uncommitted_changes: lines.length
@@ -335,6 +300,27 @@ export class WorktreeManager {
 		} catch (error) {
 			const typedError = error as Error;
 			throw new Error(`Failed to get worktree status: ${typedError.message}`);
+		}
+	}
+
+	async removeMultipleWorktrees(paths: string[], force: boolean = false): Promise<void> {
+		const promises = paths.map((p) => this.removeWorktree(p, force));
+		await Promise.all(promises);
+	}
+
+	/**
+	 * Refuses creation past the configured cap so a leak in caller code cannot
+	 * exhaust the filesystem's worktree budget. Callers must `git worktree
+	 * prune` to recover.
+	 */
+	async checkWorktreeLimit(maxWorktrees: number = 50): Promise<void> {
+		const worktrees = await this.listWorktrees();
+
+		if (worktrees.length >= maxWorktrees) {
+			throw new Error(
+				`Too many worktrees (${worktrees.length}/${maxWorktrees}). ` +
+					`Run 'git worktree prune' to clean up old worktrees.`
+			);
 		}
 	}
 }

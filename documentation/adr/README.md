@@ -1,3 +1,7 @@
+---
+updated: 2026-05-07
+---
+
 # Architecture Decision Records
 
 > Documentation of key architectural decisions for Valora.

@@ -1,3 +1,7 @@
+---
+updated: 2026-05-07
+---
+
 # ADR-010: Pipeline Resilience and Tool-Failure Observability
 
 > **Decision**: Pipeline stages now emit typed events and metrics counters for tool failures and loop exhaustions, hard-stop after configurable failure thresholds, use verified filesystem state for forced outputs, and support per-stage retry — making previously silent degraded states measurable and controllable.

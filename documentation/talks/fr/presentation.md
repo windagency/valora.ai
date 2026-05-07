@@ -1,3 +1,7 @@
+---
+updated: 2026-05-07
+---
+
 # Discours de présentation — VALORA
 
 ### Guide du présentateur · Français

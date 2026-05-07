@@ -1,3 +1,7 @@
+---
+updated: 2026-05-07
+---
+
 # Pipeline Resilience — Operations Guide
 
 > How to observe, diagnose, and tune pipeline failure behaviour — covering tool execution failures, loop exhaustion, hard stops, and retry configuration.

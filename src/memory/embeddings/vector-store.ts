@@ -76,7 +76,7 @@ export function readVectorStoreMeta(dir: string): null | PersistedMeta {
  */
 export function openVectorStore(dir: string, model: string, dim: number): VectorStore {
 	mkdirSync(dir, { recursive: true });
-	const state = initialiseState(dir, model, dim);
+	const state = initializeState(dir, model, dim);
 	return buildStoreApi(state);
 }
 
@@ -165,7 +165,7 @@ function flushState(state: VectorStoreState): void {
 	atomicWriteFile(state.indexPath, JSON.stringify(index, null, 2));
 }
 
-function initialiseState(dir: string, model: string, dim: number): VectorStoreState {
+function initializeState(dir: string, model: string, dim: number): VectorStoreState {
 	const binPath = path.join(dir, BIN_FILENAME);
 	const indexPath = path.join(dir, INDEX_FILENAME);
 	const persisted = readVectorStoreMeta(dir);

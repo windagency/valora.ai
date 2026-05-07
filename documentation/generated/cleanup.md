@@ -1,3 +1,7 @@
+---
+updated: 2026-05-07
+---
+
 # Module: `cleanup`
 
 _Generated: 2026-04-18_

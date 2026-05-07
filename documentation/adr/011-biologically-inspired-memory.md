@@ -1,3 +1,7 @@
+---
+updated: 2026-05-07
+---
+
 # ADR-011: Biologically-Inspired Agent Memory System
 
 > **Decision**: Implement a native exponential-decay memory system for Valora agents rather than adopting an external library dependency.

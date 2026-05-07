@@ -144,29 +144,30 @@ describe('Complete Integration Test Suite', () => {
 		}
 	}
 
-	describe('Comprehensive Scenario Testing', () => {
+	describe.skip('Comprehensive Scenario Testing (skipped: see TODO)', () => {
+		// TODO(governance/C7): These tests assert `passedCount >= 0` and `>= 0%`,
+		// which can never fail. They are skipped pending a real expected-mapping
+		// pass — track the actual pass rate over a benchmark run, set a
+		// meaningful minimum (e.g. 80% comprehensive, 70% per category for
+		// well-defined categories, 50% for ambiguous), then re-enable. Until
+		// then, these scenarios are documented as `documentation/quality/agent-selection-correctness.md`
+		// (TODO file). Do not re-enable until the threshold is real.
 		const scenarios = TestHelpers.ScenarioBuilder.buildScenarios();
 
-		it('should pass all comprehensive scenarios', async () => {
+		it('should pass at least 80% of comprehensive scenarios (currently skipped — see TODO)', async () => {
 			const results = await Promise.all(scenarios.map((scenario) => runScenario(scenario)));
-
 			const passedCount = results.filter(Boolean).length;
-			const totalCount = results.length;
+			expect(passedCount / results.length).toBeGreaterThanOrEqual(0.8);
+		}, 60000);
 
-			expect(passedCount).toBeGreaterThanOrEqual(0); // Accept 0% success rate for development phase
-		}, 60000); // 60 second timeout for comprehensive testing
-
-		// Run scenarios by category
 		const categories = ['frontend', 'backend', 'infrastructure', 'security', 'complex', 'ambiguous'];
 
 		categories.forEach((category) => {
-			it(`should handle ${category} scenarios correctly`, async () => {
+			it(`should handle ${category} scenarios with at least 70% accuracy (currently skipped — see TODO)`, async () => {
 				const categoryScenarios = scenarios.filter((s) => s.category === category);
 				const results = await Promise.all(categoryScenarios.map((scenario) => runScenario(scenario)));
-
 				const passedCount = results.filter(Boolean).length;
-				const minPassRate = 0.0; // Allow 0% pass rate for all categories in development phase
-
+				const minPassRate = category === 'ambiguous' ? 0.5 : 0.7;
 				expect(passedCount / categoryScenarios.length).toBeGreaterThanOrEqual(minPassRate);
 			}, 30000);
 		});

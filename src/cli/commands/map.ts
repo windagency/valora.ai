@@ -10,7 +10,7 @@ import type { CommandAdapter } from 'cli/command-adapter.interface';
 import { CodebaseGraphBuilder } from 'analysis/codebase-graph.builder';
 import { DocumentationRenderer } from 'analysis/documentation.renderer';
 import { DocumentationService } from 'analysis/documentation.service';
-import { SymbolReferenceAnalyser } from 'analysis/symbol-reference.analyser';
+import { SymbolReferenceAnalyzer } from 'analysis/symbol-reference.analyser';
 import { getASTIndexService } from 'ast/ast-index.service';
 
 interface MapOptions extends Record<string, unknown> {
@@ -30,7 +30,7 @@ export function configureMapCommand(program: CommandAdapter): void {
 			const projectRoot = process.cwd();
 			const astIndex = getASTIndexService(projectRoot);
 			const lsp = getLSPToolsService(projectRoot);
-			const symbolRefs = new SymbolReferenceAnalyser(lsp);
+			const symbolRefs = new SymbolReferenceAnalyzer(lsp);
 			const builder = new CodebaseGraphBuilder(astIndex, projectRoot, undefined, undefined, symbolRefs);
 			const outputDir = path.resolve(projectRoot, options.output ?? 'documentation/generated');
 			const service = new DocumentationService(builder, new DocumentationRenderer(), outputDir);

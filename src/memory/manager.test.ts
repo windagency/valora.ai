@@ -2,7 +2,7 @@
  * Unit tests for MemoryManager
  */
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 
 import type { MemoryCategory, MemoryEntry, MemoryStoreFile } from 'types/memory.types';
 
@@ -31,7 +31,7 @@ function makeEntry(overrides: Partial<MemoryEntry> = {}): MemoryEntry {
 	};
 }
 
-function makeMockStore(): MemoryStore {
+function makeInMemoryStore(): MemoryStore {
 	const storage = new Map<MemoryCategory, MemoryEntry[]>();
 
 	const getOrInit = (category: MemoryCategory): MemoryEntry[] => {
@@ -43,52 +43,52 @@ function makeMockStore(): MemoryStore {
 	};
 
 	return {
-		getEntries: vi.fn(async (category: MemoryCategory) => [...getOrInit(category)]),
-		appendEntry: vi.fn(async (category: MemoryCategory, entry: MemoryEntry) => {
+		getEntries: async (category: MemoryCategory) => [...getOrInit(category)],
+		appendEntry: async (category: MemoryCategory, entry: MemoryEntry) => {
 			getOrInit(category).push(entry);
-		}),
-		updateEntry: vi.fn(async (category: MemoryCategory, id: string, patch: Partial<MemoryEntry>) => {
+		},
+		updateEntry: async (category: MemoryCategory, id: string, patch: Partial<MemoryEntry>) => {
 			const entries = getOrInit(category);
 			const entry = entries.find((e) => e.id === id);
 			if (entry === undefined) return false;
 			Object.assign(entry, patch);
 			return true;
-		}),
-		removeEntry: vi.fn(async (category: MemoryCategory, id: string) => {
+		},
+		removeEntry: async (category: MemoryCategory, id: string) => {
 			const entries = getOrInit(category);
 			const idx = entries.findIndex((e) => e.id === id);
 			if (idx === -1) return false;
 			entries.splice(idx, 1);
 			return true;
-		}),
-		removeEntries: vi.fn(async (category: MemoryCategory, ids: Set<string>) => {
+		},
+		removeEntries: async (category: MemoryCategory, ids: Set<string>) => {
 			const entries = getOrInit(category);
 			const before = entries.length;
 			const filtered = entries.filter((e) => !ids.has(e.id));
 			storage.set(category, filtered);
 			return before - filtered.length;
-		}),
-		setEntries: vi.fn(async (category: MemoryCategory, entries: MemoryEntry[]) => {
+		},
+		setEntries: async (category: MemoryCategory, entries: MemoryEntry[]) => {
 			storage.set(category, entries);
+		},
+		load: async (category: MemoryCategory): Promise<MemoryStoreFile> => ({
+			version: 1,
+			lastWrittenAt: new Date().toISOString(),
+			entries: getOrInit(category)
 		}),
-		load: vi.fn(
-			async (category: MemoryCategory): Promise<MemoryStoreFile> => ({
-				version: 1,
-				lastWrittenAt: new Date().toISOString(),
-				entries: getOrInit(category)
-			})
-		),
-		getMetadata: vi.fn(async (_category: MemoryCategory) => ({
+		getMetadata: async (_category: MemoryCategory) => ({
 			version: 1,
 			lastWrittenAt: new Date().toISOString()
-		})),
-		setLastConsolidatedAt: vi.fn(async (_timestamp: string) => {
-			// no-op
 		}),
-		save: vi.fn(),
-		flush: vi.fn(async () => {
+		setLastConsolidatedAt: async (_timestamp: string) => {
 			// no-op
-		})
+		},
+		save: async () => {
+			// no-op
+		},
+		flush: async () => {
+			// no-op
+		}
 	} as unknown as MemoryStore;
 }
 
@@ -97,7 +97,7 @@ describe('MemoryManager', () => {
 	let manager: MemoryManager;
 
 	beforeEach(() => {
-		store = makeMockStore();
+		store = makeInMemoryStore();
 		manager = new MemoryManager(store);
 	});
 
@@ -120,7 +120,10 @@ describe('MemoryManager', () => {
 			expect(new Date(entry.createdAt).getTime()).toBeLessThanOrEqual(after);
 			expect(entry.createdAt).toBe(entry.updatedAt);
 			expect(entry.createdAt).toBe(entry.lastAccessedAt);
-			expect(vi.mocked(store.appendEntry)).toHaveBeenCalledWith('episodic', entry);
+
+			// Entry is persisted in the store
+			const stored = await store.getEntries('episodic');
+			expect(stored.some((e) => e.id === entry.id)).toBe(true);
 		});
 
 		it('gives 2× halfLife when isError=true', async () => {
@@ -161,12 +164,7 @@ describe('MemoryManager', () => {
 				supersedes: old.id
 			});
 
-			expect(vi.mocked(store.updateEntry)).toHaveBeenCalledWith(
-				'episodic',
-				old.id,
-				expect.objectContaining({ supersededBy: newEntry.id, confidence: 'stale' })
-			);
-
+			// Observable outcome: the old entry is stale and references the new entry
 			const entries = await store.getEntries('episodic');
 			const oldEntry = entries.find((e) => e.id === old.id);
 			expect(oldEntry?.confidence).toBe('stale');
@@ -207,17 +205,16 @@ describe('MemoryManager', () => {
 			expect(ids).toContain(fresh.id);
 		});
 
-		it('calls strengthenEntry for returned entries (accessCount increments)', async () => {
+		it('strengthens returned entries — accessCount increments in the store', async () => {
 			const entry = makeEntry({ id: 'mem-strengthtest' });
 			await store.appendEntry('episodic', entry);
 
 			await manager.query({ strengthen: true });
 
-			expect(vi.mocked(store.updateEntry)).toHaveBeenCalledWith(
-				'episodic',
-				entry.id,
-				expect.objectContaining({ accessCount: 1 })
-			);
+			// Observable outcome: the store now holds the entry with incremented accessCount
+			const stored = await store.getEntries('episodic');
+			const updated = stored.find((e) => e.id === entry.id);
+			expect(updated?.accessCount).toBe(1);
 		});
 	});
 
@@ -231,11 +228,14 @@ describe('MemoryManager', () => {
 			const count = await manager.invalidateByPaths(['src/foo.ts']);
 			expect(count).toBe(1);
 
-			expect(vi.mocked(store.updateEntry)).toHaveBeenCalledWith(
-				'episodic',
-				e1.id,
-				expect.objectContaining({ halfLifeDays: 7 })
-			);
+			// Observable outcome: the matching entry's halfLife was halved in the store
+			const stored = await store.getEntries('episodic');
+			const updated = stored.find((e) => e.id === e1.id);
+			expect(updated?.halfLifeDays).toBe(7);
+
+			// Non-matching entry is unchanged
+			const unchanged = stored.find((e) => e.id === e2.id);
+			expect(unchanged?.halfLifeDays).toBe(10);
 		});
 
 		it('enforces minimum halfLife of 1 day', async () => {
@@ -244,11 +244,10 @@ describe('MemoryManager', () => {
 
 			await manager.invalidateByPaths(['src/x.ts']);
 
-			expect(vi.mocked(store.updateEntry)).toHaveBeenCalledWith(
-				'episodic',
-				e.id,
-				expect.objectContaining({ halfLifeDays: 1 })
-			);
+			// Observable outcome: halfLife does not drop below 1
+			const stored = await store.getEntries('episodic');
+			const updated = stored.find((entry) => entry.id === e.id);
+			expect(updated?.halfLifeDays).toBe(1);
 		});
 	});
 
@@ -262,11 +261,10 @@ describe('MemoryManager', () => {
 			const count = await manager.markStaleByPaths(['src/a.ts']);
 			expect(count).toBe(1);
 
-			expect(vi.mocked(store.updateEntry)).toHaveBeenCalledWith(
-				'episodic',
-				e1.id,
-				expect.objectContaining({ confidence: 'stale' })
-			);
+			// Observable outcome: the matching entry is stale; the other is not
+			const stored = await store.getEntries('episodic');
+			expect(stored.find((e) => e.id === e1.id)?.confidence).toBe('stale');
+			expect(stored.find((e) => e.id === e2.id)?.confidence).not.toBe('stale');
 		});
 	});
 
@@ -283,11 +281,11 @@ describe('MemoryManager', () => {
 			expect(promoted.tags).toContain('error');
 			expect(promoted.tags).toContain('consolidated');
 
-			expect(vi.mocked(store.updateEntry)).toHaveBeenCalledWith(
-				'episodic',
-				episodic.id,
-				expect.objectContaining({ supersededBy: promoted.id, confidence: 'stale' })
-			);
+			// Observable outcome: the episodic source entry is marked stale in the store
+			const episodics = await store.getEntries('episodic');
+			const source = episodics.find((e) => e.id === episodic.id);
+			expect(source?.confidence).toBe('stale');
+			expect(source?.supersededBy).toBe(promoted.id);
 		});
 	});
 
@@ -307,11 +305,10 @@ describe('MemoryManager', () => {
 			const count = await manager.pruneCategory('episodic');
 			expect(count).toBe(1);
 
-			expect(vi.mocked(store.removeEntries)).toHaveBeenCalledWith('episodic', expect.any(Set));
-			const callArgs = vi.mocked(store.removeEntries).mock.calls[0];
-			const removedIds = callArgs?.[1] as Set<string>;
-			expect(removedIds.has(weak.id)).toBe(true);
-			expect(removedIds.has(strong.id)).toBe(false);
+			// Observable outcome: only the strong entry remains in the store
+			const remaining = await store.getEntries('episodic');
+			expect(remaining.some((e) => e.id === weak.id)).toBe(false);
+			expect(remaining.some((e) => e.id === strong.id)).toBe(true);
 		});
 	});
 });

@@ -12,11 +12,7 @@ import type { OptimizationMetrics, QualityMetrics } from 'types/session.types';
 
 import { getConfigLoader } from 'config/loader';
 import { AgentLoader } from 'executor/agent-loader';
-import { CommandIsolationExecutor } from 'executor/command-isolation.executor';
 import { CommandLoader } from 'executor/command-loader';
-import { PipelineExecutor } from 'executor/pipeline';
-import { PromptLoader } from 'executor/prompt-loader';
-import { StageExecutor } from 'executor/stage-executor';
 import { getStageOutputCache } from 'executor/stage-output-cache';
 import { getConsoleOutput } from 'output/console-output';
 import { getLogger, type Logger } from 'output/logger';
@@ -135,11 +131,8 @@ export interface CommandExecutorDependencies {
 	commandLoader: CommandLoader;
 	documentOutputProcessor?: DocumentOutputProcessor;
 	dynamicAgentResolver?: DynamicAgentResolverService;
-	isolationExecutor: CommandIsolationExecutor;
 	logger: Logger;
 	mcpSampling?: MCPSamplingService;
-	pipelineExecutor: PipelineExecutor;
-	promptLoader: PromptLoader;
 	providerResolver: CLIProviderResolver;
 	sessionLifecycle: SessionLifecycle;
 	sessionManager: CLISessionManager;
@@ -149,16 +142,10 @@ export class CommandExecutor {
 	// Core dependencies
 	private agentLoader!: AgentLoader;
 	private commandLoader!: CommandLoader;
-	private promptLoader!: PromptLoader;
 	// Planned for future use - keeping for compatibility
 	private analyticsService?: AgentSelectionAnalyticsService;
 	private dynamicAgentResolver?: DynamicAgentResolverService;
 
-	// @ts-expect-error - Planned for future use
-	private pipelineExecutor!: PipelineExecutor;
-
-	// @ts-expect-error - Planned for future use
-	private isolationExecutor!: CommandIsolationExecutor;
 	private logger!: Logger;
 	private mcpSampling?: MCPSamplingService;
 	private providerResolver!: CLIProviderResolver;
@@ -188,10 +175,7 @@ export class CommandExecutor {
 			// New signature: constructor(dependencies: CommandExecutorDependencies)
 			const deps = dependencies as CommandExecutorDependencies;
 			this.commandLoader = deps.commandLoader;
-			this.promptLoader = deps.promptLoader;
 			this.agentLoader = deps.agentLoader;
-			this.pipelineExecutor = deps.pipelineExecutor;
-			this.isolationExecutor = deps.isolationExecutor;
 			this.sessionLifecycle = deps.sessionLifecycle;
 			this.sessionManager = deps.sessionManager;
 			this.providerResolver = deps.providerResolver;
@@ -218,11 +202,7 @@ export class CommandExecutor {
 	private initializeDependencies(): void {
 		this.logger = getLogger();
 		this.commandLoader = new CommandLoader();
-		this.promptLoader = new PromptLoader();
 		this.agentLoader = new AgentLoader();
-		this.pipelineExecutor = new PipelineExecutor(this.promptLoader, this.agentLoader);
-		const stageExecutor = new StageExecutor(this.promptLoader, this.agentLoader);
-		this.isolationExecutor = new CommandIsolationExecutor(stageExecutor);
 		this.sessionLifecycle = new SessionLifecycle(new SessionStore());
 		this.sessionManager = new CLISessionManager(this.sessionLifecycle);
 		this.providerResolver = new CLIProviderResolver();

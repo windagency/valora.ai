@@ -74,8 +74,9 @@ export class DocValidator {
 		const linkPattern = /\[([^\]]+)\]\(([^)#]+)[^)]*\)/g;
 		const dir = path.dirname(filePath);
 		const errors: DocValidationError[] = [];
+		const strippedBody = this.stripCodeBlocks(body);
 
-		for (const match of body.matchAll(linkPattern)) {
+		for (const match of strippedBody.matchAll(linkPattern)) {
 			const href = match[2];
 			if (!href || href.startsWith('http') || href.startsWith('mailto:')) continue;
 
@@ -93,5 +94,9 @@ export class DocValidator {
 		}
 
 		return errors;
+	}
+
+	private stripCodeBlocks(body: string): string {
+		return body.replace(/```[\s\S]*?```/g, '').replace(/`[^`\n]+`/g, '');
 	}
 }

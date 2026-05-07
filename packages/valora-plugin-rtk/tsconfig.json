@@ -7,7 +7,7 @@
 		"moduleResolution": "bundler",
 		"outDir": "dist",
 		"paths": {
-			"plugins/*": ["../../dist/plugins/*"]
+			"@windagency/valora-plugin-api": ["../../packages/valora-plugin-api/src/index"]
 		},
 		"rootDir": "src",
 		"sourceMap": false

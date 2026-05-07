@@ -1,3 +1,7 @@
+---
+updated: 2026-05-07
+---
+
 # ADR-013: Memory Vault — Per-Memory Markdown Files with Embeddings
 
 > **Decision**: Extend the biological memory system with a per-memory Markdown vault and optional content embeddings computed via the existing `LLMProvider` abstraction, replacing the three flat JSON stores introduced in ADR-011.

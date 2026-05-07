@@ -1,3 +1,7 @@
+---
+updated: 2026-05-07
+---
+
 # fzf, eza, and zoxide reference
 
 > Command reference for fuzzy finding (`fzf`), modern directory listing (`eza`), and smart navigation (`zoxide`).

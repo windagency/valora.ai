@@ -51,6 +51,7 @@ import type { PromptLoader } from './prompt-loader';
 import { type EscalationDetectionService, getEscalationDetectionService } from './escalation-detection.service';
 import { type EscalationHandlerService, getEscalationHandlerService } from './escalation-handler.service';
 import { getMessageBuilderService, type MessageBuilderService } from './message-builder.service';
+import { compressMessageHistory, deduplicateLines, djb2 } from './message-compression';
 import { getCompressionStats, stripAnsiCodes } from './output-compression.service';
 import { getOutputParsingService, type OutputParsingService } from './output-parsing.service';
 import { getPipelineEmitter, type PipelineEventEmitter } from './pipeline-events';
@@ -59,6 +60,8 @@ import { getSessionBudgetService, type SessionBudgetService } from './session-bu
 import { getStageOutputCache, type StageOutputCache } from './stage-output-cache';
 import { getStageValidationService, type StageValidationService } from './stage-validation.service';
 import { getToolExecutionService, type ToolExecutionService } from './tool-execution.service';
+
+export { compressMessageHistory, djb2 } from './message-compression';
 
 /**
  * If this many tool calls fail within a single stage, the stage is hard-stopped
@@ -87,38 +90,6 @@ const FATAL_TOOLS = new Set(['delete_file', 'search_replace', 'write']);
  * remains as a second safety net.
  */
 const PROACTIVE_COMPRESS_AFTER_ITERATIONS = 8;
-
-/**
- * Simple djb2 hash — used to detect duplicate tool results across iterations.
- * Pure arithmetic, no imports needed.
- *
- * Exported for unit testing.
- */
-export function djb2(s: string): number {
-	let h = 5381;
-	for (let i = 0; i < s.length; i++) h = ((h << 5) + h) ^ s.charCodeAt(i);
-	return h >>> 0;
-}
-
-/**
- * Compress a message array in-place by replacing old tool results with a
- * placeholder, keeping the most recent `keepRecent` messages intact.
- * Returns the number of messages replaced.
- *
- * Extracted from `StageExecutor.compressToolResults` for unit testing.
- */
-export function compressMessageHistory(messages: LLMMessage[], keepRecent = 4): number {
-	const cutoff = messages.length - keepRecent;
-	let pruned = 0;
-	for (let i = 0; i < cutoff; i++) {
-		const msg = messages[i];
-		if (msg?.role === 'tool' && msg.content !== '[Tool result omitted to reduce context length]') {
-			messages[i] = { ...msg, content: '[Tool result omitted to reduce context length]' };
-			pruned++;
-		}
-	}
-	return pruned;
-}
 
 /**
  * Default failure policy per stage type.
@@ -1167,9 +1138,9 @@ export class StageExecutor {
 				toolCallId: result.tool_call_id,
 				toolName
 			});
-			const sanitised = injectionDetector.sanitiseToolResult(result.tool_call_id, formatted);
+			const sanitized = injectionDetector.sanitizeToolResult(result.tool_call_id, formatted);
 
-			const hashKey = `${toolName}:${djb2(sanitised)}`;
+			const hashKey = `${toolName}:${djb2(sanitized)}`;
 			const existingIndex = toolResultHashes.get(hashKey);
 
 			if (existingIndex !== undefined) {
@@ -1182,7 +1153,7 @@ export class StageExecutor {
 			} else {
 				toolResultHashes.set(hashKey, messages.length + 1);
 				messages.push({
-					content: sanitised,
+					content: sanitized,
 					name: result.tool_call_id,
 					role: 'tool'
 				});
@@ -1946,35 +1917,4 @@ Summarize ALL changes you made during tool execution. Output ONLY the JSON code 
 			return null;
 		}
 	}
-}
-
-/**
- * Collapse consecutive repeated lines in tool output to `"<line> (×N)"`.
- * Only exact-match consecutive duplicates are collapsed — non-adjacent repeats
- * and blank lines are left untouched to preserve structural context.
- */
-function deduplicateLines(text: string): string {
-	const lines = text.split('\n');
-	const result: string[] = [];
-	let i = 0;
-
-	while (i < lines.length) {
-		const line = lines[i] ?? '';
-		// Don't collapse blank lines — they carry structural meaning
-		if (!line.trim()) {
-			result.push(line);
-			i++;
-			continue;
-		}
-
-		let count = 1;
-		while (i + count < lines.length && (lines[i + count] ?? '') === line) {
-			count++;
-		}
-
-		result.push(count > 1 ? `${line} (×${count})` : line);
-		i += count;
-	}
-
-	return result.join('\n');
 }

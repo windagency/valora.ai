@@ -1,3 +1,7 @@
+---
+updated: 2026-05-07
+---
+
 # Developer Guide
 
 > Technical documentation for contributors to and extenders of Valora.

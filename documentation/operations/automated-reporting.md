@@ -1,3 +1,7 @@
+---
+updated: 2026-05-07
+---
+
 # Automated Metrics Reporting
 
 > How to run, schedule, and interpret the weekly workflow metrics reports generated from Valora session data.

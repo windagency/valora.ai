@@ -1,8 +1,7 @@
 /**
  * End-to-End tests for CLI commands
  *
- * Tests the complete CLI workflow using Playwright for browser automation
- * and testcontainers for isolated environments.
+ * Tests the complete CLI workflow using Playwright for browser automation.
  */
 
 import * as fs from 'fs/promises';
@@ -10,12 +9,10 @@ import * as path from 'path';
 import { execa } from 'execa';
 import { Browser, Page, chromium } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { TestcontainersHelper } from '../utils/testcontainers-helper';
 
 describe('CLI Commands E2E', () => {
 	let browser: Browser | null = null;
 	let page: Page | null = null;
-	let testcontainersHelper: TestcontainersHelper;
 	let tempDir: string;
 	let aiBinaryPath: string;
 	let playwrightAvailable = false;
@@ -42,10 +39,6 @@ describe('CLI Commands E2E', () => {
 	}
 
 	beforeAll(async () => {
-		// Set up test environment
-		testcontainersHelper = new TestcontainersHelper();
-		await testcontainersHelper.startSharedContainers();
-
 		// Create temporary directory for testing
 		tempDir = await fs.mkdtemp(path.join('/tmp', 'ai-cli-e2e-'));
 
@@ -61,13 +54,12 @@ describe('CLI Commands E2E', () => {
 			// Playwright browsers not installed - skip browser tests
 			playwrightAvailable = false;
 		}
-	}, 120000); // Increased timeout for container startup
+	}, 30000);
 
 	afterAll(async () => {
 		// Clean up
 		if (page) await page.close();
 		if (browser) await browser.close();
-		await testcontainersHelper.stopAllContainers();
 
 		try {
 			await fs.rm(tempDir, { force: true, recursive: true });

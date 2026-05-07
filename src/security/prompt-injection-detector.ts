@@ -11,6 +11,7 @@
 
 import { getLogger } from 'output/logger';
 
+import { getAuditSink } from './audit-sink';
 import { createSecurityEvent, type SecurityEvent } from './security-event.types';
 
 /**
@@ -131,7 +132,7 @@ export class PromptInjectionDetector {
 	/**
 	 * Sanitise tool result content based on injection risk.
 	 */
-	sanitiseToolResult(toolName: string, content: string): string {
+	sanitizeToolResult(toolName: string, content: string): string {
 		if (!content || typeof content !== 'string') return content;
 
 		const { markers, score } = this.scan(content);
@@ -236,6 +237,7 @@ export class PromptInjectionDetector {
 			toolName
 		});
 		this.events.push(event);
+		getAuditSink().append(event);
 
 		const logger = getLogger();
 		logger.warn(`[Security] Prompt injection detected in ${toolName}`, { action, markers, score });

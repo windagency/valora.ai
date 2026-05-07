@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { CodebaseGraphBuilder } from './codebase-graph.builder';
-import type { FileDependencyAnalyser } from './file-dependency.analyser';
-import type { ModuleDependencyAnalyser } from './module-dependency.analyser';
-import type { SymbolReferenceAnalyser } from './symbol-reference.analyser';
+import type { FileDependencyAnalyzer } from './file-dependency.analyser';
+import type { ModuleDependencyAnalyzer } from './module-dependency.analyser';
+import type { SymbolReferenceAnalyzer } from './symbol-reference.analyser';
 import type { ASTIndexService } from 'ast/ast-index.service';
 import type { CodebaseIndex } from 'ast/ast.types';
 
@@ -24,12 +24,12 @@ function makeMocks() {
 		getIndex: vi.fn().mockReturnValue(EMPTY_INDEX)
 	} as unknown as ASTIndexService;
 	const modDeps = {
-		analyse: vi.fn().mockReturnValue([{ name: 'ast', path: 'src/ast', dependsOn: [] }])
-	} as unknown as ModuleDependencyAnalyser;
+		analyze: vi.fn().mockReturnValue([{ name: 'ast', path: 'src/ast', dependsOn: [] }])
+	} as unknown as ModuleDependencyAnalyzer;
 	const fileDeps = {
-		analyse: vi.fn().mockReturnValue([{ path: 'src/ast/a.ts', module: 'ast', imports: [] }])
-	} as unknown as FileDependencyAnalyser;
-	const symRefs = { analyse: vi.fn().mockResolvedValue([]) } as unknown as SymbolReferenceAnalyser;
+		analyze: vi.fn().mockReturnValue([{ path: 'src/ast/a.ts', module: 'ast', imports: [] }])
+	} as unknown as FileDependencyAnalyzer;
+	const symRefs = { analyze: vi.fn().mockResolvedValue([]) } as unknown as SymbolReferenceAnalyzer;
 	return { astIndex, modDeps, fileDeps, symRefs };
 }
 
@@ -62,7 +62,7 @@ describe('CodebaseGraphBuilder', () => {
 
 		const graph = await builder.build({ includeSymbols: false });
 
-		expect(symRefs.analyse).not.toHaveBeenCalled();
+		expect(symRefs.analyze).not.toHaveBeenCalled();
 		expect(graph.symbols).toHaveLength(0);
 	});
 });

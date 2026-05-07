@@ -1,3 +1,7 @@
+---
+updated: 2026-05-07
+---
+
 # jq and yq reference
 
 > Command reference for querying and transforming JSON (`jq`) and YAML/TOML/XML (`yq`).

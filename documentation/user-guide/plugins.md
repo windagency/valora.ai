@@ -1,3 +1,7 @@
+---
+updated: 2026-05-07
+---
+
 # Plugins
 
 > Extend Valora with additional agents, commands, hooks, prompts, templates, and compression strategies — packaged as self-contained plugin directories.

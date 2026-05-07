@@ -1,56 +1,85 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
-
-vi.mock('fs');
-import * as fs from 'fs';
+import { mkdtempSync, readFileSync, rmSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { DocumentationService } from './documentation.service';
+import { DocumentationRenderer } from './documentation.renderer';
 import type { CodebaseGraphBuilder } from './codebase-graph.builder';
-import type { DocumentationRenderer } from './documentation.renderer';
 import type { CodebaseGraph } from './analysis.types';
 
-const EMPTY_GRAPH: CodebaseGraph = {
-	modules: [{ name: 'ast', path: 'src/ast', dependsOn: [] }],
-	files: [],
-	symbols: [],
-	generatedAt: new Date()
-};
+const FIXED_DATE = new Date('2024-01-15T00:00:00.000Z');
 
-function makeMocks() {
-	const builder = { build: vi.fn().mockResolvedValue(EMPTY_GRAPH) } as unknown as CodebaseGraphBuilder;
-	const renderer = {
-		render: vi.fn().mockReturnValue({ index: '# index', modules: new Map([['ast', '# ast']]) })
-	} as unknown as DocumentationRenderer;
-	return { builder, renderer };
+function makeGraph(overrides: Partial<CodebaseGraph> = {}): CodebaseGraph {
+	return {
+		modules: [{ name: 'ast', path: 'src/ast', dependsOn: [] }],
+		files: [],
+		symbols: [],
+		generatedAt: FIXED_DATE,
+		...overrides
+	};
+}
+
+function makeBuilder(graph: CodebaseGraph): CodebaseGraphBuilder {
+	return { build: vi.fn().mockResolvedValue(graph) } as unknown as CodebaseGraphBuilder;
 }
 
 describe('DocumentationService', () => {
-	beforeEach(() => vi.clearAllMocks());
+	let workingDir: string;
 
-	it('creates output directory recursively', async () => {
-		const { builder, renderer } = makeMocks();
-		const service = new DocumentationService(builder, renderer, '/out');
-		await service.generate();
-		expect(fs.mkdirSync).toHaveBeenCalledWith('/out', { recursive: true });
+	beforeEach(() => {
+		workingDir = mkdtempSync(join(tmpdir(), 'valora-doc-test-'));
 	});
 
-	it('writes index.md', async () => {
-		const { builder, renderer } = makeMocks();
-		const service = new DocumentationService(builder, renderer, '/out');
-		await service.generate();
-		expect(fs.writeFileSync).toHaveBeenCalledWith('/out/index.md', '# index', 'utf-8');
+	afterEach(() => {
+		rmSync(workingDir, { recursive: true, force: true });
 	});
 
-	it('writes one file per module', async () => {
-		const { builder, renderer } = makeMocks();
-		const service = new DocumentationService(builder, renderer, '/out');
+	it('creates output directory and writes index.md with module dependency section', async () => {
+		const graph = makeGraph();
+		const service = new DocumentationService(makeBuilder(graph), new DocumentationRenderer(), workingDir);
+
 		await service.generate();
-		expect(fs.writeFileSync).toHaveBeenCalledWith('/out/ast.md', '# ast', 'utf-8');
+
+		const index = readFileSync(join(workingDir, 'index.md'), 'utf-8');
+		expect(index).toContain('# Codebase Map');
+		expect(index).toContain('## Module Dependencies');
+		expect(index).toContain('```mermaid');
 	});
 
-	it('passes includeSymbols option to builder', async () => {
-		const { builder, renderer } = makeMocks();
-		const service = new DocumentationService(builder, renderer, '/out');
+	it('writes one markdown file per module named after the module', async () => {
+		const graph = makeGraph();
+		const service = new DocumentationService(makeBuilder(graph), new DocumentationRenderer(), workingDir);
+
+		await service.generate();
+
+		const astContent = readFileSync(join(workingDir, 'ast.md'), 'utf-8');
+		expect(astContent).toContain('# Module: `ast`');
+	});
+
+	it('writes the generated date into index.md based on the graph timestamp', async () => {
+		const graph = makeGraph({ generatedAt: new Date('2024-06-20T00:00:00.000Z') });
+		const service = new DocumentationService(makeBuilder(graph), new DocumentationRenderer(), workingDir);
+
+		await service.generate();
+
+		const index = readFileSync(join(workingDir, 'index.md'), 'utf-8');
+		expect(index).toContain('2024-06-20');
+	});
+
+	it('passes includeSymbols option through to the builder and reflects it in generated output', async () => {
+		const graph = makeGraph({
+			symbols: [],
+			files: [{ path: 'src/ast/parser.ts', module: 'ast', imports: [] }]
+		});
+		const builder = makeBuilder(graph);
+		const service = new DocumentationService(builder, new DocumentationRenderer(), workingDir);
+
 		await service.generate({ includeSymbols: false });
-		expect(builder.build).toHaveBeenCalledWith({ includeSymbols: false });
+
+		// The builder was called with the right option
+		expect(vi.mocked(builder.build)).toHaveBeenCalledWith({ includeSymbols: false });
+		// The output was still written to disk
+		expect(readFileSync(join(workingDir, 'index.md'), 'utf-8')).toContain('# Codebase Map');
 	});
 });

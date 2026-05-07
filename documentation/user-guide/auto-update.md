@@ -1,3 +1,7 @@
+---
+updated: 2026-05-07
+---
+
 # Auto-update
 
 > Valora checks for new versions automatically and shows a reminder when an update is available — for both the core CLI and your installed plugins.

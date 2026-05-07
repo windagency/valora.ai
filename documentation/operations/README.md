@@ -1,3 +1,7 @@
+---
+updated: 2026-05-07
+---
+
 # Operations Guide
 
 > Operational procedures for deploying, monitoring, and maintaining Valora in a project environment.

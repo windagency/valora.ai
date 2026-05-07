@@ -13,7 +13,7 @@ import { ConfigurationError } from 'utils/error-handler';
 import { ensureDir, fileExists, getAIRoot, readJSON, writeJSON } from 'utils/file-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ConfigLoader, resetUnknownProviderWarningsForTests } from './loader';
-import { CONFIG_SCHEMA, DEFAULT_CONFIG } from './schema';
+import { DEFAULT_CONFIG } from './schema';
 
 // Mock dependencies
 vi.mock('utils/file-utils', async (importOriginal) => {
@@ -28,47 +28,6 @@ vi.mock('utils/file-utils', async (importOriginal) => {
 	};
 });
 vi.mock('./constants');
-vi.mock('./schema', async (importOriginal) => {
-	const actual = await importOriginal<typeof import('./schema')>();
-	return {
-		...actual,
-		CONFIG_SCHEMA: {
-			parse: vi.fn((data) => data) // Mock successful validation
-		},
-		DEFAULT_CONFIG: {
-			defaults: {
-				default_provider: 'anthropic',
-				dry_run: false,
-				dry_run_estimate_tokens: true,
-				dry_run_show_diffs: true,
-				interactive: false,
-				log_level: 'info',
-				output_format: 'markdown',
-				session_mode: true
-			},
-			features: {
-				agent_selection_analytics: false,
-				agent_selection_fallback_reporting: false,
-				agent_selection_monitoring: false,
-				dynamic_agent_selection: false,
-				dynamic_agent_selection_implement_only: true
-			},
-			logging: {
-				cleanup_interval_hours: 24,
-				daily_file_max_size_mb: 50,
-				dry_run: false,
-				enabled: true
-			},
-			paths: { config_file: 'config.json' },
-			providers: {},
-			sessions: {
-				cleanup_interval_hours: 24,
-				dry_run: false,
-				enabled: true
-			}
-		}
-	};
-});
 vi.mock('output/logger', () => ({
 	getLogger: vi.fn(() => ({
 		debug: vi.fn(),
@@ -91,13 +50,38 @@ const mockFileExists = vi.mocked(fileExists);
 const mockReadJSON = vi.mocked(readJSON);
 const mockEnsureDir = vi.mocked(ensureDir);
 const mockGetAIRoot = vi.mocked(getAIRoot);
-const mockConfigSchemaParse = vi.mocked(CONFIG_SCHEMA.parse);
+
+/** Environment variable keys that the loader reads — must be cleared between tests. */
+const LOADER_ENV_KEYS = [
+	'AI_LOG_LEVEL',
+	'VALORA_LOG_LEVEL',
+	'AI_INTERACTIVE',
+	'VALORA_INTERACTIVE',
+	'OPENAI_API_KEY',
+	'ANTHROPIC_API_KEY',
+	'GOOGLE_API_KEY',
+	'AI_SESSION_TIMEOUT',
+	'AI_LOG_RETENTION_ENABLED',
+	'AI_SESSION_RETENTION_ENABLED',
+	'VALORA_CONFIG_PATH',
+	'AI_CONFIG_PATH',
+	'VALORA_GLOBAL_CONFIG_DIR'
+];
 
 describe('ConfigLoader', () => {
 	let loader: ConfigLoader;
 	let tempDir: string;
+	let savedEnv: Record<string, string | undefined>;
 
 	beforeEach(() => {
+		// Snapshot and clean loader-relevant env vars so tests are isolated
+		savedEnv = Object.fromEntries(LOADER_ENV_KEYS.map((k) => [k, process.env[k]]));
+		for (const key of LOADER_ENV_KEYS) {
+			delete process.env[key];
+		}
+		// Point global config dir to a nonexistent path so it doesn't pick up real user config
+		process.env['VALORA_GLOBAL_CONFIG_DIR'] = '/nonexistent-valora-test-dir';
+
 		tempDir = path.join(process.cwd(), 'test-config');
 		// Provide explicit config path to avoid getAIRoot dependency
 		loader = new ConfigLoader(path.join(tempDir, 'config.json'));
@@ -109,7 +93,6 @@ describe('ConfigLoader', () => {
 		mockGetAIRoot.mockReturnValue(tempDir);
 		mockFileExists.mockReturnValue(false);
 		mockReadJSON.mockResolvedValue({});
-		mockConfigSchemaParse.mockReturnValue(DEFAULT_CONFIG);
 
 		// Default registry mock: all providers are known (no unknown-provider warnings by default)
 		vi.mocked(getProviderRegistry).mockReturnValue({
@@ -121,6 +104,14 @@ describe('ConfigLoader', () => {
 
 	afterEach(() => {
 		vi.resetAllMocks();
+		// Restore env vars
+		for (const [key, value] of Object.entries(savedEnv)) {
+			if (value === undefined) {
+				delete process.env[key];
+			} else {
+				process.env[key] = value;
+			}
+		}
 	});
 
 	describe('constructor', () => {
@@ -144,12 +135,10 @@ describe('ConfigLoader', () => {
 			mockFileExists.mockReturnValue(false);
 
 			const config1 = await loader.load();
-			const firstCallCount = mockFileExists.mock.calls.length;
 			const config2 = await loader.load();
 
+			// Both calls must return the exact same object reference (cache hit)
 			expect(config1).toBe(config2);
-			// Second call should not trigger additional fileExists calls (cache hit)
-			expect(mockFileExists).toHaveBeenCalledTimes(firstCallCount);
 		});
 
 		it('should load config from file when it exists', async () => {
@@ -160,17 +149,12 @@ describe('ConfigLoader', () => {
 
 			mockFileExists.mockReturnValue(true);
 			mockReadJSON.mockResolvedValue(fileConfig);
-			mockConfigSchemaParse.mockReturnValue({
-				...DEFAULT_CONFIG,
-				defaults: { ...DEFAULT_CONFIG.defaults, log_level: 'debug' },
-				providers: { ...DEFAULT_CONFIG.providers, openai: { apiKey: 'test-key' } }
-			});
 
 			const config = await loader.load();
 
 			expect(mockReadJSON).toHaveBeenCalledWith(path.join(tempDir, 'config.json'));
 			expect(config.defaults.log_level).toBe('debug');
-			expect(config.providers.openai?.apiKey).toBe('test-key');
+			expect(config.providers['openai']?.apiKey).toBe('test-key');
 		});
 
 		it('should handle missing config file gracefully', async () => {
@@ -186,7 +170,6 @@ describe('ConfigLoader', () => {
 		it('should throw ConfigurationError for invalid JSON in config file', async () => {
 			mockFileExists.mockReturnValue(true);
 			mockReadJSON.mockRejectedValue(new Error('Invalid JSON'));
-			mockConfigSchemaParse.mockReturnValue(DEFAULT_CONFIG);
 
 			await expect(loader.load()).rejects.toThrow(ConfigurationError);
 			await expect(loader.load()).rejects.toThrow(`Failed to parse config file: ${loader['configPath']}`);
@@ -194,20 +177,14 @@ describe('ConfigLoader', () => {
 
 		it('should merge config sources in correct order', async () => {
 			const fileConfig = { defaults: { log_level: 'warn' as const } };
-			const envConfig = { defaults: { log_level: 'error' as const } }; // Should override file
-			const cliOverrides = { defaults: { log_level: 'debug' as const } }; // Should override env
+			const cliOverrides = { defaults: { log_level: 'debug' as const } }; // Should override file
 
 			mockFileExists.mockReturnValue(true);
 			mockReadJSON.mockResolvedValue(fileConfig);
 
-			// Mock environment loading
+			// CLI flag should win over file
 			const originalEnv = process.env;
 			process.env['AI_LOG_LEVEL'] = 'error';
-
-			mockConfigSchemaParse.mockReturnValue({
-				...DEFAULT_CONFIG,
-				defaults: { ...DEFAULT_CONFIG.defaults, log_level: 'debug' }
-			});
 
 			const config = await loader.load(cliOverrides);
 
@@ -217,31 +194,36 @@ describe('ConfigLoader', () => {
 			process.env = originalEnv;
 		});
 
-		it('should validate config with schema', async () => {
-			const validConfig = {
-				...DEFAULT_CONFIG,
-				defaults: { ...DEFAULT_CONFIG.defaults, log_level: 'info' as const }
-			};
-			mockConfigSchemaParse.mockReturnValue(validConfig);
+		it('schema validates the loaded config — valid config loads and returns expected defaults', async () => {
+			mockFileExists.mockReturnValue(false);
 
 			const config = await loader.load();
 
-			expect(mockConfigSchemaParse).toHaveBeenCalled();
-			expect(config).toBe(validConfig);
+			// Real Zod schema ran; the result matches the DEFAULT_CONFIG shape for defaults
+			expect(config.defaults.log_level).toBe(DEFAULT_CONFIG.defaults.log_level);
+			expect(config.defaults.dry_run).toBe(DEFAULT_CONFIG.defaults.dry_run);
+			// providers is an object (may contain env-contributed entries like local)
+			expect(typeof config.providers).toBe('object');
 		});
 
-		it('should handle schema validation errors', async () => {
-			const validationError = new Error('Schema validation failed');
-			mockFileExists.mockReturnValue(false);
-			mockReadJSON.mockResolvedValue({});
-			mockConfigSchemaParse.mockImplementation(() => {
-				throw validationError;
-			});
+		it('schema rejects structurally invalid config — wrong type for required field throws ConfigurationError', async () => {
+			mockFileExists.mockReturnValue(true);
+			// log_level must be one of the enum values; give it an invalid value
+			mockReadJSON.mockResolvedValue({ defaults: { log_level: 12345 } });
 
 			const error = await loader.load().catch((e: unknown) => e);
 			expect(error).toBeInstanceOf(ConfigurationError);
 			expect((error as ConfigurationError).message).toBe('Invalid configuration');
-			expect((error as ConfigurationError).details).toEqual({ errors: validationError });
+		});
+
+		it('should handle schema validation errors', async () => {
+			mockFileExists.mockReturnValue(true);
+			// Provide a value that passes readJSON but fails Zod validation
+			mockReadJSON.mockResolvedValue({ defaults: { log_level: 'not-a-valid-level' } });
+
+			const error = await loader.load().catch((e: unknown) => e);
+			expect(error).toBeInstanceOf(ConfigurationError);
+			expect((error as ConfigurationError).message).toBe('Invalid configuration');
 		});
 	});
 
@@ -273,7 +255,7 @@ describe('ConfigLoader', () => {
 
 			const reloadedConfig = await loader.reload();
 
-			expect(reloadedConfig.defaults).toEqual(DEFAULT_CONFIG.defaults);
+			expect(reloadedConfig.defaults).toEqual(expect.objectContaining({ log_level: 'info' }));
 		});
 	});
 
@@ -324,20 +306,10 @@ describe('ConfigLoader', () => {
 			process.env['AI_LOG_LEVEL'] = 'debug';
 			process.env['AI_SESSION_TIMEOUT'] = '3600';
 
-			mockConfigSchemaParse.mockReturnValue({
-				...DEFAULT_CONFIG,
-				defaults: { log_level: 'debug' },
-				providers: {
-					anthropic: { apiKey: 'sk-ant-test456' },
-					openai: { apiKey: 'sk-test123' }
-				},
-				sessions: { timeout: 3600 }
-			});
-
 			const config = await loader.load();
 
-			expect(config.providers.openai.apiKey).toBe('sk-test123');
-			expect(config.providers.anthropic.apiKey).toBe('sk-ant-test456');
+			expect(config.providers['openai']?.apiKey).toBe('sk-test123');
+			expect(config.providers['anthropic']?.apiKey).toBe('sk-ant-test456');
 			expect(config.defaults.log_level).toBe('debug');
 
 			// Restore environment
@@ -365,12 +337,6 @@ describe('ConfigLoader', () => {
 				sessions: { timeout: 7200 }
 			};
 
-			mockConfigSchemaParse.mockReturnValue({
-				...DEFAULT_CONFIG,
-				defaults: { ...DEFAULT_CONFIG.defaults, log_level: 'debug' },
-				sessions: { ...DEFAULT_CONFIG.sessions, timeout: 7200 }
-			});
-
 			const config = await loader.load(cliOverrides);
 
 			expect(config.defaults.log_level).toBe('debug');
@@ -383,10 +349,6 @@ describe('ConfigLoader', () => {
 
 			mockFileExists.mockReturnValue(true);
 			mockReadJSON.mockResolvedValue(fileConfig);
-			mockConfigSchemaParse.mockReturnValue({
-				...DEFAULT_CONFIG,
-				defaults: { ...DEFAULT_CONFIG.defaults, log_level: 'error' }
-			});
 
 			const config = await loader.load(cliOverrides);
 
@@ -428,22 +390,22 @@ describe('ConfigLoader', () => {
 	});
 
 	describe('caching behavior', () => {
-		it('should cache loaded config', async () => {
+		it('should cache loaded config — two calls return the same reference', async () => {
 			const config1 = await loader.load();
 			const config2 = await loader.load();
 
 			expect(config1).toBe(config2); // same reference — cache hit
 		});
 
-		it('should clear cache on reload', async () => {
+		it('should clear cache on reload — result after reload reflects fresh load', async () => {
 			mockFileExists.mockReturnValue(false);
 
-			await loader.load();
-			const firstCallCount = mockFileExists.mock.calls.length;
-			await loader.reload();
+			const firstConfig = await loader.load();
+			const afterReload = await loader.reload();
 
-			// Reload should trigger the same number of fileExists calls again
-			expect(mockFileExists).toHaveBeenCalledTimes(firstCallCount * 2);
+			// The reloaded config should be a fresh object (different reference) with the same shape
+			expect(afterReload).not.toBe(firstConfig);
+			expect(afterReload.defaults.log_level).toBe(firstConfig.defaults.log_level);
 		});
 	});
 
@@ -465,11 +427,8 @@ describe('ConfigLoader', () => {
 				getDescriptor: vi.fn(() => undefined)
 			} as unknown as ReturnType<typeof getProviderRegistry>);
 
-			mockFileExists.mockReturnValue(false);
-			mockConfigSchemaParse.mockReturnValue({
-				...DEFAULT_CONFIG,
-				providers: { myplugin: { apiKey: 'test' } }
-			});
+			mockFileExists.mockReturnValue(true);
+			mockReadJSON.mockResolvedValue({ providers: { myplugin: { apiKey: 'test' } } });
 
 			await loader.load();
 			loader.warnUnknownProviders();
@@ -496,11 +455,8 @@ describe('ConfigLoader', () => {
 				getDescriptor: vi.fn(() => undefined)
 			} as unknown as ReturnType<typeof getProviderRegistry>);
 
-			mockFileExists.mockReturnValue(false);
-			mockConfigSchemaParse.mockReturnValue({
-				...DEFAULT_CONFIG,
-				providers: { unknownprovider: { apiKey: 'x' } }
-			});
+			mockFileExists.mockReturnValue(true);
+			mockReadJSON.mockResolvedValue({ providers: { unknownprovider: { apiKey: 'x' } } });
 
 			// Load twice (simulating two load calls within the same process)
 			await loader.load();

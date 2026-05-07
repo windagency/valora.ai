@@ -2,7 +2,7 @@
  * Integration tests for config loader and file utilities interaction
  *
  * Tests the integration between ConfigLoader and file system operations
- * using testcontainers for isolated file system testing.
+ * using a temporary directory for isolated file system testing.
  */
 
 import * as fs from 'fs/promises';

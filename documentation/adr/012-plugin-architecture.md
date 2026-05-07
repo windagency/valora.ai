@@ -1,3 +1,7 @@
+---
+updated: 2026-05-07
+---
+
 # ADR-012: Plugin Architecture
 
 > **Decision**: Valora adopts a resource-overlay plugin model: a plugin is a directory with a Zod-validated `valora-plugin.json` manifest that contributes agents, commands, hooks, prompts, templates, MCP bundles, and agent-context fragments. Hooks require an explicit `shell-hooks` permission declaration. No code-execution surface is introduced.
@@ -155,6 +159,5 @@ The remaining trust gap — in-process capability gating for `fs-read`, `fs-writ
 - [ADR-008: PreToolUse CLI Enforcement](./008-pretooluse-cli-enforcement.md) — Hook execution model that plugins extend
 - [ADR-009: Supply Chain Hardening](./009-supply-chain-hardening.md) — The stance against arbitrary dependency code execution
 - [ADR-014: Plugin Capability Gating](./014-plugin-capability-gating.md) — Closes the in-process sandbox gap left open by this ADR
-- [Plugin Architecture Exploration](../../.claude/plans/explore-the-possibility-of-whimsical-mochi.md) — Full trade-off analysis and RTK worked example
 - [User Guide: Plugins](../user-guide/plugins.md)
 - [Developer Guide: Writing Plugins](../developer-guide/writing-plugins.md)

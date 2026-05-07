@@ -1,0 +1,26 @@
+{
+	"compilerOptions": {
+		"alwaysStrict": true,
+		"declaration": true,
+		"declarationMap": true,
+		"esModuleInterop": true,
+		"forceConsistentCasingInFileNames": true,
+		"isolatedModules": true,
+		"lib": ["ES2022"],
+		"module": "ESNext",
+		"moduleResolution": "bundler",
+		"noImplicitAny": true,
+		"noImplicitReturns": true,
+		"noUnusedLocals": true,
+		"noUnusedParameters": true,
+		"outDir": "dist",
+		"rootDir": "src",
+		"skipLibCheck": true,
+		"sourceMap": false,
+		"strict": true,
+		"target": "ES2022",
+		"types": ["node"]
+	},
+	"exclude": ["node_modules", "dist", "**/*.test.ts", "**/*.spec.ts"],
+	"include": ["src/**/*"]
+}

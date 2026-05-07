@@ -1,3 +1,7 @@
+---
+updated: 2026-05-07
+---
+
 # Module: `memory`
 
 _Last updated: 2026-05-07 (Valora 2.6.0 — vault unification, ADR-013 accepted)_

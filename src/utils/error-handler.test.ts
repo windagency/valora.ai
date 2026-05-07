@@ -231,7 +231,12 @@ describe('CircuitBreaker', () => {
 	let breaker: CircuitBreaker;
 
 	beforeEach(() => {
+		vi.useFakeTimers();
 		breaker = new CircuitBreaker(3, 1000); // 3 failures, 1 second timeout
+	});
+
+	afterEach(() => {
+		vi.useRealTimers();
 	});
 
 	async function triggerFailures(cb: CircuitBreaker, count: number) {
@@ -272,7 +277,7 @@ describe('CircuitBreaker', () => {
 	it('should transition to half-open after timeout', async () => {
 		await triggerFailures(breaker, 3);
 
-		await new Promise((resolve) => setTimeout(resolve, 1100));
+		await vi.advanceTimersByTimeAsync(1100);
 
 		await expect(
 			breaker.execute(async () => {
@@ -286,7 +291,7 @@ describe('CircuitBreaker', () => {
 	it('should reset on success after half-open', async () => {
 		await triggerFailures(breaker, 3);
 
-		await new Promise((resolve) => setTimeout(resolve, 1100));
+		await vi.advanceTimersByTimeAsync(1100);
 		await breaker.execute(async () => 'success');
 
 		expect(breaker.getState()).toBe('closed');

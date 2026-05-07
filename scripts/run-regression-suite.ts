@@ -12,7 +12,7 @@
  * Requires ANTHROPIC_API_KEY in the environment.
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'fs';
 import { resolve } from 'path';
 
 import { AnthropicProvider } from '../src/llm/providers/anthropic.provider';
@@ -36,7 +36,6 @@ function loadBaselines(): RegressionBaseline[] {
 }
 
 function loadScenarios(): RegressionScenario[] {
-	const { readdirSync } = require('fs') as typeof import('fs');
 	return readdirSync(SCENARIOS_DIR)
 		.filter((f: string) => f.endsWith('.json'))
 		.map((f: string) => JSON.parse(readFileSync(resolve(SCENARIOS_DIR, f), 'utf-8')) as RegressionScenario);
@@ -53,9 +52,10 @@ async function main(): Promise<void> {
 	const baselines = loadBaselines();
 
 	if (baselines.length === 0) {
-		console.warn('No baselines found. Run capture-regression-transcript.ts first.');
-		console.log('Skipping all scenarios (no baselines).');
-		process.exit(0);
+		console.error(
+			'No regression baselines committed in data/regression-baselines.json. The regression suite cannot detect model drift without baselines. Capture them with `pnpm regression:capture` (requires ANTHROPIC_API_KEY) and commit the resulting JSON.'
+		);
+		process.exit(1);
 	}
 
 	const provider = new AnthropicProvider({ apiKey });

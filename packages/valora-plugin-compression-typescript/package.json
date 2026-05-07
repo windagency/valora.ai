@@ -41,6 +41,7 @@
 		"@windagency/valora": ">=0.1.0"
 	},
 	"devDependencies": {
+		"@windagency/valora-plugin-api": "workspace:*",
 		"vitest": "^1.0.0"
 	}
 }

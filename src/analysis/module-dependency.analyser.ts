@@ -3,8 +3,8 @@ import * as path from 'path';
 import type { ModuleNode } from 'analysis/analysis.types';
 import type { CodebaseIndex } from 'ast/ast.types';
 
-export class ModuleDependencyAnalyser {
-	analyse(index: CodebaseIndex, projectRoot: string): ModuleNode[] {
+export class ModuleDependencyAnalyzer {
+	analyze(index: CodebaseIndex, projectRoot: string): ModuleNode[] {
 		const moduleFiles = this.groupFilesByModule(index);
 		const modules: ModuleNode[] = [];
 

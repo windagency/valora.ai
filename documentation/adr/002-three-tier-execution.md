@@ -1,3 +1,7 @@
+---
+updated: 2026-05-07
+---
+
 # ADR-002: Three-Tier Execution Model
 
 > **Decision**: Valora implements three execution tiers — MCP Sampling (future), Guided Completion (default, free via Cursor subscription), and API Fallback (autonomous, paid) — with automatic fallback between them.

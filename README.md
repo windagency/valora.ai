@@ -141,7 +141,7 @@ Extend Valora with **self-contained plugin directories**:
 
 Plugins are discovered from four locations (later takes precedence): `data/plugins/` (built-in), `~/.valora/plugins/` (user), `.valora/plugins/` (project), `node_modules/@windagency/valora-plugin-*` (npm). Install an official plugin with `valora plugin add <name>` and add its short name to `plugins.enabled` in `.valora/config.json`. No restart required. See [Plugins guide](./documentation/user-guide/plugins.md).
 
-17 built-in compression strategies (git, tsc, eslint, vitest, pytest, docker, …) ship as three **code plugins** and are the canonical example of the `code` contribution type.
+35 built-in compression strategies ship as three **code plugins** and are the canonical example of the `code` contribution type. See [Strategies by plugin](./documentation/architecture/session-optimization.md#strategies-by-plugin) for the full list.
 
 </td>
 <td width="50%">

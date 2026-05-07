@@ -1,3 +1,7 @@
+---
+updated: 2026-05-07
+---
+
 # Troubleshooting Guide
 
 Common issues and solutions when using VALORA.

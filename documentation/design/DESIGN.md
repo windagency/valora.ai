@@ -1,3 +1,7 @@
+---
+updated: 2026-05-07
+---
+
 # UI/UX Design Specification
 
 Valora's UI/UX is inspired by the Claude CLI — calm, minimal, text-first, and cognitively efficient. The design prioritises readability and conversational flow over decoration.

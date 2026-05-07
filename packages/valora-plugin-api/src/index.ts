@@ -1,0 +1,22 @@
+export type {
+	CodePluginModule,
+	CompressionStrategy,
+	LLMProviderContract,
+	PluginAPI,
+	PluginEmbeddingRequest,
+	PluginEmbeddingResult,
+	PluginLifecycleHooks,
+	PluginLLMCompletionOptions,
+	PluginLLMCompletionResult,
+	PluginLLMMessage,
+	PluginLLMRole,
+	PluginLLMToolCall,
+	PluginLLMToolDefinition,
+	PluginLLMUsage,
+	PluginLogger,
+	PluginProvider,
+	PluginProviderClass,
+	PluginProviderFactory,
+	ProviderDescriptor,
+	ProviderWizardContext
+} from './plugin-api.types.js';

@@ -1,3 +1,7 @@
+---
+updated: 2026-05-07
+---
+
 # Metrics System Architecture
 
 > Architecture of the workflow metrics collection, extraction, and reporting system in VALORA.

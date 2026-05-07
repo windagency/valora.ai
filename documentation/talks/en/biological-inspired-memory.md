@@ -1,3 +1,7 @@
+---
+updated: 2026-05-07
+---
+
 # Teaching Machines to Remember
 
 ### A Biologically-Inspired Persistent Memory for AI Agent Orchestration

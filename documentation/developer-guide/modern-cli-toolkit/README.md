@@ -1,3 +1,7 @@
+---
+updated: 2026-05-07
+---
+
 # Modern CLI Toolkit Reference
 
 Reference documentation for modern CLI tools that replace legacy commands with token-efficient alternatives. These rules are **automatically enforced** via a PreToolUse hook — legacy commands in `run_terminal_cmd` calls are blocked with a deny message.

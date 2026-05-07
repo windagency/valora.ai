@@ -4,8 +4,11 @@
  * This setup configures:
  * - Environment variables for testing
  * - Global mocks and utilities
- * - Testcontainers when explicitly enabled via USE_TESTCONTAINERS=true
  * - Cleanup hooks
+ *
+ * Valora is process-local at v2.5; persistence is out of scope.
+ * Testcontainers will be re-introduced behind a real adapter when
+ * a database or cache consumer is added to src/.
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, vi } from 'vitest';
@@ -15,56 +18,19 @@ process.env.NODE_ENV = 'test';
 process.env.AI_INTERACTIVE = 'false';
 process.env.AI_MCP_ENABLED = 'false';
 
-// Testcontainers are opt-in: only initialize when USE_TESTCONTAINERS=true
-const useTestcontainers = process.env.USE_TESTCONTAINERS === 'true' && process.env.SKIP_TESTCONTAINERS !== 'true';
-
-let testcontainersAvailable = false;
-let testcontainersHelper: any = null;
-
-async function initializeTestcontainersHelper() {
-	const { TestcontainersHelper } = await import('./testcontainers-helper.js');
-	testcontainersHelper = new TestcontainersHelper();
-	testcontainersAvailable = true;
-}
-
 /**
  * Global setup - runs once before all tests
  */
-beforeAll(
-	async () => {
-		// Set up test environment variables
-		process.env.AI_TEST_MODE = 'true';
-
-		if (useTestcontainers) {
-			await initializeTestcontainersHelper();
-
-			if (testcontainersAvailable && testcontainersHelper) {
-				await testcontainersHelper.startSharedContainers();
-				process.env.AI_TEST_DATABASE_URL = await testcontainersHelper.getDatabaseUrl();
-				process.env.AI_TEST_REDIS_URL = await testcontainersHelper.getRedisUrl();
-			}
-		}
-
-		if (!testcontainersAvailable) {
-			process.env.AI_TEST_DATABASE_URL = 'postgresql://test:test@localhost:5432/ai_test';
-			process.env.AI_TEST_REDIS_URL = 'redis://localhost:6379';
-		}
-	},
-	useTestcontainers ? 300000 : 30000
-);
+beforeAll(async () => {
+	// Set up test environment variables
+	process.env.AI_TEST_MODE = 'true';
+}, 30000);
 
 /**
  * Global teardown - runs once after all tests
  */
 afterAll(async () => {
-	// Clean up testcontainers
-	if (testcontainersAvailable && testcontainersHelper) {
-		try {
-			await testcontainersHelper.stopAllContainers();
-		} catch (error) {
-			console.warn('Failed to stop testcontainers:', error);
-		}
-	}
+	// Nothing to tear down — no containers in use
 }, 30000);
 
 /**

@@ -1,3 +1,7 @@
+---
+updated: 2026-05-07
+---
+
 # Code Quality Standards
 
 > Quick reference for code quality rules enforced in VALORA. For naming conventions and commit format, see [Contributing Guidelines](./contributing.md). For deep rationale and extended examples, see [CODE-QUALITY-GUIDELINES.md](./CODE-QUALITY-GUIDELINES.md).

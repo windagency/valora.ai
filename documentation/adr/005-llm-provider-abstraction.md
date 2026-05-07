@@ -1,3 +1,7 @@
+---
+updated: 2026-05-07
+---
+
 # ADR-005: LLM Provider Abstraction
 
 > **Decision**: All LLM calls go through a normalised `LLMProvider` interface, allowing Anthropic, OpenAI, Google, Cursor, and local model servers to be switched via configuration without code changes.

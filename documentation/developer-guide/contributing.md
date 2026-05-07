@@ -1,3 +1,7 @@
+---
+updated: 2026-05-07
+---
+
 # Contributing Guidelines
 
 > How to contribute to VALORA. Naming conventions and commit format are defined here; `code-quality.md` defers to this file on those topics.

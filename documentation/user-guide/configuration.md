@@ -1,3 +1,7 @@
+---
+updated: 2026-05-07
+---
+
 # Configuration
 
 > How to configure VALORA for your project, team, and environment.

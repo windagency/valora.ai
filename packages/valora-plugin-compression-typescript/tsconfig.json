@@ -15,7 +15,7 @@
 		"noUnusedParameters": true,
 		"outDir": "dist",
 		"paths": {
-			"plugins/plugin-api.types": ["../../dist/plugins/plugin-api.types"]
+			"@windagency/valora-plugin-api": ["../../packages/valora-plugin-api/src/index"]
 		},
 		"rootDir": "src",
 		"skipLibCheck": true,

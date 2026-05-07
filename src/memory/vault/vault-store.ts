@@ -237,9 +237,9 @@ export class VaultStore implements MemoryStorePort {
 	private persistMeta(): void {
 		try {
 			const metaPath = path.join(this.vaultDir, META_FILENAME);
-			const serialised: Record<string, VaultMeta> = {};
-			for (const [cat, m] of this.meta) serialised[cat] = m;
-			atomicWriteFile(metaPath, JSON.stringify(serialised, null, 2));
+			const serialized: Record<string, VaultMeta> = {};
+			for (const [cat, m] of this.meta) serialized[cat] = m;
+			atomicWriteFile(metaPath, JSON.stringify(serialized, null, 2));
 		} catch (err) {
 			getLogger().warn(`Vault: could not persist meta: ${String(err)}`);
 		}

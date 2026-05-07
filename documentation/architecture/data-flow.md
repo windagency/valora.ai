@@ -1,3 +1,7 @@
+---
+updated: 2026-05-07
+---
+
 # Data Flow Architecture
 
 > Data flow, state management, and integration patterns in VALORA.

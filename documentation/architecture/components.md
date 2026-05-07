@@ -1,3 +1,7 @@
+---
+updated: 2026-05-07
+---
+
 # Component Architecture
 
 > Component-level design details for each major module in VALORA.

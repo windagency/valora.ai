@@ -3,12 +3,27 @@ import { fileURLToPath } from 'node:url';
 
 import { DocValidator } from '../src/lint/doc-validator.js';
 
-const repoRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
-const docsDir = path.join(repoRoot, 'docs');
 const STALENESS_THRESHOLD_DAYS = 90;
+const DEFAULT_DOCS_DIRNAME = 'documentation';
+
+const repoRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
+const targetArg = process.argv[2];
+const docsDir = targetArg ? path.resolve(targetArg) : path.join(repoRoot, DEFAULT_DOCS_DIRNAME);
 
 const validator = new DocValidator({ stalenessThresholdDays: STALENESS_THRESHOLD_DAYS });
-const result = await validator.validateDirectory(docsDir);
+
+let result;
+try {
+	result = await validator.validateDirectory(docsDir);
+} catch (error) {
+	const code = (error as NodeJS.ErrnoException).code;
+	if (code === 'ENOENT') {
+		console.error(`✗ Documentation directory does not exist: ${docsDir}`);
+		console.error(`  Pass an explicit path as the first argument, or create the directory.`);
+		process.exit(2);
+	}
+	throw error;
+}
 
 if (result.errors.length === 0) {
 	console.log(`✓ ${result.scannedFiles} docs scanned — all healthy`);

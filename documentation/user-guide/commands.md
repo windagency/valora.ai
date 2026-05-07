@@ -1,3 +1,7 @@
+---
+updated: 2026-05-07
+---
+
 # Command Reference
 
 > Complete reference for all 26 commands in VALORA.

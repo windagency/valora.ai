@@ -1,3 +1,7 @@
+---
+updated: 2026-05-07
+---
+
 # Quick Start
 
 Get Valora installed and running your first command in 5 minutes.

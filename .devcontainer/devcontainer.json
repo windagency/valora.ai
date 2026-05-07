@@ -1,6 +1,6 @@
 {
 	"name": "Valora Sandbox",
-	"image": "mcr.microsoft.com/devcontainers/javascript-node:24",
+	"image": "mcr.microsoft.com/devcontainers/javascript-node:24-bookworm",
 	"features": {
 		"ghcr.io/devcontainers/features/common-utils:2": {
 			"username": "node",

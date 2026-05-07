@@ -1,3 +1,7 @@
+---
+updated: 2026-05-07
+---
+
 # Language Convention Guide
 
 ## Language Standards

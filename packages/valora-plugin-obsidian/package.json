@@ -43,6 +43,7 @@
 		"@windagency/valora": ">=0.1.0"
 	},
 	"devDependencies": {
+		"@windagency/valora-plugin-api": "workspace:*",
 		"esbuild": "^0.28.0",
 		"zod": "^3.24.0"
 	}

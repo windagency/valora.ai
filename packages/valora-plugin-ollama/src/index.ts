@@ -1,4 +1,4 @@
-import type { PluginAPI, ProviderDescriptor } from 'plugins/plugin-api.types';
+import type { PluginAPI, ProviderDescriptor } from '@windagency/valora-plugin-api';
 
 import { OllamaBinaryManagerImpl } from './binary-manager.js';
 import { OllamaModelManagerImpl } from './model-manager.js';

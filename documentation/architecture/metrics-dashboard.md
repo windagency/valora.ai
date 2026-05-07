@@ -1,3 +1,7 @@
+---
+updated: 2026-05-07
+---
+
 # Metrics Dashboard
 
 > The interactive dashboard for viewing workflow optimisation metrics, spending, and pipeline health in VALORA.
