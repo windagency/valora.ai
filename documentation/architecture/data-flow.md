@@ -302,10 +302,15 @@ flowchart TD
 │   ├── manifest.json
 │   ├── files.json
 │   └── symbols-*.json
-├── memory/              ← Agent memory stores (biologically-inspired decay)
-│   ├── episodic.json    #   7-day half-life events and observations
-│   ├── semantic.json    #   30-day half-life extracted patterns and insights
-│   └── decisions.json   #   21-day half-life architectural decisions
+├── memory/              ← Agent memory vault (ADR-013, biologically-inspired decay)
+│   ├── version          #   Vault schema version stamp
+│   ├── meta.json        #   Per-category timestamps
+│   ├── episodic/*.md    #   7-day half-life events and observations
+│   ├── semantic/*.md    #   30-day half-life consolidated patterns
+│   ├── decisions/*.md   #   21-day half-life architectural decisions
+│   ├── embeddings.bin   #   Packed Float32Array of embedding vectors
+│   ├── embeddings.index.json
+│   └── _legacy/         #   Auto-archived legacy JSON, if any
 └── spending.jsonl        ← append-only per-request cost ledger
 ```
 

@@ -30,7 +30,7 @@
 		"pnpm": "10.19.0"
 	},
 	"scripts": {
-		"build": "esbuild src/index.ts --bundle --platform=node --format=esm --outfile=dist/index.js --banner:js=\"import { createRequire } from 'module'; const require = createRequire(import.meta.url);\"",
+		"build": "esbuild src/index.ts --bundle --platform=node --format=esm --outfile=dist/index.js --external:openai --banner:js=\"import { createRequire } from 'module'; const require = createRequire(import.meta.url);\"",
 		"clean": "rm -rf ./dist",
 		"lint": "eslint --color",
 		"lint:fix": "eslint --color --fix",
@@ -45,7 +45,8 @@
 		"dist"
 	],
 	"peerDependencies": {
-		"@windagency/valora": ">=0.1.0"
+		"@windagency/valora": ">=0.1.0",
+		"openai": "^4.67.0"
 	},
 	"devDependencies": {
 		"esbuild": "^0.28.0",

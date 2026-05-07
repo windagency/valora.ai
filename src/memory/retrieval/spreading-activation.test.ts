@@ -142,18 +142,60 @@ describe('spreadActivation', () => {
 		expect(result.get('inferred')!).toBeGreaterThan(result.get('stale')!);
 	});
 
-	it('propagates activation backwards along inEdges', () => {
-		// b → a: if a is a seed, b should receive activation via inEdges of a
+	it('propagates activation backwards along symmetric co_accessed edges', () => {
+		// b -- a: when both share a co_accessed edge and a is a seed, b should
+		// receive activation via the reverse traversal because co_access is
+		// Hebbian (symmetric).
+		const b = makeRecord('b');
+		b.links = [{ fromId: 'b', kind: 'co_accessed', toId: 'a' }];
+		const a = makeRecord('a');
+		const { byId, outEdges, inEdges } = makeIndex([a, b]);
+		const seeds = new Map([['a', 1.0]]);
+
+		const result = spreadActivation(seeds, byId, outEdges, inEdges, 1, 0.6, NOW_MS);
+
+		expect(result.has('b')).toBe(true);
+	});
+
+	it('does NOT propagate backwards along directional related edges', () => {
+		// b → a (related): activation should not flow backwards from a to b,
+		// because `related` is a directional authorial edge.
 		const b = makeRecord('b');
 		b.links = [{ fromId: 'b', kind: 'related', toId: 'a' }];
 		const a = makeRecord('a');
 		const { byId, outEdges, inEdges } = makeIndex([a, b]);
 		const seeds = new Map([['a', 1.0]]);
 
-		// a is a seed; b points TO a — so b is in a's inEdges
 		const result = spreadActivation(seeds, byId, outEdges, inEdges, 1, 0.6, NOW_MS);
 
-		expect(result.has('b')).toBe(true);
+		expect(result.has('b')).toBe(false);
+	});
+
+	it('reaches a downstream node via the stronger of two parallel paths', () => {
+		// a → b → d (weights 0.4, 0.4) and a → c → d (weights 0.9, 0.9). Without
+		// re-enqueuing on stronger arrival, d would be locked to whichever path
+		// arrived first in BFS order; with the activation guard it must reflect
+		// the stronger composition.
+		const a = makeRecord('a');
+		a.links = [
+			{ fromId: 'a', kind: 'related', toId: 'b', weight: 0.4 },
+			{ fromId: 'a', kind: 'related', toId: 'c', weight: 0.9 }
+		];
+		const b = makeRecord('b');
+		b.links = [{ fromId: 'b', kind: 'related', toId: 'd', weight: 0.4 }];
+		const c = makeRecord('c');
+		c.links = [{ fromId: 'c', kind: 'related', toId: 'd', weight: 0.9 }];
+		const d = makeRecord('d');
+		const { byId, outEdges, inEdges } = makeIndex([a, b, c, d]);
+		const seeds = new Map([['a', 1.0]]);
+
+		const result = spreadActivation(seeds, byId, outEdges, inEdges, 3, 1.0, NOW_MS);
+
+		// Activation through c→d (1.0 × 0.9 × 0.9 = 0.81) should win over b→d
+		// (1.0 × 0.4 × 0.4 = 0.16) — d's score divided by decay/confidence is
+		// the activation, so d should be at least as large as the c-path value.
+		const dScore = result.get('d') ?? 0;
+		expect(dScore).toBeGreaterThan(0.16 * 0.7); // observed-tier confidence weight
 	});
 
 	it('takes the max activation when a node is reachable by multiple paths', () => {
@@ -174,5 +216,13 @@ describe('spreadActivation', () => {
 		const result = spreadActivation(seeds, byId, outEdges, inEdges, 2, 0.6, NOW_MS);
 
 		expect(result.has('d')).toBe(true);
+	});
+
+	it('throws when gamma is greater than 1 to prevent unbounded activation growth', () => {
+		const a = makeRecord('a');
+		const { byId, outEdges, inEdges } = makeIndex([a]);
+		const seeds = new Map([['a', 1.0]]);
+
+		expect(() => spreadActivation(seeds, byId, outEdges, inEdges, 3, 1.1, NOW_MS)).toThrow(/gamma.*must be.*<= 1/i);
 	});
 });

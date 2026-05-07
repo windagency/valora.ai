@@ -16,17 +16,17 @@ describe('diffPluginVersions', () => {
 	});
 
 	it('returns empty when installed version matches registry version', () => {
-		const catalog = new Map([['valora-plugin-rtk', '1.0.0']]);
+		const catalog = new Map([['valora-plugin-rtk', { version: '1.0.0' }]]);
 		expect(diffPluginVersions([ref()], catalog, new Map())).toEqual([]);
 	});
 
 	it('returns empty when installed version is newer than catalog', () => {
-		const catalog = new Map([['valora-plugin-rtk', '0.9.0']]);
+		const catalog = new Map([['valora-plugin-rtk', { version: '0.9.0' }]]);
 		expect(diffPluginVersions([ref({ currentVersion: '1.0.0' })], catalog, new Map())).toEqual([]);
 	});
 
 	it('returns outdated plugin when catalog version is newer', () => {
-		const catalog = new Map([['valora-plugin-rtk', '1.1.0']]);
+		const catalog = new Map([['valora-plugin-rtk', { version: '1.1.0' }]]);
 		const result = diffPluginVersions([ref()], catalog, new Map());
 		const expected: OutdatedPlugin[] = [
 			{
@@ -58,7 +58,7 @@ describe('diffPluginVersions', () => {
 	});
 
 	it('prefers registry over npm when both have a newer version', () => {
-		const catalog = new Map([['valora-plugin-rtk', '1.2.0']]);
+		const catalog = new Map([['valora-plugin-rtk', { version: '1.2.0' }]]);
 		const npm = new Map([['valora-plugin-rtk', '1.3.0']]);
 		const result = diffPluginVersions([ref()], catalog, npm);
 		expect(result[0]?.source).toBe('registry');
@@ -76,8 +76,8 @@ describe('diffPluginVersions', () => {
 			ref({ name: 'valora-plugin-new', packageName: '@windagency/valora-plugin-new', currentVersion: '1.5.0' })
 		];
 		const catalog = new Map([
-			['valora-plugin-rtk', '1.1.0'], // outdated
-			['valora-plugin-eng', '2.0.0'] // up-to-date
+			['valora-plugin-rtk', { version: '1.1.0' }], // outdated
+			['valora-plugin-eng', { version: '2.0.0' }] // up-to-date
 			// valora-plugin-new is absent → no npm fallback either
 		]);
 		const result = diffPluginVersions(installed, catalog, new Map());
@@ -86,7 +86,7 @@ describe('diffPluginVersions', () => {
 	});
 
 	it('preserves location in the outdated entry', () => {
-		const catalog = new Map([['valora-plugin-rtk', '2.0.0']]);
+		const catalog = new Map([['valora-plugin-rtk', { version: '2.0.0' }]]);
 		const result = diffPluginVersions([ref({ location: 'project' })], catalog, new Map());
 		expect(result[0]?.location).toBe('project');
 	});

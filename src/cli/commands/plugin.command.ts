@@ -52,9 +52,10 @@ async function checkBinaryRequirements(
 	}
 }
 
-async function defaultPromptInstall(name: string, _installCommand: string): Promise<boolean> {
+async function defaultPromptInstall(name: string, installCommand: string): Promise<boolean> {
 	if (!process.stdout.isTTY) return false;
-	return promptYesNo(`Download '${name}' now? [y/N] `);
+	console.log(`The plugin requires '${name}'. The install command is:\n  ${installCommand}\n`);
+	return promptYesNo(`Run this command to install '${name}'? [y/N] `);
 }
 
 async function isBinaryOnPath(name: string): Promise<boolean> {
@@ -79,12 +80,12 @@ async function tryInstallBinary(
 	promptFn: (name: string, installCommand: string) => Promise<boolean>
 ): Promise<boolean> {
 	if (!req.installCommand) return false;
-	if (req.autoInstall) {
-		console.log(`Installing ${req.name}…`);
-	} else {
-		const confirmed = await promptFn(req.name, req.installCommand);
-		if (!confirmed) return false;
-	}
+	// Always prompt before running an arbitrary shell install command, even when the
+	// manifest declares autoInstall: true. The flag is now informational only — it
+	// does not bypass user consent. This closes the privilege-escalation surface
+	// that third-party manifests would otherwise have on first install.
+	const confirmed = await promptFn(req.name, req.installCommand);
+	if (!confirmed) return false;
 	const code = await installer(req.installCommand);
 	if (code === 0) {
 		console.log(`✓ ${req.name} downloaded successfully.`);
@@ -143,11 +144,14 @@ export function configurePluginCommand(program: CommandAdapter, hooks: PluginCom
 				return;
 			}
 
+			const shortName = shortNameFromPackage(resolvePackageName(name));
+			const integrity = await fetchIntegrityForPlugin(shortName);
+
 			console.log(`Installing ${name} (scope: ${scope})…`);
 			try {
-				await pluginInstaller.install(name, scope as InstallScope);
+				await pluginInstaller.install(name, scope as InstallScope, integrity);
 				console.log(`✓ Plugin installed. Restart Valora to activate.`);
-				await checkBinaryRequirements(shortNameFromPackage(resolvePackageName(name)), checker, installer, promptFn);
+				await checkBinaryRequirements(shortName, checker, installer, promptFn);
 			} catch (error) {
 				const message = error instanceof Error ? error.message : String(error);
 				console.error(`✗ Installation failed: ${message}`);
@@ -311,6 +315,16 @@ async function buildNpmLatestMap(plugins: Array<{ name: string; packageName: str
 	return new Map(results.filter((r) => r.version !== null).map((r) => [r.name, r.version as string]));
 }
 
+async function fetchIntegrityForPlugin(shortName: string): Promise<string | undefined> {
+	try {
+		const registry = await fetchPluginRegistry();
+		const entry = registry?.find((e) => e.name === shortName);
+		return entry?.integrity;
+	} catch {
+		return undefined;
+	}
+}
+
 async function installFromLocalTgz(
 	installer: PluginInstallerService,
 	tgzPath: string,
@@ -357,7 +371,7 @@ async function installOutdatedPlugins(
 		}
 		console.log(`Updating ${p.name} (${p.currentVersion} → ${p.latestVersion})…`);
 		try {
-			await installer.install(p.name, p.location as InstallScope);
+			await installer.install(p.name, p.location as InstallScope, p.integrity);
 			console.log(`  ${color.green('✓')} ${p.name} updated.`);
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);

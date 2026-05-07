@@ -20,8 +20,17 @@ export interface LoadedPlugin {
 	promptsDir?: string;
 	status: PluginStatus;
 	templatesDir?: string;
+	/**
+	 * Permissions declared in the manifest that the runtime does not (yet) enforce.
+	 * Surfaced for `valora doctor` so users can see what their plugin manifest claims
+	 * versus what the host actually gates. Currently always a subset of
+	 * { 'fs-read', 'fs-write', 'network' }.
+	 */
+	unenforcedPermissions?: PluginPermission[];
 	validatorModules?: Array<{ modulePath: string; stage: string }>;
 }
+
+export type PluginAutoUpdateMode = 'check-only' | 'install' | 'prompt';
 
 export interface PluginBinaryRequirement {
 	autoInstall?: boolean;
@@ -64,7 +73,19 @@ export interface PluginManifest {
 
 export type PluginPermission = 'code-exec' | 'fs-read' | 'fs-write' | 'mcp-connect' | 'network' | 'shell-hooks';
 
+/**
+ * A single entry in the resolved plugin update catalogue: the version a plugin
+ * should be moved to, plus the optional sha256 SRI integrity to verify the
+ * downloaded tarball against. Lives in `types/` so both `cli/plugin-catalogue-utils`
+ * and `updater/plugin-compare` can consume it without forming a layer cycle.
+ */
+export interface CatalogEntry {
+	integrity?: string;
+	version: string;
+}
+
 export interface PluginsConfig {
+	autoUpdate?: PluginAutoUpdateMode;
 	enabled?: string[];
 	sources?: PluginSource[];
 }

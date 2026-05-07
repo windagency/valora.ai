@@ -4,7 +4,9 @@
 
 ## Status
 
-Proposed
+Accepted
+
+> Implementation landed in Valora 2.6.0. See `src/memory/vault/`, `src/memory/embeddings/`, `src/memory/retrieval/`, `src/memory/consolidation/`, and `src/memory/migration/`. The legacy JSON `MemoryStore` is retained only as a migration source and is no longer instantiated by production code paths (enforced by arch-unit tests in `__tests__/architecture/vault-memory.arch.test.ts`).
 
 ## Consequences
 
@@ -70,8 +72,9 @@ The side file is addressable by memory ID and appended-to on every new embedding
 On boot, the vault is scanned to build a `VaultIndex` in memory:
 
 - `byId`, `byCategory`, `byTag`, `byPath`, `byAgent` maps
-- Typed adjacency maps (`outEdges`, `inEdges`) derived from frontmatter and inline links
-- The `Float32Array` of all vectors loaded contiguously
+- Typed adjacency maps (`outEdges`, `inEdges`) derived from frontmatter (Hebbian `co_accessed`) and inline `[[id|kind]]` wikilinks (`related`, `supersedes`, `decays_from`)
+
+Embedding vectors are loaded lazily on the recall path via `openVectorStore`, which streams the contents of `embeddings.bin` and aligns with the persisted `model`/`dim` in `embeddings.index.json`. Loading is deferred to the first `query()` to keep cold-start cost proportional to vault size, not embedding size.
 
 The index is rebuilt from disk on every cold start. An opportunistic snapshot (`.valora/memory/.index-snapshot.bin`) accelerates subsequent boots by rescanning only files whose `mtime` is newer than the snapshot timestamp.
 

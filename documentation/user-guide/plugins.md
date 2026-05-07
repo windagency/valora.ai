@@ -121,7 +121,32 @@ valora plugin update [name] [--check]
 
 Plugins installed via your project's package manager (`npm` scope from `node_modules`) are reported but not installed — update those via `npm install`, `pnpm add`, etc.
 
-You can also enable automatic plugin updates by setting `autoUpdate.mode=auto` in `~/.valora/config.json`. See [Auto-update](./auto-update.md) for details.
+### Automatic plugin updates and consent
+
+When `autoUpdate.mode=auto` is set in `~/.valora/config.json`, the postaction hook checks the registry for outdated plugins on every CLI run. The default is to **prompt before each install** so a compromised registry cannot silently change plugin code on your machine. The behaviour is controlled by `plugins.autoUpdate`:
+
+```json
+{
+	"autoUpdate": { "mode": "auto" },
+	"plugins": {
+		"autoUpdate": "prompt"
+	}
+}
+```
+
+| `plugins.autoUpdate` | Behaviour                                                                                                                                                              |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `prompt` (default)   | Confirm interactively before each install. Falls back to **check-only** when there is no TTY (CI / piped). The integrity check (sha256) result is shown in the prompt. |
+| `check-only`         | Print a one-line notice listing plugins with available updates; never install. Use `valora plugin update` to apply.                                                    |
+| `install`            | Legacy silent install. Not recommended; restored only for users who explicitly want it.                                                                                |
+
+When prompted, you will see the plugin name, the version diff, and whether the tarball was sha256-verified against the registry:
+
+```
+Update valora-plugin-rtk 1.0.0 → 1.1.0 (verified by sha256)? [y/N]
+```
+
+A plugin without an integrity field shows `(no integrity check)` instead — it will install if you confirm, but consider it the same trust level as `pnpm add` of a fresh package.
 
 ### Examples
 
@@ -349,31 +374,59 @@ A plugin that contributes hooks must declare the `shell-hooks` permission in its
 
 Available permissions:
 
-| Permission    | Required for                                        |
-| ------------- | --------------------------------------------------- |
-| `shell-hooks` | `hooks` contributions                               |
-| `code-exec`   | `code` contributions (TypeScript modules)           |
-| `fs-write`    | `code` contributions that write to the file system  |
-| `network`     | `code` contributions that make outbound connections |
+| Permission    | Status        | Effect                                                                                                                                                          |
+| ------------- | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `shell-hooks` | Enforced      | Required to register `hooks` contributions. A plugin that contributes `hooks` without this permission has its hooks silently dropped (with a warn).             |
+| `code-exec`   | Enforced      | Required to dynamically import the plugin's `codeEntrypoint` and run `register()`. Also required for `validators` contributions.                                |
+| `mcp-connect` | Enforced      | Required to register external MCP servers from `mcps` contributions. A plugin that contributes `mcps` without this permission has its servers silently dropped. |
+| `fs-read`     | Informational | Documentation-only; the runtime does not gate file-system reads. The host logs a warn at load when this is declared.                                            |
+| `fs-write`    | Informational | Documentation-only; the runtime does not gate file-system writes. The host logs a warn at load when this is declared.                                           |
+| `network`     | Informational | Documentation-only; the runtime does not gate outbound connections. The host logs a warn at load when this is declared.                                         |
 
-The `mcp-connect` permission is reserved for a future code-contribution surface not yet released.
+**Why some permissions are informational.** Code plugins run in the host process with full Node capability — there is no in-process sandbox today. The `fs-*` and `network` tokens are reserved for a future capability-gating story documented in [ADR-014: Plugin Capability Gating](../adr/014-plugin-capability-gating.md). Until that lands, treat plugin code as you would any other npm dependency: only install plugins from sources you trust.
+
+### Hardening with the Node Permission Model (optional)
+
+Security-sensitive teams can raise the floor today by launching Valora under [Node 20+'s permission model](https://nodejs.org/api/permissions.html). This is process-wide (not per-plugin) but materially reduces the impact of a compromised plugin:
+
+```bash
+# Allow only the directories Valora actually needs to read and write
+node --permission \
+     --allow-fs-read=$HOME/.valora \
+     --allow-fs-read=$(pwd)/.valora \
+     --allow-fs-write=$HOME/.valora \
+     --allow-fs-write=$(pwd)/.valora \
+     "$(which valora)" "$@"
+```
+
+Wrap this in a shell script your team aliases as `valora`. With these flags, a malicious plugin's `fs.writeFileSync('/etc/cron.d/evil', ...)` is blocked by the Node runtime regardless of what the plugin's manifest claims. Network access can be similarly restricted via `--allow-net=...`. Audit `valora doctor` for plugins that declare informational permissions (`fs-write`, `network`) before enabling them — those manifests describe what the plugin _intends_ to do, not what the runtime currently permits.
 
 ## `requiresBinary`
 
-Plugins that wrap an external CLI tool can declare a binary requirement so Valora surfaces a friendly error when the tool is missing:
+Plugins that wrap an external CLI tool can declare a binary requirement so Valora surfaces a friendly error when the tool is missing — and optionally offer to run an install command on the user's behalf:
 
 ```json
 {
-	"requiresBinary": [{ "name": "rtk", "version": ">=0.5", "install": "brew install rtk" }]
+	"requiresBinary": [
+		{
+			"name": "obsidian",
+			"installCommand": "brew install --cask obsidian",
+			"install": "https://obsidian.md/download"
+		}
+	]
 }
 ```
 
-Valora checks `$PATH` for the named binary at load time. If it is absent, the plugin is skipped and the `install` hint is shown:
+Valora checks `$PATH` (or `checkCommand`) at install time. If the binary is absent and `installCommand` is set, you are **always** prompted before the command runs:
 
 ```
-[plugins] Skipping valora-plugin-rtk: binary "rtk" not found.
-          Install: brew install rtk
+The plugin requires 'obsidian'. The install command is:
+  brew install --cask obsidian
+
+Run this command to install 'obsidian'? [y/N]
 ```
+
+The legacy `autoInstall: true` flag in the manifest is now informational only — it does not bypass the prompt. This closes the privilege-escalation surface where an updated plugin manifest could silently run an arbitrary shell command on first install.
 
 ## Troubleshooting
 

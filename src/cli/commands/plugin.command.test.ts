@@ -291,7 +291,7 @@ describe('plugin add', () => {
 		const program = makeProgram();
 		await runCommand(program, ['plugin', 'add', 'rtk']);
 
-		expect(mockInstall).toHaveBeenCalledWith('rtk', 'user');
+		expect(mockInstall).toHaveBeenCalledWith('rtk', 'user', undefined);
 		expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('installed'));
 	});
 
@@ -441,8 +441,8 @@ describe('plugin update (install)', () => {
 		await runCommand(program, ['plugin', 'update']);
 
 		expect(mockInstall).toHaveBeenCalledTimes(2);
-		expect(mockInstall).toHaveBeenCalledWith('valora-plugin-rtk', 'user');
-		expect(mockInstall).toHaveBeenCalledWith('valora-plugin-eng', 'project');
+		expect(mockInstall).toHaveBeenCalledWith('valora-plugin-rtk', 'user', undefined);
+		expect(mockInstall).toHaveBeenCalledWith('valora-plugin-eng', 'project', undefined);
 	});
 
 	it('installs only the named plugin when a name is provided', async () => {
@@ -483,7 +483,7 @@ describe('plugin update (install)', () => {
 		await runCommand(program, ['plugin', 'update', 'rtk']);
 
 		expect(mockInstall).toHaveBeenCalledTimes(1);
-		expect(mockInstall).toHaveBeenCalledWith('valora-plugin-rtk', 'user');
+		expect(mockInstall).toHaveBeenCalledWith('valora-plugin-rtk', 'user', undefined);
 	});
 
 	it('matches a plugin when the name uses the valora- package prefix', async () => {
@@ -524,7 +524,7 @@ describe('plugin update (install)', () => {
 		await runCommand(program, ['plugin', 'update', 'valora-core-product']);
 
 		expect(mockInstall).toHaveBeenCalledTimes(1);
-		expect(mockInstall).toHaveBeenCalledWith('valora-core-product', 'user');
+		expect(mockInstall).toHaveBeenCalledWith('valora-core-product', 'user', undefined);
 	});
 
 	it('warns and skips npm-scope plugins without installing', async () => {
@@ -842,7 +842,7 @@ describe('plugin add — autoInstall binary requirement', () => {
 		vi.clearAllMocks();
 	});
 
-	it('installs binary without prompting when autoInstall is true', async () => {
+	it('always prompts before running the install command, even when autoInstall is true', async () => {
 		(PluginInstallerService as ReturnType<typeof vi.fn>).mockImplementationOnce(() => ({
 			install: vi.fn().mockResolvedValue(undefined)
 		}));
@@ -864,7 +864,7 @@ describe('plugin add — autoInstall binary requirement', () => {
 				})
 			])
 		}));
-		const mockPromptInstall = vi.fn();
+		const mockPromptInstall = vi.fn().mockResolvedValue(true);
 		const mockBinaryInstaller = vi.fn().mockResolvedValue(0);
 
 		const program = makeProgram({
@@ -874,13 +874,16 @@ describe('plugin add — autoInstall binary requirement', () => {
 		});
 		await runCommand(program, ['plugin', 'add', 'ollama']);
 
-		expect(mockPromptInstall).not.toHaveBeenCalled();
+		expect(mockPromptInstall).toHaveBeenCalledWith(
+			'ollama',
+			'curl -fsSL https://example.com/ollama.tgz | sudo tar -xz -C /usr/local/'
+		);
 		expect(mockBinaryInstaller).toHaveBeenCalledWith(
 			'curl -fsSL https://example.com/ollama.tgz | sudo tar -xz -C /usr/local/'
 		);
 	});
 
-	it('logs a message instead of prompting when auto-installing', async () => {
+	it('does not run the install command when the user declines, even with autoInstall: true', async () => {
 		(PluginInstallerService as ReturnType<typeof vi.fn>).mockImplementationOnce(() => ({
 			install: vi.fn().mockResolvedValue(undefined)
 		}));
@@ -902,16 +905,18 @@ describe('plugin add — autoInstall binary requirement', () => {
 				})
 			])
 		}));
+		const mockPromptInstall = vi.fn().mockResolvedValue(false);
 		const mockBinaryInstaller = vi.fn().mockResolvedValue(0);
 
 		const program = makeProgram({
 			binaryChecker: vi.fn().mockResolvedValue(false),
-			binaryInstaller: mockBinaryInstaller
+			binaryInstaller: mockBinaryInstaller,
+			promptInstall: mockPromptInstall
 		});
 		await runCommand(program, ['plugin', 'add', 'ollama']);
 
-		const logOutput = consoleSpy.mock.calls.map((c) => c.join(' ')).join('\n');
-		expect(logOutput).toContain('ollama');
+		expect(mockPromptInstall).toHaveBeenCalled();
+		expect(mockBinaryInstaller).not.toHaveBeenCalled();
 	});
 
 	it('still prompts when autoInstall is not set', async () => {
@@ -1162,7 +1167,10 @@ describe('plugin add — postInstallCommand', () => {
 		}));
 		const mockBinaryInstaller = vi.fn().mockResolvedValueOnce(1).mockResolvedValue(0);
 
-		const program = makeProgram({ binaryInstaller: mockBinaryInstaller });
+		const program = makeProgram({
+			binaryInstaller: mockBinaryInstaller,
+			promptInstall: vi.fn().mockResolvedValue(true)
+		});
 		await runCommand(program, ['plugin', 'add', 'obsidian']);
 
 		expect(mockBinaryInstaller).toHaveBeenNthCalledWith(1, 'exit 1');
@@ -1285,7 +1293,7 @@ describe('plugin add (local tgz)', () => {
 		const program = makeProgram();
 		await runCommand(program, ['plugin', 'add', 'rtk']);
 
-		expect(mockInstall).toHaveBeenCalledWith('rtk', 'user');
+		expect(mockInstall).toHaveBeenCalledWith('rtk', 'user', undefined);
 		expect(vi.mocked(peekTarballManifest)).not.toHaveBeenCalled();
 	});
 });

@@ -3,6 +3,8 @@ import * as path from 'node:path';
 
 import type { Edge, MemoryCategory, MemoryEntry } from 'types/memory.types';
 
+import { getLogger } from 'output/logger';
+
 import { parseMemoryFile } from './file-format';
 
 export interface VaultIndex {
@@ -43,8 +45,9 @@ export function addRecord(index: VaultIndex, record: VaultRecord): void {
 	for (const tag of entry.tags) addToSet(index.byTag, tag, entry.id);
 	for (const p of entry.relatedPaths) addToSet(index.byPath, p, entry.id);
 
-	index.outEdges.set(entry.id, links);
-	for (const edge of links) {
+	const allOut: Edge[] = [...links, ...synthesiseCoAccessedEdges(entry)];
+	index.outEdges.set(entry.id, allOut);
+	for (const edge of allOut) {
 		addToSet(index.inEdges, edge.toId, entry.id);
 	}
 }
@@ -68,8 +71,11 @@ export function buildVaultIndex(vaultDir: string): VaultIndex {
 				const id = path.basename(file, '.md');
 				const { entry, links } = parseMemoryFile(content, id);
 				addRecord(index, { entry, links, mdPath });
-			} catch {
-				// skip unreadable files
+			} catch (err) {
+				// Silent skipping turns vault corruption into invisible data
+				// loss. Surface a structured warning so operators can act —
+				// the index is still built from whatever else parses cleanly.
+				getLogger().warn(`Vault: failed to parse ${mdPath}: ${(err as Error).message}`);
 			}
 		}
 	}
@@ -93,6 +99,22 @@ export function removeRecord(index: VaultIndex, id: string): void {
 	for (const edge of links) {
 		removeFromSet(index.inEdges, edge.toId, id);
 	}
+}
+
+/**
+ * Convert persisted Hebbian co-retrieval counts into traversable `co_accessed` edges.
+ * Without this step the counts are dead-on-reload — the edges that ADR-013 §5
+ * requires spreading activation to walk would not exist after a process restart.
+ * Edge weight uses log1p to dampen the influence of runaway pair counts.
+ */
+export function synthesiseCoAccessedEdges(entry: { coAccess?: Record<string, number>; id: string }): Edge[] {
+	if (!entry.coAccess) return [];
+	const edges: Edge[] = [];
+	for (const [peerId, count] of Object.entries(entry.coAccess)) {
+		if (count <= 0) continue;
+		edges.push({ fromId: entry.id, kind: 'co_accessed', toId: peerId, weight: Math.log1p(count) });
+	}
+	return edges;
 }
 
 function addToSet<K>(map: Map<K, Set<string>>, key: K, value: string): void {

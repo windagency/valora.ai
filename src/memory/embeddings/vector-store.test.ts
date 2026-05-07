@@ -4,7 +4,7 @@ import * as path from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { openVectorStore } from './vector-store';
+import { openVectorStore, readVectorStoreMeta } from './vector-store';
 
 describe('VectorStore', () => {
 	let tmpDir: string;
@@ -114,6 +114,64 @@ describe('VectorStore', () => {
 			expect(store.has('mem-drop')).toBe(false);
 			expect(store.has('mem-keep')).toBe(true);
 			expect(store.count()).toBe(1);
+		});
+	});
+
+	describe('dimension and model pinning', () => {
+		it('throws when reopened with a different embedding dimension than the persisted one', () => {
+			const store = openVectorStore(tmpDir, 'nomic-embed-text', 4);
+			store.append('mem-a', [1, 2, 3, 4]);
+			store.flush();
+
+			expect(() => openVectorStore(tmpDir, 'nomic-embed-text', 8)).toThrow(/reembed/i);
+		});
+
+		it('throws when reopened with a different embedding model than the persisted one', () => {
+			const store = openVectorStore(tmpDir, 'nomic-embed-text', 4);
+			store.append('mem-a', [1, 2, 3, 4]);
+			store.flush();
+
+			expect(() => openVectorStore(tmpDir, 'other-model', 4)).toThrow(/reembed/i);
+		});
+
+		it('preserves count when reopened with the same model and dim', () => {
+			const store = openVectorStore(tmpDir, 'nomic-embed-text', 2);
+			store.append('mem-a', [1, 0]);
+			store.append('mem-b', [0, 1]);
+			store.flush();
+
+			const reopened = openVectorStore(tmpDir, 'nomic-embed-text', 2);
+			expect(reopened.count()).toBe(2);
+		});
+
+		it('rejects appends whose vector length does not match the store dim', () => {
+			const store = openVectorStore(tmpDir, 'model', 4);
+			expect(() => store.append('mem-a', [1, 2])).toThrow(/dim/i);
+		});
+	});
+
+	describe('readVectorStoreMeta', () => {
+		it('returns null when no embeddings.index.json exists', () => {
+			expect(readVectorStoreMeta(tmpDir)).toBeNull();
+		});
+
+		it('returns the persisted model and dim once a store has been flushed', () => {
+			const store = openVectorStore(tmpDir, 'nomic-embed-text', 6);
+			store.append('mem-a', [1, 2, 3, 4, 5, 6]);
+			store.flush();
+
+			expect(readVectorStoreMeta(tmpDir)).toEqual({ dim: 6, model: 'nomic-embed-text' });
+		});
+	});
+
+	describe('atomic flush', () => {
+		it('does not leave a .tmp file alongside embeddings.bin or embeddings.index.json', () => {
+			const store = openVectorStore(tmpDir, 'nomic-embed-text', 2);
+			store.append('mem-a', [1, 0]);
+			store.flush();
+
+			const stragglers = fs.readdirSync(tmpDir).filter((f) => f.endsWith('.tmp'));
+			expect(stragglers).toEqual([]);
 		});
 	});
 });

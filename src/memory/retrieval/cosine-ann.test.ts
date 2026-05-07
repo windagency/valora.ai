@@ -30,6 +30,26 @@ describe('cosineSimilarity', () => {
 		const b = new Float32Array([1, 0]);
 		expect(cosineSimilarity(a, b)).toBe(0);
 	});
+
+	it('returns 0 when input vectors have different lengths', () => {
+		const a = new Float32Array([1, 0, 0]);
+		const b = new Float32Array([1, 0]);
+		expect(cosineSimilarity(a, b)).toBe(0);
+	});
+
+	it('returns a finite number when either vector contains NaN', () => {
+		const a = new Float32Array([1, NaN]);
+		const b = new Float32Array([1, 0]);
+		const result = cosineSimilarity(a, b);
+		expect(Number.isFinite(result)).toBe(true);
+	});
+
+	it('returns a finite number when either vector contains Infinity', () => {
+		const a = new Float32Array([Infinity, 0]);
+		const b = new Float32Array([1, 0]);
+		const result = cosineSimilarity(a, b);
+		expect(Number.isFinite(result)).toBe(true);
+	});
 });
 
 describe('topKCosine', () => {

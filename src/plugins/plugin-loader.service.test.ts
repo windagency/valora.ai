@@ -639,3 +639,136 @@ describe('PluginLoaderService — catalogAll()', () => {
 		expect(result.find((p) => p.manifest?.name === 'plugin-b')?.status).toBe('disabled');
 	});
 });
+
+describe('PluginLoaderService — unenforced permissions audit', () => {
+	let tmpDir: string;
+	let loader: PluginLoaderService;
+
+	beforeEach(() => {
+		tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'valora-perms-test-'));
+		loader = new PluginLoaderService({
+			discoverWithSource: () => [{ dir: tmpDir, location: 'built-in' as const }]
+		} as never);
+	});
+
+	afterEach(() => {
+		fs.rmSync(tmpDir, { recursive: true, force: true });
+	});
+
+	it('records fs-read, fs-write, and network as unenforced when declared', () => {
+		writeJson(path.join(tmpDir, 'valora-plugin.json'), {
+			name: 'wide-permissions-plugin',
+			version: '1.0.0',
+			contributes: ['agents'],
+			permissions: ['fs-read', 'fs-write', 'network']
+		});
+		writeFile(path.join(tmpDir, 'agents', 'foo.md'), '---\nrole: foo\n---\ntest');
+
+		const plugins = loader.loadAll();
+
+		expect(plugins).toHaveLength(1);
+		expect(plugins[0].unenforcedPermissions).toEqual(expect.arrayContaining(['fs-read', 'fs-write', 'network']));
+	});
+
+	it('does not list code-exec or shell-hooks among unenforced permissions', () => {
+		writeJson(path.join(tmpDir, 'valora-plugin.json'), {
+			name: 'mixed-permissions-plugin',
+			version: '1.0.0',
+			contributes: ['hooks'],
+			permissions: ['shell-hooks', 'fs-write']
+		});
+
+		const plugins = loader.loadAll();
+
+		expect(plugins[0].unenforcedPermissions).toEqual(['fs-write']);
+	});
+
+	it('omits unenforcedPermissions when no informational permissions are declared', () => {
+		writeJson(path.join(tmpDir, 'valora-plugin.json'), {
+			name: 'minimal-plugin',
+			version: '1.0.0',
+			contributes: ['agents'],
+			permissions: []
+		});
+
+		const plugins = loader.loadAll();
+
+		expect(plugins[0].unenforcedPermissions).toBeUndefined();
+	});
+});
+
+describe('PluginLoaderService — engines.valora compatibility', () => {
+	let tmpDir: string;
+
+	beforeEach(() => {
+		tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'valora-engines-test-'));
+	});
+
+	afterEach(() => {
+		fs.rmSync(tmpDir, { recursive: true, force: true });
+	});
+
+	function makeLoader(hostVersion: string): PluginLoaderService {
+		return new PluginLoaderService(
+			{ discoverWithSource: () => [{ dir: tmpDir, location: 'built-in' as const }] } as never,
+			() => hostVersion
+		);
+	}
+
+	it('loads a plugin whose engines.valora range is satisfied by the host', () => {
+		writeJson(path.join(tmpDir, 'valora-plugin.json'), {
+			name: 'compatible-plugin',
+			version: '1.0.0',
+			contributes: ['agents'],
+			engines: { valora: '>=2.0.0' }
+		});
+		writeFile(path.join(tmpDir, 'agents', 'foo.md'), '---\nrole: foo\n---\ntest');
+
+		const plugins = makeLoader('2.5.0').loadAll();
+
+		expect(plugins).toHaveLength(1);
+		expect(plugins[0].status).toBe('enabled');
+	});
+
+	it('skips a plugin whose engines.valora range excludes the host version', () => {
+		writeJson(path.join(tmpDir, 'valora-plugin.json'), {
+			name: 'incompatible-plugin',
+			version: '1.0.0',
+			contributes: ['agents'],
+			engines: { valora: '>=99.0.0' }
+		});
+		writeFile(path.join(tmpDir, 'agents', 'foo.md'), '---\nrole: foo\n---\ntest');
+
+		const plugins = makeLoader('2.5.0').loadAll();
+
+		expect(plugins).toHaveLength(0);
+	});
+
+	it('reports incompatible plugins as invalid in the catalogue', () => {
+		writeJson(path.join(tmpDir, 'valora-plugin.json'), {
+			name: 'incompatible-plugin',
+			version: '1.0.0',
+			contributes: ['agents'],
+			engines: { valora: '>=99.0.0' }
+		});
+
+		const result = makeLoader('2.5.0').catalogAll();
+
+		expect(result).toHaveLength(1);
+		expect(result[0].status).toBe('invalid');
+		expect(result[0].validationErrors?.[0]).toMatch(/engines\.valora/);
+	});
+
+	it('loads a plugin without engines.valora (treated as universally compatible)', () => {
+		writeJson(path.join(tmpDir, 'valora-plugin.json'), {
+			name: 'no-engines-plugin',
+			version: '1.0.0',
+			contributes: ['agents']
+		});
+		writeFile(path.join(tmpDir, 'agents', 'foo.md'), '---\nrole: foo\n---\ntest');
+
+		const plugins = makeLoader('2.5.0').loadAll();
+
+		expect(plugins).toHaveLength(1);
+	});
+});

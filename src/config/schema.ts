@@ -196,6 +196,13 @@ export const PLUGIN_SOURCE_SCHEMA = z.object({
 
 // Plugins configuration schema
 export const PLUGINS_CONFIG_SCHEMA = z.object({
+	/**
+	 * How plugin updates discovered at startup are applied.
+	 * - 'check-only': notify only, never install
+	 * - 'prompt' (default): confirm interactively before each install; falls back to check-only when no TTY
+	 * - 'install': install silently (legacy behaviour; not recommended)
+	 */
+	autoUpdate: z.enum(['check-only', 'install', 'prompt']).default('prompt'),
 	enabled: z.array(z.string()).optional(),
 	sources: z.array(PLUGIN_SOURCE_SCHEMA).optional()
 });

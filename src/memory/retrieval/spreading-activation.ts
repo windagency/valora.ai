@@ -13,6 +13,15 @@ const CONFIDENCE_WEIGHT: Record<ConfidenceTier, number> = {
 
 const TRAVERSAL_KINDS = new Set<Edge['kind']>(['co_accessed', 'related']);
 
+/**
+ * Edges whose backward traversal carries semantic weight. `co_accessed` is
+ * symmetric (Hebbian co-retrieval), so reverse propagation is meaningful.
+ * `related` is directional in our schema; we choose not to propagate backwards
+ * to avoid amplifying activation through one-way authorial intent (e.g.,
+ * "promotion-from-X" should not flood X's neighbours).
+ */
+const REVERSE_TRAVERSAL_KINDS = new Set<Edge['kind']>(['co_accessed']);
+
 export function spreadActivation(
 	seeds: Map<string, number>,
 	byId: Map<string, VaultRecord>,
@@ -22,38 +31,40 @@ export function spreadActivation(
 	gamma: number,
 	now = Date.now()
 ): Map<string, number> {
+	if (gamma > 1) throw new Error(`spreadActivation: gamma must be <= 1 (got ${gamma})`);
 	const activation = new Map<string, number>(seeds);
 	const queue: Array<[string, number]> = [...seeds.keys()].map((id) => [id, depth]);
-	const visited = new Set<string>(seeds.keys());
 
 	let head = 0;
 	while (head < queue.length) {
 		const [currentId, remaining] = queue[head++]!;
 		if (remaining === 0) continue;
 		const act = activation.get(currentId) ?? 0;
-		propagateForward(currentId, act, remaining, gamma, outEdges, activation, queue, visited);
-		propagateReverse(currentId, act, remaining, gamma, outEdges, inEdges, activation, queue, visited);
+		propagateForward(currentId, act, remaining, gamma, outEdges, activation, queue);
+		propagateReverse(currentId, act, remaining, gamma, outEdges, inEdges, activation, queue);
 	}
 
 	return scoreActivation(activation, byId, now);
 }
 
+/**
+ * Apply a candidate activation to a node and re-enqueue it for further
+ * propagation if the new activation is strictly higher than what is already
+ * recorded. The activation guard alone terminates cycles because activation
+ * decays by `gamma < 1` at every hop, so a node revisited via a longer path
+ * always carries a smaller candidate.
+ */
 function propagate(
 	id: string,
 	activation: number,
 	remaining: number,
 	activationMap: Map<string, number>,
-	queue: Array<[string, number]>,
-	visited: Set<string>
+	queue: Array<[string, number]>
 ): void {
 	const current = activationMap.get(id) ?? 0;
 	if (activation <= current) return;
 	activationMap.set(id, activation);
-
-	if (!visited.has(id) && remaining > 0) {
-		visited.add(id);
-		queue.push([id, remaining]);
-	}
+	if (remaining > 0) queue.push([id, remaining]);
 }
 
 function propagateForward(
@@ -63,12 +74,11 @@ function propagateForward(
 	gamma: number,
 	outEdges: Map<string, Edge[]>,
 	activation: Map<string, number>,
-	queue: Array<[string, number]>,
-	visited: Set<string>
+	queue: Array<[string, number]>
 ): void {
 	for (const edge of outEdges.get(currentId) ?? []) {
 		if (!TRAVERSAL_KINDS.has(edge.kind)) continue;
-		propagate(edge.toId, act * (edge.weight ?? 1.0) * gamma, remaining - 1, activation, queue, visited);
+		propagate(edge.toId, act * (edge.weight ?? 1.0) * gamma, remaining - 1, activation, queue);
 	}
 }
 
@@ -80,13 +90,14 @@ function propagateReverse(
 	outEdges: Map<string, Edge[]>,
 	inEdges: Map<string, Set<string>>,
 	activation: Map<string, number>,
-	queue: Array<[string, number]>,
-	visited: Set<string>
+	queue: Array<[string, number]>
 ): void {
 	for (const neighborId of inEdges.get(currentId) ?? []) {
-		const edge = (outEdges.get(neighborId) ?? []).find((e) => e.toId === currentId && TRAVERSAL_KINDS.has(e.kind));
+		const edge = (outEdges.get(neighborId) ?? []).find(
+			(e) => e.toId === currentId && REVERSE_TRAVERSAL_KINDS.has(e.kind)
+		);
 		if (!edge) continue;
-		propagate(neighborId, act * (edge.weight ?? 1.0) * gamma, remaining - 1, activation, queue, visited);
+		propagate(neighborId, act * (edge.weight ?? 1.0) * gamma, remaining - 1, activation, queue);
 	}
 }
 

@@ -201,8 +201,10 @@ export class MemoryStore {
 			writeFileSync(storePath, JSON.stringify(storeFile, null, 2));
 			this.dirty.delete(category);
 		} catch (error) {
-			getLogger().error(`Failed to persist memory store for category '${category}'`, error as Error);
-			throw error;
+			// ADR-011 graceful-degradation contract: persistence failures must
+			// be non-fatal so the pipeline can continue. The dirty flag is
+			// retained, so a subsequent `flush()` will retry the write.
+			getLogger().warn(`Failed to persist memory store for category '${category}': ${(error as Error).message}`);
 		}
 	}
 }

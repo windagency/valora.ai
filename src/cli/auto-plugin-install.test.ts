@@ -42,7 +42,7 @@ describe('autoInstallPlugin', () => {
 
 		await autoInstallPlugin(installer, outdated());
 
-		expect(mockInstall).toHaveBeenCalledWith('valora-plugin-rtk', 'user');
+		expect(mockInstall).toHaveBeenCalledWith('valora-plugin-rtk', 'user', undefined);
 		const output = stderrSpy.mock.calls.map((c) => String(c[0])).join('');
 		expect(output).toContain('Updating plugin valora-plugin-rtk');
 		expect(output).toContain('✓ Plugin valora-plugin-rtk updated');
@@ -72,8 +72,43 @@ describe('autoInstallPlugin', () => {
 describe('autoInstallOutdatedPlugins', () => {
 	it('does nothing when the list is empty', async () => {
 		const installer = new PluginInstallerService({ run: vi.fn() });
-		await autoInstallOutdatedPlugins(installer, []);
+		await autoInstallOutdatedPlugins(installer, [], { policy: 'install' });
 		expect(stderrSpy).not.toHaveBeenCalled();
+	});
+
+	it('honours check-only policy by listing updates and never invoking install', async () => {
+		const installer = new PluginInstallerService({ run: vi.fn() });
+		const plugins = [
+			outdated({ name: 'valora-plugin-rtk', location: 'user' }),
+			outdated({ name: 'valora-plugin-eng', packageName: '@windagency/valora-plugin-eng', location: 'project' })
+		];
+
+		await autoInstallOutdatedPlugins(installer, plugins, { policy: 'check-only' });
+
+		expect(vi.mocked(installer.install)).not.toHaveBeenCalled();
+		const output = stderrSpy.mock.calls.map((c) => String(c[0])).join('');
+		expect(output).toContain('2 plugin update(s) available');
+		expect(output).toContain('valora-plugin-rtk');
+		expect(output).toContain('valora plugin update');
+	});
+
+	it('honours prompt policy and installs only when the confirm callback returns true', async () => {
+		const installer = new PluginInstallerService({ run: vi.fn() });
+		const confirm = vi
+			.fn<[OutdatedPlugin], Promise<boolean>>()
+			.mockResolvedValueOnce(true) // first plugin accepted
+			.mockResolvedValueOnce(false); // second declined
+		const plugins = [
+			outdated({ name: 'valora-plugin-rtk', location: 'user' }),
+			outdated({ name: 'valora-plugin-eng', packageName: '@windagency/valora-plugin-eng', location: 'user' })
+		];
+
+		await autoInstallOutdatedPlugins(installer, plugins, { policy: 'prompt', confirm });
+
+		expect(vi.mocked(installer.install)).toHaveBeenCalledTimes(1);
+		expect(vi.mocked(installer.install)).toHaveBeenCalledWith('valora-plugin-rtk', 'user', undefined);
+		const output = stderrSpy.mock.calls.map((c) => String(c[0])).join('');
+		expect(output).toContain('Skipped valora-plugin-eng');
 	});
 
 	it('installs each non-npm plugin in sequence', async () => {
@@ -83,11 +118,11 @@ describe('autoInstallOutdatedPlugins', () => {
 			outdated({ name: 'valora-plugin-eng', packageName: '@windagency/valora-plugin-eng', location: 'project' })
 		];
 
-		await autoInstallOutdatedPlugins(installer, plugins);
+		await autoInstallOutdatedPlugins(installer, plugins, { policy: 'install' });
 
 		expect(vi.mocked(installer.install)).toHaveBeenCalledTimes(2);
-		expect(vi.mocked(installer.install)).toHaveBeenNthCalledWith(1, 'valora-plugin-rtk', 'user');
-		expect(vi.mocked(installer.install)).toHaveBeenNthCalledWith(2, 'valora-plugin-eng', 'project');
+		expect(vi.mocked(installer.install)).toHaveBeenNthCalledWith(1, 'valora-plugin-rtk', 'user', undefined);
+		expect(vi.mocked(installer.install)).toHaveBeenNthCalledWith(2, 'valora-plugin-eng', 'project', undefined);
 	});
 
 	it('skips npm-scoped plugins and continues with others', async () => {
@@ -97,9 +132,9 @@ describe('autoInstallOutdatedPlugins', () => {
 			outdated({ name: 'valora-plugin-eng', packageName: '@windagency/valora-plugin-eng', location: 'user' })
 		];
 
-		await autoInstallOutdatedPlugins(installer, plugins);
+		await autoInstallOutdatedPlugins(installer, plugins, { policy: 'install' });
 
 		expect(vi.mocked(installer.install)).toHaveBeenCalledTimes(1);
-		expect(vi.mocked(installer.install)).toHaveBeenCalledWith('valora-plugin-eng', 'user');
+		expect(vi.mocked(installer.install)).toHaveBeenCalledWith('valora-plugin-eng', 'user', undefined);
 	});
 });

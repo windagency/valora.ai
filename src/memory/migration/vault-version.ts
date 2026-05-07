@@ -1,4 +1,5 @@
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { atomicWriteFile } from 'memory/vault/file-format';
+import { mkdirSync, readFileSync } from 'node:fs';
 import * as path from 'node:path';
 
 export const VAULT_SCHEMA_VERSION = 1;
@@ -17,5 +18,5 @@ export function readVaultVersion(vaultDir: string): null | number {
 
 export function writeVaultVersion(vaultDir: string, version: number = VAULT_SCHEMA_VERSION): void {
 	mkdirSync(vaultDir, { recursive: true });
-	writeFileSync(path.join(vaultDir, VERSION_FILENAME), String(version), 'utf-8');
+	atomicWriteFile(path.join(vaultDir, VERSION_FILENAME), String(version));
 }

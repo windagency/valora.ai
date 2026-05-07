@@ -259,6 +259,12 @@ export const DEFAULT_MEMORY_RETRIEVAL_BOOST_DAYS = 2;
 export const DEFAULT_MEMORY_PRUNE_THRESHOLD = 0.05;
 export const DEFAULT_MEMORY_MAX_ENTRIES_PER_STORE = 500;
 export const DEFAULT_MEMORY_ERROR_HALF_LIFE_MULTIPLIER = 2;
+/**
+ * Cap on how far retrieval-strengthening can extend a memory's half-life,
+ * expressed as a multiple of the category default. Without a cap, frequently
+ * queried entries grow their half-life unboundedly (audit finding H5).
+ */
+export const MEMORY_HALF_LIFE_CAP_MULTIPLIER = 10;
 export const DEFAULT_MEMORY_INJECTION_TOKEN_BUDGET = 2000;
 export const DEFAULT_MEMORY_INJECTION_STRENGTH_THRESHOLD = 0.2;
 export const MEMORY_PERSIST_DEBOUNCE_MS = 2000;

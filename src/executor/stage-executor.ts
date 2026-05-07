@@ -1906,8 +1906,7 @@ Summarize ALL changes you made during tool execution. Output ONLY the JSON code 
 	 */
 	private async loadAgentMemory(executionContext: ExecutionContext): Promise<null | string> {
 		try {
-			const storeModule = await import('memory/store');
-			const managerModule = await import('memory/manager');
+			const memory = await import('memory');
 			const { formatMemoryForInjection } = await import('./memory-formatter');
 			const { getConfigLoader } = await import('config/loader');
 
@@ -1917,8 +1916,11 @@ Summarize ALL changes you made during tool execution. Output ONLY the JSON code 
 				return null;
 			}
 
-			const store = new storeModule.MemoryStore();
-			const manager = new managerModule.MemoryManager(store, memConfig);
+			const vaultDir = memory.getDefaultVaultDir();
+			memory.runAutoMigrationIfNeeded(memory.getLegacyJsonDir(), vaultDir);
+			const store = new memory.VaultStore(vaultDir);
+			const embedder = await memory.resolveEmbedder(memConfig);
+			const manager = new memory.MemoryManager(store, memConfig, embedder);
 
 			const tags = [executionContext.commandName, executionContext.agentRole].filter(Boolean);
 			const minStrength = memConfig?.injection_strength_threshold ?? 0.2;
@@ -1929,7 +1931,8 @@ Summarize ALL changes you made during tool execution. Output ONLY the JSON code 
 				limit: 20,
 				minStrength,
 				strengthen: true,
-				tags
+				tags,
+				tokenBudget
 			});
 
 			if (results.length === 0) {

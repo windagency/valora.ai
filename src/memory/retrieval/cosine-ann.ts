@@ -6,6 +6,8 @@ export interface AnnCandidate {
 }
 
 export function cosineSimilarity(a: Float32Array, b: Float32Array): number {
+	if (a.length !== b.length) return 0;
+
 	let dot = 0;
 	let normA = 0;
 	let normB = 0;
@@ -15,7 +17,10 @@ export function cosineSimilarity(a: Float32Array, b: Float32Array): number {
 		normB += b[i]! * b[i]!;
 	}
 	const denom = Math.sqrt(normA) * Math.sqrt(normB);
-	return denom === 0 ? 0 : dot / denom;
+	if (denom === 0) return 0;
+
+	const score = dot / denom;
+	return Number.isFinite(score) ? score : 0;
 }
 
 export function topKCosine(

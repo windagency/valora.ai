@@ -10,9 +10,13 @@ vi.mock('openai', () => {
 		model: 'google/gemma-4-31b-it:free',
 		usage: { completion_tokens: 5, prompt_tokens: 3, total_tokens: 8 }
 	});
+	const mockModelsList = vi.fn().mockResolvedValue({
+		data: [{ id: 'google/gemma-4-31b-it:free' }, { id: 'anthropic/claude-sonnet-4.5' }, { id: 'openai/gpt-4o' }]
+	});
 	return {
 		default: vi.fn().mockImplementation(() => ({
-			chat: { completions: { create: mockCreate } }
+			chat: { completions: { create: mockCreate } },
+			models: { list: mockModelsList }
 		}))
 	};
 });
@@ -63,9 +67,32 @@ describe('OpenRouterProvider', () => {
 		expect(provider.getAlternativeModels()).toContain(OPENROUTER_MODELS.GEMMA_4_31B_FREE);
 	});
 
-	it('validateModel() always resolves true regardless of model name', async () => {
+	it('validateModel() returns true when the model id is in the OpenRouter catalogue', async () => {
 		const provider = new OpenRouterProvider({ apiKey: 'sk-test' });
-		await expect(provider.validateModel('any/model:slug')).resolves.toBe(true);
+		await expect(provider.validateModel('anthropic/claude-sonnet-4.5')).resolves.toBe(true);
+	});
+
+	it('validateModel() returns false when the model id is not in the OpenRouter catalogue', async () => {
+		const provider = new OpenRouterProvider({ apiKey: 'sk-test' });
+		await expect(provider.validateModel('not-a-real-model')).resolves.toBe(false);
+	});
+
+	it('validateModel() returns false when the API call fails (graceful degradation)', async () => {
+		const OpenAI = (await import('openai')).default;
+		vi.mocked(OpenAI).mockImplementationOnce(
+			() =>
+				({
+					chat: { completions: { create: vi.fn() } },
+					models: { list: vi.fn().mockRejectedValue(new Error('network')) }
+				}) as never
+		);
+		const provider = new OpenRouterProvider({ apiKey: 'sk-test' });
+		await expect(provider.validateModel('any/model')).resolves.toBe(false);
+	});
+
+	it('validateModel() returns false when no API key is configured (cannot validate)', async () => {
+		const provider = new OpenRouterProvider({});
+		await expect(provider.validateModel('any/model')).resolves.toBe(false);
 	});
 
 	it('complete() returns the model response content, finish_reason, model, and usage', async () => {

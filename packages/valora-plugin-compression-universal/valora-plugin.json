@@ -1,7 +1,7 @@
 {
 	"name": "valora-plugin-compression-universal",
 	"version": "1.0.0",
-	"description": "Compression strategies for universal tools: git, grep, rg, docker, make.",
+	"description": "Compression strategies for universal CLI tools: git, grep, rg, docker, make, ls, find, tree, cat, diff, curl, wget, jq, yq, tail, journalctl, gh (17 strategies).",
 	"engines": { "valora": ">=0.1.0" },
 	"contributes": ["code"],
 	"permissions": ["code-exec"],

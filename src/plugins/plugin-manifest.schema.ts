@@ -6,6 +6,21 @@ export const PLUGIN_MANIFEST_FILE = 'valora-plugin.json';
 export const PLUGIN_HOOKS_FILE = 'hooks.json';
 export const PLUGIN_MCPS_FILE = 'mcps.json';
 
+/**
+ * Plugin names must be lowercase kebab-case starting with an alphanumeric.
+ * Enforced both at manifest validation time (Zod schema) and at every site that
+ * uses the name as a path segment (path-join into install/staging/scope dirs).
+ */
+export const PLUGIN_NAME_REGEX = /^[a-z0-9][a-z0-9-]*$/;
+
+export function assertValidPluginName(name: unknown): asserts name is string {
+	if (typeof name !== 'string' || !PLUGIN_NAME_REGEX.test(name)) {
+		throw new Error(
+			`Invalid plugin name "${String(name)}". Plugin names must be lowercase kebab-case (matching ${PLUGIN_NAME_REGEX.source}).`
+		);
+	}
+}
+
 export const PLUGIN_CONTRIBUTION_TYPE_SCHEMA = z.enum([
 	'agent-context',
 	'agents',
@@ -51,10 +66,7 @@ export const PLUGIN_MANIFEST_SCHEMA = z.object({
 	description: z.string().optional(),
 	engines: z.object({ valora: z.string().optional() }).optional(),
 	homepage: z.string().url().optional(),
-	name: z
-		.string()
-		.min(1)
-		.regex(/^[a-z0-9][a-z0-9-]*$/, 'Plugin name must be lowercase kebab-case'),
+	name: z.string().min(1).regex(PLUGIN_NAME_REGEX, 'Plugin name must be lowercase kebab-case'),
 	overrides: z.array(z.string()).optional(),
 	permissions: z.array(PLUGIN_PERMISSION_SCHEMA).optional(),
 	requires: z.array(z.string()).optional(),

@@ -7,7 +7,7 @@ import type { GoldenPrinciple } from '../src/maintenance/maintenance.types.js';
 import { GoldenPrinciplesScannerService } from '../src/maintenance/golden-principles-scanner.service.js';
 
 const repoRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
-const principlesFile = path.join(repoRoot, 'docs', 'quality', 'golden-principles.json');
+const principlesFile = path.join(repoRoot, 'documentation', 'quality', 'golden-principles.json');
 const srcDir = path.join(repoRoot, 'src');
 
 const principles: GoldenPrinciple[] = JSON.parse(fs.readFileSync(principlesFile, 'utf-8')) as GoldenPrinciple[];

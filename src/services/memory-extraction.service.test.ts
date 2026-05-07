@@ -255,7 +255,8 @@ describe('MemoryExtractionService', () => {
 
 	// ------------------------------------------------------------------ 7
 	describe('Patterns — workflow_optimizations', () => {
-		it("creates an inferred entry with 'optimisation' tag for workflow_optimizations", async () => {
+		it("creates an inferred entry with 'optimization' tag for workflow_optimizations", async () => {
+			// Tag identifier uses American English per LANGUAGE_CONVENTION.md.
 			const service = new MemoryExtractionService();
 			await service.extractFromFeedbackOutputs(
 				[
@@ -272,7 +273,7 @@ describe('MemoryExtractionService', () => {
 
 			const optimisationCall = mockManagerInstance.create.mock.calls.find(
 				([, opts]: [string, Record<string, unknown>]) =>
-					(opts['tags'] as string[]).includes('optimisation') && (opts['tags'] as string[]).includes('workflow')
+					(opts['tags'] as string[]).includes('optimization') && (opts['tags'] as string[]).includes('workflow')
 			);
 			expect(optimisationCall).toBeDefined();
 			const [, opts] = optimisationCall as [string, Record<string, unknown>];
@@ -322,7 +323,7 @@ describe('MemoryExtractionService', () => {
 							pain_points: ['pain'],
 							bottlenecks_identified: ['bottleneck'],
 							agent_improvements: ['improvement'],
-							workflow_optimizations: ['optimisation']
+							workflow_optimizations: ['optimization']
 						},
 						success: true
 					}
@@ -368,7 +369,7 @@ describe('MemoryExtractionService', () => {
 
 			// The optimisation entry should exist
 			const optimisationCalls = mockManagerInstance.create.mock.calls.filter(
-				([, opts]: [string, Record<string, unknown>]) => (opts['tags'] as string[]).includes('optimisation')
+				([, opts]: [string, Record<string, unknown>]) => (opts['tags'] as string[]).includes('optimization')
 			);
 			expect(optimisationCalls).toHaveLength(1);
 			expect(result).toHaveLength(1);

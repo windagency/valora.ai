@@ -1,4 +1,5 @@
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { readVaultVersion, writeVaultVersion } from 'memory/migration/vault-version';
+import { existsSync, readFileSync, rmSync } from 'node:fs';
 import * as path from 'node:path';
 
 import type { Edge, MemoryCategory, MemoryEntry, MemoryStorePort } from 'types/memory.types';
@@ -6,8 +7,16 @@ import type { Edge, MemoryCategory, MemoryEntry, MemoryStorePort } from 'types/m
 import { MEMORY_STORE_VERSION } from 'config/constants';
 import { getLogger } from 'output/logger';
 
-import { atomicWriteFile, serialiseMemoryFile } from './file-format';
-import { addRecord, buildVaultIndex, createEmptyIndex, removeRecord, type VaultIndex } from './vault-index';
+import { atomicWriteFile, parseVaultLinks, serialiseMemoryFile } from './file-format';
+import {
+	addRecord,
+	buildVaultIndex,
+	createEmptyIndex,
+	removeRecord,
+	synthesiseCoAccessedEdges,
+	type VaultIndex,
+	type VaultRecord
+} from './vault-index';
 
 export interface VaultStats {
 	edgeCount: number;
@@ -21,6 +30,7 @@ interface VaultMeta {
 }
 
 const ALL_CATEGORIES: MemoryCategory[] = ['episodic', 'semantic', 'decisions'];
+const META_FILENAME = 'meta.json';
 
 export class VaultStore implements MemoryStorePort {
 	private index: VaultIndex;
@@ -82,6 +92,7 @@ export class VaultStore implements MemoryStorePort {
 
 	/** Additional stat surface for the `valora memory info` command. */
 	getVaultStats(): VaultStats {
+		this.ensureIndex();
 		const entryCount = this.index.byId.size;
 		let edgeCount = 0;
 		for (const [, edges] of this.index.outEdges) edgeCount += edges.length;
@@ -124,19 +135,27 @@ export class VaultStore implements MemoryStorePort {
 
 	async setEntries(category: MemoryCategory, entries: MemoryEntry[]): Promise<void> {
 		this.ensureIndex();
-		const existing = await this.getEntries(category);
-		const existingIds = new Set(existing.map((e) => e.id));
+		// Snapshot the full VaultRecord (entry + programmatic links) so rollback
+		// can restore edges that are not embedded in the content body.
+		const beforeRecords = this.snapshotCategory(category);
+		const beforeIds = new Set(beforeRecords.map((r) => r.entry.id));
 		const newIds = new Set(entries.map((e) => e.id));
 
-		for (const id of existingIds) {
-			if (!newIds.has(id)) await this.removeEntry(category, id);
-		}
-		for (const entry of entries) {
-			if (existingIds.has(entry.id)) {
-				await this.updateEntry(category, entry.id, entry);
-			} else {
-				await this.appendEntry(category, entry);
+		try {
+			for (const id of beforeIds) {
+				if (!newIds.has(id)) await this.removeEntry(category, id);
 			}
+			for (const entry of entries) {
+				if (beforeIds.has(entry.id)) {
+					await this.updateEntry(category, entry.id, entry);
+				} else {
+					await this.appendEntry(category, entry);
+				}
+			}
+		} catch (err) {
+			getLogger().warn(`Vault.setEntries: rolling back due to error: ${String(err)}`);
+			await this.rollbackSetEntries(category, beforeRecords);
+			throw err;
 		}
 	}
 
@@ -157,8 +176,32 @@ export class VaultStore implements MemoryStorePort {
 		if (record?.entry.category !== category) return Promise.resolve(false);
 
 		const updated: MemoryEntry = { ...record.entry, ...patch };
-		atomicWriteFile(record.mdPath, serialiseMemoryFile(updated, record.links));
-		this.index.byId.set(id, { ...record, entry: updated });
+		// If the patch changed `content`, re-derive any wikilinks embedded in
+		// the new body so they are not lost. Inline links from the previous
+		// content are dropped; links not present in the new body should not
+		// appear in the file. Frontmatter-managed `coAccess` is unaffected.
+		const links = patch.content !== undefined ? parseVaultLinks(id, patch.content) : record.links;
+		atomicWriteFile(record.mdPath, serialiseMemoryFile(updated, links));
+		this.index.byId.set(id, { ...record, entry: updated, links });
+
+		this.refreshSecondaryIndexes(record.entry, updated);
+
+		// Compute the full edge set (explicit links + synthesised co_accessed)
+		// for both the previous and updated record so the in-memory inEdges/outEdges
+		// stay consistent with what addRecord would build on a fresh reload.
+		const previousOut = this.index.outEdges.get(id) ?? [];
+		const nextOut = [...links, ...synthesiseCoAccessedEdges(updated)];
+		for (const edge of previousOut) this.index.inEdges.get(edge.toId)?.delete(id);
+		this.index.outEdges.set(id, nextOut);
+		for (const edge of nextOut) {
+			let inSet = this.index.inEdges.get(edge.toId);
+			if (!inSet) {
+				inSet = new Set();
+				this.index.inEdges.set(edge.toId, inSet);
+			}
+			inSet.add(id);
+		}
+
 		this.touchMeta(category);
 		return Promise.resolve(true);
 	}
@@ -168,12 +211,22 @@ export class VaultStore implements MemoryStorePort {
 		this.indexLoaded = true;
 		this.index = buildVaultIndex(this.vaultDir);
 		this.loadMeta();
+		// Stamp the schema version on first use so future migrations can
+		// detect the format generation that wrote the vault.
+		if (readVaultVersion(this.vaultDir) === null) {
+			try {
+				writeVaultVersion(this.vaultDir);
+			} catch (err) {
+				getLogger().warn(`Vault: could not write version file: ${String(err)}`);
+			}
+		}
 	}
 
 	private loadMeta(): void {
-		// meta is lightweight — derive from index scan if not persisted
+		const persisted = this.readPersistedMeta();
 		for (const category of ALL_CATEGORIES) {
-			this.meta.set(category, { lastWrittenAt: new Date().toISOString() });
+			const fallback: VaultMeta = { lastWrittenAt: new Date().toISOString() };
+			this.meta.set(category, persisted[category] ?? fallback);
 		}
 	}
 
@@ -183,19 +236,104 @@ export class VaultStore implements MemoryStorePort {
 
 	private persistMeta(): void {
 		try {
-			mkdirSync(this.vaultDir, { recursive: true });
-			const metaPath = path.join(this.vaultDir, 'meta.json');
+			const metaPath = path.join(this.vaultDir, META_FILENAME);
 			const serialised: Record<string, VaultMeta> = {};
 			for (const [cat, m] of this.meta) serialised[cat] = m;
-			writeFileSync(metaPath, JSON.stringify(serialised, null, 2));
+			atomicWriteFile(metaPath, JSON.stringify(serialised, null, 2));
 		} catch (err) {
 			getLogger().warn(`Vault: could not persist meta: ${String(err)}`);
 		}
 	}
 
+	private readPersistedMeta(): Record<string, VaultMeta> {
+		const metaPath = path.join(this.vaultDir, META_FILENAME);
+		if (!existsSync(metaPath)) return {};
+		try {
+			const raw = readFileSync(metaPath, 'utf-8');
+			const parsed = JSON.parse(raw) as Record<string, VaultMeta>;
+			return parsed;
+		} catch (err) {
+			getLogger().warn(`Vault: could not read meta.json: ${String(err)}`);
+			return {};
+		}
+	}
+
+	private async rollbackSetEntries(category: MemoryCategory, before: VaultRecord[]): Promise<void> {
+		const beforeIds = new Set(before.map((r) => r.entry.id));
+		const current = await this.getEntries(category);
+		for (const entry of current) {
+			if (!beforeIds.has(entry.id)) await this.removeEntry(category, entry.id);
+		}
+		for (const record of before) {
+			const stillThere = current.find((e) => e.id === record.entry.id);
+			// Use appendEntryWithLinks to preserve programmatic edges (supersedes,
+			// decays_from, co_accessed) that are not embedded in the content body.
+			if (!stillThere) await this.appendEntryWithLinks(category, record.entry, record.links);
+			else await this.updateEntry(category, record.entry.id, record.entry);
+		}
+	}
+
+	private snapshotCategory(category: MemoryCategory): VaultRecord[] {
+		const ids = this.index.byCategory.get(category);
+		if (!ids) return [];
+		const records: VaultRecord[] = [];
+		for (const id of ids) {
+			const rec = this.index.byId.get(id);
+			if (rec) records.push({ entry: { ...rec.entry }, links: [...rec.links], mdPath: rec.mdPath });
+		}
+		return records;
+	}
+
 	private touchMeta(category: MemoryCategory): void {
 		const meta = this.meta.get(category) ?? {};
 		this.meta.set(category, { ...meta, lastWrittenAt: new Date().toISOString() });
+	}
+
+	/**
+	 * Diff-update the secondary indexes (byTag/byPath/byAgent/byCategory) so
+	 * lookups by those keys stay consistent with the current entry state. Without
+	 * this, an updateEntry that changes tags/paths/agentRole/category leaves
+	 * stale references under the old keys and never registers under the new ones.
+	 */
+	private refreshSecondaryIndexes(previous: MemoryEntry, next: MemoryEntry): void {
+		const id = next.id;
+		if (previous.category !== next.category) {
+			this.index.byCategory.get(previous.category)?.delete(id);
+			let nextCat = this.index.byCategory.get(next.category);
+			if (!nextCat) {
+				nextCat = new Set();
+				this.index.byCategory.set(next.category, nextCat);
+			}
+			nextCat.add(id);
+		}
+		if (previous.agentRole !== next.agentRole) {
+			this.index.byAgent.get(previous.agentRole)?.delete(id);
+			let nextAgent = this.index.byAgent.get(next.agentRole);
+			if (!nextAgent) {
+				nextAgent = new Set();
+				this.index.byAgent.set(next.agentRole, nextAgent);
+			}
+			nextAgent.add(id);
+		}
+		diffSet(this.index.byTag, previous.tags, next.tags, id);
+		diffSet(this.index.byPath, previous.relatedPaths, next.relatedPaths, id);
+	}
+}
+
+function diffSet(map: Map<string, Set<string>>, before: string[], after: string[], id: string): void {
+	const beforeSet = new Set(before);
+	const afterSet = new Set(after);
+	for (const key of beforeSet) {
+		if (!afterSet.has(key)) map.get(key)?.delete(id);
+	}
+	for (const key of afterSet) {
+		if (beforeSet.has(key)) continue;
+		let bucket = map.get(key);
+		if (!bucket) {
+			bucket = new Set();
+			map.set(key, bucket);
+		}
+		bucket.add(id);
 	}
 }
 

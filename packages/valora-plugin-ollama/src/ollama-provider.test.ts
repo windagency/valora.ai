@@ -8,7 +8,10 @@ const mockProcessManager = {
 	ensureRunning: vi.fn().mockResolvedValue(undefined),
 	stop: vi.fn().mockResolvedValue(undefined)
 };
-const mockModelManager = { ensureModel: vi.fn().mockResolvedValue(undefined) };
+const mockModelManager = {
+	ensureModel: vi.fn().mockResolvedValue(undefined),
+	listLocalModels: vi.fn().mockResolvedValue(['llama3.1:latest', 'mistral:7b'])
+};
 
 const doubles: OllamaManagers = {
 	binary: mockBinaryManager,
@@ -35,6 +38,8 @@ describe('OllamaProvider', () => {
 		mockProcessManager.ensureRunning.mockClear();
 		mockProcessManager.stop.mockClear();
 		mockModelManager.ensureModel.mockClear();
+		mockModelManager.listLocalModels.mockClear();
+		mockModelManager.listLocalModels.mockResolvedValue(['llama3.1:latest', 'mistral:7b']);
 	});
 
 	it('isConfigured() always returns true', () => {
@@ -191,5 +196,37 @@ describe('OllamaProvider', () => {
 		expect(result.content).toBe('Hello world');
 		expect(result.role).toBe('assistant');
 		expect(mockBinaryManager.assertInstalled).toHaveBeenCalledOnce();
+	});
+
+	describe('validateModel', () => {
+		it('returns true when the model is locally pulled (matched by exact name)', async () => {
+			mockModelManager.listLocalModels.mockResolvedValueOnce(['llama3.1', 'mistral']);
+			const provider = new OllamaProvider({}, doubles);
+			await expect(provider.validateModel('llama3.1')).resolves.toBe(true);
+		});
+
+		it('returns true when the model name matches an "<name>:tag"-prefixed local entry', async () => {
+			mockModelManager.listLocalModels.mockResolvedValueOnce(['llama3.1:latest']);
+			const provider = new OllamaProvider({}, doubles);
+			await expect(provider.validateModel('llama3.1')).resolves.toBe(true);
+		});
+
+		it('returns false when the model is not present in the local catalogue', async () => {
+			mockModelManager.listLocalModels.mockResolvedValueOnce(['mistral:7b']);
+			const provider = new OllamaProvider({}, doubles);
+			await expect(provider.validateModel('llama3.1')).resolves.toBe(false);
+		});
+
+		it('returns false when the Ollama server is not reachable (graceful degradation)', async () => {
+			mockProcessManager.ensureRunning.mockRejectedValueOnce(new Error('connection refused'));
+			const provider = new OllamaProvider({}, doubles);
+			await expect(provider.validateModel('llama3.1')).resolves.toBe(false);
+		});
+
+		it('returns false when the binary is not installed', async () => {
+			mockBinaryManager.assertInstalled.mockRejectedValueOnce(new Error('ollama not on PATH'));
+			const provider = new OllamaProvider({}, doubles);
+			await expect(provider.validateModel('llama3.1')).resolves.toBe(false);
+		});
 	});
 });

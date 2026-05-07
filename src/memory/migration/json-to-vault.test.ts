@@ -128,4 +128,44 @@ describe('migrateJsonToVault', () => {
 		expect(result.migrated).toBe(3);
 		expect(result.skipped).toBe(0);
 	});
+
+	it('a second run on archived sources is a no-op (idempotent)', async () => {
+		writeJsonStore(jsonDir, 'episodic', [makeEntry('mem-1'), makeEntry('mem-2')]);
+
+		await migrateJsonToVault({ jsonDir, vaultDir });
+		const firstCount = fs.readdirSync(path.join(vaultDir, 'episodic')).length;
+
+		const second = await migrateJsonToVault({ jsonDir, vaultDir });
+		const secondCount = fs.readdirSync(path.join(vaultDir, 'episodic')).length;
+
+		expect(secondCount).toBe(firstCount);
+		expect(second.migrated).toBe(0);
+	});
+
+	it('a second run with the source still present skips already-migrated entries', async () => {
+		// Simulates a crash after .md files were written but before the JSON
+		// was archived: the source stays in place, vault entries already exist.
+		const entries = [makeEntry('mem-a'), makeEntry('mem-b')];
+		writeJsonStore(jsonDir, 'episodic', entries);
+
+		// First migration creates vault files and archives the source.
+		await migrateJsonToVault({ jsonDir, vaultDir });
+		// Re-create the source as if it never archived.
+		writeJsonStore(jsonDir, 'episodic', entries);
+
+		const second = await migrateJsonToVault({ jsonDir, vaultDir });
+		const dirEntries = fs.readdirSync(path.join(vaultDir, 'episodic'));
+
+		expect(dirEntries.length).toBe(entries.length);
+		expect(second.migrated).toBe(0);
+		expect(second.skipped).toBeGreaterThanOrEqual(entries.length);
+	});
+
+	it('writes the vault version file atomically (no .tmp file remains)', async () => {
+		writeJsonStore(jsonDir, 'episodic', [makeEntry('mem-v')]);
+		await migrateJsonToVault({ jsonDir, vaultDir });
+
+		const stragglers = fs.readdirSync(vaultDir).filter((f) => f.endsWith('.tmp'));
+		expect(stragglers).toEqual([]);
+	});
 });

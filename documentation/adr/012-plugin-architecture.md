@@ -15,20 +15,30 @@ Accepted
 - **Permission gating** — the `shell-hooks` and `code-exec` permissions create explicit contracts; a misconfigured plugin that omits a permission simply won't have the corresponding surface registered.
 - **Graceful degradation** — manifest validation failures, missing binaries, and code-module import errors produce warnings, never hard failures. A failing strategy falls back to uncompressed output rather than crashing the pipeline.
 - **Reuses existing extension points** — `AgentLoader`, `CommandLoader`, `HookExecutionService` already support multiple directories; the plugin system feeds into these without new loading logic.
-- **Code plugins implemented (Approach C, partial)** — As of April 2026, the `code` contribution type is active. Three built-in compression plugins (`valora-plugin-compression-universal`, `-typescript`, `-python`) register 17 tool strategies via `api.compression.registerStrategy()`. They are the reference implementation for the `PluginAPI` contract.
+- **Code plugins implemented (Approach C, full PluginAPI surface)** — As of April 2026, the `code` contribution type is active. The full `PluginAPI` is live: `compression`, `cli`, `config`, `lifecycle`, `providers`, `logger`. First-party reference plugins:
+  - **Compression** — `valora-plugin-compression-{universal,typescript,python}` register 17 tool strategies via `api.compression.registerStrategy()`. Reference for the simplest single-namespace plugin.
+  - **Obsidian** — `valora-plugin-obsidian` exercises three namespaces simultaneously (`api.config.extend` + `api.lifecycle.onActivate` + `api.cli.addSubcommand`).
+  - **OpenRouter** — `valora-plugin-openrouter` is the reference for the `providers` namespace.
 - **Horizon 1 migration complete** — As of April 2026, all embedded built-in resources have been packaged into 10 named plugins under `packages/` and `data/plugins/`: `valora-core-secops`, `valora-core-design`, `valora-core-platform`, `valora-core-generators`, `valora-core-product`, `valora-core-qa`, `valora-core-quality-gate`, `valora-core-docs`, `valora-core-engineering`, `valora-core-implement`. The directory `data/commands/` is now docs-only. `data/agents/` retains `registry.json` for dynamic agent selection at runtime.
 
 ### Negative
 
-- **`code-exec` scope is limited** — `PluginAPI` currently exposes only `compression`, `logger`, `providers` (reserved), `config` (reserved), and `lifecycle` (reserved). LLM providers, custom presenters, and quality scorers require the `providers` surface to be activated, which is deferred pending the full signing and capability-gating story.
-- **No versioned resolution algorithm** — when two plugins contribute the same agent name or compression strategy key, last-wins (data) or first-wins (code registry) precedence is simple but may surprise plugin authors.
-- **`requiresBinary` version is informational** — the version range in `requiresBinary` is not currently enforced (only presence on `$PATH` is checked).
+- **No in-process sandbox for code plugins** — code plugins run in the host Node process via `await import(codeEntrypoint)`. There is no VM/Worker isolation. The `fs-read`, `fs-write`, and `network` permissions in the manifest schema are accepted for forward compatibility but **not enforced** at runtime. They are surfaced on `LoadedPlugin.unenforcedPermissions` so audit tooling can show users what the manifest claims versus what the host actually gates. Treat plugin code as you would any other npm dependency: install only from trusted sources. Closing this gap is the subject of [ADR-014: Plugin Capability Gating](./014-plugin-capability-gating.md).
+- **Mixed conflict-resolution semantics** — three contribution registries handle conflicts differently: provider conflicts use a TTY prompt with persisted resolution (`ProviderConflictError` → `resolveProviderConflict`), CLI subcommand conflicts log a warn and last-write-wins, compression strategy conflicts log a warn and first-write-wins, while filesystem-resource conflicts (agents/commands/prompts) silently last-wins by discovery order. Plugin authors should use `manifest.overrides` to declare intentional shadowing.
+- **`requiresBinary` version is informational** — the version range in `requiresBinary` is not enforced (only presence on `$PATH` or `checkCommand` is checked). The `autoInstall: true` flag on a binary requirement is also informational since 2026-05: the host always prompts before running the install shell command, regardless of the flag.
 - **Code plugin constants must be inlined** — path aliases to Valora core (`config/*`, `executor/*`, etc.) are not resolvable in compiled plugin output. Plugins must inline any shared constants (e.g. `MAX_GREP_OUTPUT_LINES`).
 
 ### Neutral
 
 - **`plugins.enabled` allowlist** — plugins are opt-in, not opt-out. A newly installed plugin directory is inert until added to the list.
 - **Synchronous discovery** — `discoverPluginDirs` is synchronous to avoid async complexity at startup. Suitable for the current number of plugin roots; reconsider if roots number in the hundreds.
+- **`engines.valora` is enforced (since 2026-05)** — the loader compares `manifest.engines.valora` against the running host version using a minimal subset of node-semver (exact, comparators, caret, tilde, AND-joined ranges). Plugins outside the declared range are skipped with a warn and surfaced as `status: 'invalid'` in the catalogue.
+- **Tarball integrity (since 2026-05)** — `data/plugins/registry.json` carries a per-entry `integrity` field (sha256 SRI) computed at registry-generation time. The installer recomputes the SHA256 after `npm pack` and aborts on mismatch. Plugins resolved from a local source path skip integrity verification (developer workflow).
+- **Auto-update is opt-in and consent-gated (since 2026-05)** — when global auto-update mode is `auto`, plugin updates are gated by `plugins.autoUpdate`. Default is `prompt` (confirm interactively per plugin, fall back to `check-only` on non-TTY). Set `install` to restore the legacy silent behaviour.
+- **Binary-install consent (since 2026-05)** — `requiresBinary.installCommand` always prompts the user with the command preview, even when `autoInstall: true` is set. The flag is preserved in the schema for backwards compatibility but does not change behaviour.
+- **Tarslip + ownership hardening (since 2026-05)** — extraction is preceded by a `tar -tf` listing pass; tarballs whose entries are absolute or contain `..` segments are refused. Extraction passes `--no-same-owner --no-same-permissions`.
+- **Manifest-name path-traversal closed (since 2026-05)** — the manifest's `name` field is path-joined into the install scope dir. The Zod schema enforces `^[a-z0-9][a-z0-9-]*$`, but `installFromTarball` and `peekTarballManifest` previously read the raw JSON and never re-validated the name. `assertValidPluginName` is now called in `peekTarballManifest`, in `installFromTarball` after staging extraction, and in `resolveTargetDir` itself for defence-in-depth.
+- **Symlink-aware discovery (since 2026-05)** — discovery uses `fs.realpathSync` containment to ensure that symlinked plugin directories whose real path lies outside the discovery root are rejected, while in-root symlinks (developer aliases) continue to resolve.
 
 <details>
 <summary><strong>Context</strong></summary>
@@ -127,7 +137,16 @@ Plugins are npm packages that export a `register(ctx: PluginContext)` function, 
 
 A plugin directory can optionally contain a compiled module at `codeEntrypoint` that must implement the `register(api: PluginAPI)` contract. Dynamic `import()` is used only for this file, gated on `contributes: ["code"]` and `permissions: ["code-exec"]` manifest declarations.
 
-**Partially implemented.** The `code` contribution type and `PluginAPI` are active as of April 2026. The `compression` namespace is the first production surface. The `providers`, `config`, and `lifecycle` namespaces are declared but gated pending the signing and capability-gating story (ADR-013). The three built-in compression plugins (`valora-plugin-compression-universal`, `-typescript`, `-python`) are the reference implementation.
+**Implemented.** The `code` contribution type and the full `PluginAPI` (`compression`, `cli`, `config`, `lifecycle`, `providers`, `logger`) are active as of May 2026. Trust is layered:
+
+1. **Discovery containment** — `fs.realpathSync` ensures only directories whose real path is inside one of the four search roots are loaded.
+2. **Manifest validation** — Zod schema validates every manifest; mismatched `engines.valora` skips the plugin with a warn.
+3. **Tarball integrity** — `npm pack` output is sha256-verified against `registry.json` before extraction.
+4. **Tar safety** — `tar -tf` listing pass rejects entries with absolute paths or `..` segments; extract uses `--no-same-owner --no-same-permissions`.
+5. **Consent-by-default** — auto-updates prompt per plugin (configurable via `plugins.autoUpdate`); binary install commands always prompt.
+6. **Provider conflict protocol** — duplicate provider keys are surfaced via TTY prompt with persisted resolution, or `ProviderConflictError` on non-TTY.
+
+The remaining trust gap — in-process capability gating for `fs-read`, `fs-write`, `network` — is deferred to a future ADR. The schema accepts these tokens for forward compatibility and the loader surfaces them in `LoadedPlugin.unenforcedPermissions` for audit visibility.
 
 </details>
 
@@ -135,6 +154,7 @@ A plugin directory can optionally contain a compiled module at `codeEntrypoint` 
 
 - [ADR-008: PreToolUse CLI Enforcement](./008-pretooluse-cli-enforcement.md) — Hook execution model that plugins extend
 - [ADR-009: Supply Chain Hardening](./009-supply-chain-hardening.md) — The stance against arbitrary dependency code execution
+- [ADR-014: Plugin Capability Gating](./014-plugin-capability-gating.md) — Closes the in-process sandbox gap left open by this ADR
 - [Plugin Architecture Exploration](../../.claude/plans/explore-the-possibility-of-whimsical-mochi.md) — Full trade-off analysis and RTK worked example
 - [User Guide: Plugins](../user-guide/plugins.md)
 - [Developer Guide: Writing Plugins](../developer-guide/writing-plugins.md)

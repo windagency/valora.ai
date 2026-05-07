@@ -78,6 +78,17 @@ export function configureDoctorCommand(program: CommandAdapter): void {
 		});
 }
 
+export function printPluginsSection(color: ColorAdapter, plugins: LoadedPlugin[]): void {
+	console.log(color.cyan('\nPlugins:'));
+	if (plugins.length === 0) {
+		console.log(`  ${color.gray('(none)')}`);
+		return;
+	}
+	for (const plugin of plugins) {
+		printPluginEntry(color, plugin);
+	}
+}
+
 function printInstallationInfo(color: ColorAdapter): void {
 	const packageRoot = getPackageRoot();
 	const dataDir = getPackageDataDir();
@@ -95,22 +106,20 @@ function printInstallationInfo(color: ColorAdapter): void {
 	console.log(`  Project config:    ${projectDir ?? color.gray('(none)')}`);
 }
 
-function printPluginsSection(color: ColorAdapter, plugins: LoadedPlugin[]): void {
-	console.log(color.cyan('\nPlugins:'));
-	if (plugins.length === 0) {
-		console.log(`  ${color.gray('(none)')}`);
-		return;
+function printPluginEntry(color: ColorAdapter, plugin: LoadedPlugin): void {
+	const contribs = plugin.manifest.contributes?.join(', ') ?? 'none';
+	const perms = plugin.manifest.permissions?.join(', ') ?? 'none';
+	const binaries = plugin.manifest.requiresBinary?.map((b) => b.name).join(', ');
+	console.log(`  ${color.green(plugin.manifest.name)}@${plugin.manifest.version}`);
+	console.log(`    contributes: ${contribs}`);
+	console.log(`    permissions: ${perms}`);
+	if (plugin.unenforcedPermissions?.length) {
+		console.log(
+			`    informational: ${color.yellow(plugin.unenforcedPermissions.join(', '))} (declared but not gated by the runtime)`
+		);
 	}
-	for (const plugin of plugins) {
-		const contribs = plugin.manifest.contributes?.join(', ') ?? 'none';
-		const perms = plugin.manifest.permissions?.join(', ') ?? 'none';
-		const binaries = plugin.manifest.requiresBinary?.map((b) => b.name).join(', ');
-		console.log(`  ${color.green(plugin.manifest.name)}@${plugin.manifest.version}`);
-		console.log(`    contributes: ${contribs}`);
-		console.log(`    permissions: ${perms}`);
-		if (binaries) console.log(`    requires:    ${binaries}`);
-		console.log(`    path:        ${plugin.pluginDir}`);
-	}
+	if (binaries) console.log(`    requires:    ${binaries}`);
+	console.log(`    path:        ${plugin.pluginDir}`);
 }
 
 function printProjectOverrides(color: ColorAdapter): void {

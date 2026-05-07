@@ -11,8 +11,7 @@
  * - Auto-detected patterns (agent improvements, workflow optimisations) → 'inferred'
  */
 
-import { MemoryManager } from 'memory/manager';
-import { MemoryStore } from 'memory/store';
+import { getDefaultVaultDir, getLegacyJsonDir, MemoryManager, runAutoMigrationIfNeeded, VaultStore } from 'memory';
 
 import type { MemoryEntry } from 'types/memory.types';
 
@@ -43,7 +42,7 @@ export class MemoryExtractionService {
 	private readonly manager: MemoryManager;
 
 	constructor(manager?: MemoryManager) {
-		this.manager = manager ?? new MemoryManager(new MemoryStore());
+		this.manager = manager ?? new MemoryManager(buildDefaultVaultStore());
 	}
 
 	async extractFromFeedbackOutputs(
@@ -164,7 +163,7 @@ export class MemoryExtractionService {
 				relatedPaths,
 				sessionId,
 				source: { command: 'feedback', label: 'post-session-extraction' },
-				tags: ['optimisation', 'workflow']
+				tags: ['optimization', 'workflow']
 			});
 			entries.push(entry);
 		}
@@ -217,6 +216,12 @@ export class MemoryExtractionService {
 
 		return entries;
 	}
+}
+
+function buildDefaultVaultStore(): VaultStore {
+	const vaultDir = getDefaultVaultDir();
+	runAutoMigrationIfNeeded(getLegacyJsonDir(), vaultDir);
+	return new VaultStore(vaultDir);
 }
 
 let extractionInstance: MemoryExtractionService | null = null;

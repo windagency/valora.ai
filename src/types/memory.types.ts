@@ -84,6 +84,14 @@ export interface MemoryEntry {
 	embeddingModel?: string;
 	/** Dimension of the stored embedding vector */
 	embeddingDim?: number;
+	/**
+	 * In-memory only marker (NOT persisted to frontmatter): set during parse when
+	 * the file's `content_hash` does not match the actual body. Indicates the
+	 * stored embedding was computed against an older content and must be
+	 * regenerated before this entry contributes to cosine recall. Typically
+	 * triggered by a user editing the memory's body in Obsidian outside Valora.
+	 */
+	embeddingStale?: boolean;
 	/** Hebbian co-access counts: maps co-retrieved memory ID to retrieval-pair count */
 	coAccess?: Record<string, number>;
 }
@@ -105,6 +113,13 @@ export interface MemoryQueryOptions {
 	strengthen?: boolean;
 	/** Free-text query for semantic (ANN) recall — used when an EmbedderPort is configured */
 	text?: string;
+	/**
+	 * Optional token budget. When set, the recall path truncates results so
+	 * the cumulative content size fits within the budget (using ~4 chars per
+	 * token as the estimate). ADR-013 §5 step 4: budget is applied inside the
+	 * recall path so callers never receive results that would overflow context.
+	 */
+	tokenBudget?: number;
 }
 
 export interface MemoryQueryResult {

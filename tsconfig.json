@@ -37,6 +37,7 @@
 			"llm/*": ["./src/llm/*"],
 			"lsp/*": ["./src/lsp/*"],
 			"mcp/*": ["./src/mcp/*"],
+			"memory": ["./src/memory/index.ts"],
 			"memory/*": ["./src/memory/*"],
 			"output/*": ["./src/output/*"],
 			"plugins/*": ["./src/plugins/*"],

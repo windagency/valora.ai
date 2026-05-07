@@ -28,14 +28,21 @@ describe('buildCatalogMap', () => {
 		expect(buildCatalogMap([]).size).toBe(0);
 	});
 
-	it('maps each entry by name to its version', () => {
+	it('maps each entry by name to its version and integrity (when present)', () => {
 		const catalog = [
-			{ name: 'valora-plugin-rtk', version: '1.1.0', package: '', contributes: [], description: '' },
+			{
+				name: 'valora-plugin-rtk',
+				version: '1.1.0',
+				package: '',
+				contributes: [],
+				description: '',
+				integrity: `sha256-${'A'.repeat(43)}=`
+			},
 			{ name: 'valora-plugin-eng', version: '2.0.0', package: '', contributes: [], description: '' }
 		];
 		const map = buildCatalogMap(catalog);
-		expect(map.get('valora-plugin-rtk')).toBe('1.1.0');
-		expect(map.get('valora-plugin-eng')).toBe('2.0.0');
+		expect(map.get('valora-plugin-rtk')).toEqual({ version: '1.1.0', integrity: `sha256-${'A'.repeat(43)}=` });
+		expect(map.get('valora-plugin-eng')).toEqual({ version: '2.0.0' });
 		expect(map.size).toBe(2);
 	});
 });

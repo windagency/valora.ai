@@ -33,16 +33,17 @@ my-plugin/
 
 ## Contribution Types
 
-| Type            | Directory / File                | Format                         | Permission needed |
-| --------------- | ------------------------------- | ------------------------------ | ----------------- |
-| `agents`        | `agents/`                       | Markdown + YAML front matter   | —                 |
-| `commands`      | `commands/`                     | Markdown + YAML front matter   | —                 |
-| `hooks`         | `hooks/` + `hooks.json`         | Shell scripts + JSON config    | `shell-hooks`     |
-| `prompts`       | `prompts/`                      | Markdown + YAML front matter   | —                 |
-| `templates`     | `templates/`                    | Markdown files                 | —                 |
-| `mcps`          | `mcps.json`                     | External MCP server JSON       | —                 |
-| `agent-context` | `agent-context/`                | Plain markdown fragments       | —                 |
-| `code`          | Compiled JS at `codeEntrypoint` | ES module exporting `register` | `code-exec`       |
+| Type            | Directory / File                                  | Format                           | Permission needed |
+| --------------- | ------------------------------------------------- | -------------------------------- | ----------------- |
+| `agents`        | `agents/`                                         | Markdown + YAML front matter     | —                 |
+| `commands`      | `commands/`                                       | Markdown + YAML front matter     | —                 |
+| `hooks`         | `hooks/` + `hooks.json`                           | Shell scripts + JSON config      | `shell-hooks`     |
+| `prompts`       | `prompts/`                                        | Markdown + YAML front matter     | —                 |
+| `templates`     | `templates/`                                      | Markdown files                   | —                 |
+| `mcps`          | `mcps.json`                                       | External MCP server JSON         | `mcp-connect`     |
+| `agent-context` | `agent-context/`                                  | Plain markdown fragments         | —                 |
+| `code`          | Compiled JS at `codeEntrypoint`                   | ES module exporting `register`   | `code-exec`       |
+| `validators`    | Compiled JS pointed to from `validators[].module` | ES modules with `default` export | `code-exec`       |
 
 ## Code Plugins
 
@@ -84,13 +85,14 @@ export function register(api: PluginAPI): void {
 
 ### `PluginAPI` surface
 
-| Namespace     | Method                        | Description                                                                                                                                      |
-| ------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `compression` | `registerStrategy(tool, fn)`  | Register an output compression strategy for an executable name. First registration wins; subsequent calls for the same key are silently ignored. |
-| `logger`      | `debug / info / warn / error` | Structured logger scoped to the plugin name.                                                                                                     |
-| `providers`   | `register(name, class)`       | _(Reserved — not yet active)_ Register an LLM provider.                                                                                          |
-| `config`      | `extend(schema)`              | _(Reserved — not yet active)_ Extend Valora's config schema.                                                                                     |
-| `lifecycle`   | `onActivate / onDeactivate`   | _(Reserved — not yet active)_ Plugin lifecycle hooks.                                                                                            |
+| Namespace     | Method                                          | Description                                                                                                                                                                                |
+| ------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `cli`         | `addSubcommand(name, description, handler)`     | Register a top-level Valora subcommand contributed by the plugin (e.g. `valora obsidian open`). Last registration wins; conflicts are logged with a warn naming both owners.               |
+| `compression` | `registerStrategy(tool, fn)`                    | Register an output compression strategy for an executable name. First registration wins; subsequent calls for the same key are warned about and ignored.                                   |
+| `config`      | `extend(schema)`                                | Validate the user's `.valora/config.json` against a Zod schema and return a typed accessor. Returns the schema's defaults if the user config is invalid (with a warning).                  |
+| `lifecycle`   | `onActivate(fn) / onDeactivate(fn)`             | Register asynchronous hooks fired at host activate / deactivate. Errors in a hook are isolated — they log a warn but do not crash the host or other plugins.                               |
+| `logger`      | `debug / info / warn / error`                   | Structured logger scoped to the plugin name.                                                                                                                                               |
+| `providers`   | `register(name, class \| factory, descriptor?)` | Register an LLM provider. Conflicts are surfaced via a TTY prompt that asks the user to pick a winner; the choice is persisted to disk. On non-TTY/CI a `ProviderConflictError` is thrown. |
 
 `CompressionStrategy` signature: `(output: string, command: string) => string`
 
@@ -153,27 +155,33 @@ Hook scripts receive the tool call JSON on stdin and respond by:
 
 Validated by `PLUGIN_MANIFEST_SCHEMA` in `src/plugins/plugin-manifest.schema.ts`.
 
-| Field            | Type       | Required | Description                                                            |
-| ---------------- | ---------- | -------- | ---------------------------------------------------------------------- |
-| `name`           | `string`   | Yes      | Unique plugin identifier (kebab-case recommended)                      |
-| `version`        | `string`   | Yes      | SemVer: `MAJOR.MINOR.PATCH`                                            |
-| `description`    | `string`   | No       | Human-readable description                                             |
-| `homepage`       | `string`   | No       | URL to the plugin's homepage or repository                             |
-| `engines.valora` | `string`   | No       | SemVer range declaring minimum Valora compatibility                    |
-| `contributes`    | `string[]` | No       | List of contribution types (see table above)                           |
-| `permissions`    | `string[]` | No       | Required permissions; must include `shell-hooks` for hooks             |
-| `requires`       | `string[]` | No       | Plugin names that must be loaded before this one                       |
-| `requiresBinary` | `object[]` | No       | External binaries the plugin depends on                                |
-| `overrides`      | `string[]` | No       | Built-in resource names this plugin supersedes (informational)         |
-| `codeEntrypoint` | `string`   | No       | Relative path to compiled JS entry point (required for `code` plugins) |
+| Field            | Type       | Required | Description                                                                                                                                                                                                                                              |
+| ---------------- | ---------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `name`           | `string`   | Yes      | Unique plugin identifier (kebab-case recommended)                                                                                                                                                                                                        |
+| `version`        | `string`   | Yes      | SemVer: `MAJOR.MINOR.PATCH`                                                                                                                                                                                                                              |
+| `description`    | `string`   | No       | Human-readable description                                                                                                                                                                                                                               |
+| `homepage`       | `string`   | No       | URL to the plugin's homepage or repository                                                                                                                                                                                                               |
+| `engines.valora` | `string`   | No       | SemVer range declaring minimum Valora compatibility                                                                                                                                                                                                      |
+| `contributes`    | `string[]` | No       | List of contribution types (see table above)                                                                                                                                                                                                             |
+| `permissions`    | `string[]` | No       | Required permissions; must include `shell-hooks` for hooks                                                                                                                                                                                               |
+| `requires`       | `string[]` | No       | Plugin names that must be loaded before this one                                                                                                                                                                                                         |
+| `requiresBinary` | `object[]` | No       | External binaries the plugin depends on                                                                                                                                                                                                                  |
+| `overrides`      | `string[]` | No       | Built-in resource names this plugin supersedes (informational)                                                                                                                                                                                           |
+| `codeEntrypoint` | `string`   | No       | Relative path to compiled JS entry point (required for `code` plugins)                                                                                                                                                                                   |
+| `cli`            | `object[]` | No       | Static declarations of CLI subcommands the plugin contributes (used for help text and pre-parse stub registration). The `register()` function still calls `api.cli.addSubcommand` at runtime.                                                            |
+| `validators`     | `object[]` | No       | Pipeline-stage deterministic validators this plugin contributes. Each entry has `module` (relative path to a compiled JS module exporting a `DeterministicValidator` as default) and `stage` (the pipeline stage name). Requires `code-exec` permission. |
 
 `requiresBinary` entries:
 
-| Sub-field | Type     | Description                                          |
-| --------- | -------- | ---------------------------------------------------- |
-| `name`    | `string` | Binary name checked on `$PATH`                       |
-| `version` | `string` | SemVer range (informational, not enforced by Valora) |
-| `install` | `string` | Install hint shown when binary is missing            |
+| Sub-field            | Type      | Description                                                                                                                                                                                                                          |
+| -------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `name`               | `string`  | Binary name checked on `$PATH`                                                                                                                                                                                                       |
+| `version`            | `string`  | SemVer range (informational, not enforced by Valora)                                                                                                                                                                                 |
+| `install`            | `string`  | URL or hint shown when the binary is missing.                                                                                                                                                                                        |
+| `installCommand`     | `string`  | Shell command Valora can offer to run on the user's behalf. The command is **always** shown to the user with an interactive confirmation prompt before execution, regardless of `autoInstall`.                                       |
+| `checkCommand`       | `string`  | Optional shell command whose exit code (`0` = present) replaces the default `$PATH` lookup. Useful for binaries installed in non-PATH locations (e.g. Obsidian on macOS).                                                            |
+| `postInstallCommand` | `string`  | Optional shell command run after a successful `installCommand`.                                                                                                                                                                      |
+| `autoInstall`        | `boolean` | **Informational since 2026-05.** Previously skipped the prompt; now the host always prompts before running the install command. The flag is preserved in the schema for forward compatibility but does not change runtime behaviour. |
 
 ## Per-Type Examples
 
@@ -230,6 +238,39 @@ Do not hallucinate lines that are missing — they were filtered by RTK intentio
 ```
 
 Fragments in `agent-context/` are concatenated into the agent's system prompt after the built-in context section. They are injected for all agents loaded in a session.
+
+## Compatibility, Integrity, and Audit
+
+### `engines.valora` is enforced
+
+When `engines.valora` is declared in the manifest, the plugin loader compares it against the running Valora version and skips the plugin on mismatch with a warning. The supported range syntax is a subset of node-semver: exact (`1.2.3`), comparators (`>=1.2.3`, `>1.2.3`, `<=1.2.3`, `<1.2.3`), caret (`^1.2.3`), tilde (`~1.2.3`), and space-joined AND ranges (`>=1.0.0 <2.0.0`). OR (`||`) ranges and pre-release identifiers are not supported — keep ranges simple.
+
+```json
+{ "engines": { "valora": ">=2.5.0" } }
+```
+
+A plugin that omits `engines.valora` is treated as universally compatible. Use this only when you have no Valora-version-specific dependencies.
+
+### Tarball integrity (`registry.json`)
+
+`scripts/generate-plugin-registry.ts` computes a SHA256 of each first-party plugin tarball at registry-generation time and emits an `integrity` field per registry entry in `data/plugins/registry.json`. The format matches npm's SRI:
+
+```json
+{
+	"name": "valora-plugin-rtk",
+	"version": "1.0.0",
+	"package": "@windagency/valora-plugin-rtk",
+	"integrity": "sha256-abc123…="
+}
+```
+
+When `valora plugin add <name>` (or the auto-update flow) installs a registry-listed plugin, the host fetches the tarball via `npm pack`, recomputes the SHA256, and refuses to extract on mismatch. Plugins resolved from a local source path (`VALORA_PLUGIN_REGISTRY` developer override) skip this check, since `npm pack` of a local directory is non-reproducible. If a registry entry has no `integrity` field, installation proceeds with a warning.
+
+### Unenforced permissions audit
+
+The schema accepts `fs-read`, `fs-write`, and `network` for forward compatibility, but the runtime does not enforce them — they are documentation only. When a manifest declares any of them, the loader logs a warning at load time and surfaces them on `LoadedPlugin.unenforcedPermissions` so audit tooling (e.g. `valora doctor`) can show users that the manifest claims a capability the host treats as informational.
+
+If you want your plugin to be honest with users today, omit these tokens until they become enforceable. Do not use them as a substitute for runtime sandboxing.
 
 ## Discovery and Loading Architecture
 

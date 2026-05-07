@@ -3,11 +3,18 @@ import type { InstalledPluginRef } from 'updater/plugin-compare';
 
 import { resolvePackageName } from 'plugins/plugin-installer.service';
 
-import type { CataloguedPlugin } from 'types/plugin.types';
+import type { CatalogEntry, CataloguedPlugin } from 'types/plugin.types';
 
-export function buildCatalogMap(catalog: null | RegistryEntry[]): Map<string, string> {
+export type { CatalogEntry };
+
+export function buildCatalogMap(catalog: null | RegistryEntry[]): Map<string, CatalogEntry> {
 	if (!catalog) return new Map();
-	return new Map(catalog.map((entry) => [entry.name, entry.version]));
+	return new Map(
+		catalog.map((entry) => [
+			entry.name,
+			{ version: entry.version, ...(entry.integrity ? { integrity: entry.integrity } : {}) }
+		])
+	);
 }
 
 export function isUpdatablePlugin(p: CataloguedPlugin): boolean {

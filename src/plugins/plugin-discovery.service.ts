@@ -56,14 +56,28 @@ export class PluginDiscoveryService {
 		}
 	}
 
+	private isContainedInRoot(candidate: string, resolvedRoot: string): boolean {
+		try {
+			const realCandidate = fs.realpathSync(candidate);
+			return realCandidate === resolvedRoot || realCandidate.startsWith(resolvedRoot + path.sep);
+		} catch {
+			return false;
+		}
+	}
+
 	private scanPluginRoot(rootDir: string): string[] {
-		const resolvedRoot = path.resolve(rootDir);
+		let resolvedRoot: string;
+		try {
+			resolvedRoot = fs.realpathSync(rootDir);
+		} catch {
+			return [];
+		}
 		try {
 			return fs
 				.readdirSync(rootDir, { withFileTypes: true })
-				.filter((entry) => entry.isDirectory())
-				.map((entry) => path.resolve(rootDir, entry.name))
-				.filter((pluginDir) => pluginDir.startsWith(resolvedRoot + path.sep))
+				.filter((entry) => entry.isDirectory() || entry.isSymbolicLink())
+				.map((entry) => path.join(rootDir, entry.name))
+				.filter((pluginDir) => this.isContainedInRoot(pluginDir, resolvedRoot))
 				.filter((pluginDir) => fs.existsSync(path.join(pluginDir, PLUGIN_MANIFEST_FILE)));
 		} catch (error) {
 			const errorMessage = error instanceof Error ? error.message : String(error);

@@ -1,3 +1,5 @@
+import type { CatalogEntry } from 'types/plugin.types';
+
 import { isNewerVersion } from './compare';
 
 export interface InstalledPluginRef {
@@ -9,6 +11,7 @@ export interface InstalledPluginRef {
 
 export interface OutdatedPlugin {
 	currentVersion: string;
+	integrity?: string;
 	latestVersion: string;
 	location: InstalledPluginRef['location'];
 	name: string;
@@ -24,26 +27,27 @@ export interface OutdatedPlugin {
  */
 export function diffPluginVersions(
 	installed: InstalledPluginRef[],
-	catalog: Map<string, string>,
+	catalog: Map<string, CatalogEntry>,
 	npmLatest: Map<string, string>
 ): OutdatedPlugin[] {
 	const result: OutdatedPlugin[] = [];
 
 	for (const plugin of installed) {
-		const registryVersion = catalog.get(plugin.name);
+		const registryEntry = catalog.get(plugin.name);
 		const npmVersion = npmLatest.get(plugin.name);
 
-		if (registryVersion !== undefined && isNewerVersion(plugin.currentVersion, registryVersion)) {
+		if (registryEntry !== undefined && isNewerVersion(plugin.currentVersion, registryEntry.version)) {
 			result.push({
 				currentVersion: plugin.currentVersion,
-				latestVersion: registryVersion,
+				...(registryEntry.integrity ? { integrity: registryEntry.integrity } : {}),
+				latestVersion: registryEntry.version,
 				location: plugin.location,
 				name: plugin.name,
 				packageName: plugin.packageName,
 				source: 'registry'
 			});
 		} else if (
-			registryVersion === undefined &&
+			registryEntry === undefined &&
 			npmVersion !== undefined &&
 			isNewerVersion(plugin.currentVersion, npmVersion)
 		) {

@@ -10,7 +10,10 @@ import type {
 
 export interface OllamaManagers {
 	binary: { assertInstalled(): Promise<void> };
-	model: { ensureModel(_baseUrl: string, _model: string): Promise<void> };
+	model: {
+		ensureModel(_baseUrl: string, _model: string): Promise<void>;
+		listLocalModels(_baseUrl: string): Promise<string[]>;
+	};
 	process: { ensureRunning(_baseUrl: string): Promise<void>; stop(): Promise<void> };
 }
 
@@ -118,8 +121,18 @@ export class OllamaProvider implements LLMProvider {
 		return { content: fullContent, finish_reason: finishReason, role: 'assistant' as const };
 	}
 
-	validateModel(_modelName: string): Promise<boolean> {
-		return Promise.resolve(true);
+	async validateModel(modelName: string): Promise<boolean> {
+		try {
+			const host = this.getOllamaHost();
+			await this.managers.binary.assertInstalled();
+			await this.managers.process.ensureRunning(host);
+			const models = await this.managers.model.listLocalModels(host);
+			// Ollama tags include the version suffix (`llama3.1:latest`); accept both forms.
+			return models.some((m) => m === modelName || m.startsWith(`${modelName}:`));
+		} catch {
+			// Ollama not running, binary missing, or HTTP failure — cannot confirm; surface as unvalidated.
+			return false;
+		}
 	}
 
 	private async ensureReady(model: string): Promise<void> {

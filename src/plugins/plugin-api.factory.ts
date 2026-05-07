@@ -28,7 +28,7 @@ export function createPluginAPI(
 	return {
 		cli: {
 			addSubcommand(name, description, handler) {
-				registerCliSubcommand(name, description, handler);
+				registerCliSubcommand(name, description, handler, plugin.manifest.name);
 			}
 		},
 		compression: {

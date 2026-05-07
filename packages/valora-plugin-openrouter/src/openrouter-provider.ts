@@ -14,6 +14,7 @@ const DEFAULT_TITLE = 'Valora';
 
 export class OpenRouterProvider implements LLMProvider {
 	name = 'openrouter';
+	private cachedModels: null | Set<string> = null;
 	private client: null | OpenAI = null;
 	private readonly config: Record<string, unknown>;
 
@@ -103,8 +104,15 @@ export class OpenRouterProvider implements LLMProvider {
 		return { content: fullContent, finish_reason: finishReason, role: 'assistant' };
 	}
 
-	validateModel(_model: string): Promise<boolean> {
-		return Promise.resolve(true);
+	async validateModel(model: string): Promise<boolean> {
+		if (!this.isConfigured()) return false;
+		try {
+			const catalogue = await this.loadCatalogue();
+			return catalogue.has(model);
+		} catch {
+			// Network failure / non-OK response: surface as "couldn't validate" rather than throwing.
+			return false;
+		}
 	}
 
 	private configString(key: string, fallback: string): string {
@@ -129,6 +137,17 @@ export class OpenRouterProvider implements LLMProvider {
 		});
 
 		return this.client;
+	}
+
+	private async loadCatalogue(): Promise<Set<string>> {
+		if (this.cachedModels !== null) return this.cachedModels;
+		const response = await this.getClient().models.list();
+		const ids = new Set<string>();
+		for (const entry of response.data) {
+			if (typeof entry.id === 'string') ids.add(entry.id);
+		}
+		this.cachedModels = ids;
+		return ids;
 	}
 
 	private mapMessages(

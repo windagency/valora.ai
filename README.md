@@ -490,10 +490,15 @@ When installed in a project, VALORA supports a `.valora/` directory for local ov
 ├── sessions/                    # Session state (gitignored)
 ├── logs/                        # Execution logs (gitignored)
 ├── index/                       # Codebase symbol index (gitignored)
-├── memory/                      # Agent memory stores (gitignored)
-│   ├── episodic.json            #   7-day half-life events and observations
-│   ├── semantic.json            #   30-day half-life patterns and insights
-│   └── decisions.json           #   21-day half-life architectural decisions
+├── memory/                      # Agent memory vault (gitignored — ADR-013)
+│   ├── version                  #   Vault schema version stamp
+│   ├── meta.json                #   Last-written / last-consolidated timestamps
+│   ├── episodic/<id>.md         #   7-day half-life events and observations
+│   ├── semantic/<id>.md         #   30-day half-life patterns and insights
+│   ├── decisions/<id>.md        #   21-day half-life architectural decisions
+│   ├── embeddings.bin           #   Packed Float32Array of all embedding vectors
+│   ├── embeddings.index.json    #   id → byte-offset index pinned to model + dim
+│   └── _legacy/                 #   Archived JSON files from auto-migration
 └── cache/                       # Cache data (gitignored)
 ```
 

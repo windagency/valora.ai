@@ -7,6 +7,11 @@ vi.mock('node:fs', async (importOriginal) => {
 	return { ...actual, readFileSync: vi.fn(actual.readFileSync) };
 });
 
+const warn = vi.fn();
+vi.mock('output/logger', () => ({
+	getLogger: () => ({ debug: vi.fn(), error: vi.fn(), info: vi.fn(), warn })
+}));
+
 const sampleEntries = [
 	{
 		contributes: ['agents', 'commands'],
@@ -24,6 +29,7 @@ describe('fetchPluginRegistry', () => {
 	afterEach(() => {
 		vi.restoreAllMocks();
 		vi.unstubAllGlobals();
+		warn.mockReset();
 		if (originalLocalEnv === undefined) {
 			delete process.env['VALORA_PLUGIN_REGISTRY'];
 		} else {
@@ -131,6 +137,53 @@ describe('fetchPluginRegistry', () => {
 			'https://example.com/custom-registry.json',
 			expect.objectContaining({ signal: expect.anything() as unknown })
 		);
+	});
+
+	it('warns once when VALORA_PLUGIN_REGISTRY_URL overrides the registry URL', async () => {
+		delete process.env['VALORA_PLUGIN_REGISTRY'];
+		process.env['VALORA_PLUGIN_REGISTRY_URL'] = 'https://example.com/custom-registry.json';
+		vi.stubGlobal(
+			'fetch',
+			vi.fn().mockResolvedValue({
+				ok: true,
+				text: vi.fn().mockResolvedValue(JSON.stringify(sampleEntries))
+			})
+		);
+
+		const { fetchPluginRegistry } = await import('./plugin-registry.service');
+		await fetchPluginRegistry();
+
+		expect(warn).toHaveBeenCalled();
+		const messages = warn.mock.calls.map((c) => String(c[0]));
+		expect(messages.some((m) => m.includes('VALORA_PLUGIN_REGISTRY_URL'))).toBe(true);
+	});
+
+	it('warns when VALORA_PLUGIN_REGISTRY points at a local file', async () => {
+		process.env['VALORA_PLUGIN_REGISTRY'] = '/tmp/test-registry.json';
+		vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify(sampleEntries));
+
+		const { fetchPluginRegistry } = await import('./plugin-registry.service');
+		await fetchPluginRegistry();
+
+		const messages = warn.mock.calls.map((c) => String(c[0]));
+		expect(messages.some((m) => m.includes('VALORA_PLUGIN_REGISTRY'))).toBe(true);
+	});
+
+	it('does not warn when no env override is set', async () => {
+		delete process.env['VALORA_PLUGIN_REGISTRY'];
+		delete process.env['VALORA_PLUGIN_REGISTRY_URL'];
+		vi.stubGlobal(
+			'fetch',
+			vi.fn().mockResolvedValue({
+				ok: true,
+				text: vi.fn().mockResolvedValue(JSON.stringify(sampleEntries))
+			})
+		);
+
+		const { fetchPluginRegistry } = await import('./plugin-registry.service');
+		await fetchPluginRegistry();
+
+		expect(warn).not.toHaveBeenCalled();
 	});
 
 	it('returns null when the local file cannot be read', async () => {

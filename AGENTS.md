@@ -20,9 +20,8 @@ Valora is a TypeScript CLI/MCP orchestration platform for multi-agent AI workflo
 | Agent registry and capabilities      | `data/agents/registry.json`                             |
 | Command specs                        | `data/commands/registry.json`                           |
 | Plugin development guide             | `documentation/developer-guide/`                        |
-| Quality grades per domain            | `docs/quality/grades.json`                              |
-| Golden principles (mechanical rules) | `docs/quality/golden-principles.json`                   |
-| Active implementation plans          | `docs/superpowers/plans/`                               |
+| Quality grades per domain            | `documentation/quality/grades.json`                     |
+| Golden principles (mechanical rules) | `documentation/quality/golden-principles.json`          |
 | Test conventions                     | `.claude/CLAUDE.md`                                     |
 | Security controls                    | `SECURITY.md`                                           |
 | EU AI Act obligations (deployers)    | `documentation/user-guide/eu-ai-act-compliance.md`      |

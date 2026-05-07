@@ -185,7 +185,9 @@ async function handleAutoMode(
 ): Promise<void> {
 	if (state) await handleAutoInstall(state);
 	const installer = new PluginInstallerService(silentSpawnRunner);
-	await autoInstallOutdatedPlugins(installer, outdatedPlugins);
+	const config = await getConfigLoader().load();
+	const policy = config.plugins?.autoUpdate ?? 'prompt';
+	await autoInstallOutdatedPlugins(installer, outdatedPlugins, { policy });
 }
 
 async function handleReminderMode(

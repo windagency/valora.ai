@@ -6,9 +6,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { MemoryEntry } from 'types/memory.types';
 
-// Mock the MemoryManager and MemoryStore
+// Mock the MemoryManager, VaultStore, and the auto-migration helper.
+// The production constructor now defaults to VaultStore (ADR-013); MemoryStore
+// only survives as a migration-only backend.
 vi.mock('memory/manager');
-vi.mock('memory/store');
+vi.mock('memory/vault/vault-store');
+vi.mock('memory/migration/auto-migrate', () => ({
+	runAutoMigrationIfNeeded: vi.fn().mockReturnValue(null)
+}));
+vi.mock('memory/vault/default-vault-dir', () => ({
+	getDefaultVaultDir: vi.fn().mockReturnValue('/tmp/valora-vault-mock'),
+	getLegacyJsonDir: vi.fn().mockReturnValue('/tmp/valora-vault-mock')
+}));
 vi.mock('utils/safe-exec');
 vi.mock('output/pipeline-emitter', () => ({
 	getPipelineEmitter: () => ({
@@ -25,7 +34,7 @@ vi.mock('output/logger', () => ({
 }));
 
 import { MemoryManager } from 'memory/manager';
-import { MemoryStore } from 'memory/store';
+import { VaultStore } from 'memory/vault/vault-store';
 import { SafeExecutor } from 'utils/safe-exec';
 
 import {
@@ -35,7 +44,7 @@ import {
 } from './memory-consolidation.service';
 
 const MockMemoryManager = vi.mocked(MemoryManager);
-const MockMemoryStore = vi.mocked(MemoryStore);
+const MockVaultStore = vi.mocked(VaultStore);
 const MockSafeExecutor = vi.mocked(SafeExecutor);
 
 /** Build a minimal MemoryEntry for testing. */
@@ -98,7 +107,7 @@ describe('MemoryConsolidationService', () => {
 		};
 
 		// Make constructors return our mock instances
-		MockMemoryStore.mockImplementation(() => mockStoreInstance as unknown as MemoryStore);
+		MockVaultStore.mockImplementation(() => mockStoreInstance as unknown as VaultStore);
 		MockMemoryManager.mockImplementation(() => mockManagerInstance as unknown as MemoryManager);
 
 		// Default: git returns empty output
@@ -414,16 +423,16 @@ describe('MemoryConsolidationService', () => {
 
 	// ------------------------------------------------------------------ singleton
 	describe('Singleton helpers', () => {
-		it('getMemoryConsolidation() returns the same instance on repeated calls', () => {
-			const a = getMemoryConsolidation();
-			const b = getMemoryConsolidation();
+		it('getMemoryConsolidation() returns the same instance on repeated calls', async () => {
+			const a = await getMemoryConsolidation();
+			const b = await getMemoryConsolidation();
 			expect(a).toBe(b);
 		});
 
-		it('resetMemoryConsolidation() causes getMemoryConsolidation() to return a new instance', () => {
-			const a = getMemoryConsolidation();
+		it('resetMemoryConsolidation() causes getMemoryConsolidation() to return a new instance', async () => {
+			const a = await getMemoryConsolidation();
 			resetMemoryConsolidation();
-			const b = getMemoryConsolidation();
+			const b = await getMemoryConsolidation();
 			expect(a).not.toBe(b);
 		});
 	});

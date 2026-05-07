@@ -11,16 +11,23 @@
  * or as a post-feedback automatic maintenance step.
  */
 
-import type { EmbedderPort } from 'memory/embeddings/embedder.port';
+import {
+	centroidSummary,
+	cosineClusters,
+	type EmbedderPort,
+	getDefaultVaultDir,
+	getLegacyJsonDir,
+	MemoryManager,
+	openVectorStore,
+	readVectorStoreMeta,
+	resolveEmbedder,
+	runAutoMigrationIfNeeded,
+	VaultStore
+} from 'memory';
 
-import { centroidSummary, cosineClusters } from 'memory/consolidation/cluster';
-import { openVectorStore } from 'memory/embeddings/vector-store';
-import { MemoryManager } from 'memory/manager';
-import { MemoryStore } from 'memory/store';
-import { VaultStore } from 'memory/vault/vault-store';
+import type { Edge, MemoryEntry, MemoryStorePort } from 'types/memory.types';
 
-import type { Edge, MemoryEntry } from 'types/memory.types';
-
+import { getConfigLoader } from 'config/loader';
 import { getPipelineEmitter } from 'output/pipeline-emitter';
 import { generateMemoryId } from 'utils/id-generator';
 import { SafeExecutor } from 'utils/safe-exec';
@@ -86,16 +93,50 @@ function parseGitLogOutput(output: string): ParsedCommit[] {
 
 const COSINE_CLUSTER_THRESHOLD = 0.82;
 
+function buildDefaultVaultStore(): VaultStore {
+	const vaultDir = getDefaultVaultDir();
+	runAutoMigrationIfNeeded(getLegacyJsonDir(), vaultDir);
+	return new VaultStore(vaultDir);
+}
+
+function readSemanticHalfLifeOrDefault(): number {
+	try {
+		return getConfigLoader().get().memory?.semantic_half_life_days ?? 30;
+	} catch {
+		return 30;
+	}
+}
+
 /** Determine the confidence ranking (higher is better). */
 export class MemoryConsolidationService {
 	private readonly embedder?: EmbedderPort;
 	private readonly manager: MemoryManager;
-	private readonly store: MemoryStore | VaultStore;
+	private readonly store: MemoryStorePort;
 
-	constructor(store?: MemoryStore | VaultStore, embedder?: EmbedderPort) {
-		this.store = store ?? new MemoryStore();
-		this.manager = new MemoryManager(this.store, undefined, embedder);
+	constructor(store?: MemoryStorePort, embedder?: EmbedderPort) {
+		this.store = store ?? buildDefaultVaultStore();
 		this.embedder = embedder;
+		this.manager = new MemoryManager(this.store, undefined, embedder);
+	}
+
+	/**
+	 * Build a service with the embedder resolved from configuration. Used by
+	 * the singleton helper and the CLI entry points so cosine consolidation
+	 * fires automatically when a provider with `embed?()` is available.
+	 *
+	 * If configuration cannot be loaded (e.g. early-boot or test contexts),
+	 * the service is constructed without an embedder and falls back to the
+	 * Jaccard merge path — preferable to halting consolidation entirely.
+	 */
+	static async create(): Promise<MemoryConsolidationService> {
+		let embedder: EmbedderPort | undefined;
+		try {
+			const config = getConfigLoader().get();
+			embedder = await resolveEmbedder(config.memory);
+		} catch {
+			embedder = undefined;
+		}
+		return new MemoryConsolidationService(undefined, embedder);
 	}
 
 	async consolidate(options: ConsolidationOptions = {}): Promise<ConsolidationResult> {
@@ -193,7 +234,20 @@ export class MemoryConsolidationService {
 			if (bestConfidence !== primaryEntry.confidence) {
 				await this.manager.update('episodic', primaryEntry.id, { confidence: bestConfidence });
 			}
-			await this.manager.promote(primaryEntry.id, combinedContent, combinedTags);
+			const promoted = await this.manager.promote(primaryEntry.id, combinedContent, combinedTags);
+			// Persist `decays_from` edges for the rest of the cluster. A single
+			// appendEntryWithLinks call writes all edges at once — per-member
+			// calls would overwrite the file each iteration, losing all but the
+			// last edge (H14). The supersedes edge for the primary was already
+			// written by promote(); include it again here to survive the overwrite.
+			const vault = this.store instanceof VaultStore ? this.store : undefined;
+			if (vault !== undefined && cluster.length > 1) {
+				const allEdges: Edge[] = [
+					{ fromId: promoted.id, kind: 'supersedes', toId: primaryEntry.id },
+					...cluster.slice(1).map((m): Edge => ({ fromId: promoted.id, kind: 'decays_from', toId: m.id }))
+				];
+				await vault.appendEntryWithLinks('semantic', promoted, allEdges);
+			}
 			for (const entry of cluster.slice(1)) {
 				await this.manager.delete('episodic', entry.id);
 			}
@@ -223,6 +277,11 @@ export class MemoryConsolidationService {
 			cluster[0]!.confidence
 		);
 
+		// Half-life from injected config so cosine and Jaccard paths agree (H13).
+		// Falls back to the default constant when config has not been loaded
+		// (e.g. unit/integration tests that bypass the loader).
+		const semanticHalfLife = readSemanticHalfLifeOrDefault();
+
 		const newEntry: MemoryEntry = {
 			accessCount: 0,
 			agentRole: cluster[0]!.agentRole,
@@ -230,7 +289,7 @@ export class MemoryConsolidationService {
 			confidence: bestConfidence,
 			content,
 			createdAt: now,
-			halfLifeDays: 30,
+			halfLifeDays: semanticHalfLife,
 			id,
 			isError: false,
 			lastAccessedAt: now,
@@ -253,10 +312,14 @@ export class MemoryConsolidationService {
 	private async mergeCosine(dryRun: boolean): Promise<number> {
 		const vaultStore = this.store as VaultStore;
 		const vaultDir = vaultStore.getVaultDir();
-		const entries = await vaultStore.getEntries('episodic');
 
-		// Open the vector store; model/dim will be loaded from disk index if present
-		const vs = openVectorStore(vaultDir, 'stub', 2);
+		// Cosine consolidation requires existing on-disk embeddings; align with
+		// the persisted model/dim so the strict mismatch guard does not throw.
+		const meta = readVectorStoreMeta(vaultDir);
+		if (meta === null) return 0;
+
+		const entries = await vaultStore.getEntries('episodic');
+		const vs = openVectorStore(vaultDir, meta.model, meta.dim);
 		const clusters = cosineClusters(entries, vs, COSINE_CLUSTER_THRESHOLD);
 		let mergedCount = 0;
 
@@ -274,7 +337,9 @@ export class MemoryConsolidationService {
 
 	private async mergeEpisodicEntries(dryRun: boolean): Promise<number> {
 		if (this.embedder && this.store instanceof VaultStore) {
-			return this.mergeCosine(dryRun);
+			const cosineMerged = await this.mergeCosine(dryRun);
+			if (cosineMerged > 0) return cosineMerged;
+			// No embeddings on disk — fall back to Jaccard so consolidation still runs.
 		}
 		return this.mergeJaccard(dryRun);
 	}
@@ -369,26 +434,36 @@ export class MemoryConsolidationService {
 	}
 }
 
+const CONFIDENCE_RANK: Record<MemoryEntry['confidence'], number> = {
+	inferred: 1,
+	observed: 2,
+	stale: 0,
+	verified: 3
+};
+
 function confidenceRank(confidence: MemoryEntry['confidence']): number {
-	switch (confidence) {
-		case 'inferred':
-			return 1;
-		case 'observed':
-			return 2;
-		case 'stale':
-			return 0;
-		case 'verified':
-			return 3;
-	}
+	return CONFIDENCE_RANK[confidence];
 }
 
 let consolidationInstance: MemoryConsolidationService | null = null;
+let consolidationPromise: null | Promise<MemoryConsolidationService> = null;
 
-export function getMemoryConsolidation(): MemoryConsolidationService {
-	consolidationInstance ??= new MemoryConsolidationService();
-	return consolidationInstance;
+/**
+ * Returns the shared {@link MemoryConsolidationService} for this process,
+ * resolving the configured embedder on first use so cosine consolidation can
+ * fire when a provider implements `embed?()`. Subsequent calls return the same
+ * instance without re-resolving.
+ */
+export async function getMemoryConsolidation(): Promise<MemoryConsolidationService> {
+	if (consolidationInstance !== null) return consolidationInstance;
+	consolidationPromise ??= MemoryConsolidationService.create().then((service) => {
+		consolidationInstance = service;
+		return service;
+	});
+	return consolidationPromise;
 }
 
 export function resetMemoryConsolidation(): void {
 	consolidationInstance = null;
+	consolidationPromise = null;
 }

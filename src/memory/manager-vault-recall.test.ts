@@ -58,6 +58,40 @@ describe('MemoryManager — vault recall', () => {
 		expect(() => results).not.toThrow();
 	});
 
+	it('accumulates co_access for every pair across N>=3 results without losing updates', async () => {
+		// With ≥3 results the naive read-modify-write loop loses earlier updates
+		// because the loop holds stale entry references after each persist.
+		const manager = new MemoryManager(vaultStore);
+		const ids: string[] = [];
+		for (let i = 0; i < 3; i++) {
+			const e = await manager.create('episodic', {
+				agentRole: 'lead',
+				confidence: 'observed',
+				content: `entry ${i}`,
+				relatedPaths: [],
+				sessionId: 'ses-trio',
+				source: { command: 'test' },
+				tags: ['trio']
+			});
+			ids.push(e.id);
+		}
+
+		await manager.query({ tags: ['trio'], strengthen: false });
+
+		// Reload from disk — the in-memory index reads should also expose the
+		// fully accumulated counts.
+		const fresh = new VaultStore(tmpDir);
+		const entries = await fresh.getEntries('episodic');
+		for (const id of ids) {
+			const entry = entries.find((e) => e.id === id);
+			expect(entry).toBeDefined();
+			for (const peer of ids) {
+				if (peer === id) continue;
+				expect(entry!.coAccess?.[peer]).toBe(1);
+			}
+		}
+	});
+
 	it('increments co_access between all pairs of returned entries', async () => {
 		const manager = new MemoryManager(vaultStore);
 		const a = await manager.create('episodic', {
@@ -89,6 +123,98 @@ describe('MemoryManager — vault recall', () => {
 
 		expect(updatedA?.coAccess?.[b.id]).toBeGreaterThan(0);
 		expect(updatedB?.coAccess?.[a.id]).toBeGreaterThan(0);
+	});
+
+	it('always returns at least the first entry even when it alone exceeds the tokenBudget', async () => {
+		const manager = new MemoryManager(vaultStore);
+		const longContent = 'x'.repeat(400); // ~100 tokens on its own
+
+		await manager.create('episodic', {
+			agentRole: 'lead',
+			confidence: 'observed',
+			content: longContent,
+			relatedPaths: [],
+			sessionId: 'ses-1',
+			source: { command: 'test' },
+			tags: ['oversized']
+		});
+
+		// Budget of 10 tokens ≈ 40 chars, far smaller than the single entry.
+		const results = await manager.query({ tags: ['oversized'], tokenBudget: 10, strengthen: false });
+		expect(results.length).toBeGreaterThanOrEqual(1);
+	});
+
+	it('truncates query results to fit within tokenBudget', async () => {
+		const manager = new MemoryManager(vaultStore);
+
+		// 100-char content is roughly 25 tokens.
+		const longContent = 'x'.repeat(100);
+		await manager.create('episodic', {
+			agentRole: 'lead',
+			confidence: 'observed',
+			content: longContent,
+			relatedPaths: [],
+			sessionId: 'ses-1',
+			source: { command: 'test' },
+			tags: ['budget']
+		});
+		await manager.create('episodic', {
+			agentRole: 'lead',
+			confidence: 'observed',
+			content: longContent,
+			relatedPaths: [],
+			sessionId: 'ses-1',
+			source: { command: 'test' },
+			tags: ['budget']
+		});
+		await manager.create('episodic', {
+			agentRole: 'lead',
+			confidence: 'observed',
+			content: longContent,
+			relatedPaths: [],
+			sessionId: 'ses-1',
+			source: { command: 'test' },
+			tags: ['budget']
+		});
+
+		// Budget of 50 tokens ≈ 200 chars ≈ 2 entries.
+		const results = await manager.query({
+			tags: ['budget'],
+			tokenBudget: 50,
+			strengthen: false
+		});
+
+		expect(results.length).toBeLessThanOrEqual(2);
+	});
+
+	it('does not return entries whose confidence is "stale"', async () => {
+		const manager = new MemoryManager(vaultStore);
+
+		const original = await manager.create('episodic', {
+			agentRole: 'lead',
+			confidence: 'observed',
+			content: 'use the original auth flow',
+			relatedPaths: [],
+			sessionId: 'ses-1',
+			source: { command: 'test' },
+			tags: ['auth']
+		});
+
+		const replacement = await manager.create('episodic', {
+			agentRole: 'lead',
+			confidence: 'observed',
+			content: 'use the new auth flow',
+			relatedPaths: [],
+			sessionId: 'ses-1',
+			source: { command: 'test' },
+			supersedes: original.id,
+			tags: ['auth']
+		});
+
+		const results = await manager.query({ tags: ['auth'], strengthen: false });
+		const ids = results.map((r) => r.entry.id);
+		expect(ids).toContain(replacement.id);
+		expect(ids).not.toContain(original.id);
 	});
 
 	it('returns semantically similar entry first when embedder and vectors are available', async () => {

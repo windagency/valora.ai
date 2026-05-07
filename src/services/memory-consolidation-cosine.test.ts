@@ -32,10 +32,23 @@ vi.mock('output/logger', () => ({
 	})
 }));
 
+vi.mock('memory', async () => {
+	const actual = await vi.importActual<typeof import('memory')>('memory');
+	return { ...actual, getDefaultVaultDir: vi.fn(), resolveEmbedder: vi.fn(), runAutoMigrationIfNeeded: vi.fn() };
+});
+vi.mock('config/loader', () => ({
+	getConfigLoader: () => ({
+		get: vi.fn().mockReturnValue({ memory: { embedding: { provider: 'auto' } } })
+	})
+}));
+
 import type { EmbedderPort } from 'memory/embeddings/embedder.port';
-import { openVectorStore } from 'memory/embeddings/vector-store';
-import { VaultStore } from 'memory/vault/vault-store';
-import { MemoryConsolidationService } from './memory-consolidation.service';
+import { getDefaultVaultDir, openVectorStore, resolveEmbedder, runAutoMigrationIfNeeded, VaultStore } from 'memory';
+import {
+	getMemoryConsolidation,
+	MemoryConsolidationService,
+	resetMemoryConsolidation
+} from './memory-consolidation.service';
 
 function stubEmbedder(): EmbedderPort {
 	return {
@@ -132,6 +145,43 @@ describe('MemoryConsolidationService — cosine clustering', () => {
 		// No cosine-based merge
 		const semantics = await vaultStore.getEntries('semantic');
 		expect(semantics.length).toBe(0);
+		expect(result.merged).toBe(0);
+	});
+
+	describe('default singleton — cosine fires when an embedder is configured', () => {
+		beforeEach(() => {
+			vi.mocked(getDefaultVaultDir).mockReturnValue(tmpDir);
+			vi.mocked(runAutoMigrationIfNeeded).mockReturnValue(null);
+			resetMemoryConsolidation();
+		});
+
+		afterEach(() => {
+			resetMemoryConsolidation();
+			vi.mocked(resolveEmbedder).mockReset();
+		});
+
+		it('cosine-merges entries with no shared tags via the singleton when a provider supports embed()', async () => {
+			vi.mocked(resolveEmbedder).mockResolvedValueOnce(stubEmbedder());
+
+			// Two entries that DO NOT share a primary tag — Jaccard cannot merge them.
+			// Their vectors are identical, so cosine clustering must merge them.
+			await vaultStore.appendEntry('episodic', makeEpisodic('sing-a', 'first observation', ['alpha']));
+			await vaultStore.appendEntry('episodic', makeEpisodic('sing-b', 'second observation', ['beta']));
+			const vs = openVectorStore(tmpDir, 'stub', 2);
+			vs.append('sing-a', [1, 0]);
+			vs.append('sing-b', [1, 0]);
+			vs.flush();
+
+			const service = await getMemoryConsolidation();
+			const result = await service.consolidate({ pruneOnly: false });
+
+			expect(result.merged).toBeGreaterThan(0);
+			// Read from a fresh VaultStore so we observe what was persisted to disk
+			// rather than the test's stale in-memory index.
+			const fresh = new VaultStore(tmpDir);
+			const semantics = await fresh.getEntries('semantic');
+			expect(semantics.length).toBeGreaterThan(0);
+		});
 	});
 });
 

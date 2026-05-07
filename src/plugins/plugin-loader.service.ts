@@ -8,11 +8,14 @@ import type {
 	PluginContributionType,
 	PluginLocation,
 	PluginManifest,
+	PluginPermission,
 	PluginsConfig
 } from 'types/plugin.types';
 
 import { getLogger } from 'output/logger';
+import { getValoraVersion } from 'utils/paths';
 import { getResourceResolver } from 'utils/resource-resolver';
+import { satisfiesSemverRange } from 'utils/semver-range';
 
 import { PluginDiscoveryService } from './plugin-discovery.service';
 import {
@@ -23,12 +26,29 @@ import {
 	PLUGIN_MCPS_FILE
 } from './plugin-manifest.schema';
 
+export type HostVersionProvider = () => string;
+
+/**
+ * Permissions accepted by the manifest schema for forward compatibility, but
+ * not yet enforced by the runtime. The set is surfaced on `LoadedPlugin` so
+ * that `valora doctor` and similar audit commands can show users that their
+ * plugin's manifest claims a capability the host treats as informational.
+ *
+ * Closing this gap is tracked in ADR-014 (Plugin Capability Gating). When the
+ * Worker-thread isolation lands, this constant should empty out — every token
+ * in `PluginPermission` will be enforced. Until then, additions here require
+ * an ADR-012 update so the discrepancy stays visible.
+ */
+const UNENFORCED_PERMISSIONS: readonly PluginPermission[] = ['fs-read', 'fs-write', 'network'] as const;
+
 export class PluginLoaderService {
 	private readonly discovery: PluginDiscoveryService;
+	private readonly hostVersionProvider: HostVersionProvider;
 	private readonly logger = getLogger();
 
-	constructor(discovery?: PluginDiscoveryService) {
+	constructor(discovery?: PluginDiscoveryService, hostVersionProvider: HostVersionProvider = getValoraVersion) {
 		this.discovery = discovery ?? new PluginDiscoveryService();
+		this.hostVersionProvider = hostVersionProvider;
 	}
 
 	catalogAll(config?: PluginsConfig): CataloguedPlugin[] {
@@ -41,6 +61,16 @@ export class PluginLoaderService {
 					return { dir, location, manifest: null, status: 'invalid' as const };
 				}
 				const manifest: PluginManifest = result.data;
+				const engineError = this.checkEngineCompatibility(manifest);
+				if (engineError) {
+					return {
+						dir,
+						location,
+						manifest,
+						status: 'invalid' as const,
+						validationErrors: [engineError]
+					};
+				}
 				const enabled = !config?.enabled || config.enabled.includes(manifest.name);
 				return { dir, location, manifest, status: enabled ? ('enabled' as const) : ('disabled' as const) };
 			} catch {
@@ -64,6 +94,23 @@ export class PluginLoaderService {
 			.map(({ dir, location }) => this.loadPlugin(dir, location, config))
 			.filter((plugin): plugin is LoadedPlugin => plugin !== null);
 		return this.sortByDependencies(loaded);
+	}
+
+	private checkEngineCompatibility(manifest: PluginManifest): null | string {
+		const range = manifest.engines?.valora;
+		if (range === undefined) return null;
+		const hostVersion = this.hostVersionProvider();
+		if (satisfiesSemverRange(hostVersion, range)) return null;
+		return (
+			`Plugin "${manifest.name}" requires engines.valora "${range}" but host is ${hostVersion}; ` +
+			`skipping. Update Valora or relax the manifest's engines.valora range.`
+		);
+	}
+
+	private collectUnenforcedPermissions(manifest: PluginManifest): PluginPermission[] | undefined {
+		const declared = manifest.permissions ?? [];
+		const unenforced = UNENFORCED_PERMISSIONS.filter((p) => declared.includes(p));
+		return unenforced.length > 0 ? unenforced : undefined;
 	}
 
 	private isEnabled(name: string, config?: PluginsConfig): boolean {
@@ -106,6 +153,12 @@ export class PluginLoaderService {
 
 			const manifest: PluginManifest = result.data;
 
+			const engineError = this.checkEngineCompatibility(manifest);
+			if (engineError) {
+				this.logger.warn(engineError, { plugin: manifest.name });
+				return null;
+			}
+
 			if (!this.isEnabled(manifest.name, config)) {
 				this.logger.debug(`Plugin disabled: ${manifest.name}`);
 				return null;
@@ -114,12 +167,22 @@ export class PluginLoaderService {
 			// Register with ResourceResolver so command-discovery's isAllowedDirectory passes.
 			getResourceResolver().registerPluginDir(pluginDir);
 
+			const unenforcedPermissions = this.collectUnenforcedPermissions(manifest);
+			if (unenforcedPermissions) {
+				this.logger.warn(
+					`Plugin "${manifest.name}" declares informational permissions that the host does not enforce: ` +
+						`${unenforcedPermissions.join(', ')}. Treat these as documentation; behaviour is unchanged.`,
+					{ permissions: unenforcedPermissions, plugin: manifest.name }
+				);
+			}
+
 			const plugin: LoadedPlugin = {
 				location,
 				manifest,
 				pluginDir,
 				status: 'enabled',
-				...this.resolveContribDirs(pluginDir, manifest)
+				...this.resolveContribDirs(pluginDir, manifest),
+				...(unenforcedPermissions ? { unenforcedPermissions } : {})
 			};
 
 			const contribs = manifest.contributes?.join(', ') ?? 'none';

@@ -112,6 +112,20 @@ export class MCPOrchestratorServer implements MCPSamplingService {
 		await initializePlugins(this.container);
 		this.shutdownManager.registerCleanup(() => dispatchDeactivateHooks(this.container));
 
+		// Flush the vault on shutdown so any in-flight writes (debounced or
+		// otherwise) are persisted before the process exits. ADR-011 promises
+		// that memory operations are graceful — losing data on SIGTERM would
+		// silently violate that contract.
+		this.shutdownManager.registerCleanup(async () => {
+			try {
+				const { VaultStore } = await import('memory/vault/vault-store');
+				const { getDefaultVaultDir } = await import('memory/vault/default-vault-dir');
+				await new VaultStore(getDefaultVaultDir()).flush();
+			} catch (err) {
+				this.logger.warn(`Memory vault flush failed during shutdown: ${String(err)}`);
+			}
+		});
+
 		// Start system monitoring
 		this.systemMonitor.startMonitoring();
 

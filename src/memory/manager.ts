@@ -24,7 +24,8 @@ import {
 	DEFAULT_MEMORY_RECALL_WALK_DECAY,
 	DEFAULT_MEMORY_RECALL_WALK_DEPTH,
 	DEFAULT_MEMORY_RETRIEVAL_BOOST_DAYS,
-	DEFAULT_MEMORY_SEMANTIC_HALF_LIFE_DAYS
+	DEFAULT_MEMORY_SEMANTIC_HALF_LIFE_DAYS,
+	MEMORY_HALF_LIFE_CAP_MULTIPLIER
 } from 'config/constants';
 import { generateMemoryId } from 'utils/id-generator';
 
@@ -209,12 +210,27 @@ export class MemoryManager {
 			tags: mergedTags
 		});
 
+		// Mark the source episodic stale and record the cross-store
+		// supersession explicitly. `create()` only handles same-category
+		// supersession; cross-category needs an explicit update here.
 		await this.store.updateEntry('episodic', episodicId, {
 			confidence: 'stale',
 			supersededBy: newEntry.id
 		});
 
-		return newEntry;
+		// When the backend is a VaultStore, persist the supersedes wikilink so
+		// the relationship is human-inspectable in the file body and audit
+		// tools can follow promote chains across categories. The link is NOT
+		// traversed by spreading activation by design (see TRAVERSAL_KINDS in
+		// retrieval/spreading-activation.ts) — promotion is one-way authorial
+		// intent, not a Hebbian or "related-to" association.
+		if (this.store instanceof VaultStore) {
+			await this.store.appendEntryWithLinks('semantic', { ...newEntry, supersedes: episodicId }, [
+				{ fromId: newEntry.id, kind: 'supersedes', toId: episodicId }
+			]);
+		}
+
+		return { ...newEntry, supersedes: episodicId };
 	}
 
 	async prune(): Promise<number> {
@@ -242,23 +258,20 @@ export class MemoryManager {
 
 	async purge(criteria: PurgeCriteria): Promise<PurgeResult> {
 		const { all, categories, dryRun, olderThanMs } = criteria;
-		const targetCategories: MemoryCategory[] = all ? [...ALL_CATEGORIES] : (categories ?? [...ALL_CATEGORIES]);
+
+		if (all !== true && categories === undefined && olderThanMs === undefined) {
+			throw new Error(
+				'purge requires explicit criteria: pass `all: true`, supply a `categories` array, or set `olderThanMs` to avoid accidentally deleting every memory.'
+			);
+		}
+
+		const targetCategories: MemoryCategory[] = all === true ? [...ALL_CATEGORIES] : (categories ?? [...ALL_CATEGORIES]);
 
 		let totalDeleted = 0;
 		let totalWouldDelete = 0;
 
 		for (const category of targetCategories) {
-			const entries = await this.store.getEntries(category);
-			const idsToRemove = new Set<string>();
-
-			for (const entry of entries) {
-				if (olderThanMs !== undefined) {
-					const ageMs = Date.now() - new Date(entry.createdAt).getTime();
-					if (ageMs < olderThanMs) continue;
-				}
-				idsToRemove.add(entry.id);
-			}
-
+			const idsToRemove = await this.collectPurgeIds(category, olderThanMs);
 			if (dryRun) {
 				totalWouldDelete += idsToRemove.size;
 			} else {
@@ -271,7 +284,8 @@ export class MemoryManager {
 
 	async query(options: MemoryQueryOptions): Promise<MemoryQueryResult[]> {
 		const limit = options.limit ?? 50;
-		const results = await this.recall(options, limit);
+		const recalled = await this.recall(options, limit);
+		const results = applyTokenBudget(recalled, options.tokenBudget);
 		await this.postProcess(results, options);
 		return results;
 	}
@@ -288,10 +302,14 @@ export class MemoryManager {
 	private buildSeeds(queryVec: Float32Array, vs: VectorStore, candidateIds: string[]): Map<string, number> {
 		const seeds = new Map<string, number>();
 		const k = this.config.recall?.seed_k ?? DEFAULT_MEMORY_RECALL_SEED_K;
-		for (const { id, score } of topKCosine(queryVec, vs, candidateIds, k)) seeds.set(id, Math.max(0, score));
-		if (seeds.size === 0) {
-			for (const id of candidateIds) seeds.set(id, 1.0);
+		for (const { id, score } of topKCosine(queryVec, vs, candidateIds, k)) {
+			// Filter out non-positive (orthogonal/antipodal) seeds: they would
+			// occupy a seed slot without spreading useful activation.
+			if (score > 0) seeds.set(id, score);
 		}
+		// Intentionally leaves the map empty when ANN finds no positive matches.
+		// `vaultRecall` will then fall through to lexical recall instead of
+		// flooding spreading activation with every candidate.
 		return seeds;
 	}
 
@@ -299,6 +317,7 @@ export class MemoryManager {
 		const candidates: string[] = [];
 		for (const [id, record] of index.byId) {
 			const { entry } = record;
+			if (entry.confidence === 'stale') continue;
 			const strength = computeStrength(entry.createdAt, entry.halfLifeDays);
 			if (strength < minStrength) continue;
 			if (options.agentRole !== undefined && entry.agentRole !== options.agentRole) continue;
@@ -308,28 +327,55 @@ export class MemoryManager {
 		return candidates;
 	}
 
-	private getDefaultHalfLife(category: MemoryCategory): number {
-		switch (category) {
-			case 'decisions':
-				return this.config.decision_half_life_days ?? DEFAULT_MEMORY_DECISION_HALF_LIFE_DAYS;
-			case 'episodic':
-				return this.config.episodic_half_life_days ?? DEFAULT_MEMORY_EPISODIC_HALF_LIFE_DAYS;
-			case 'semantic':
-				return this.config.semantic_half_life_days ?? DEFAULT_MEMORY_SEMANTIC_HALF_LIFE_DAYS;
+	private async collectPurgeIds(category: MemoryCategory, olderThanMs: number | undefined): Promise<Set<string>> {
+		const entries = await this.store.getEntries(category);
+		const ids = new Set<string>();
+		for (const entry of entries) {
+			if (olderThanMs !== undefined) {
+				const ageMs = Date.now() - new Date(entry.createdAt).getTime();
+				if (ageMs < olderThanMs) continue;
+			}
+			ids.add(entry.id);
 		}
+		return ids;
+	}
+
+	private getDefaultHalfLife(category: MemoryCategory): number {
+		const lookup: Record<MemoryCategory, number> = {
+			decisions: this.config.decision_half_life_days ?? DEFAULT_MEMORY_DECISION_HALF_LIFE_DAYS,
+			episodic: this.config.episodic_half_life_days ?? DEFAULT_MEMORY_EPISODIC_HALF_LIFE_DAYS,
+			semantic: this.config.semantic_half_life_days ?? DEFAULT_MEMORY_SEMANTIC_HALF_LIFE_DAYS
+		};
+		return lookup[category];
 	}
 
 	private async incrementCoAccess(results: MemoryQueryResult[]): Promise<void> {
 		if (results.length < 2) return;
+
+		// Accumulate per-entry deltas in a single in-memory pass. The pair loop
+		// is still O(N²) but every disk write is deferred so we end up with at
+		// most one write per affected entry (O(N), not O(N²)). Batching also
+		// closes the lost-update window where the read-modify-write loop holds
+		// stale entry references after the underlying store has rewritten the
+		// record.
+		const deltas = new Map<string, Record<string, number>>();
 		for (let i = 0; i < results.length; i++) {
 			for (let j = i + 1; j < results.length; j++) {
 				const a = results[i]!.entry;
 				const b = results[j]!.entry;
-				const coA = { ...a.coAccess, [b.id]: (a.coAccess?.[b.id] ?? 0) + 1 };
-				const coB = { ...b.coAccess, [a.id]: (b.coAccess?.[a.id] ?? 0) + 1 };
-				await this.store.updateEntry(a.category, a.id, { coAccess: coA });
-				await this.store.updateEntry(b.category, b.id, { coAccess: coB });
+				bumpDelta(deltas, a.id, b.id);
+				bumpDelta(deltas, b.id, a.id);
 			}
+		}
+
+		for (const result of results) {
+			const delta = deltas.get(result.entry.id);
+			if (!delta) continue;
+			const merged: Record<string, number> = { ...result.entry.coAccess };
+			for (const [peerId, count] of Object.entries(delta)) {
+				merged[peerId] = (merged[peerId] ?? 0) + count;
+			}
+			await this.store.updateEntry(result.entry.category, result.entry.id, { coAccess: merged });
 		}
 	}
 
@@ -337,7 +383,8 @@ export class MemoryManager {
 		const categories = options.category !== undefined ? [options.category] : ALL_CATEGORIES;
 		const allResults: MemoryQueryResult[] = [];
 		for (const category of categories) {
-			const entries = await this.store.getEntries(category);
+			// Clone the array so callers cannot mutate the store's internal cache.
+			const entries = [...(await this.store.getEntries(category))];
 			for (const entry of entries) {
 				const strength = computeStrength(entry.createdAt, entry.halfLifeDays);
 				if (this.matchesQueryOptions(entry, options, strength)) allResults.push({ entry, strength });
@@ -380,24 +427,34 @@ export class MemoryManager {
 		const vs = openVectorStore(vaultStore.getVaultDir(), embedResult.model, embedResult.dim);
 		const minStrength = options.minStrength ?? DEFAULT_MEMORY_PRUNE_THRESHOLD;
 		const candidateIds = this.collectCandidates(index, options, minStrength);
-		const seeds = this.buildSeeds(queryVec, vs, candidateIds);
+		// Skip entries whose body has drifted from their stored content_hash — their
+		// embedding vector reflects the old content and would mis-seed activation.
+		// Detection happens at parse time (file-format.ts); the entry is reincluded
+		// once a future reembed updates the hash. Lexical fallback below is unaffected.
+		const freshCandidateIds = candidateIds.filter((id) => index.byId.get(id)?.entry.embeddingStale !== true);
+		const seeds = this.buildSeeds(queryVec, vs, freshCandidateIds);
+		// When ANN produces no useful seeds, fall back to lexical recall so the
+		// caller still gets reasonable results instead of an artificially empty
+		// or graph-flooded answer.
+		if (seeds.size === 0) return this.lexicalRecall(options, limit);
 		const walkDepth = this.config.recall?.walk_depth ?? DEFAULT_MEMORY_RECALL_WALK_DEPTH;
 		const walkDecay = this.config.recall?.walk_decay ?? DEFAULT_MEMORY_RECALL_WALK_DECAY;
 		const scores = spreadActivation(seeds, index.byId, index.outEdges, index.inEdges, walkDepth, walkDecay);
 		return this.rankResults(scores, index, limit);
 	}
 
-	/** Returns true when the entry has at least one tag from the filter list (or no filter is set). */
+	/** Returns true when the entry has at least one of the requested paths (or no filter is set). */
 	private hasPathMatch(entry: MemoryEntry, paths?: string[]): boolean {
 		return paths === undefined || paths.length === 0 || paths.some((p) => entry.relatedPaths.includes(p));
 	}
 
-	/** Returns true when the entry has at least one of the requested paths (or no filter is set). */
+	/** Returns true when the entry has at least one tag from the filter list (or no filter is set). */
 	private hasTagMatch(entry: MemoryEntry, tags?: string[]): boolean {
 		return tags === undefined || tags.length === 0 || tags.some((t) => entry.tags.includes(t));
 	}
 
 	private matchesQueryOptions(entry: MemoryEntry, options: MemoryQueryOptions, strength: number): boolean {
+		if (entry.confidence === 'stale') return false;
 		const minStrength = options.minStrength ?? DEFAULT_MEMORY_PRUNE_THRESHOLD;
 		if (strength < minStrength) return false;
 		if (!this.hasTagMatch(entry, options.tags)) return false;
@@ -408,8 +465,12 @@ export class MemoryManager {
 
 	private async strengthenEntry(category: MemoryCategory, entry: MemoryEntry): Promise<void> {
 		const retrievalBoostDays = this.config.retrieval_boost_days ?? DEFAULT_MEMORY_RETRIEVAL_BOOST_DAYS;
+		const cap = this.getDefaultHalfLife(category) * MEMORY_HALF_LIFE_CAP_MULTIPLIER;
 		const accessCount = entry.accessCount + 1;
-		const halfLifeDays = entry.halfLifeDays + retrievalBoostDays;
+		// Heavily-queried memories would otherwise grow their half-life
+		// without bound — capping at MULT × the category default keeps decay
+		// meaningful even for hot entries.
+		const halfLifeDays = Math.min(cap, entry.halfLifeDays + retrievalBoostDays);
 		const lastAccessedAt = new Date().toISOString();
 
 		entry.accessCount = accessCount;
@@ -418,6 +479,37 @@ export class MemoryManager {
 
 		await this.store.updateEntry(category, entry.id, { accessCount, halfLifeDays, lastAccessedAt });
 	}
+}
+
+const TOKEN_ESTIMATE_CHARS = 4;
+
+/**
+ * Truncate `results` so the cumulative content size fits within `tokenBudget`.
+ * Returns the input unchanged when no budget is set (tokenBudget undefined or
+ * non-positive). Estimation uses ~4 characters per token, matching the
+ * convention in `memory-formatter.ts` so both layers agree on the cost model.
+ */
+function applyTokenBudget(results: MemoryQueryResult[], tokenBudget?: number): MemoryQueryResult[] {
+	if (tokenBudget === undefined || tokenBudget <= 0) return results;
+
+	const charBudget = tokenBudget * TOKEN_ESTIMATE_CHARS;
+	const fitted: MemoryQueryResult[] = [];
+	let used = 0;
+
+	for (const result of results) {
+		const cost = result.entry.content.length;
+		if (used + cost > charBudget && fitted.length > 0) break; // always include at least one
+		used += cost;
+		fitted.push(result);
+	}
+
+	return fitted;
+}
+
+function bumpDelta(deltas: Map<string, Record<string, number>>, fromId: string, toId: string): void {
+	const existing = deltas.get(fromId) ?? {};
+	existing[toId] = (existing[toId] ?? 0) + 1;
+	deltas.set(fromId, existing);
 }
 
 function resolveConfig(config?: Partial<MemoryRetentionConfig>): MemoryRetentionConfig {

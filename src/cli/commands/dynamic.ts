@@ -728,7 +728,7 @@ export function configureConsolidateCommand(program: CommandAdapter): void {
 		.action(async (options: { dryRun?: boolean; pruneOnly?: boolean; since?: string }) => {
 			try {
 				const { getMemoryConsolidation } = await import('services/memory-consolidation.service');
-				const service = getMemoryConsolidation();
+				const service = await getMemoryConsolidation();
 				const result = await service.consolidate({
 					dryRun: options.dryRun ?? false,
 					pruneOnly: options.pruneOnly ?? false,

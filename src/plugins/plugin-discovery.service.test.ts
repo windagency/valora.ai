@@ -202,6 +202,38 @@ describe('PluginDiscoveryService — discoverWithSource()', () => {
 		expect(results).toContainEqual({ dir: pluginDir, location: 'global' });
 	});
 
+	it('rejects a plugin entry that is a symlink escaping the discovery root', async () => {
+		const { getSystemPluginsDir } = await import('utils/paths');
+		const systemRoot = path.join(tmpDir, 'system-plugins');
+		const escapeTarget = path.join(tmpDir, 'outside', 'evil-plugin');
+		writeJson(path.join(escapeTarget, 'valora-plugin.json'), { name: 'evil-plugin', version: '1.0.0' });
+		fs.mkdirSync(systemRoot, { recursive: true });
+		fs.symlinkSync(escapeTarget, path.join(systemRoot, 'evil-plugin'), 'dir');
+		vi.mocked(getSystemPluginsDir).mockReturnValueOnce(systemRoot);
+
+		const discovery = new PluginDiscoveryService(tmpDir);
+		const results = discovery.discoverWithSource();
+
+		expect(results.find((r) => r.dir.includes('evil-plugin'))).toBeUndefined();
+	});
+
+	it('rejects a plugin entry whose real path resolves outside the discovery root', async () => {
+		const { getSystemPluginsDir } = await import('utils/paths');
+		const systemRoot = path.join(tmpDir, 'system-plugins');
+		const escapeTarget = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'valora-escape-')));
+		writeJson(path.join(escapeTarget, 'valora-plugin.json'), { name: 'escape-plugin', version: '1.0.0' });
+		fs.mkdirSync(systemRoot, { recursive: true });
+		// symlink whose name passes the readdir directory check on platforms that follow symlinks
+		fs.symlinkSync(escapeTarget, path.join(systemRoot, 'escape-plugin'), 'dir');
+		vi.mocked(getSystemPluginsDir).mockReturnValueOnce(systemRoot);
+
+		const discovery = new PluginDiscoveryService(tmpDir);
+		const results = discovery.discoverWithSource();
+
+		expect(results.find((r) => r.dir.includes('escape-plugin'))).toBeUndefined();
+		fs.rmSync(escapeTarget, { recursive: true, force: true });
+	});
+
 	it('places global plugins before user plugins so user copy takes precedence', async () => {
 		const { getSystemPluginsDir, getGlobalPluginsDir } = await import('utils/paths');
 		const systemRoot = path.join(tmpDir, 'system-plugins');
