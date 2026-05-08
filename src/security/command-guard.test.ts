@@ -199,9 +199,9 @@ describe('CommandGuard', () => {
 			['docker ps', 'docker'],
 			['make build', 'make'],
 			['gh pr list', 'gh'],
-			['awk \'{print $1}\' file.txt', 'awk'],
+			["awk '{print $1}' file.txt", 'awk'],
 			['sed -n 1,10p file.txt', 'sed'],
-			['cd workspace && pwd', 'cd / pwd'],
+			['cd workspace && pwd', 'cd / pwd']
 		])('allows %s', (command) => {
 			expect(guard.validate(command).allowed).toBe(true);
 		});
@@ -217,7 +217,7 @@ describe('CommandGuard', () => {
 			['printenv', 'printenv'],
 			['hostname', 'hostname'],
 			['whoami', 'whoami'],
-			['id', 'id'],
+			['id', 'id']
 		])('blocks %s (not on allowlist or known exfiltration vector)', (command) => {
 			const result = guard.validate(command);
 			expect(result.allowed).toBe(false);

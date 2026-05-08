@@ -330,9 +330,7 @@ describe('Circular Dependencies', () => {
 
 					const content = await fs.readFile(full, 'utf8');
 					// Strip comments before scanning; matters for ADR cross-references.
-					const stripped = content
-						.replace(/\/\*[\s\S]*?\*\//g, '')
-						.replace(/\/\/[^\n]*/g, '');
+					const stripped = content.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
 					// Match `import` statements that mention `executor/` and are NOT
 					// of the form `import type { ... } from 'executor/...'`.
 					const importLines = stripped.match(/^[ \t]*import\b[^;]*;/gm) ?? [];
@@ -343,7 +341,10 @@ describe('Circular Dependencies', () => {
 						// rejected only when there is at least one runtime specifier.
 						const specifierBlock = line.match(/\{([^}]*)\}/)?.[1];
 						if (specifierBlock !== undefined) {
-							const specs = specifierBlock.split(',').map((s) => s.trim()).filter(Boolean);
+							const specs = specifierBlock
+								.split(',')
+								.map((s) => s.trim())
+								.filter(Boolean);
 							const allTypeOnly = specs.every((s) => s.startsWith('type '));
 							if (allTypeOnly) continue;
 						}
@@ -354,7 +355,10 @@ describe('Circular Dependencies', () => {
 
 			await walk(mcpDir);
 
-			expect(offenders, `mcp/ has runtime imports of executor/ — violates ADR-015 direction:\n${offenders.join('\n')}`).toEqual([]);
+			expect(
+				offenders,
+				`mcp/ has runtime imports of executor/ — violates ADR-015 direction:\n${offenders.join('\n')}`
+			).toEqual([]);
 		});
 
 		it('output should not create circular dependencies', () => {

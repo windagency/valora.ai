@@ -51,7 +51,11 @@ describe('JsonlAuditSink', () => {
 	});
 
 	it('skips malformed lines but reports the well-formed ones', () => {
-		writeFileSync(path, '{"id":"a","type":"command_blocked","severity":"low","details":{},"timestamp":"2026-05-07T00:00:00.000Z"}\nNOT_JSON\n', 'utf8');
+		writeFileSync(
+			path,
+			'{"id":"a","type":"command_blocked","severity":"low","details":{},"timestamp":"2026-05-07T00:00:00.000Z"}\nNOT_JSON\n',
+			'utf8'
+		);
 
 		const sink = new JsonlAuditSink(path);
 		const events = sink.readAll();

@@ -30,13 +30,13 @@ describe('ToolExecutionService.search_replace permission propagation', () => {
 		svc.setEffectiveConstraints({
 			delegationDepth: 1,
 			forbidden_paths: [join(workingDir, 'secrets')],
-			requires_approval_for: [],
+			requires_approval_for: []
 		});
 
 		const result = await svc.executeTool({
 			arguments: { new_str: 'rewritten', old_str: 'top-secret-value', path: 'secrets/forbidden.txt' },
 			id: 'search-replace-perm-1',
-			name: 'search_replace',
+			name: 'search_replace'
 		});
 
 		expect(result.output).toMatch(/forbidden/i);
@@ -50,13 +50,13 @@ describe('ToolExecutionService.search_replace permission propagation', () => {
 		svc.setEffectiveConstraints({
 			delegationDepth: 1,
 			forbidden_paths: [join(workingDir, 'secrets')],
-			requires_approval_for: [],
+			requires_approval_for: []
 		});
 
 		const result = await svc.executeTool({
 			arguments: { new_str: 'after', old_str: 'before', path: 'normal.txt' },
 			id: 'search-replace-perm-2',
-			name: 'search_replace',
+			name: 'search_replace'
 		});
 
 		expect(result.output).toMatch(/Successfully replaced/);

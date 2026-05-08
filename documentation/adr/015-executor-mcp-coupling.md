@@ -15,13 +15,13 @@ Accepted
 ### Positive
 
 - **No premature abstraction.** Extracting interface types into `types/mcp-execution.types.ts` and rewriting all `executor/` imports against those interfaces would be invasive (touches `stage-executor.ts`, 1,980 LOC) for a coupling whose direction is in practice always `executor → mcp`. The ADR captures the directional fact instead of paying refactor cost for an abstraction nobody else needs.
-- **The arch test stops being a no-op.** The previous body at `__tests__/architecture/circular-dependencies.test.ts:308-315` was empty with a comment that bidirectional was "acceptable". After this ADR the test asserts the *direction*: `mcp/` may not perform any runtime import of `executor/`, only `import type`.
+- **The arch test stops being a no-op.** The previous body at `__tests__/architecture/circular-dependencies.test.ts:308-315` was empty with a comment that bidirectional was "acceptable". After this ADR the test asserts the _direction_: `mcp/` may not perform any runtime import of `executor/`, only `import type`.
 - **Truthful documentation.** The system card and architecture overview can now describe `executor + mcp` as a single orchestration ring rather than implying clean layered separation that the imports do not respect.
 
 ### Negative
 
 - **`mcp/` cannot share runtime helpers from `executor/`.** Any helper currently needed at runtime would have to live in `executor/` and be imported there, or move to `utils/`/`types/`. In practice today only `CommandLoader` is referenced and only as a type — no concrete runtime helper crosses the boundary in this direction.
-- **Tighter coupling for refactors.** Splitting the orchestration ring later is harder once the ADR endorses the coupling. Mitigation: any new code that wants to push runtime symbols *from* `mcp/` *back* to `executor/` is fine (still in the allowed direction), but any future need for `mcp/` to call `executor/` runtime code triggers reopening this ADR.
+- **Tighter coupling for refactors.** Splitting the orchestration ring later is harder once the ADR endorses the coupling. Mitigation: any new code that wants to push runtime symbols _from_ `mcp/` _back_ to `executor/` is fine (still in the allowed direction), but any future need for `mcp/` to call `executor/` runtime code triggers reopening this ADR.
 
 ### Neutral
 
@@ -47,11 +47,13 @@ mcp/ → executor/ (imports)
 Two options were considered:
 
 **Option Y — Full type extraction.** Move shared interfaces into `src/types/mcp-execution.types.ts`. Have both layers import from `types/` only.
+
 - Pro: Strictest separation; no concrete cross-layer dependency.
 - Con: Requires rewriting `stage-executor.ts` to inject MCP services through interfaces and the DI container. Touches a 1,980-LOC file; high blast radius.
 - Pro/con assessment: ~25 % of the imports are already type-only; ~75 % are concrete. The ratio of work-to-benefit is poor.
 
 **Option X — Direction-only enforcement.** Document the bidirectional coupling as deliberate (executor is the orchestration layer; mcp is its tool-protocol adapter), and tighten the arch test to enforce the direction (mcp must remain type-only towards executor, no runtime imports).
+
 - Pro: Minimal change. Reflects the actual architecture (executor coordinates everything; mcp is one of the things it coordinates).
 - Pro: Removes the empty test body that gave false signal.
 - Con: Codifies the coupling. Future refactors that genuinely want to invert the flow (e.g. mcp owning its own pipeline stage executor) must reopen this ADR.

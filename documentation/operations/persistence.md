@@ -18,10 +18,10 @@ The helper class and related packages (`testcontainers`, `@testcontainers/postgr
 
 ## Verification Summary
 
-| Evidence | Detail |
-|---|---|
-| `package.json` | No `testcontainers`, `@testcontainers/*` entries in `devDependencies` |
-| `src/` | Zero references to `AI_TEST_DATABASE_URL`, `AI_TEST_REDIS_URL`, or `AI_TEST_LOCALSTACK` |
+| Evidence       | Detail                                                                                  |
+| -------------- | --------------------------------------------------------------------------------------- |
+| `package.json` | No `testcontainers`, `@testcontainers/*` entries in `devDependencies`                   |
+| `src/`         | Zero references to `AI_TEST_DATABASE_URL`, `AI_TEST_REDIS_URL`, or `AI_TEST_LOCALSTACK` |
 
 To reproduce the verification:
 

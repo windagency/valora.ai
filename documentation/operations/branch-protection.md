@@ -26,18 +26,18 @@ The `prepublishOnly` script in `package.json` mirrors these same gates locally f
 
 Apply these on GitHub under **Settings → Branches → Branch protection rules** for both `main` and `dev`.
 
-| Setting                                                        | Required value                                                                                                                                       |
-| -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Require a pull request before merging                          | **On**. Require **1** approving review (more if the team grows). Dismiss stale approvals on new commits.                                             |
-| Require status checks to pass before merging                   | **On**. Require branches up-to-date before merging.                                                                                                  |
-| Required status checks                                         | `Lint and typecheck`, `Unit tests`, `Architecture tests`, `Security tests`, `Documentation validator`, `CodeQL`. (Dependency review is PR-only.) |
-| Require conversation resolution before merging                 | **On**.                                                                                                                                              |
-| Require linear history                                         | **On**. Forces squash or rebase, prevents merge-commit churn.                                                                                        |
-| Require signed commits                                         | Recommended **on** for `main`. Optional for `dev`.                                                                                                   |
-| Do not allow bypassing the above settings                      | **On**. No admin override.                                                                                                                            |
-| Restrict who can push to matching branches                     | Only the merge queue / CODEOWNERS, not direct pushes from individual humans.                                                                          |
-| Block force pushes                                             | **On**.                                                                                                                                              |
-| Allow deletions                                                | **Off**.                                                                                                                                             |
+| Setting                                        | Required value                                                                                                                                   |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Require a pull request before merging          | **On**. Require **1** approving review (more if the team grows). Dismiss stale approvals on new commits.                                         |
+| Require status checks to pass before merging   | **On**. Require branches up-to-date before merging.                                                                                              |
+| Required status checks                         | `Lint and typecheck`, `Unit tests`, `Architecture tests`, `Security tests`, `Documentation validator`, `CodeQL`. (Dependency review is PR-only.) |
+| Require conversation resolution before merging | **On**.                                                                                                                                          |
+| Require linear history                         | **On**. Forces squash or rebase, prevents merge-commit churn.                                                                                    |
+| Require signed commits                         | Recommended **on** for `main`. Optional for `dev`.                                                                                               |
+| Do not allow bypassing the above settings      | **On**. No admin override.                                                                                                                       |
+| Restrict who can push to matching branches     | Only the merge queue / CODEOWNERS, not direct pushes from individual humans.                                                                     |
+| Block force pushes                             | **On**.                                                                                                                                          |
+| Allow deletions                                | **Off**.                                                                                                                                         |
 
 ## `--no-verify` policy
 

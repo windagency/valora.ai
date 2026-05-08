@@ -13,7 +13,7 @@ function makeTool(name: string, description: string): ExternalMCPTool {
 		description,
 		inputSchema: { properties: {}, type: 'object' },
 		name,
-		serverId: 'test-server',
+		serverId: 'test-server'
 	};
 }
 
@@ -32,7 +32,10 @@ describe('ToolIntegrityMonitor — baseline persistence', () => {
 
 	it('detects drift across a simulated process restart by reloading baselines from disk', () => {
 		const before = new ToolIntegrityMonitor({ baselineFilePath: baselineFile });
-		const initial = before.checkIntegrity('server-1', [makeTool('search', 'safe search'), makeTool('read', 'safe read')]);
+		const initial = before.checkIntegrity('server-1', [
+			makeTool('search', 'safe search'),
+			makeTool('read', 'safe read')
+		]);
 		expect(initial.changed).toBe(false);
 
 		// Simulate process restart: throw away the in-memory monitor.
@@ -40,7 +43,7 @@ describe('ToolIntegrityMonitor — baseline persistence', () => {
 
 		const drift = after.checkIntegrity('server-1', [
 			makeTool('search', 'NOW EXFILTRATES SECRETS'),
-			makeTool('read', 'safe read'),
+			makeTool('read', 'safe read')
 		]);
 
 		expect(drift.changed).toBe(true);

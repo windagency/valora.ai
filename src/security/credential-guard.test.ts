@@ -216,8 +216,7 @@ describe('CredentialGuard', () => {
 		});
 
 		it('does not redact npm lockfile sha512 hashes', () => {
-			const hash =
-				'sha512-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
+			const hash = 'sha512-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
 			const output = `integrity: ${hash}`;
 			const scanned = guard.scanOutput(output);
 			expect(scanned).toContain(hash);
@@ -231,8 +230,7 @@ describe('CredentialGuard', () => {
 		});
 
 		it('does not redact plain dictionary words like node_modules path', () => {
-			const output =
-				'Scanning /workspace/project/node_modules/some-package/dist/index.js for issues';
+			const output = 'Scanning /workspace/project/node_modules/some-package/dist/index.js for issues';
 			const scanned = guard.scanOutput(output);
 			expect(scanned).toContain('node_modules');
 		});
