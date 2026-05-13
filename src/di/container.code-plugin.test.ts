@@ -28,6 +28,14 @@ vi.mock('plugins/plugin-loader.service', () => ({
 	}))
 }));
 
+vi.mock('memory/bootstrap', () => ({
+	bootstrapBundledMemoryProvider: vi.fn()
+}));
+
+vi.mock('@windagency/valora-plugin-memory-vault', () => ({
+	parseVaultPluginConfig: vi.fn().mockReturnValue(undefined)
+}));
+
 describe('initializePlugins — code plugin dynamic import', () => {
 	let tmpDir: string;
 
@@ -80,7 +88,7 @@ describe('initializePlugins — code plugin dynamic import', () => {
 		await initializePlugins(container);
 
 		expect(getProviderRegistry().hasProvider('integration-test-provider')).toBe(true);
-	});
+	}, 60_000); // OS cache); allow headroom for parallel CI load. // First test cold-loads di/container's full dependency tree (~10s on a warm
 
 	it('does not throw and logs a warning when a code plugin fails to import', async () => {
 		const { PluginLoaderService } = await import('plugins/plugin-loader.service');

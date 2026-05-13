@@ -540,10 +540,14 @@ describe('Architecture Tests', () => {
 					while ((match = importRegex.exec(content)) !== null) {
 						const pkg = match[1].split('/')[0]; // Get package name from scoped imports
 
-						// Skip allowed packages and local aliased imports (like 'types/', 'output/', 'memory/', etc.)
+						// Skip allowed packages and local aliased imports (like 'types/', 'output/', 'memory/', etc.).
+						// Workspace packages under the `@windagency` scope are first-party shared libraries
+						// (e.g. `@windagency/valora-plugin-api` for the canonical memory types), not
+						// third-party deps, so they are exempt from this rule.
 						if (
 							!allowedPackages.includes(pkg) &&
 							!pkg.startsWith('@types') &&
+							!pkg.startsWith('@windagency') &&
 							pkg !== 'types' &&
 							pkg !== 'output' &&
 							pkg !== 'utils' &&

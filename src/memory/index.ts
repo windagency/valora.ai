@@ -1,26 +1,60 @@
 /**
- * Public memory module surface.
+ * Memory module — host-side surface for the registry-routed memory subsystem.
  *
- * External callers (CLI, executor, services) should import from this barrel
- * rather than reaching into module internals — see the arch-unit rule
- * "External code uses public memory API" in vault-memory.arch.test.ts.
+ * The bundled vault implementation lives in
+ * `@windagency/valora-plugin-memory-vault`. Production callers reach the
+ * active provider via `getMemoryRegistry().getActive()`; the legacy named
+ * exports below are forwarded from the bundled package so that
+ * `from 'memory'` keeps resolving for code that has not yet migrated.
  *
- * The `MemoryStore` (legacy JSON backend) is exported only as a deprecated
- * type re-export so legacy migration paths continue to compile; new code
- * must use `VaultStore` (resolved through DI).
+ * New code should consume `getMemoryRegistry()` (this module) and the
+ * `MemoryProvider` contract from `@windagency/valora-plugin-api` (mirrored
+ * via `types/memory.types`).
  */
 
-export { centroidSummary, cosineClusters } from './consolidation/cluster';
-export { computeEffectiveHalfLife, computeStrength, shouldPrune } from './decay';
-export type { EmbedderPort } from './embeddings/embedder.port';
-export { EmbedderNotSupportedError, LlmProviderEmbedder } from './embeddings/llm-provider-embedder';
-export { resolveEmbedder } from './embeddings/resolve-embedder';
-export { openVectorStore, readVectorStoreMeta, type VectorStore } from './embeddings/vector-store';
-export { MemoryManager } from './manager';
-export { runAutoMigrationIfNeeded } from './migration/auto-migrate';
-export { migrateJsonToVault, type MigrationOptions, type MigrationResult } from './migration/json-to-vault';
-export { readVaultVersion, VAULT_SCHEMA_VERSION, writeVaultVersion } from './migration/vault-version';
-/** @deprecated retained for migration paths only — production code uses VaultStore. */
-export { MemoryStore } from './store';
-export { getDefaultVaultDir, getLegacyJsonDir } from './vault/default-vault-dir';
-export { openVaultStore, type VaultStats, VaultStore } from './vault/vault-store';
+export { bootstrapBundledMemoryProvider, type BootstrapBundledMemoryProviderOptions } from './bootstrap';
+export {
+	getMemoryRegistry,
+	MemoryProviderConflictError,
+	MemoryProviderRegistry,
+	resetMemoryRegistry
+} from './registry';
+
+export type { EmbedderPort } from '@windagency/valora-plugin-memory-vault';
+export {
+	centroidSummary,
+	computeEffectiveHalfLife,
+	computeStrength,
+	cosineClusters,
+	EmbedderNotSupportedError,
+	getDefaultVaultDir,
+	getLegacyJsonDir,
+	LlmProviderEmbedder,
+	MemoryManager,
+	/** @deprecated legacy JSON backend retained for migration paths only. */
+	computeContentHash,
+	MemoryStore,
+	migrateJsonToVault,
+	type MigrationOptions,
+	type MigrationResult,
+	openVaultStore,
+	openVectorStore,
+	type ParsedMemoryFile,
+	parseMemoryFile,
+	parseVaultPluginConfig,
+	readVaultVersion,
+	readVectorStoreMeta,
+	resolveEmbedder,
+	runAutoMigrationIfNeeded,
+	serialiseMemoryFile,
+	shouldPrune,
+	VAULT_DESCRIPTOR,
+	VAULT_PLUGIN_CONFIG_SCHEMA,
+	VAULT_SCHEMA_VERSION,
+	VaultMemoryProvider,
+	type VaultPluginConfig,
+	type VaultStats,
+	VaultStore,
+	type VectorStore,
+	writeVaultVersion
+} from '@windagency/valora-plugin-memory-vault';

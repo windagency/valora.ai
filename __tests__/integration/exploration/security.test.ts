@@ -14,7 +14,7 @@ import * as os from 'os';
 import { describe, it, beforeAll, afterAll, expect } from 'vitest';
 import { InputValidator, InputValidationError } from 'utils/input-validator';
 import { SafeExecutor } from 'utils/safe-exec';
-import { WorktreeManager } from 'exploration/worktree-manager-secure';
+import { WorktreeManager } from 'exploration/worktree-manager';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 

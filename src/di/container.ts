@@ -9,11 +9,19 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CodePluginModule } from 'plugins/plugin-api.types';
 
 import { readFileSync } from 'fs';
+import { MemoryProviderConflictError } from 'memory/registry';
 import { preloadConflictResolutions, resolveProviderConflict } from 'plugins/conflict-resolver';
 import { createPluginAPI, type PluginLifecycleRegistry } from 'plugins/plugin-api.factory';
 import { PluginLoaderService } from 'plugins/plugin-loader.service';
+import { getCommandGuard } from 'security/command-guard';
+import { getCredentialGuard } from 'security/credential-guard';
+import { getPromptInjectionDetector } from 'security/prompt-injection-detector';
+import { getToolDefinitionValidator } from 'security/tool-definition-validator';
+import { getToolIntegrityMonitor } from 'security/tool-integrity-monitor';
 
 import type { DeterministicValidator } from 'executor/validators/types';
+import type { ExternalMCPServerConfig } from 'types/mcp-client.types';
+import type { ToolCallArgs } from 'types/mcp.types';
 import type { LoadedPlugin, PluginsConfig } from 'types/plugin.types';
 
 import { CommandExecutor } from 'cli/command-executor';
@@ -31,21 +39,10 @@ import { PromptLoader } from 'executor/prompt-loader';
 import { StageExecutor } from 'executor/stage-executor';
 import { registerValidator } from 'executor/validators/registry';
 import { getProviderRegistry, ProviderConflictError } from 'llm/registry';
-import { ExternalMCPIntegrator } from 'mcp/external-mcp-integrator';
-import { MCPApprovalWorkflow } from 'mcp/mcp-approval-workflow';
-// Initialize providers before importing registry (triggers self-registration)
-import 'llm/providers';
-import { getCommandGuard } from 'security/command-guard';
-import { getCredentialGuard } from 'security/credential-guard';
-import { getPromptInjectionDetector } from 'security/prompt-injection-detector';
-import { getToolDefinitionValidator } from 'security/tool-definition-validator';
-import { getToolIntegrityMonitor } from 'security/tool-integrity-monitor';
-
-import type { ExternalMCPServerConfig } from 'types/mcp-client.types';
-import type { ToolCallArgs } from 'types/mcp.types';
-
 import { ExternalMCPToolProxy } from 'mcp/external-client/tool-proxy';
+import { ExternalMCPIntegrator } from 'mcp/external-mcp-integrator';
 import { MCPApprovalCacheService } from 'mcp/mcp-approval-cache.service';
+import { MCPApprovalWorkflow } from 'mcp/mcp-approval-workflow';
 import { MCPAuditLoggerService } from 'mcp/mcp-audit-logger.service';
 import { MCPClientManagerService, registerGlobalPluginMcpServers } from 'mcp/mcp-client-manager.service';
 import { MCPRequestHandler } from 'mcp/request-handler';
@@ -251,6 +248,10 @@ export function getLoadedPlugins(): LoadedPlugin[] {
 }
 
 export async function initializePlugins(container: DIContainer): Promise<void> {
+	// Load LLM provider SDKs and vault lazily — keeps CLI startup fast for
+	// commands that don't need them (--help, config, session, etc.).
+	await Promise.all([import('llm/providers'), bootstrapMemoryFromConfig()]);
+
 	const pluginLoader = container.resolve<PluginLoaderService>(SERVICE_IDENTIFIERS.PLUGIN_LOADER);
 
 	let pluginsConfig: PluginsConfig | undefined;
@@ -331,14 +332,17 @@ async function loadCodePlugin(
 				await mod.register(api);
 				break;
 			} catch (err) {
-				if (!(err instanceof ProviderConflictError)) throw err;
+				const isProviderConflict = err instanceof ProviderConflictError;
+				const isMemoryConflict = err instanceof MemoryProviderConflictError;
+				if (!isProviderConflict && !isMemoryConflict) throw err;
+				const conflict = err as MemoryProviderConflictError | ProviderConflictError;
 				const winner = await resolveProviderConflict({
-					existingOwner: err.existingOwner,
-					incomingOwner: err.incomingOwner,
-					key: err.providerKey
+					existingOwner: conflict.existingOwner,
+					incomingOwner: conflict.incomingOwner,
+					key: conflict.providerKey
 				});
-				if (winner === err.incomingOwner) {
-					resolvedOverrides.add(err.providerKey);
+				if (winner === conflict.incomingOwner) {
+					resolvedOverrides.add(conflict.providerKey);
 				}
 			}
 		}
@@ -592,6 +596,27 @@ function setupDefaultServices(container: DIContainer): void {
 		const approvalWorkflow = container.resolve(SERVICE_IDENTIFIERS.MCP_APPROVAL_WORKFLOW) as MCPApprovalWorkflow;
 		return new ExternalMCPIntegrator(clientManager, approvalCache, auditLogger, approvalWorkflow);
 	});
+}
+
+/**
+ * Resolve the bundled vault's plugin-namespaced config and bootstrap the
+ * provider. The heavy vault package is loaded lazily so it does not inflate
+ * CLI startup time for commands that don't need memory (e.g. --help).
+ * Falls back to all-defaults when the loader has not yet run.
+ */
+async function bootstrapMemoryFromConfig(): Promise<void> {
+	const [{ parseVaultPluginConfig }, { bootstrapBundledMemoryProvider }] = await Promise.all([
+		import('@windagency/valora-plugin-memory-vault'),
+		import('memory/bootstrap')
+	]);
+	let memoryConfig;
+	try {
+		const rawPlugins = getConfigLoader().getRaw()['plugins'] as Record<string, unknown> | undefined;
+		memoryConfig = parseVaultPluginConfig(rawPlugins?.['memory-vault']);
+	} catch {
+		memoryConfig = undefined;
+	}
+	bootstrapBundledMemoryProvider({ memoryConfig });
 }
 
 /**

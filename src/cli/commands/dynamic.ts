@@ -453,7 +453,7 @@ function displayMetrics(analyticsEnabled: boolean): void {
 	console.log(`
 ${color.bold('📈 Rollout Success Metrics')}
 
-${color.bold('Target Metrics (Phase 7 Success Criteria):')}
+${color.bold('Target Metrics:')}
   Accuracy: >85% correct agent selection for well-defined tasks
   Performance: <500ms agent resolution overhead
   Adoption: >70% of implement commands use auto-selection within 3 months
@@ -727,9 +727,13 @@ export function configureConsolidateCommand(program: CommandAdapter): void {
 		.option('--since <date>', 'Override git log start date (ISO format, e.g. 2026-01-01)')
 		.action(async (options: { dryRun?: boolean; pruneOnly?: boolean; since?: string }) => {
 			try {
-				const { getMemoryConsolidation } = await import('services/memory-consolidation.service');
-				const service = await getMemoryConsolidation();
-				const result = await service.consolidate({
+				const { getMemoryRegistry } = await import('memory/registry');
+				const provider = getMemoryRegistry().getActive();
+				if (provider.consolidate === undefined) {
+					console.error('Active memory provider does not support consolidation.');
+					process.exit(1);
+				}
+				const result = await provider.consolidate({
 					dryRun: options.dryRun ?? false,
 					pruneOnly: options.pruneOnly ?? false,
 					since: options.since

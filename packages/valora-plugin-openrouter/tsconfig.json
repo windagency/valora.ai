@@ -22,7 +22,7 @@
 			"mcp/*": ["../../dist/mcp/*"],
 			"memory/*": ["../../dist/memory/*"],
 			"output/*": ["../../dist/output/*"],
-			"@windagency/valora-plugin-api": ["../../packages/valora-plugin-api/src/index"],
+			"@windagency/valora-plugin-api": ["../../packages/valora-plugin-api/dist/index"],
 			"services/*": ["../../dist/services/*"],
 			"session/*": ["../../dist/session/*"],
 			"src/*": ["../../dist/*"],

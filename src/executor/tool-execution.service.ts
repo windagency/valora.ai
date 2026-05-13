@@ -1072,7 +1072,6 @@ export class ToolExecutionService {
 	 * Route tool execution to the appropriate handler
 	 */
 	private async executeToolByName(name: AllowedTool, args: Record<string, unknown>): Promise<string> {
-		// Check if this is an MCP tool (handled separately in Phase 2)
 		if (isMCPTool(name)) {
 			return this.executeMcpTool(name, args);
 		}

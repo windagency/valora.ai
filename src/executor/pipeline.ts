@@ -384,7 +384,7 @@ export class PipelineExecutor {
 		stageOutputs: StageOutput[]
 	): Promise<void> {
 		try {
-			const { getMemoryExtraction } = await import('services/memory-extraction.service');
+			const { getMemoryExtraction } = await import('@windagency/valora-plugin-memory-vault');
 			const extractor = getMemoryExtraction();
 			const sessionId = executionContext.sessionInfo?.sessionId ?? 'unknown';
 			const agentRole = executionContext.agentRole;

@@ -35,6 +35,15 @@ importers:
       '@types/react':
         specifier: ^19
         version: 19.2.10
+      '@windagency/valora-plugin-api':
+        specifier: workspace:*
+        version: link:packages/valora-plugin-api
+      '@windagency/valora-plugin-memory-vault':
+        specifier: workspace:*
+        version: link:packages/valora-plugin-memory-vault
+      '@windagency/valora-runtime':
+        specifier: workspace:*
+        version: link:packages/valora-runtime
       archiver:
         specifier: ^7.0.0
         version: 7.0.1
@@ -266,6 +275,19 @@ importers:
         specifier: '>=0.1.0'
         version: 2.4.0(ws@8.19.0)
 
+  packages/valora-plugin-memory-vault:
+    dependencies:
+      '@windagency/valora':
+        specifier: '>=0.1.0'
+        version: 2.4.0(ws@8.19.0)
+    devDependencies:
+      '@windagency/valora-plugin-api':
+        specifier: workspace:*
+        version: link:../valora-plugin-api
+      '@windagency/valora-runtime':
+        specifier: workspace:*
+        version: link:../valora-runtime
+
   packages/valora-plugin-obsidian:
     dependencies:
       '@windagency/valora':
@@ -360,6 +382,12 @@ importers:
       '@windagency/valora-plugin-platform':
         specifier: workspace:*
         version: link:../valora-plugin-platform
+
+  packages/valora-runtime:
+    dependencies:
+      nanoid:
+        specifier: ^5.0.0
+        version: 5.1.6
 
 packages:
   '@alcalzone/ansi-tokenize@0.2.4':

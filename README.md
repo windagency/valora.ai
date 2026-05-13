@@ -453,7 +453,7 @@ valora/                          # npm package root
 │   ├── executor/                # Pipeline execution
 │   ├── llm/                     # LLM provider integrations
 │   ├── lsp/                     # LSP integration (language server protocol client)
-│   ├── memory/                  # Biologically-inspired memory (exponential-decay stores)
+│   ├── memory/                  # MemoryProvider registry + bootstrap glue (the bundled vault lives in packages/valora-plugin-memory-vault/; ADR-016 — replaceable via plugin)
 │   ├── mcp/                     # MCP server implementation
 │   ├── security/                # Agentic AI security (credential, command, injection guards)
 │   ├── session/                 # Session management
@@ -490,7 +490,7 @@ When installed in a project, VALORA supports a `.valora/` directory for local ov
 ├── sessions/                    # Session state (gitignored)
 ├── logs/                        # Execution logs (gitignored)
 ├── index/                       # Codebase symbol index (gitignored)
-├── memory/                      # Agent memory vault (gitignored — ADR-013)
+├── memory/                      # Agent memory vault (gitignored — ADR-013; layout owned by the active memory plugin per ADR-016)
 │   ├── version                  #   Vault schema version stamp
 │   ├── meta.json                #   Last-written / last-consolidated timestamps
 │   ├── episodic/<id>.md         #   7-day half-life events and observations

@@ -8,32 +8,52 @@ updated: 2026-05-07
 
 ## Config Quick Reference
 
-| Setting                               | Default           | Description                                              |
-| ------------------------------------- | ----------------- | -------------------------------------------------------- |
-| `llm.default_provider`                | `"anthropic"`     | Active LLM provider                                      |
-| `llm.providers.*.api_key_env`         | provider-specific | Environment variable holding the API key                 |
-| `llm.providers.*.default_model`       | provider-specific | Model used when none is specified                        |
-| `llm.providers.*.timeout_ms`          | `300000`          | Request timeout in milliseconds                          |
-| `execution.default_mode`              | `"guided"`        | Execution mode: `guided` or `api`                        |
-| `execution.enable_parallel_execution` | `true`            | Allow parallel pipeline stages                           |
-| `execution.max_concurrent_stages`     | `4`               | Maximum stages running simultaneously                    |
-| `session.auto_save`                   | `true`            | Save session state automatically                         |
-| `session.auto_save_interval_ms`       | `5000`            | Auto-save interval                                       |
-| `session.cleanup_days`                | `30`              | Delete sessions older than N days                        |
-| `session.encryption`                  | `true`            | Encrypt session data at rest                             |
-| `logging.level`                       | `"info"`          | Log verbosity: `debug`, `info`, `warn`, `error`          |
-| `logging.file_enabled`                | `true`            | Write logs to file                                       |
-| `logging.daily_file_max_size_mb`      | `100`             | Rotate log file at this size                             |
-| `memory.enabled`                      | `true`            | Enable or disable the agent memory system                |
-| `memory.episodic_half_life_days`      | `7`               | Decay half-life for episodic memory (events, errors)     |
-| `memory.semantic_half_life_days`      | `30`              | Decay half-life for semantic memory (patterns, insights) |
-| `memory.decision_half_life_days`      | `21`              | Decay half-life for decision memory (architecture)       |
-| `memory.retrieval_boost_days`         | `2`               | Days added to half-life each time an entry is accessed   |
-| `memory.prune_threshold`              | `0.05`            | Minimum strength below which an entry is pruned          |
-| `memory.max_entries_per_store`        | `500`             | Maximum entries per JSON store before automatic pruning  |
-| `memory.error_half_life_multiplier`   | `2`               | Half-life multiplier applied to error entries (isError)  |
-| `memory.injection_token_budget`       | `2000`            | Maximum tokens allocated for injected agent memory       |
-| `memory.injection_strength_threshold` | `0.2`             | Minimum entry strength required for prompt injection     |
+| Setting                               | Default           | Description                                       |
+| ------------------------------------- | ----------------- | ------------------------------------------------- |
+| `llm.default_provider`                | `"anthropic"`     | Active LLM provider                               |
+| `llm.providers.*.api_key_env`         | provider-specific | Environment variable holding the API key          |
+| `llm.providers.*.default_model`       | provider-specific | Model used when none is specified                 |
+| `llm.providers.*.timeout_ms`          | `300000`          | Request timeout in milliseconds                   |
+| `execution.default_mode`              | `"guided"`        | Execution mode: `guided` or `api`                 |
+| `execution.enable_parallel_execution` | `true`            | Allow parallel pipeline stages                    |
+| `execution.max_concurrent_stages`     | `4`               | Maximum stages running simultaneously             |
+| `session.auto_save`                   | `true`            | Save session state automatically                  |
+| `session.auto_save_interval_ms`       | `5000`            | Auto-save interval                                |
+| `session.cleanup_days`                | `30`              | Delete sessions older than N days                 |
+| `session.encryption`                  | `true`            | Encrypt session data at rest                      |
+| `logging.level`                       | `"info"`          | Log verbosity: `debug`, `info`, `warn`, `error`   |
+| `logging.file_enabled`                | `true`            | Write logs to file                                |
+| `logging.daily_file_max_size_mb`      | `100`             | Rotate log file at this size                      |
+| `memory.enabled`                      | `true`            | Enable or disable the agent memory system         |
+| `memory.provider`                     | `"vault"`         | Selects which memory plugin is active (see below) |
+
+Vault-specific tuning knobs live under `plugins.memory-vault.*` and are
+validated by the bundled vault plugin's own schema, not the host's:
+
+| Setting                                             | Default              | Description                                              |
+| --------------------------------------------------- | -------------------- | -------------------------------------------------------- |
+| `plugins.memory-vault.episodic_half_life_days`      | `7`                  | Decay half-life for episodic memory (events, errors)     |
+| `plugins.memory-vault.semantic_half_life_days`      | `30`                 | Decay half-life for semantic memory (patterns, insights) |
+| `plugins.memory-vault.decision_half_life_days`      | `21`                 | Decay half-life for decision memory (architecture)       |
+| `plugins.memory-vault.retrieval_boost_days`         | `2`                  | Days added to half-life each time an entry is accessed   |
+| `plugins.memory-vault.prune_threshold`              | `0.05`               | Minimum strength below which an entry is pruned          |
+| `plugins.memory-vault.max_entries_per_store`        | `500`                | Maximum entries per store before automatic pruning       |
+| `plugins.memory-vault.error_half_life_multiplier`   | `2`                  | Half-life multiplier applied to error entries (isError)  |
+| `plugins.memory-vault.injection_token_budget`       | `2000`               | Maximum tokens allocated for injected agent memory       |
+| `plugins.memory-vault.injection_strength_threshold` | `0.2`                | Minimum entry strength required for prompt injection     |
+| `plugins.memory-vault.embedding.model`              | `"nomic-embed-text"` | Embedding model name                                     |
+| `plugins.memory-vault.embedding.dim`                | `768`                | Embedding dimensionality                                 |
+| `plugins.memory-vault.embedding.batch_size`         | `32`                 | Embedding batch size                                     |
+| `plugins.memory-vault.recall.seed_k`                | `12`                 | Spreading-activation seed-set size                       |
+| `plugins.memory-vault.recall.walk_depth`            | `2`                  | Spreading-activation walk depth                          |
+
+> **Migration from pre-2.7.0:** the previous flat `memory.*` keys (`backend`,
+> `*_half_life_days`, `embedding`, `recall`, thresholds) were moved under
+> `plugins.memory-vault.*`. The configuration loader refuses to start if any
+> legacy `memory.*` key is still present and links to
+> `documentation/migrations/2026-05-memory-plugin.md` for a fix-it diff.
+> Third-party memory plugins own their own `plugins.<name>.*` namespace and
+> document their own knobs.
 
 ## Configuration Cascade
 

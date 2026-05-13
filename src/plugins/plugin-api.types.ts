@@ -3,6 +3,7 @@ import type { ZodType, ZodTypeAny } from 'zod';
 import type { CompressionStrategy } from 'executor/output-compression.service';
 import type { Logger } from 'output/logger';
 import type { LLMProvider } from 'types/llm.types';
+import type { MemoryProvider, MemoryProviderDescriptor } from 'types/memory.types';
 
 export type { CompressionStrategy };
 
@@ -22,6 +23,9 @@ export interface PluginAPI {
 	};
 	lifecycle: PluginLifecycleHooks;
 	logger: Pick<Logger, 'debug' | 'error' | 'info' | 'warn'>;
+	memory: {
+		register(name: string, provider: PluginMemoryProvider, descriptor?: MemoryProviderDescriptor): void;
+	};
 	providers: {
 		register(name: string, provider: PluginProvider, descriptor?: ProviderDescriptor): void;
 	};
@@ -31,6 +35,12 @@ export interface PluginLifecycleHooks {
 	onActivate: (fn: () => Promise<void>) => void;
 	onDeactivate: (fn: () => Promise<void>) => void;
 }
+
+export type PluginMemoryProvider = PluginMemoryProviderClass | PluginMemoryProviderFactory;
+
+export type PluginMemoryProviderClass = new (config: Record<string, unknown>) => MemoryProvider;
+
+export type PluginMemoryProviderFactory = (config: Record<string, unknown>) => MemoryProvider;
 
 export type PluginProvider = PluginProviderClass | PluginProviderFactory;
 

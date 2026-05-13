@@ -1,5 +1,5 @@
 ---
-updated: 2026-05-07
+updated: 2026-05-11
 ---
 
 # Persistence
@@ -9,6 +9,12 @@ updated: 2026-05-07
 Valora is process-local at v2.5. All state is held in memory or on the local filesystem via the session and config layers. No database, cache, or message broker is in use.
 
 Persistence infrastructure is therefore out of scope for the current release.
+
+## Local-filesystem state: memory vault
+
+The largest local-filesystem footprint Valora maintains is the memory store. Since [ADR-016](../adr/016-memory-as-plugin.md) the store is **owned by whichever memory plugin is active**, not by core. The bundled default `'vault'` provider writes to `.valora/memory/vault/` (or `~/.valora/memory/vault/` outside a project) using one Markdown file per entry plus a packed `embeddings.bin` index — that layout is specific to `@windagency/valora-plugin-memory-vault`. If a site swaps in a different memory plugin via `memory.provider`, its on-disk layout, backup story, and migration semantics are defined by that plugin, not by this document.
+
+Operations runbooks targeting "the Valora memory directory" should therefore assume the bundled vault. For non-default providers, consult the relevant plugin's documentation for backup, retention, and disaster-recovery guidance.
 
 ## When Persistence Is Introduced
 

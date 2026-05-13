@@ -13,24 +13,7 @@ import {
 	DEFAULT_LOG_MAX_FILES,
 	DEFAULT_LOG_MAX_SIZE_MB,
 	DEFAULT_LOG_RETENTION_ENABLED,
-	DEFAULT_MEMORY_BACKEND,
-	DEFAULT_MEMORY_DECISION_HALF_LIFE_DAYS,
-	DEFAULT_MEMORY_EMBED_BATCH_SIZE,
-	DEFAULT_MEMORY_EMBED_DIM,
-	DEFAULT_MEMORY_EMBED_MODEL,
 	DEFAULT_MEMORY_ENABLED,
-	DEFAULT_MEMORY_EPISODIC_HALF_LIFE_DAYS,
-	DEFAULT_MEMORY_ERROR_HALF_LIFE_MULTIPLIER,
-	DEFAULT_MEMORY_INJECTION_STRENGTH_THRESHOLD,
-	DEFAULT_MEMORY_INJECTION_TOKEN_BUDGET,
-	DEFAULT_MEMORY_MAX_ENTRIES_PER_STORE,
-	DEFAULT_MEMORY_PRUNE_THRESHOLD,
-	DEFAULT_MEMORY_RECALL_CO_ACCESS_INCREMENT,
-	DEFAULT_MEMORY_RECALL_SEED_K,
-	DEFAULT_MEMORY_RECALL_WALK_DECAY,
-	DEFAULT_MEMORY_RECALL_WALK_DEPTH,
-	DEFAULT_MEMORY_RETRIEVAL_BOOST_DAYS,
-	DEFAULT_MEMORY_SEMANTIC_HALF_LIFE_DAYS,
 	DEFAULT_SESSION_CLEANUP_INTERVAL_HOURS,
 	DEFAULT_SESSION_COMPRESS_AFTER_DAYS,
 	DEFAULT_SESSION_DRY_RUN,
@@ -155,36 +138,23 @@ export const PATHS_CONFIG_SCHEMA = z.object({
 	sessions_dir: z.string().optional()
 });
 
-const MEMORY_EMBEDDING_SCHEMA = z.object({
-	batch_size: z.number().min(1).max(256).default(DEFAULT_MEMORY_EMBED_BATCH_SIZE),
-	dim: z.number().min(1).default(DEFAULT_MEMORY_EMBED_DIM),
-	model: z.string().default(DEFAULT_MEMORY_EMBED_MODEL),
-	provider: z.string().default('auto')
-});
-
-const MEMORY_RECALL_SCHEMA = z.object({
-	co_access_increment: z.number().min(0).default(DEFAULT_MEMORY_RECALL_CO_ACCESS_INCREMENT),
-	seed_k: z.number().min(1).max(100).default(DEFAULT_MEMORY_RECALL_SEED_K),
-	walk_decay: z.number().min(0).max(1).default(DEFAULT_MEMORY_RECALL_WALK_DECAY),
-	walk_depth: z.number().min(0).max(10).default(DEFAULT_MEMORY_RECALL_WALK_DEPTH)
-});
-
-// Memory configuration schema
-export const MEMORY_CONFIG_SCHEMA = z.object({
-	backend: z.enum(['json', 'vault']).default(DEFAULT_MEMORY_BACKEND),
-	decision_half_life_days: z.number().min(1).max(365).default(DEFAULT_MEMORY_DECISION_HALF_LIFE_DAYS),
-	embedding: MEMORY_EMBEDDING_SCHEMA.optional(),
-	enabled: z.boolean().default(DEFAULT_MEMORY_ENABLED),
-	episodic_half_life_days: z.number().min(1).max(365).default(DEFAULT_MEMORY_EPISODIC_HALF_LIFE_DAYS),
-	error_half_life_multiplier: z.number().min(1).max(10).default(DEFAULT_MEMORY_ERROR_HALF_LIFE_MULTIPLIER),
-	injection_strength_threshold: z.number().min(0).max(1).default(DEFAULT_MEMORY_INJECTION_STRENGTH_THRESHOLD),
-	injection_token_budget: z.number().min(100).max(10000).default(DEFAULT_MEMORY_INJECTION_TOKEN_BUDGET),
-	max_entries_per_store: z.number().min(10).max(10000).default(DEFAULT_MEMORY_MAX_ENTRIES_PER_STORE),
-	prune_threshold: z.number().min(0).max(1).default(DEFAULT_MEMORY_PRUNE_THRESHOLD),
-	recall: MEMORY_RECALL_SCHEMA.optional(),
-	retrieval_boost_days: z.number().min(0).max(30).default(DEFAULT_MEMORY_RETRIEVAL_BOOST_DAYS),
-	semantic_half_life_days: z.number().min(1).max(365).default(DEFAULT_MEMORY_SEMANTIC_HALF_LIFE_DAYS)
-});
+/**
+ * Memory configuration schema.
+ *
+ * The host owns only two cross-cutting fields: whether memory is enabled
+ * and which provider is active. Every vault tuning knob (half-lives,
+ * thresholds, embedding settings, recall parameters) lives under
+ * `plugins.memory-vault.*` and is validated by the bundled vault's own
+ * `VAULT_PLUGIN_CONFIG_SCHEMA`. Strict mode surfaces stray legacy keys at
+ * parse time; for the friendly remediation message see
+ * `assertNoLegacyMemoryKeys()` in `memory-config-guard.ts`.
+ */
+export const MEMORY_CONFIG_SCHEMA = z
+	.object({
+		enabled: z.boolean().default(DEFAULT_MEMORY_ENABLED),
+		provider: z.string().default('vault')
+	})
+	.strict();
 
 // Plugin source configuration schema
 export const PLUGIN_SOURCE_SCHEMA = z.object({
@@ -194,18 +164,22 @@ export const PLUGIN_SOURCE_SCHEMA = z.object({
 	url: z.string().url().optional()
 });
 
-// Plugins configuration schema
-export const PLUGINS_CONFIG_SCHEMA = z.object({
-	/**
-	 * How plugin updates discovered at startup are applied.
-	 * - 'check-only': notify only, never install
-	 * - 'prompt' (default): confirm interactively before each install; falls back to check-only when no TTY
-	 * - 'install': install silently (legacy behaviour; not recommended)
-	 */
-	autoUpdate: z.enum(['check-only', 'install', 'prompt']).default('prompt'),
-	enabled: z.array(z.string()).optional(),
-	sources: z.array(PLUGIN_SOURCE_SCHEMA).optional()
-});
+// Plugins configuration schema — passthrough so per-plugin subkeys
+// (e.g. `plugins['memory-vault']`) survive validation and remain readable by
+// each plugin via `api.config.extend()` or the bundled bootstrap path.
+export const PLUGINS_CONFIG_SCHEMA = z
+	.object({
+		/**
+		 * How plugin updates discovered at startup are applied.
+		 * - 'check-only': notify only, never install
+		 * - 'prompt' (default): confirm interactively before each install; falls back to check-only when no TTY
+		 * - 'install': install silently (legacy behaviour; not recommended)
+		 */
+		autoUpdate: z.enum(['check-only', 'install', 'prompt']).default('prompt'),
+		enabled: z.array(z.string()).optional(),
+		sources: z.array(PLUGIN_SOURCE_SCHEMA).optional()
+	})
+	.passthrough();
 
 // Observability configuration schema
 export const OBSERVABILITY_CONFIG_SCHEMA = z.object({
@@ -245,7 +219,10 @@ export type DefaultsConfig = z.infer<typeof DEFAULTS_CONFIG_SCHEMA>;
 export type FeatureFlags = z.infer<typeof FEATURE_FLAGS_SCHEMA>;
 export type HooksConfigSchema = z.infer<typeof HOOKS_CONFIG_SCHEMA>;
 export type LoggingRetentionConfig = z.infer<typeof LOGGING_RETENTION_CONFIG_SCHEMA>;
-export type MemoryRetentionConfig = z.infer<typeof MEMORY_CONFIG_SCHEMA>;
+// Memory module owns the canonical type; re-exported here for backward
+// compatibility with consumers that import from `config/schema`. The Zod
+// schema's parse output is structurally compatible with this interface.
+export type { MemoryRetentionConfig } from 'types/memory.types';
 export type ObservabilityConfig = z.infer<typeof OBSERVABILITY_CONFIG_SCHEMA>;
 export type PathsConfig = z.infer<typeof PATHS_CONFIG_SCHEMA>;
 export type PluginsConfigSchema = z.infer<typeof PLUGINS_CONFIG_SCHEMA>;

@@ -6,10 +6,11 @@ import { describe, it } from 'vitest';
 const ROOT = path.join(__dirname, '../..');
 const SRC_DIR = path.join(ROOT, 'src');
 const MEMORY_DIR = path.join(ROOT, 'src/memory');
-const EMBEDDINGS_DIR = path.join(ROOT, 'src/memory/embeddings');
+const VAULT_PACKAGE_DIR = path.join(ROOT, 'packages/valora-plugin-memory-vault/src');
+const EMBEDDINGS_DIR = path.join(VAULT_PACKAGE_DIR, 'embeddings');
 const SERVICES_DIR = path.join(ROOT, 'src/services');
-const VAULT_DIR = path.join(MEMORY_DIR, 'vault');
-const MIGRATION_DIR = path.join(MEMORY_DIR, 'migration');
+const VAULT_DIR = path.join(VAULT_PACKAGE_DIR, 'vault');
+const MIGRATION_DIR = path.join(VAULT_PACKAGE_DIR, 'migration');
 
 function getTypeScriptSources(dir: string): string[] {
 	const files: string[] = [];
@@ -84,15 +85,21 @@ describe('Memory Vault Architecture', () => {
 			}
 		});
 
-		it('no memory file outside embeddings/ imports directly from the llm/ module', () => {
+		it('no memory file outside embeddings/ or bootstrap imports directly from the llm/ module', () => {
+			// `bootstrap.ts` is the host-side glue that wires the bundled
+			// vault provider's `providerLookup` to the real `llm/registry`.
+			// All other files in `src/memory/` must reach embedders only
+			// through `EmbedderPort`.
+			const bootstrapPath = path.join(MEMORY_DIR, 'bootstrap.ts');
 			const violations = getTypeScriptSources(MEMORY_DIR)
 				.filter((file) => !file.startsWith(EMBEDDINGS_DIR))
+				.filter((file) => file !== bootstrapPath)
 				.filter((file) => /from\s+['"]llm\//.test(fs.readFileSync(file, 'utf-8')))
 				.map((file) => path.relative(ROOT, file));
 
 			if (violations.length > 0) {
 				throw new Error(
-					`Direct llm/ import in memory/ outside embeddings/:\n  - ${violations.join('\n  - ')}\n\n` +
+					`Direct llm/ import in memory/ outside embeddings/ or bootstrap:\n  - ${violations.join('\n  - ')}\n\n` +
 						`Memory must reach embedders via EmbedderPort, never via concrete LLM modules.`
 				);
 			}
@@ -135,7 +142,7 @@ describe('Memory Vault Architecture', () => {
 	describe('Atomic writes only', () => {
 		it('vault, embeddings, and migration source files do not call writeFileSync directly', () => {
 			const targetDirs = [VAULT_DIR, EMBEDDINGS_DIR, MIGRATION_DIR];
-			const allowedFiles = [/src\/memory\/vault\/file-format\.ts$/];
+			const allowedFiles = [/[\\/]vault[\\/]file-format\.ts$/];
 			const violations: string[] = [];
 
 			for (const dir of targetDirs) {
@@ -258,10 +265,12 @@ describe('Memory Vault Architecture', () => {
 	});
 
 	describe('Embedder adapter exists', () => {
-		it('LlmProviderEmbedder is defined under src/memory/embeddings/ and implements EmbedderPort', () => {
+		it('LlmProviderEmbedder is defined in the bundled vault package and implements EmbedderPort', () => {
 			const adapterPath = path.join(EMBEDDINGS_DIR, 'llm-provider-embedder.ts');
 			if (!fs.existsSync(adapterPath)) {
-				throw new Error(`Expected src/memory/embeddings/llm-provider-embedder.ts to exist (ADR-013 §4 adapter).`);
+				throw new Error(
+					`Expected packages/valora-plugin-memory-vault/src/embeddings/llm-provider-embedder.ts to exist (ADR-013 §4 adapter).`
+				);
 			}
 			const content = fs.readFileSync(adapterPath, 'utf-8');
 			if (!/implements\s+EmbedderPort/.test(content)) {
@@ -293,6 +302,116 @@ describe('Memory Vault Architecture', () => {
 			if (status !== 'Accepted') {
 				throw new Error(
 					`ADR-013 status must be 'Accepted' once the vault implementation has shipped.\nFound: '${status ?? 'missing'}'.`
+				);
+			}
+		});
+	});
+
+	describe('Registry-routed consumers', () => {
+		// Files that legitimately construct VaultStore / MemoryManager:
+		//   - src/memory/**: the host-side bootstrap + registry glue.
+		//   - src/cli/commands/memory.command.ts: only the `migrate` and
+		//     `reembed` subcommands, which manipulate vault internals
+		//     directly.
+		// The consolidation + extraction services and the rest of the vault
+		// implementation now live in `packages/valora-plugin-memory-vault/`,
+		// which is excluded from this scan by `getTypeScriptSources(SRC_DIR)`.
+		const allowedRoots = [path.join(ROOT, 'src/memory'), path.join(ROOT, 'src/cli/commands/memory.command.ts')];
+
+		function isAllowed(file: string): boolean {
+			return allowedRoots.some((root) => file === root || file.startsWith(`${root}/`));
+		}
+
+		it('non-allowed production code does not instantiate VaultStore', () => {
+			const violations: string[] = [];
+			for (const file of getTypeScriptSources(SRC_DIR)) {
+				if (isAllowed(file)) continue;
+				const content = stripImports(stripComments(fs.readFileSync(file, 'utf-8')));
+				if (/\bnew\s+VaultStore\s*\(/.test(content)) {
+					violations.push(path.relative(ROOT, file));
+				}
+			}
+
+			if (violations.length > 0) {
+				throw new Error(
+					`Production code outside the bundled vault plugin must not construct VaultStore directly; ` +
+						`reach the active backend via getMemoryRegistry().getActive().\n` +
+						`Violations:\n  - ${violations.join('\n  - ')}`
+				);
+			}
+		});
+
+		it('non-allowed production code does not instantiate MemoryManager', () => {
+			const violations: string[] = [];
+			for (const file of getTypeScriptSources(SRC_DIR)) {
+				if (isAllowed(file)) continue;
+				const content = stripImports(stripComments(fs.readFileSync(file, 'utf-8')));
+				if (/\bnew\s+MemoryManager\s*\(/.test(content)) {
+					violations.push(path.relative(ROOT, file));
+				}
+			}
+
+			if (violations.length > 0) {
+				throw new Error(
+					`Production code outside the bundled vault plugin must not construct MemoryManager directly; ` +
+						`reach the active backend via getMemoryRegistry().getActive().\n` +
+						`Violations:\n  - ${violations.join('\n  - ')}`
+				);
+			}
+		});
+
+		it('the bundled vault provider is registered exactly once at bootstrap', () => {
+			const bootstrapPath = path.join(MEMORY_DIR, 'bootstrap.ts');
+			if (!fs.existsSync(bootstrapPath)) {
+				throw new Error(
+					`memory/bootstrap.ts must exist as the single registration site for the bundled vault provider.`
+				);
+			}
+			const content = fs.readFileSync(bootstrapPath, 'utf-8');
+			if (!/registerProvider/.test(content) || !/setActive/.test(content)) {
+				throw new Error(
+					`memory/bootstrap.ts must call both registerProvider() and setActive() to register and activate the bundled vault provider.`
+				);
+			}
+		});
+	});
+
+	describe('Port-only manager', () => {
+		it('MemoryManager does not branch on `instanceof VaultStore`', () => {
+			const managerPath = path.join(MEMORY_DIR, 'manager.ts');
+			if (!fs.existsSync(managerPath)) return;
+			const content = stripComments(fs.readFileSync(managerPath, 'utf-8'));
+			if (/instanceof\s+VaultStore/.test(content)) {
+				throw new Error(
+					`MemoryManager must talk to its store only through MemoryStorePort. ` +
+						`Vault-specific behaviour belongs on the port (e.g. semanticRecall) or behind the optional links argument of appendEntry.`
+				);
+			}
+		});
+
+		it('MemoryManager does not import VaultStore at runtime', () => {
+			const managerPath = path.join(MEMORY_DIR, 'manager.ts');
+			if (!fs.existsSync(managerPath)) return;
+			const content = fs.readFileSync(managerPath, 'utf-8');
+			// Guard against value imports of VaultStore. Type-only imports are
+			// fine because they never produce runtime code.
+			const valueImport = /^\s*import\s+\{[^}]*\bVaultStore\b[^}]*\}\s+from\s+['"][^'"]*vault[^'"]*['"]/m;
+			if (valueImport.test(content)) {
+				throw new Error(
+					`MemoryManager must not value-import VaultStore. The manager dispatches via MemoryStorePort + optional capability methods.`
+				);
+			}
+		});
+
+		it('memory module does not import config/schema (uses types/memory.types instead)', () => {
+			const violations = getTypeScriptSources(MEMORY_DIR)
+				.filter((file) => importsFrom(fs.readFileSync(file, 'utf-8'), 'config/schema'))
+				.map((file) => path.relative(ROOT, file));
+
+			if (violations.length > 0) {
+				throw new Error(
+					`memory/ must not depend on config/schema; the canonical MemoryRetentionConfig lives in types/memory.types.\n` +
+						`Violations:\n  - ${violations.join('\n  - ')}`
 				);
 			}
 		});

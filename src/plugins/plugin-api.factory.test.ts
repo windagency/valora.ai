@@ -21,6 +21,12 @@ vi.mock('llm/registry', () => ({
 	}))
 }));
 
+vi.mock('memory/registry', () => ({
+	getMemoryRegistry: vi.fn(() => ({
+		registerProvider: vi.fn()
+	}))
+}));
+
 vi.mock('config/loader', () => ({
 	getConfigLoader: vi.fn(() => ({
 		getRaw: vi.fn(() => ({}))
@@ -85,6 +91,62 @@ describe('createPluginAPI', () => {
 		api.providers.register('anthropic', FakeProvider as never);
 
 		expect(mockRegister).toHaveBeenCalledWith('anthropic', FakeProvider, { owner: 'plugin-a', override: false });
+	});
+
+	describe('api.memory.register()', () => {
+		it('passes plugin name as owner when registering a memory provider', async () => {
+			const { getMemoryRegistry } = await import('memory/registry');
+			const mockRegister = vi.fn();
+			vi.mocked(getMemoryRegistry).mockReturnValue({ registerProvider: mockRegister } as never);
+
+			const api = createPluginAPI(
+				{} as never,
+				makePlugin({ manifest: { name: 'my-mem-plugin', version: '1.0.0' } }),
+				makeRegistry()
+			);
+			const FakeMemory = class {};
+			const descriptor = { capabilities: ['embeddings'] as const, label: 'Fake' };
+			api.memory.register('vault', FakeMemory as never, descriptor as never);
+
+			expect(mockRegister).toHaveBeenCalledWith(
+				'vault',
+				FakeMemory,
+				{ owner: 'my-mem-plugin', override: false },
+				descriptor
+			);
+		});
+
+		it('sets override: true when memory key appears in manifest.overrides', async () => {
+			const { getMemoryRegistry } = await import('memory/registry');
+			const mockRegister = vi.fn();
+			vi.mocked(getMemoryRegistry).mockReturnValue({ registerProvider: mockRegister } as never);
+
+			const plugin = makePlugin({
+				manifest: { name: 'override-mem-plugin', version: '1.0.0', overrides: ['vault'] }
+			});
+			const api = createPluginAPI({} as never, plugin, makeRegistry());
+			const FakeMemory = class {};
+			api.memory.register('vault', FakeMemory as never);
+
+			expect(mockRegister).toHaveBeenCalledWith('vault', FakeMemory, {
+				owner: 'override-mem-plugin',
+				override: true
+			});
+		});
+
+		it('omits descriptor argument when none is provided', async () => {
+			const { getMemoryRegistry } = await import('memory/registry');
+			const mockRegister = vi.fn();
+			vi.mocked(getMemoryRegistry).mockReturnValue({ registerProvider: mockRegister } as never);
+
+			const api = createPluginAPI({} as never, makePlugin(), makeRegistry());
+			const FakeMemory = class {};
+			api.memory.register('test-mem', FakeMemory as never);
+
+			expect(mockRegister).toHaveBeenCalledWith('test-mem', FakeMemory, expect.any(Object));
+			// 3 args (no descriptor) when descriptor is undefined
+			expect(mockRegister.mock.calls[0]).toHaveLength(3);
+		});
 	});
 
 	it('accumulates activate hooks via api.lifecycle.onActivate()', () => {
