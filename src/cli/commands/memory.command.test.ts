@@ -5,34 +5,79 @@ import * as path from 'node:path';
 import { Command } from 'commander';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('memory/vault/vault-store', () => ({
-	VaultStore: vi.fn().mockImplementation(() => ({
-		getEntries: vi.fn().mockResolvedValue([]),
-		getVaultStats: vi.fn().mockReturnValue({ edgeCount: 5, embeddingCoverage: 0.75, entryCount: 10 })
-	}))
+import type { MemoryProvider, MemoryProviderInfo, MemoryVerifyReport } from 'types/memory.types';
+
+const fakeProviderInfo: MemoryProviderInfo = {
+	capabilities: ['embeddings', 'graph-edges'],
+	counts: { decisions: 2, episodic: 5, semantic: 3 },
+	edgeCount: 5,
+	embeddingCoverage: 0.75,
+	label: 'Valora Vault',
+	name: 'vault',
+	schemaVersion: 1
+};
+
+const fakeVerifyReport: MemoryVerifyReport = {
+	counts: { decisions: 2, episodic: 5, semantic: 3 },
+	issues: [],
+	ok: true
+};
+
+const fakeProvider: MemoryProvider = {
+	create: vi.fn(),
+	delete: vi.fn(),
+	findByPaths: vi.fn(),
+	flush: vi.fn(),
+	get: vi.fn(),
+	info: vi.fn().mockResolvedValue(fakeProviderInfo),
+	invalidateByPaths: vi.fn(),
+	markStaleByPaths: vi.fn(),
+	prune: vi.fn(),
+	purge: vi.fn(),
+	query: vi.fn().mockResolvedValue([]),
+	update: vi.fn(),
+	verify: vi.fn().mockResolvedValue(fakeVerifyReport)
+};
+
+vi.mock('memory/registry', () => ({
+	getMemoryRegistry: vi.fn(() => ({
+		getActive: vi.fn(() => fakeProvider),
+		hasActive: vi.fn(() => true)
+	})),
+	MemoryProviderConflictError: class MemoryProviderConflictError extends Error {
+		constructor(
+			public providerKey: string,
+			public existingOwner: string,
+			public incomingOwner: string
+		) {
+			super(`stub conflict: ${providerKey}`);
+		}
+	},
+	MemoryProviderRegistry: class MemoryProviderRegistry {},
+	resetMemoryRegistry: vi.fn()
 }));
 
-vi.mock('memory/migration/json-to-vault', () => ({
-	migrateJsonToVault: vi.fn().mockReturnValue({ migrated: 3, skipped: 0 })
-}));
-
-vi.mock('memory/migration/vault-version', () => ({
-	readVaultVersion: vi.fn().mockReturnValue(1)
-}));
+vi.mock('memory', async () => {
+	const actual = await vi.importActual<typeof import('memory')>('memory');
+	return {
+		...actual,
+		migrateJsonToVault: vi.fn().mockReturnValue({ migrated: 3, skipped: 0 })
+	};
+});
 
 vi.mock('output/color-adapter.interface', () => ({
 	getColorAdapter: vi.fn(() => ({
 		bold: (s: string) => s,
 		cyan: (s: string) => s,
 		dim: (s: string) => s,
+		gray: (s: string) => s,
 		green: (s: string) => s,
 		red: (s: string) => s,
 		yellow: (s: string) => s
 	}))
 }));
 
-import { VaultStore } from 'memory/vault/vault-store';
-import { migrateJsonToVault } from 'memory/migration/json-to-vault';
+import { migrateJsonToVault } from 'memory';
 import { configureMemoryCommand } from './memory.command';
 
 describe('configureMemoryCommand', () => {
@@ -43,12 +88,16 @@ describe('configureMemoryCommand', () => {
 		tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'valora-mem-cmd-'));
 		program = new Command();
 		program.exitOverride();
-		configureMemoryCommand(program, { vaultDir: path.join(tmpDir, 'vault'), jsonDir: path.join(tmpDir, 'json') });
+		configureMemoryCommand(program, { jsonDir: path.join(tmpDir, 'json'), vaultDir: path.join(tmpDir, 'vault') });
 	});
 
 	afterEach(() => {
 		fs.rmSync(tmpDir, { force: true, recursive: true });
 		vi.clearAllMocks();
+		// Restore default resolved values after clearAllMocks wipes them.
+		vi.mocked(fakeProvider.info).mockResolvedValue(fakeProviderInfo);
+		vi.mocked(fakeProvider.verify).mockResolvedValue(fakeVerifyReport);
+		vi.mocked(fakeProvider.query).mockResolvedValue([]);
 	});
 
 	it('registers a memory subcommand on the program', () => {
@@ -65,7 +114,7 @@ describe('configureMemoryCommand', () => {
 	});
 
 	describe('memory info', () => {
-		it('outputs vault entry count', async () => {
+		it('outputs vault entry total (sum of all category counts)', async () => {
 			const output: string[] = [];
 			const originalLog = console.log;
 			console.log = (...args: unknown[]) => output.push(args.join(' '));
@@ -73,6 +122,7 @@ describe('configureMemoryCommand', () => {
 			await program.parseAsync(['node', 'valora', 'memory', 'info']);
 
 			console.log = originalLog;
+			// 5 episodic + 3 semantic + 2 decisions = 10
 			expect(output.some((line) => line.includes('10'))).toBe(true);
 		});
 
@@ -118,15 +168,9 @@ describe('configureMemoryCommand', () => {
 	});
 
 	describe('memory verify', () => {
-		it('reads entries from the vault store', async () => {
+		it('calls the active provider verify()', async () => {
 			await program.parseAsync(['node', 'valora', 'memory', 'verify']);
-
-			const mockStore = vi.mocked(VaultStore).mock.results[0]?.value as {
-				getEntries: ReturnType<typeof vi.fn>;
-				getVaultStats: ReturnType<typeof vi.fn>;
-			};
-			expect(mockStore).toBeDefined();
-			expect(mockStore.getEntries).toHaveBeenCalled();
+			expect(fakeProvider.verify).toHaveBeenCalled();
 		});
 
 		it('outputs a summary line after verifying', async () => {

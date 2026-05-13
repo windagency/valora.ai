@@ -1,10 +1,12 @@
 ---
-updated: 2026-05-07
+updated: 2026-05-11
 ---
 
 # ADR-011: Biologically-Inspired Agent Memory System
 
 > **Decision**: Implement a native exponential-decay memory system for Valora agents rather than adopting an external library dependency.
+
+> **Note (2026-05):** This ADR describes the decay model and tag-based recall semantics of the **bundled vault plugin**. Since [ADR-016](./016-memory-as-plugin.md), the host owns only the `MemoryProvider` contract and a registry; the decay/recall behaviour documented below belongs to `@windagency/valora-plugin-memory-vault`. A user who installs an alternative memory plugin will get whatever recall and retention semantics that plugin chooses to implement.
 
 ## Status
 

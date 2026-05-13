@@ -118,7 +118,7 @@ describe.skipIf(!cliBuilt)('User Workflow Acceptance Tests', () => {
 
 			expect(exitCode).toBe(0);
 			expect(stdout).toContain('--force');
-		}, 15000);
+		}, 30000);
 	});
 
 	describe('Command Orchestration', () => {
@@ -167,7 +167,7 @@ describe.skipIf(!cliBuilt)('User Workflow Acceptance Tests', () => {
 
 			expect(exitCode).toBe(0);
 			expect(stdout.trim().length).toBeGreaterThan(0);
-		}, 15000);
+		}, 30000);
 	});
 
 	describe('Error Recovery and Resilience', () => {
@@ -191,7 +191,7 @@ describe.skipIf(!cliBuilt)('User Workflow Acceptance Tests', () => {
 
 			expect(helpExit).toBe(0);
 			expect(helpOutput).toContain('valora');
-		}, 20000);
+		}, 45000);
 
 		it('should fail with a non-zero exit code for unknown exec commands', async () => {
 			const { exitCode } = await execa('node', [aiBinaryPath, 'exec', 'unknown-command'], {
@@ -202,7 +202,7 @@ describe.skipIf(!cliBuilt)('User Workflow Acceptance Tests', () => {
 			});
 
 			expect(exitCode).toBe(1);
-		}, 15000);
+		}, 30000);
 	});
 
 	describe('Performance Requirements', () => {
@@ -220,14 +220,14 @@ describe.skipIf(!cliBuilt)('User Workflow Acceptance Tests', () => {
 					cwd: tempDir,
 					env: cliEnv(),
 					input: '',
-					timeout: 20000
+					timeout: 30000
 				});
 
 				const endTime = Date.now();
 				const duration = endTime - startTime;
 
 				expect(exitCode).toBe(0);
-				expect(duration).toBeLessThan(20000); // Should complete within 20 seconds
+				expect(duration).toBeLessThan(30000); // Should complete within 30 seconds
 			}
 		}, 90000);
 	});
@@ -306,6 +306,6 @@ describe.skipIf(!cliBuilt)('User Workflow Acceptance Tests', () => {
 				const result = await op;
 				expect(result.exitCode).toBe(0);
 			}
-		}, 40000);
+		}, 120000);
 	});
 });

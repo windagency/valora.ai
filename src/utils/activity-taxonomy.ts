@@ -25,6 +25,7 @@ const PLUGIN_ACTIVITY_MAP: Record<string, Activity> = {
 	'valora-plugin-compression-python': Activity.Optimisation,
 	'valora-plugin-compression-typescript': Activity.Optimisation,
 	'valora-plugin-compression-universal': Activity.Optimisation,
+	'valora-plugin-memory-vault': Activity.Infrastructure,
 	'valora-plugin-obsidian': Activity.Platform,
 	'valora-plugin-ollama': Activity.Platform,
 	'valora-plugin-openrouter': Activity.Platform,

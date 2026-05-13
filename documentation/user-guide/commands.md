@@ -1005,7 +1005,9 @@ valora feedback --command=implement --satisfaction=8 --suggest-improvements
 
 ## consolidate _(Experimental)_
 
-> Consolidate and prune the biologically-inspired memory stores. Runs automatically after `feedback` completes successfully; invoke manually for maintenance.
+> Consolidate and prune the agent memory stores. Runs automatically after `feedback` completes successfully; invoke manually for maintenance.
+>
+> The command delegates to the active memory provider via the registry — the bundled vault performs prune → git-invalidate → cosine/Jaccard merge → promote → flush. A different memory plugin may implement consolidation differently or treat it as a no-op; consult that plugin's documentation. The options below correspond to the vault's behaviour.
 
 ```bash
 valora consolidate [options]

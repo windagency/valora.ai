@@ -76,7 +76,11 @@ export default defineConfig({
 		exclude: ['node_modules', 'dist', 'coverage'],
 		globals: true,
 		hookTimeout: 120000, // 2 minutes for architecture tests that need to parse all files
-		include: ['src/**/*.{test,spec}.ts', '__tests__/**/*.{test,spec}.ts'],
+		include: [
+			'src/**/*.{test,spec}.ts',
+			'__tests__/**/*.{test,spec}.ts',
+			'packages/valora-plugin-memory-vault/src/**/*.{test,spec}.ts'
+		],
 		// Use threads for better performance, but allow fallback to single thread
 		pool: process.env.CI ? 'threads' : 'forks',
 		poolOptions: {

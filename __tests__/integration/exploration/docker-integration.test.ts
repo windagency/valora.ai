@@ -147,7 +147,7 @@ describe('Docker Integration Tests', () => {
 	describe('WorktreeManager', () => {
 		it('should create a git worktree', async () => {
 			const branchName = `test-worktree-${Date.now()}`;
-			const worktreePath = path.join(testRepoDir, '..', 'worktrees', branchName);
+			const worktreePath = path.join(testRepoDir, 'worktrees', branchName);
 
 			const result = await worktreeManager.createWorktree({
 				branch: branchName,
@@ -212,7 +212,7 @@ describe('Docker Integration Tests', () => {
 			}
 
 			const branchName = `test-container-${Date.now()}`;
-			const worktreePath = path.join(testRepoDir, '..', 'worktrees', branchName);
+			const worktreePath = path.join(testRepoDir, 'worktrees', branchName);
 
 			// Create worktree first
 			await worktreeManager.createWorktree({
@@ -270,7 +270,7 @@ describe('Docker Integration Tests', () => {
 			}
 
 			const branchName = `test-exec-${Date.now()}`;
-			const worktreePath = path.join(testRepoDir, '..', 'worktrees', branchName);
+			const worktreePath = path.join(testRepoDir, 'worktrees', branchName);
 
 			// Create worktree
 			await worktreeManager.createWorktree({
@@ -344,7 +344,7 @@ describe('Docker Integration Tests', () => {
 			const worktrees = [];
 			for (let i = 1; i <= config.branches; i++) {
 				const branchName = `${exploration.id}-branch-${i}`;
-				const worktreePath = path.join(testRepoDir, '..', 'worktrees', branchName);
+				const worktreePath = path.join(testRepoDir, 'worktrees', branchName);
 
 				const worktreeInfo = await worktreeManager.createWorktree({
 					branch: branchName,

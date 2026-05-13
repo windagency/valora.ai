@@ -29,6 +29,13 @@ Valora is a TypeScript CLI/MCP orchestration platform for multi-agent AI workflo
 | Memory data governance and purge     | `documentation/user-guide/memory-data-governance.md`    |
 | System card (auditor reference)      | `documentation/architecture/system-card.md`             |
 
+## Most important behavioural rules
+
+1. **Don’t assume. Don’t hide confusion. Surface tradeoffs.**
+2. **Minimum code that solves the problem. Nothing speculative.**
+3. **Touch only what you must. Clean up only your own mess.**
+4. **Define success criteria. Loop until verified.**
+
 ## Non-negotiable rules
 
 1. **TDD always.** Write the failing test before any implementation code.

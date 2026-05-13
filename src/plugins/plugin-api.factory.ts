@@ -1,5 +1,7 @@
 import type { ZodType } from 'zod';
 
+import { getMemoryRegistry } from 'memory/registry';
+
 import type { DIContainer } from 'di/container';
 import type { LoadedPlugin } from 'types/plugin.types';
 
@@ -65,6 +67,17 @@ export function createPluginAPI(
 			}
 		},
 		logger,
+		memory: {
+			register(name, provider, descriptor) {
+				const override = resolvedOverrides.has(name) || (plugin.manifest.overrides?.includes(name) ?? false);
+				const options = { override, owner: plugin.manifest.name };
+				if (descriptor !== undefined) {
+					getMemoryRegistry().registerProvider(name, provider, options, descriptor);
+				} else {
+					getMemoryRegistry().registerProvider(name, provider, options);
+				}
+			}
+		},
 		providers: {
 			register(name, provider, descriptor) {
 				const override = resolvedOverrides.has(name) || (plugin.manifest.overrides?.includes(name) ?? false);

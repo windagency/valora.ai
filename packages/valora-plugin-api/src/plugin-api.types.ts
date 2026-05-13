@@ -1,6 +1,10 @@
 /* eslint-disable no-unused-vars -- pure type declarations; param names are documentation */
 import type { ZodType, ZodTypeAny } from 'zod';
 
+import type { MemoryProviderClass, MemoryProviderDescriptor, MemoryProviderFactory } from './memory.types.js';
+
+export type PluginMemoryProvider = MemoryProviderClass | MemoryProviderFactory;
+
 /**
  * Compression strategy function — takes raw command output and the command
  * name, returns a compressed/filtered string.
@@ -51,6 +55,9 @@ export interface PluginAPI {
 	};
 	lifecycle: PluginLifecycleHooks;
 	logger: PluginLogger;
+	memory: {
+		register(name: string, provider: PluginMemoryProvider, descriptor?: MemoryProviderDescriptor): void;
+	};
 	providers: {
 		register(name: string, provider: PluginProvider, descriptor?: ProviderDescriptor): void;
 	};

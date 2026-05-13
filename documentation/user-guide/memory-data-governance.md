@@ -1,14 +1,16 @@
 ---
-updated: 2026-05-07
+updated: 2026-05-11
 ---
 
 # Memory Data Governance
 
 > **Regulation:** EU AI Act Article 10 — Data and data governance.
 
-## What is stored
+> **Note on backends ([ADR-016](../adr/016-memory-as-plugin.md)):** Retention, pruning, purge, and on-disk format are properties of the **active memory provider**, not of Valora core. The descriptions below cover the **default `'vault'` provider** (`@windagency/valora-plugin-memory-vault`). A site that installs a different memory plugin must consult that plugin's documentation for equivalent guarantees — the host only knows which provider is active and that it implements the `MemoryProvider` contract.
 
-Valora maintains a local memory vault at `.valora/memory/vault/` (or `~/.valora/memory/vault/` when not in a project context). Memory entries are plain Markdown files with YAML frontmatter. No data is sent to any server; all memory is local to the machine running Valora.
+## What is stored (default `'vault'` provider)
+
+The bundled vault maintains a local memory store at `.valora/memory/vault/` (or `~/.valora/memory/vault/` when not in a project context). Memory entries are plain Markdown files with YAML frontmatter. No data is sent to any server; all memory is local to the machine running Valora.
 
 | Store       | Purpose                                                                      | Default half-life |
 | ----------- | ---------------------------------------------------------------------------- | ----------------- |
@@ -16,11 +18,13 @@ Valora maintains a local memory vault at `.valora/memory/vault/` (or `~/.valora/
 | `semantic`  | Promoted long-term knowledge (architectural patterns, team conventions)      | 30 days           |
 | `decisions` | Architectural decisions and rationale                                        | 21 days           |
 
-Half-life values are configured in `src/config/constants.ts:254-272` and can be overridden via `config.memory.*_half_life_days`.
+Half-life values live under `plugins.memory-vault.*_half_life_days` and are validated by the bundled vault's own schema. Other memory plugins are free to choose different stores, granularities, or retention models entirely.
 
-## Decay and automatic pruning
+## Decay and automatic pruning (default `'vault'` provider)
 
-Memory entries decay exponentially over time using a configurable half-life. Entries below the `prune_threshold` (default: strength < 0.05) are removed when `valora memory prune` is run or during automatic consolidation.
+Memory entries in the bundled vault decay exponentially over time using a configurable half-life. Entries below `plugins.memory-vault.prune_threshold` (default: strength < 0.05) are removed when `valora memory prune` is run or during automatic consolidation.
+
+Other memory plugins may implement different retention policies (TTL, LRU, retention windows, or no decay at all). The `MemoryProvider.prune()` method is part of the contract and every provider implements it, but the meaning of "pruned" is provider-defined.
 
 ## How to inspect memory
 

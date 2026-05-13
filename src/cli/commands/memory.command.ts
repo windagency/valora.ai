@@ -1,15 +1,9 @@
-import {
-	MemoryManager,
-	migrateJsonToVault,
-	openVectorStore,
-	readVaultVersion,
-	resolveEmbedder,
-	VaultStore
-} from 'memory';
+import { migrateJsonToVault, openVectorStore, parseVaultPluginConfig, resolveEmbedder, VaultStore } from 'memory';
+import { getMemoryRegistry } from 'memory/registry';
 import { createSecurityEvent } from 'security/security-event.types';
 
 import type { CommandAdapter } from 'cli/command-adapter.interface';
-import type { MemoryCategory, MemoryEntry } from 'types/memory.types';
+import type { MemoryCategory, MemoryEntry, MemoryProvider } from 'types/memory.types';
 
 import {
 	DEFAULT_MEMORY_EMBED_BATCH_SIZE,
@@ -71,25 +65,21 @@ export function configureMemoryCommand(program: CommandAdapter, dirs: MemoryComm
 		.command('info')
 		.description('Show vault statistics (entry count, edge count, embedding coverage)')
 		.action(async () => {
-			const store = new VaultStore(vaultDir);
-			// Load entries to populate the index
-			await store.getEntries('episodic');
-			await store.getEntries('semantic');
-			await store.getEntries('decisions');
-			const stats = store.getVaultStats();
-			const version = readVaultVersion(vaultDir);
+			const info = await activeProvider().info();
+			const totalEntries = info.counts.episodic + info.counts.semantic + info.counts.decisions;
 
-			console.log(color.bold('Memory vault info'));
-			console.log(`  Schema version:      ${version ?? 'none (no vault)'}`);
-			console.log(`  Entries:             ${stats.entryCount}`);
-			console.log(`  Edges:               ${stats.edgeCount}`);
-			console.log(`  Embedding coverage:  ${Math.round(stats.embeddingCoverage * 100)}%`);
+			console.log(color.bold(`Memory provider: ${info.label} (${info.name})`));
+			console.log(`  Schema version:      ${info.schemaVersion ?? 'none (no vault)'}`);
+			console.log(`  Entries:             ${totalEntries}`);
+			console.log(`  Edges:               ${info.edgeCount ?? 0}`);
+			console.log(`  Embedding coverage:  ${Math.round((info.embeddingCoverage ?? 0) * 100)}%`);
 		});
 
 	memory
 		.command('migrate')
 		.description('Migrate legacy JSON stores into the Markdown vault')
 		.action(() => {
+			// Vault-specific tooling: bypasses the registry by design
 			console.log(color.cyan('Migrating JSON memory stores to vault…'));
 			const result = migrateJsonToVault({ jsonDir, vaultDir });
 			console.log(color.green(`Migration complete: ${result.migrated} migrated, ${result.skipped} skipped`));
@@ -99,21 +89,12 @@ export function configureMemoryCommand(program: CommandAdapter, dirs: MemoryComm
 		.command('verify')
 		.description('Verify all vault entries are readable and report coverage')
 		.action(async () => {
-			const store = new VaultStore(vaultDir);
-			let total = 0;
-			let failures = 0;
+			const report = await activeProvider().verify();
+			const total = report.counts.episodic + report.counts.semantic + report.counts.decisions;
 
-			for (const category of ['episodic', 'semantic', 'decisions'] as const) {
-				try {
-					const entries = await store.getEntries(category);
-					total += entries.length;
-				} catch {
-					failures++;
-				}
-			}
-
-			if (failures > 0) {
-				console.log(color.red(`Verify: ${failures} category read failures`));
+			if (!report.ok) {
+				console.log(color.red(`Verify: ${report.issues.length} issues`));
+				for (const issue of report.issues) console.log(color.red(`  - ${issue}`));
 			} else {
 				console.log(color.green(`Verify OK: ${total} entries readable across all categories`));
 			}
@@ -127,7 +108,7 @@ export function configureMemoryCommand(program: CommandAdapter, dirs: MemoryComm
 		.option('--older-than <duration>', 'Purge entries older than this duration (e.g. 7d, 30d, 24h)')
 		.option('--dry-run', 'Report what would be deleted without deleting')
 		.option('--yes', 'Skip confirmation prompt')
-		.action(async (options: PurgeOptions) => executePurge(options, color, vaultDir));
+		.action(async (options: PurgeOptions) => executePurge(options, color));
 
 	memory
 		.command('list')
@@ -136,7 +117,7 @@ export function configureMemoryCommand(program: CommandAdapter, dirs: MemoryComm
 		.option('--tag <tag>', 'Filter by tag')
 		.option('--agent <role>', 'Filter by agent role')
 		.option('--limit <n>', 'Maximum number of entries to display', '20')
-		.action(async (options: ListOptions) => executeList(options, color, vaultDir));
+		.action(async (options: ListOptions) => executeList(options, color));
 
 	memory
 		.command('reembed')
@@ -145,6 +126,10 @@ export function configureMemoryCommand(program: CommandAdapter, dirs: MemoryComm
 		.option('--model <name>', 'Override the embedding model from config')
 		.option('--dim <n>', 'Override the embedding dimension from config')
 		.action(async (options: ReembedOptions) => executeReembed(options, color, vaultDir));
+}
+
+function activeProvider(): MemoryProvider {
+	return getMemoryRegistry().getActive();
 }
 
 function assertPurgeTarget(
@@ -196,11 +181,9 @@ async function deleteExistingEmbeddings(vaultDir: string): Promise<void> {
 	}
 }
 
-async function executeList(options: ListOptions, color: ColorAdapter, vaultDir: string): Promise<void> {
-	const store = new VaultStore(vaultDir);
-	const manager = new MemoryManager(store);
+async function executeList(options: ListOptions, color: ColorAdapter): Promise<void> {
 	const limit = options.limit ? parseInt(options.limit, 10) : 20;
-	const results = await manager.query({
+	const results = await activeProvider().query({
 		agentRole: options.agent,
 		category: options.category as MemoryCategory | undefined,
 		limit,
@@ -224,22 +207,22 @@ async function executeList(options: ListOptions, color: ColorAdapter, vaultDir: 
 	}
 }
 
-async function executePurge(options: PurgeOptions, color: ColorAdapter, vaultDir: string): Promise<void> {
+async function executePurge(options: PurgeOptions, color: ColorAdapter): Promise<void> {
 	const { all, dryRun, olderThan, store, yes } = options;
 	assertPurgeTarget(all, store, olderThan, color);
 	const categories: MemoryCategory[] | undefined = store ? [store as MemoryCategory] : undefined;
 	const olderThanMs = resolvePurgeDuration(olderThan, color);
-	const manager = new MemoryManager(new VaultStore(vaultDir));
+	const provider = activeProvider();
 
 	if (dryRun) {
-		const result = await manager.purge({ all, categories, dryRun: true, olderThanMs });
+		const result = await provider.purge({ all, categories, dryRun: true, olderThanMs });
 		console.log(color.cyan(`Dry run: would delete ${result.totalWouldDelete} entries`));
 		return;
 	}
 
 	if (!yes && !(await confirmPurge(all, store, olderThan, color))) return;
 
-	const result = await manager.purge({ all, categories, dryRun: false, olderThanMs });
+	const result = await provider.purge({ all, categories, dryRun: false, olderThanMs });
 	const auditEvent = createSecurityEvent('memory_purged', 'low', {
 		all: all ?? false,
 		categories: categories ?? ['episodic', 'semantic', 'decisions'],
@@ -263,6 +246,8 @@ async function executeReembed(options: ReembedOptions, color: ColorAdapter, vaul
 	const resolved = await resolveReembedConfig(options, color);
 	if (resolved === null) return;
 
+	// Reembed manipulates the vault's binary embedding store directly. It is
+	// vault-specific tooling that bypasses the MemoryProvider port.
 	const store = new VaultStore(vaultDir);
 	const allEntries = await collectAllVaultEntries(store);
 	await deleteExistingEmbeddings(vaultDir);
@@ -304,8 +289,9 @@ function readMemoryConfigOrDefaults(): ReembedConfig {
 		model: DEFAULT_MEMORY_EMBED_MODEL
 	};
 	try {
-		const memoryConfig = getConfigLoader().get().memory;
-		const embedding = memoryConfig?.embedding;
+		const rawPlugins = getConfigLoader().getRaw()['plugins'] as Record<string, unknown> | undefined;
+		const memoryConfig = parseVaultPluginConfig(rawPlugins?.['memory-vault']);
+		const embedding = memoryConfig.embedding;
 		return {
 			batchSize: embedding?.batch_size ?? DEFAULT_MEMORY_EMBED_BATCH_SIZE,
 			dim: embedding?.dim ?? DEFAULT_MEMORY_EMBED_DIM,

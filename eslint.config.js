@@ -535,5 +535,36 @@ export default [
 		rules: {
 			'no-restricted-imports': 'off'
 		}
+	},
+	// Workspace packages: parent-relative imports reach sibling subdirectories
+	// inside the same package, which is the conventional pattern. The
+	// host-wide rule is to prevent host code from reaching across module
+	// boundaries; inside a single package the boundary is the package itself.
+	{
+		files: ['packages/*/src/**/*.{ts,tsx}'],
+		rules: {
+			'no-restricted-imports': 'off'
+		}
+	},
+	// Type-only declaration files in shared packages: parameter names are
+	// documentation, not runtime variables. The unused-args rule fights
+	// against meaningful naming in interface signatures.
+	{
+		files: [
+			'packages/valora-plugin-memory-vault/src/embeddings/embedder.port.ts',
+			'packages/valora-plugin-memory-vault/src/embeddings/llm-provider-embedder.ts',
+			'packages/valora-plugin-memory-vault/src/embeddings/vector-store.ts',
+			'packages/valora-plugin-memory-vault/src/vault/vault-store.ts',
+			'packages/valora-plugin-memory-vault/src/vault/vault-index.ts',
+			'packages/valora-plugin-memory-vault/src/manager.ts',
+			'packages/valora-plugin-memory-vault/src/store.ts',
+			'packages/valora-plugin-memory-vault/src/vault-memory-provider.ts',
+			'packages/valora-runtime/src/logger.ts',
+			'packages/valora-runtime/src/safe-exec.ts'
+		],
+		rules: {
+			'no-unused-vars': 'off',
+			'@typescript-eslint/no-unused-vars': 'off'
+		}
 	}
 ];

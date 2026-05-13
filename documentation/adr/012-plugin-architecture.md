@@ -1,5 +1,5 @@
 ---
-updated: 2026-05-07
+updated: 2026-05-11
 ---
 
 # ADR-012: Plugin Architecture
@@ -19,10 +19,11 @@ Accepted
 - **Permission gating** — the `shell-hooks` and `code-exec` permissions create explicit contracts; a misconfigured plugin that omits a permission simply won't have the corresponding surface registered.
 - **Graceful degradation** — manifest validation failures, missing binaries, and code-module import errors produce warnings, never hard failures. A failing strategy falls back to uncompressed output rather than crashing the pipeline.
 - **Reuses existing extension points** — `AgentLoader`, `CommandLoader`, `HookExecutionService` already support multiple directories; the plugin system feeds into these without new loading logic.
-- **Code plugins implemented (Approach C, full PluginAPI surface)** — As of April 2026, the `code` contribution type is active. The full `PluginAPI` is live: `compression`, `cli`, `config`, `lifecycle`, `providers`, `logger`. First-party reference plugins:
+- **Code plugins implemented (Approach C, full PluginAPI surface)** — As of April 2026, the `code` contribution type is active. The full `PluginAPI` is live: `compression`, `cli`, `config`, `lifecycle`, `providers`, `memory`, `logger`. First-party reference plugins:
   - **Compression** — `valora-plugin-compression-{universal,typescript,python}` register 17 tool strategies via `api.compression.registerStrategy()`. Reference for the simplest single-namespace plugin.
   - **Obsidian** — `valora-plugin-obsidian` exercises three namespaces simultaneously (`api.config.extend` + `api.lifecycle.onActivate` + `api.cli.addSubcommand`).
   - **OpenRouter** — `valora-plugin-openrouter` is the reference for the `providers` namespace.
+  - **Memory vault** — `valora-plugin-memory-vault` is the reference for the `memory` namespace, registered as the default `'vault'` backend at host boot (see [ADR-016](./016-memory-as-plugin.md)). A user plugin can replace it by registering its own `MemoryProvider` and setting `memory.provider` in config.
 - **Horizon 1 migration complete** — As of April 2026, all embedded built-in resources have been packaged into 10 named plugins under `packages/` and `data/plugins/`: `valora-core-secops`, `valora-core-design`, `valora-core-platform`, `valora-core-generators`, `valora-core-product`, `valora-core-qa`, `valora-core-quality-gate`, `valora-core-docs`, `valora-core-engineering`, `valora-core-implement`. The directory `data/commands/` is now docs-only. `data/agents/` retains `registry.json` for dynamic agent selection at runtime.
 
 ### Negative
@@ -141,7 +142,7 @@ Plugins are npm packages that export a `register(ctx: PluginContext)` function, 
 
 A plugin directory can optionally contain a compiled module at `codeEntrypoint` that must implement the `register(api: PluginAPI)` contract. Dynamic `import()` is used only for this file, gated on `contributes: ["code"]` and `permissions: ["code-exec"]` manifest declarations.
 
-**Implemented.** The `code` contribution type and the full `PluginAPI` (`compression`, `cli`, `config`, `lifecycle`, `providers`, `logger`) are active as of May 2026. Trust is layered:
+**Implemented.** The `code` contribution type and the full `PluginAPI` (`compression`, `cli`, `config`, `lifecycle`, `providers`, `memory`, `logger`) are active as of May 2026. Trust is layered:
 
 1. **Discovery containment** — `fs.realpathSync` ensures only directories whose real path is inside one of the four search roots are loaded.
 2. **Manifest validation** — Zod schema validates every manifest; mismatched `engines.valora` skips the plugin with a warn.

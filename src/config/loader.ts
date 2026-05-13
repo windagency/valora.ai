@@ -20,6 +20,7 @@ import {
 	DEFAULT_SESSION_DRY_RUN,
 	DEFAULT_SESSION_RETENTION_ENABLED
 } from './constants';
+import { assertNoLegacyMemoryKeys } from './memory-config-guard';
 import { type Config, CONFIG_SCHEMA, DEFAULT_CONFIG } from './schema';
 
 /**
@@ -81,6 +82,10 @@ export class ConfigLoader {
 			globalCliFlags ?? {},
 			cliOverrides ?? {}
 		);
+
+		// Reject the legacy `memory.*` shape with a targeted message before
+		// Zod's strict parser surfaces a generic "unrecognized key" error.
+		assertNoLegacyMemoryKeys(mergedConfig);
 
 		try {
 			this.config = CONFIG_SCHEMA.parse(mergedConfig);

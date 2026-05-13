@@ -1877,27 +1877,32 @@ Summarize ALL changes you made during tool execution. Output ONLY the JSON code 
 	 */
 	private async loadAgentMemory(executionContext: ExecutionContext): Promise<null | string> {
 		try {
-			const memory = await import('memory');
+			const { getMemoryRegistry } = await import('memory/registry');
 			const { formatMemoryForInjection } = await import('./memory-formatter');
 			const { getConfigLoader } = await import('config/loader');
+			const { parseVaultPluginConfig } = await import('@windagency/valora-plugin-memory-vault');
 
 			const config = getConfigLoader().get();
-			const memConfig = config.memory;
-			if (memConfig?.enabled === false) {
+			if (config.memory?.enabled === false) {
 				return null;
 			}
 
-			const vaultDir = memory.getDefaultVaultDir();
-			memory.runAutoMigrationIfNeeded(memory.getLegacyJsonDir(), vaultDir);
-			const store = new memory.VaultStore(vaultDir);
-			const embedder = await memory.resolveEmbedder(memConfig);
-			const manager = new memory.MemoryManager(store, memConfig, embedder);
+			const registry = getMemoryRegistry();
+			if (!registry.hasActive()) {
+				return null;
+			}
+			const provider = registry.getActive();
+
+			// Memory injection thresholds live in the vault plugin's namespace;
+			// pull them from the raw plugin config and fall back to defaults if unset.
+			const rawPlugins = getConfigLoader().getRaw()['plugins'] as Record<string, unknown> | undefined;
+			const vaultConfig = parseVaultPluginConfig(rawPlugins?.['memory-vault']);
 
 			const tags = [executionContext.commandName, executionContext.agentRole].filter(Boolean);
-			const minStrength = memConfig?.injection_strength_threshold ?? 0.2;
-			const tokenBudget = memConfig?.injection_token_budget ?? 2000;
+			const minStrength = vaultConfig.injection_strength_threshold;
+			const tokenBudget = vaultConfig.injection_token_budget;
 
-			const results = await manager.query({
+			const results = await provider.query({
 				agentRole: executionContext.agentRole,
 				limit: 20,
 				minStrength,
@@ -1910,7 +1915,7 @@ Summarize ALL changes you made during tool execution. Output ONLY the JSON code 
 				return null;
 			}
 
-			await manager.flush();
+			await provider.flush();
 			return formatMemoryForInjection(results, tokenBudget);
 		} catch {
 			// Non-fatal: memory injection failure must never block pipeline execution

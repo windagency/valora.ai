@@ -21,8 +21,7 @@ import * as path from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { parseMemoryFile, serialiseMemoryFile } from 'memory/vault/file-format';
-import { VaultStore } from 'memory/vault/vault-store';
+import { parseMemoryFile, serialiseMemoryFile, VaultStore } from '@windagency/valora-plugin-memory-vault';
 
 import type { MemoryEntry } from 'types/memory.types';
 
@@ -139,6 +138,48 @@ describe('memory ↔ obsidian vault parity', () => {
 
 			const parsed = parseMemoryFile(fs.readFileSync(onDisk, 'utf-8'), entry.id);
 			expect(parsed.entry.embeddingStale).toBe(true);
+		});
+	});
+
+	describe('reverse direction — Obsidian edits propagate back into VaultStore reads', () => {
+		it('VaultStore.getEntries() returns the updated body after the user edits the .md file externally', async () => {
+			const projectVault = projectVaultUnder(tmpRoot);
+			const store = new VaultStore(projectVault);
+			const entry: MemoryEntry = {
+				accessCount: 2,
+				agentRole: 'lead',
+				category: 'episodic',
+				confidence: 'observed',
+				content: 'Original content from Valora',
+				createdAt: '2026-05-07T08:00:00.000Z',
+				halfLifeDays: 7,
+				id: 'mem-parity-reverse001',
+				isError: false,
+				lastAccessedAt: '2026-05-07T08:00:00.000Z',
+				relatedPaths: [],
+				sessionId: 'ses-rev',
+				source: { command: 'implement' },
+				tags: ['reverse'],
+				updatedAt: '2026-05-07T08:00:00.000Z'
+			};
+
+			await store.appendEntry('episodic', entry);
+			const onDisk = path.join(projectVault, 'episodic', `${entry.id}.md`);
+
+			// Simulate Obsidian editing the body section of the Markdown file.
+			// We reserialise with updated content, mimicking what Obsidian would write.
+			const updatedEntry: MemoryEntry = { ...entry, content: 'Refined by Obsidian user' };
+			const updatedMd = serialiseMemoryFile(updatedEntry, []);
+			fs.writeFileSync(onDisk, updatedMd);
+
+			// Force VaultStore to reload from disk by flushing and re-querying
+			const freshStore = new VaultStore(projectVault);
+			const entries = await freshStore.getEntries('episodic');
+			const reloaded = entries.find((e) => e.id === entry.id);
+
+			expect(reloaded).toBeDefined();
+			expect(reloaded!.content).toBe('Refined by Obsidian user');
+			expect(reloaded!.tags).toEqual(['reverse']);
 		});
 	});
 

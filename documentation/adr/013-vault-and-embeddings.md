@@ -1,16 +1,18 @@
 ---
-updated: 2026-05-07
+updated: 2026-05-11
 ---
 
 # ADR-013: Memory Vault — Per-Memory Markdown Files with Embeddings
 
 > **Decision**: Extend the biological memory system with a per-memory Markdown vault and optional content embeddings computed via the existing `LLMProvider` abstraction, replacing the three flat JSON stores introduced in ADR-011.
 
+> **Note (2026-05):** This ADR describes the on-disk format, embedding pipeline, and retrieval semantics of the **bundled vault plugin**. Since [ADR-016](./016-memory-as-plugin.md), the implementation lives in `packages/valora-plugin-memory-vault/` and is reached via the `MemoryProvider` contract. Other memory plugins are free to use a different on-disk layout — the format documented here is specific to `'vault'`.
+
 ## Status
 
 Accepted
 
-> Implementation landed in Valora 2.6.0. See `src/memory/vault/`, `src/memory/embeddings/`, `src/memory/retrieval/`, `src/memory/consolidation/`, and `src/memory/migration/`. The legacy JSON `MemoryStore` is retained only as a migration source and is no longer instantiated by production code paths (enforced by arch-unit tests in `__tests__/architecture/vault-memory.arch.test.ts`).
+> Implementation landed in Valora 2.6.0 and moved into `packages/valora-plugin-memory-vault/` in 2.7.0 ([ADR-016](./016-memory-as-plugin.md)). See `packages/valora-plugin-memory-vault/src/vault/`, `.../embeddings/`, `.../retrieval/`, `.../consolidation/`, and `.../migration/`. The legacy JSON `MemoryStore` is retained only as a migration source and is no longer instantiated by production code paths (enforced by arch-unit tests in `__tests__/architecture/vault-memory.arch.test.ts` and `__tests__/architecture/memory-plugin.arch.test.ts`).
 
 ## Consequences
 

@@ -1,7 +1,7 @@
 /**
  * Agent Selection Analytics Service
  *
- * Tracks and analyses dynamic agent selection metrics for Phase 7 rollout monitoring
+ * Tracks and analyses dynamic agent selection metrics for rollout monitoring
  */
 
 import type { AgentSelection, TaskContext } from 'types/agent.types';
