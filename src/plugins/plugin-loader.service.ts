@@ -191,9 +191,8 @@ export class PluginLoaderService {
 
 			const unenforcedPermissions = this.collectUnenforcedPermissions(manifest);
 			if (unenforcedPermissions) {
-				this.logger.warn(
-					`Plugin "${manifest.name}" declares informational permissions that the host does not enforce: ` +
-						`${unenforcedPermissions.join(', ')}. Treat these as documentation; behaviour is unchanged.`,
+				this.logger.debug(
+					`Plugin "${manifest.name}" declares unenforced permissions: ${unenforcedPermissions.join(', ')}`,
 					{ permissions: unenforcedPermissions, plugin: manifest.name }
 				);
 			}

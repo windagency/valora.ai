@@ -14,9 +14,12 @@ fi
 
 REGISTRY="${VALORA_NPM_REGISTRY_URL:?VALORA_NPM_REGISTRY_URL must be set in .env}"
 
-# Parse the host:port from the registry URL to configure the npm auth token
+# Strip the scheme to get host:port, then extract just the port number.
+# host:port is used for the npm auth token key; port alone is used when
+# rewriting the URL for the demo container (127.0.0.1 → host.docker.internal).
 REGISTRY_HOST_PORT="${REGISTRY#http://}"
 REGISTRY_HOST_PORT="${REGISTRY_HOST_PORT#https://}"
+REGISTRY_PORT="${REGISTRY_HOST_PORT##*:}"
 
 # Set a dummy auth token so the npm client doesn't reject the publish request
 # client-side (Verdaccio accepts $all with no auth plugin configured)
@@ -54,9 +57,13 @@ echo "Publishing @windagency/valora..."
 REGISTRY_SERVER_PORT=4874
 REGISTRY_JSON="$WORKSPACE_ROOT/data/plugins/registry.json"
 
-# Kill any previous registry file server and start a fresh one so the demo
-# container always gets the hashes that match what was just published
-pkill -f "node.*valora-registry-server" 2>/dev/null || true
+# Release port 4874. Kill by port rather than by process name because Node.js
+# rewrites process.title, making the process invisible to pkill -f patterns.
+# Poll until the OS confirms the port is free before binding the new server.
+fuser -k -9 "${REGISTRY_SERVER_PORT}/tcp" 2>/dev/null || true
+while fuser "${REGISTRY_SERVER_PORT}/tcp" > /dev/null 2>&1; do
+    sleep 0.1
+done
 node --title valora-registry-server -e "
 const http = require('http');
 const fs = require('fs');
@@ -71,4 +78,4 @@ http.createServer((req, res) => {
 echo ""
 echo "All packages published. In the demo container run:"
 echo "  export VALORA_PLUGIN_REGISTRY_URL=http://host.docker.internal:$REGISTRY_SERVER_PORT/registry.json"
-echo "  pnpm add -g @windagency/valora --registry http://host.docker.internal:${REGISTRY_HOST_PORT}"
+echo "  pnpm add -g @windagency/valora --registry http://host.docker.internal:${REGISTRY_PORT}"

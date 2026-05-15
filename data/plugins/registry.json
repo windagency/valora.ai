@@ -155,7 +155,7 @@
 	{
 		"contributes": [],
 		"description": "Pure-leaf runtime utilities shared across Valora plugins.",
-		"integrity": "sha256-jqJHfEHEb8na+j2lvs854tJDEHq/tY7FrEIv584Aa8c=",
+		"integrity": "sha256-qFkgxYAOsXYG/1FKbARTf7kN8scrGATainxsGhzt17w=",
 		"name": "valora-runtime",
 		"package": "@windagency/valora-runtime",
 		"path": "../../packages/valora-runtime",
