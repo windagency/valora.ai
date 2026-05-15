@@ -89,11 +89,26 @@ export class PluginLoaderService {
 	 * security checks in command-discovery continue to pass for plugin resources.
 	 */
 	loadAll(config?: PluginsConfig): LoadedPlugin[] {
-		const loaded = this.discovery
-			.discoverWithSource()
-			.map(({ dir, location }) => this.loadPlugin(dir, location, config))
+		const discovered = this.discovery.discoverWithSource();
+		const installedDirByName = this.buildInstalledDirByName(discovered.map((d) => d.dir));
+		const loaded = discovered
+			.map(({ dir, location }) => this.loadPlugin(dir, location, config, installedDirByName))
 			.filter((plugin): plugin is LoadedPlugin => plugin !== null);
 		return this.sortByDependencies(loaded);
+	}
+
+	private buildInstalledDirByName(dirs: string[]): Map<string, string> {
+		const map = new Map<string, string>();
+		for (const dir of dirs) {
+			try {
+				const raw = fs.readFileSync(path.join(dir, PLUGIN_MANIFEST_FILE), 'utf-8');
+				const parsed = JSON.parse(raw) as { name?: string };
+				if (parsed.name) map.set(parsed.name, dir);
+			} catch {
+				// unreadable manifests are silently skipped
+			}
+		}
+		return map;
 	}
 
 	private checkEngineCompatibility(manifest: PluginManifest): null | string {
@@ -136,7 +151,12 @@ export class PluginLoaderService {
 		}
 	}
 
-	private loadPlugin(pluginDir: string, location: PluginLocation, config?: PluginsConfig): LoadedPlugin | null {
+	private loadPlugin(
+		pluginDir: string,
+		location: PluginLocation,
+		config?: PluginsConfig,
+		installedDirByName?: Map<string, string>
+	): LoadedPlugin | null {
 		const manifestPath = path.join(pluginDir, PLUGIN_MANIFEST_FILE);
 
 		try {
@@ -166,6 +186,8 @@ export class PluginLoaderService {
 
 			// Register with ResourceResolver so command-discovery's isAllowedDirectory passes.
 			getResourceResolver().registerPluginDir(pluginDir);
+
+			if (installedDirByName) this.wireNodeModulesForRequires(pluginDir, manifest, installedDirByName);
 
 			const unenforcedPermissions = this.collectUnenforcedPermissions(manifest);
 			if (unenforcedPermissions) {
@@ -239,6 +261,16 @@ export class PluginLoaderService {
 			...(has('mcps') && { mcpsFile: this.resolveMcpsFile(pluginDir, manifest) }),
 			...(has('validators') && { validatorModules: this.resolveValidatorModules(pluginDir, manifest) })
 		};
+	}
+
+	private resolveDepPackageName(depDir: string, depName: string): string {
+		try {
+			const pkg = JSON.parse(fs.readFileSync(path.join(depDir, 'package.json'), 'utf-8')) as { name?: string };
+			if (pkg.name) return pkg.name;
+		} catch {
+			// fall through to convention
+		}
+		return depName.startsWith('@') ? depName : `@windagency/${depName}`;
 	}
 
 	private resolveHookCommandPaths(hooks: HooksConfig, pluginDir: string): HooksConfig {
@@ -359,5 +391,32 @@ export class PluginLoaderService {
 		}
 
 		return sorted;
+	}
+
+	private wireNodeModulesForRequires(
+		pluginDir: string,
+		manifest: PluginManifest,
+		installedDirByName: Map<string, string>
+	): void {
+		for (const dep of manifest.requires ?? []) {
+			const depDir = installedDirByName.get(dep);
+			if (!depDir) continue;
+
+			const packageName = this.resolveDepPackageName(depDir, dep);
+			const symlinkPath = path.join(pluginDir, 'node_modules', ...packageName.split('/'));
+
+			if (fs.existsSync(symlinkPath)) continue;
+
+			try {
+				fs.mkdirSync(path.dirname(symlinkPath), { recursive: true });
+				fs.symlinkSync(depDir, symlinkPath);
+			} catch (err) {
+				if ((err as NodeJS.ErrnoException).code !== 'EEXIST') {
+					this.logger.warn(`Failed to wire node_modules for "${dep}" in "${manifest.name}"`, {
+						error: (err as Error).message
+					});
+				}
+			}
+		}
 	}
 }

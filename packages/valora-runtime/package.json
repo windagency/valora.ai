@@ -39,7 +39,8 @@
 		"test": "vitest run"
 	},
 	"files": [
-		"dist"
+		"dist",
+		"valora-plugin.json"
 	],
 	"dependencies": {
 		"nanoid": "^5.0.0"

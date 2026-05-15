@@ -47,6 +47,14 @@ if [ -S /var/run/docker.sock ]; then
     sudo chmod 666 /var/run/docker.sock
 fi
 
+# Install Verdaccio (local npm registry for testing packed packages)
+if ! command -v verdaccio &> /dev/null; then
+    echo "Installing Verdaccio..."
+    pnpm add -g verdaccio
+else
+    echo "Verdaccio already installed."
+fi
+
 # Install modern CLI tools (from documentation modern-cli-toolkit)
 echo "Installing modern CLI tools..."
 SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"

@@ -697,6 +697,117 @@ describe('PluginLoaderService — unenforced permissions audit', () => {
 	});
 });
 
+describe('PluginLoaderService — node_modules wiring for requires', () => {
+	let vaultDir: string;
+	let runtimeDir: string;
+
+	beforeEach(() => {
+		vaultDir = fs.mkdtempSync(path.join(os.tmpdir(), 'valora-vault-wire-'));
+		runtimeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'valora-runtime-wire-'));
+	});
+
+	afterEach(() => {
+		fs.rmSync(vaultDir, { recursive: true, force: true });
+		fs.rmSync(runtimeDir, { recursive: true, force: true });
+	});
+
+	it('creates a node_modules symlink so code plugins can import their required deps', () => {
+		writeJson(path.join(vaultDir, 'valora-plugin.json'), {
+			name: 'valora-plugin-memory-vault',
+			version: '1.0.0',
+			contributes: ['code'],
+			permissions: ['code-exec'],
+			codeEntrypoint: 'dist/index.js',
+			requires: ['valora-runtime']
+		});
+		writeJson(path.join(runtimeDir, 'valora-plugin.json'), {
+			name: 'valora-runtime',
+			version: '1.0.0'
+		});
+		writeJson(path.join(runtimeDir, 'package.json'), {
+			name: '@windagency/valora-runtime',
+			version: '1.0.0'
+		});
+
+		const loader = new PluginLoaderService({
+			discoverWithSource: () => [
+				{ dir: vaultDir, location: 'user' as const },
+				{ dir: runtimeDir, location: 'user' as const }
+			]
+		} as never);
+
+		loader.loadAll();
+
+		const symlinkPath = path.join(vaultDir, 'node_modules', '@windagency', 'valora-runtime');
+		expect(fs.existsSync(symlinkPath)).toBe(true);
+		expect(fs.lstatSync(symlinkPath).isSymbolicLink()).toBe(true);
+		expect(fs.realpathSync(symlinkPath)).toBe(fs.realpathSync(runtimeDir));
+	});
+
+	it('falls back to the @windagency convention when the dep has no package.json', () => {
+		writeJson(path.join(vaultDir, 'valora-plugin.json'), {
+			name: 'valora-plugin-memory-vault',
+			version: '1.0.0',
+			requires: ['valora-runtime']
+		});
+		writeJson(path.join(runtimeDir, 'valora-plugin.json'), {
+			name: 'valora-runtime',
+			version: '1.0.0'
+		});
+
+		const loader = new PluginLoaderService({
+			discoverWithSource: () => [
+				{ dir: vaultDir, location: 'user' as const },
+				{ dir: runtimeDir, location: 'user' as const }
+			]
+		} as never);
+
+		loader.loadAll();
+
+		const symlinkPath = path.join(vaultDir, 'node_modules', '@windagency', 'valora-runtime');
+		expect(fs.existsSync(symlinkPath)).toBe(true);
+	});
+
+	it('skips wiring when the required dependency is not among discovered plugins', () => {
+		writeJson(path.join(vaultDir, 'valora-plugin.json'), {
+			name: 'valora-plugin-memory-vault',
+			version: '1.0.0',
+			requires: ['valora-runtime']
+		});
+
+		const loader = new PluginLoaderService({
+			discoverWithSource: () => [{ dir: vaultDir, location: 'user' as const }]
+		} as never);
+
+		loader.loadAll();
+
+		const symlinkPath = path.join(vaultDir, 'node_modules', '@windagency', 'valora-runtime');
+		expect(fs.existsSync(symlinkPath)).toBe(false);
+	});
+
+	it('is idempotent when loadAll is called multiple times', () => {
+		writeJson(path.join(vaultDir, 'valora-plugin.json'), {
+			name: 'valora-plugin-memory-vault',
+			version: '1.0.0',
+			requires: ['valora-runtime']
+		});
+		writeJson(path.join(runtimeDir, 'valora-plugin.json'), {
+			name: 'valora-runtime',
+			version: '1.0.0'
+		});
+
+		const loader = new PluginLoaderService({
+			discoverWithSource: () => [
+				{ dir: vaultDir, location: 'user' as const },
+				{ dir: runtimeDir, location: 'user' as const }
+			]
+		} as never);
+
+		loader.loadAll();
+		expect(() => loader.loadAll()).not.toThrow();
+	});
+});
+
 describe('PluginLoaderService — engines.valora compatibility', () => {
 	let tmpDir: string;
 

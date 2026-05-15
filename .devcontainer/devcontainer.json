@@ -29,9 +29,11 @@
 		"docker-socket": "[ -S /var/run/docker.sock ] && sudo chmod 666 /var/run/docker.sock || true",
 		"welcome": "echo '✅ Sandbox Ready!'"
 	},
-	"forwardPorts": [6080],
+	"forwardPorts": [6080, 4873, 4874],
 	"portsAttributes": {
-		"6080": { "label": "Desktop (noVNC)", "onAutoForward": "notify" }
+		"6080": { "label": "Desktop (noVNC)", "onAutoForward": "notify" },
+		"4873": { "label": "Verdaccio (local registry)", "onAutoForward": "silent" },
+		"4874": { "label": "Plugin registry JSON", "onAutoForward": "silent" }
 	},
 	"remoteEnv": {
 		// Get a display inside the container without any host-side setup

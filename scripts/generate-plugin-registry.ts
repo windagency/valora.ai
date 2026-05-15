@@ -1,15 +1,19 @@
 #!/usr/bin/env node
-import { spawnSync } from 'child_process';
-import { createHash } from 'crypto';
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'fs';
-import { tmpdir } from 'os';
-import { dirname, join, resolve } from 'path';
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'fs';
+import { dirname, join, relative, resolve } from 'path';
 import { fileURLToPath } from 'url';
+
+import { computeIntegrity } from './compute-registry-integrity.ts';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '..');
 const packagesDir = join(repoRoot, 'packages');
 const outputPath = join(repoRoot, 'data', 'plugins', 'registry.json');
+
+// When set, integrity is computed by downloading from the live registry (matches
+// exactly what the installer downloads). Required when pnpm publish rewrites JSON
+// field order — otherwise pnpm pack locally and npm pack from registry diverge.
+const registryUrl = process.env['VALORA_NPM_REGISTRY_URL'];
 
 interface PluginManifest {
 	contributes?: string[];
@@ -28,28 +32,6 @@ interface RegistryEntry {
 	version: string;
 }
 
-function computeIntegrity(packageDir: string): string {
-	const tmp = mkdtempSync(join(tmpdir(), 'valora-registry-pack-'));
-	try {
-		const pack = spawnSync('npm', ['pack', packageDir, '--pack-destination', tmp, '--silent'], {
-			cwd: repoRoot,
-			encoding: 'utf-8'
-		});
-		if (pack.status !== 0) {
-			throw new Error(`npm pack failed for ${packageDir}: ${pack.stderr}`);
-		}
-		const tarball = readdirSync(tmp).find((f) => f.endsWith('.tgz'));
-		if (!tarball) {
-			throw new Error(`npm pack produced no tarball for ${packageDir}`);
-		}
-		const hash = createHash('sha256');
-		hash.update(readFileSync(join(tmp, tarball)));
-		return `sha256-${hash.digest('base64')}`;
-	} finally {
-		rmSync(tmp, { force: true, recursive: true });
-	}
-}
-
 const entries: RegistryEntry[] = [];
 
 for (const dirName of readdirSync(packagesDir)) {
@@ -65,9 +47,11 @@ for (const dirName of readdirSync(packagesDir)) {
 		continue;
 	}
 
+	const packageName = `@windagency/${dirName}`;
+
 	let integrity: string;
 	try {
-		integrity = computeIntegrity(packageDir);
+		integrity = computeIntegrity(packageDir, packageName, registryUrl);
 	} catch (err) {
 		console.warn(`Skipping ${dirName}: failed to compute integrity (${(err as Error).message})`);
 		continue;
@@ -78,8 +62,9 @@ for (const dirName of readdirSync(packagesDir)) {
 		description: manifest.description ?? '',
 		integrity,
 		name: dirName,
-		package: `@windagency/${dirName}`,
-		path: `packages/${dirName}`,
+		package: packageName,
+		// Relative to the registry file so it resolves correctly regardless of CWD
+		path: relative(dirname(outputPath), packageDir),
 		version: manifest.version ?? '0.0.0'
 	});
 }

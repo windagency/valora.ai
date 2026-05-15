@@ -1,0 +1,21 @@
+storage: /home/node/.local/share/verdaccio/storage
+uplinks:
+  npmjs:
+    url: https://registry.npmjs.org/
+packages:
+  '@windagency/*':
+    access: $all
+    publish: $all
+  '@*/*':
+    access: $all
+    publish: $all
+    proxy: npmjs
+  '**':
+    access: $all
+    publish: $all
+    proxy: npmjs
+listen: 0.0.0.0:4873
+server:
+  keepAliveTimeout: 60
+log:
+  - { type: stdout, format: pretty, level: warn }

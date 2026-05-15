@@ -292,7 +292,8 @@ function resolveLocalPluginDir(shortName: string): null | string {
 		}>;
 		const entry = entries.find((e) => e.name === shortName);
 		if (!entry?.path) return null;
-		const resolved = path.resolve(entry.path);
+		// Paths are stored relative to the registry file, not the process CWD
+		const resolved = path.resolve(path.dirname(registryFile), entry.path);
 		return fs.existsSync(resolved) ? resolved : null;
 	} catch {
 		return null;
