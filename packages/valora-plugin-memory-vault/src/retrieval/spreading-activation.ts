@@ -1,8 +1,8 @@
 import type { ConfidenceTier, Edge } from '@windagency/valora-plugin-api';
 
-import { computeStrength } from '@windagency/valora-plugin-memory-vault';
-
 import type { VaultRecord } from '../vault/vault-index.js';
+
+import { computeStrength } from '../decay.js';
 
 const CONFIDENCE_WEIGHT: Record<ConfidenceTier, number> = {
 	inferred: 0.4,

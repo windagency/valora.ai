@@ -113,6 +113,21 @@ describe('configureMemoryCommand', () => {
 		expect(names).toContain('verify');
 	});
 
+	describe('bootstrap', () => {
+		it('calls the injected bootstrap function before running a memory subcommand', async () => {
+			const bootstrap = vi.fn().mockResolvedValue(undefined);
+			const bootstrapProgram = new Command();
+			bootstrapProgram.exitOverride();
+			configureMemoryCommand(bootstrapProgram, {
+				bootstrap,
+				jsonDir: path.join(tmpDir, 'json'),
+				vaultDir: path.join(tmpDir, 'vault')
+			});
+			await bootstrapProgram.parseAsync(['node', 'valora', 'memory', 'info']);
+			expect(bootstrap).toHaveBeenCalledOnce();
+		});
+	});
+
 	describe('memory info', () => {
 		it('outputs vault entry total (sum of all category counts)', async () => {
 			const output: string[] = [];

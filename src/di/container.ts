@@ -604,7 +604,7 @@ function setupDefaultServices(container: DIContainer): void {
  * CLI startup time for commands that don't need memory (e.g. --help).
  * Falls back to all-defaults when the loader has not yet run.
  */
-async function bootstrapMemoryFromConfig(): Promise<void> {
+export async function bootstrapMemoryFromConfig(): Promise<void> {
 	const [{ parseVaultPluginConfig }, { bootstrapBundledMemoryProvider }] = await Promise.all([
 		import('@windagency/valora-plugin-memory-vault'),
 		import('memory/bootstrap')

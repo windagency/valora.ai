@@ -41,8 +41,5 @@
 	"files": [
 		"dist",
 		"valora-plugin.json"
-	],
-	"dependencies": {
-		"nanoid": "^5.0.0"
-	}
+	]
 }

@@ -28,7 +28,7 @@ import { DEFAULT_STATE } from 'updater/state';
 import { autoInstallOutdatedPlugins } from 'cli/auto-plugin-install';
 import { silentSpawnRunner } from 'cli/spawn-runner';
 import { getConfigLoader, setGlobalCliOverrides } from 'config/loader';
-import { createContainer, dispatchDeactivateHooks, initializePlugins } from 'di/container';
+import { bootstrapMemoryFromConfig, createContainer, dispatchDeactivateHooks, initializePlugins } from 'di/container';
 import { getGlobalConfigDir, getRuntimeDataDir, getValoraVersion } from 'utils/paths';
 import { handlePromptCancellation, isPromptCancellation } from 'utils/prompt-handler';
 
@@ -157,7 +157,7 @@ configureInitCommand(program);
 configureBatchCommand(program);
 configureMapCommand(program);
 const memoryDir = path.join(getRuntimeDataDir(), 'memory');
-configureMemoryCommand(program, { jsonDir: memoryDir, vaultDir: memoryDir });
+configureMemoryCommand(program, { bootstrap: bootstrapMemoryFromConfig, jsonDir: memoryDir, vaultDir: memoryDir });
 configurePluginCommand(program);
 configureAgentsAuditCommand(program);
 configureTraceCommand(program);

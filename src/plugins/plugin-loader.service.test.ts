@@ -806,6 +806,48 @@ describe('PluginLoaderService — node_modules wiring for requires', () => {
 		loader.loadAll();
 		expect(() => loader.loadAll()).not.toThrow();
 	});
+
+	it('wires symlinks from peerDependencies even when requires is absent from valora-plugin.json', () => {
+		writeJson(path.join(vaultDir, 'valora-plugin.json'), {
+			name: 'valora-plugin-memory-vault',
+			version: '1.0.0',
+			contributes: ['code'],
+			permissions: ['code-exec'],
+			codeEntrypoint: 'dist/index.js'
+			// no requires field — simulates an old tarball without it
+		});
+		writeJson(path.join(vaultDir, 'package.json'), {
+			name: '@windagency/valora-plugin-memory-vault',
+			version: '1.0.0',
+			peerDependencies: {
+				'@windagency/valora': '>=0.1.0',
+				'@windagency/valora-runtime': '*'
+			}
+		});
+		writeJson(path.join(runtimeDir, 'valora-plugin.json'), {
+			name: 'valora-runtime',
+			version: '1.0.0'
+		});
+		writeJson(path.join(runtimeDir, 'package.json'), {
+			name: '@windagency/valora-runtime',
+			version: '1.0.0'
+		});
+		writeFile(path.join(vaultDir, 'dist', 'index.js'), 'export function register(api) {}');
+
+		const loader = new PluginLoaderService({
+			discoverWithSource: () => [
+				{ dir: vaultDir, location: 'user' as const },
+				{ dir: runtimeDir, location: 'user' as const }
+			]
+		} as never);
+
+		loader.loadAll();
+
+		const symlinkPath = path.join(vaultDir, 'node_modules', '@windagency', 'valora-runtime');
+		expect(fs.existsSync(symlinkPath)).toBe(true);
+		expect(fs.lstatSync(symlinkPath).isSymbolicLink()).toBe(true);
+		expect(fs.realpathSync(symlinkPath)).toBe(fs.realpathSync(runtimeDir));
+	});
 });
 
 describe('PluginLoaderService — engines.valora compatibility', () => {

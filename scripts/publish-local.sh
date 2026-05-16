@@ -38,6 +38,11 @@ until curl -sf "$REGISTRY" > /dev/null 2>&1; do
 done
 echo "Verdaccio ready at $REGISTRY"
 
+# ignore-scripts=true in .npmrc prevents prepublishOnly from running during
+# pnpm publish, so we must build explicitly first.
+echo "Building all packages..."
+(cd "$WORKSPACE_ROOT" && pnpm run build)
+
 for pkg_json in "$WORKSPACE_ROOT"/packages/*/package.json; do
     pkg_dir="$(dirname "$pkg_json")"
     name=$(node -p "require('$pkg_json').name")
@@ -76,6 +81,10 @@ http.createServer((req, res) => {
 " &
 
 echo ""
-echo "All packages published. In the demo container run:"
+echo "All packages published."
+echo ""
+echo "Run the following commands in the DEMO CONTAINER terminal"
+echo "(copy-paste them — do not click the URLs, VS Code remaps ports):"
+echo ""
 echo "  export VALORA_PLUGIN_REGISTRY_URL=http://host.docker.internal:$REGISTRY_SERVER_PORT/registry.json"
 echo "  pnpm add -g @windagency/valora --registry http://host.docker.internal:${REGISTRY_PORT}"

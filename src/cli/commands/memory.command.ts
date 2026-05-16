@@ -14,6 +14,7 @@ import { getConfigLoader } from 'config/loader';
 import { getColorAdapter } from 'output/color-adapter.interface';
 
 export interface MemoryCommandDirs {
+	bootstrap?: () => Promise<void>;
 	jsonDir: string;
 	vaultDir: string;
 }
@@ -60,6 +61,10 @@ export function configureMemoryCommand(program: CommandAdapter, dirs: MemoryComm
 	const { jsonDir, vaultDir } = dirs;
 
 	const memory = program.command('memory').description('Inspect and manage the Valora memory vault');
+
+	if (dirs.bootstrap) {
+		memory.hook('preAction', dirs.bootstrap);
+	}
 
 	memory
 		.command('info')

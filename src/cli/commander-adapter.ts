@@ -100,6 +100,11 @@ export class CommanderCommandAdapter implements CommanderCommandContract {
 		return this.cmd;
 	}
 
+	hook(event: 'postAction' | 'preAction', fn: () => Promise<void> | void): CommandAdapter {
+		this.cmd.hook(event, fn as Parameters<CommanderCommand['hook']>[1]);
+		return this;
+	}
+
 	name(str: string): CommandAdapter {
 		this.cmd.name(str);
 		return this;

@@ -35,7 +35,7 @@
 		"pnpm": "10.19.0"
 	},
 	"scripts": {
-		"build": "tsc -b",
+		"build": "tsc -b && esbuild src/index.ts --bundle --platform=node --format=esm --outfile=dist/index.js --external:@windagency/valora-runtime --external:@windagency/valora-plugin-api --banner:js=\"import { createRequire } from 'module'; const require = createRequire(import.meta.url);\"",
 		"clean": "rm -rf ./dist",
 		"lint": "eslint --color",
 		"lint:fix": "eslint --color --fix",
@@ -53,5 +53,8 @@
 		"@windagency/valora": ">=0.1.0",
 		"@windagency/valora-plugin-api": "workspace:*",
 		"@windagency/valora-runtime": "workspace:*"
+	},
+	"devDependencies": {
+		"esbuild": "^0.28.0"
 	}
 }

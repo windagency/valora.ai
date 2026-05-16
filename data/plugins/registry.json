@@ -65,7 +65,7 @@
 	{
 		"contributes": ["code"],
 		"description": "Bundled vault memory backend — biologically-inspired decay, graph retrieval, cosine + Jaccard consolidation. The default memory.provider.",
-		"integrity": "sha256-egRc6Kug2rbEvSu5+Cr0/U2M/9I2vKHl4tWaK+QVSuI=",
+		"integrity": "sha256-AEW5mW6aUkTuoJZAQ75cYyGfoCY/h1hIAkyNF8Xp/Y4=",
 		"name": "valora-plugin-memory-vault",
 		"package": "@windagency/valora-plugin-memory-vault",
 		"path": "../../packages/valora-plugin-memory-vault",
@@ -74,7 +74,7 @@
 	{
 		"contributes": ["code"],
 		"description": "Bridges the Valora memory vault to Obsidian — sets up vault config and opens it.",
-		"integrity": "sha256-wW5+aotLI2PNbcYK8XCV/A9Rbh654S+j3Z3Y4ZKSB8M=",
+		"integrity": "sha256-ZV8BA9WJogPGFljq4RHIBx53L4Tqe4UwLv7FEh6M/uU=",
 		"name": "valora-plugin-obsidian",
 		"package": "@windagency/valora-plugin-obsidian",
 		"path": "../../packages/valora-plugin-obsidian",
@@ -155,7 +155,7 @@
 	{
 		"contributes": [],
 		"description": "Pure-leaf runtime utilities shared across Valora plugins.",
-		"integrity": "sha256-qFkgxYAOsXYG/1FKbARTf7kN8scrGATainxsGhzt17w=",
+		"integrity": "sha256-j+ZXJXI3Lm10gykuyCCsTxRbH2PaCsmwFHltqDInD5Q=",
 		"name": "valora-runtime",
 		"package": "@windagency/valora-runtime",
 		"path": "../../packages/valora-runtime",

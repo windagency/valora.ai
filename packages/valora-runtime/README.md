@@ -60,7 +60,7 @@ throw new ProviderError(
 
 ## ID generation
 
-All functions wrap `nanoid` — do not add `nanoid` as a direct dependency.
+All functions use Node.js built-in `crypto.randomBytes` with a URL-safe 64-character alphabet identical to nanoid's default. No external dependencies.
 
 ```typescript
 import { generateId, generateMemoryId, generateSessionId, generateShortId } from '@windagency/valora-runtime';

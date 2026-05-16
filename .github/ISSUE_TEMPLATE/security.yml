@@ -10,7 +10,7 @@ body:
         Redact any sensitive values as `REDACTED` before submitting.
 
         For critical or sensitive vulnerabilities, please report privately by e-mail to
-        **damien.tivelet@qodea.com** instead of using this public template.
+        **damien@wind-agency.com** instead of using this public template.
 
   - type: dropdown
     id: severity

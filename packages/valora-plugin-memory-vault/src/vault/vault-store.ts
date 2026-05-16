@@ -9,7 +9,6 @@ import type {
 	MemoryStorePort
 } from '@windagency/valora-plugin-api';
 
-import { computeStrength } from '@windagency/valora-plugin-memory-vault';
 import { getLogger } from '@windagency/valora-runtime';
 import { existsSync, readFileSync, rmSync } from 'node:fs';
 import * as path from 'node:path';
@@ -21,6 +20,7 @@ import {
 	DEFAULT_MEMORY_RECALL_WALK_DEPTH,
 	MEMORY_STORE_VERSION
 } from '../constants.js';
+import { computeStrength } from '../decay.js';
 import { openVectorStore, type VectorStore } from '../embeddings/vector-store.js';
 import { readVaultVersion, writeVaultVersion } from '../migration/vault-version.js';
 import { topKCosine } from '../retrieval/cosine-ann.js';

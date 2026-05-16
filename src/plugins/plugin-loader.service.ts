@@ -122,10 +122,40 @@ export class PluginLoaderService {
 		);
 	}
 
+	private collectPeerDeps(pluginDir: string, installedDirByName: Map<string, string>): string[] {
+		try {
+			const pkgJson = JSON.parse(fs.readFileSync(path.join(pluginDir, 'package.json'), 'utf-8')) as {
+				peerDependencies?: Record<string, string>;
+			};
+			return Object.keys(pkgJson.peerDependencies ?? {}).flatMap((peer) => {
+				const [, shortName] = /^@windagency\/(.+)$/.exec(peer) ?? [];
+				return shortName && installedDirByName.has(shortName) ? [shortName] : [];
+			});
+		} catch {
+			return [];
+		}
+	}
+
 	private collectUnenforcedPermissions(manifest: PluginManifest): PluginPermission[] | undefined {
 		const declared = manifest.permissions ?? [];
 		const unenforced = UNENFORCED_PERMISSIONS.filter((p) => declared.includes(p));
 		return unenforced.length > 0 ? unenforced : undefined;
+	}
+
+	private createDepSymlink(dep: string, depDir: string, pluginDir: string, manifestName: string): void {
+		const packageName = this.resolveDepPackageName(depDir, dep);
+		const symlinkPath = path.join(pluginDir, 'node_modules', ...packageName.split('/'));
+		if (fs.existsSync(symlinkPath)) return;
+		try {
+			fs.mkdirSync(path.dirname(symlinkPath), { recursive: true });
+			fs.symlinkSync(depDir, symlinkPath);
+		} catch (err) {
+			if ((err as NodeJS.ErrnoException).code !== 'EEXIST') {
+				this.logger.warn(`Failed to wire node_modules for "${dep}" in "${manifestName}"`, {
+					error: (err as Error).message
+				});
+			}
+		}
 	}
 
 	private isEnabled(name: string, config?: PluginsConfig): boolean {
@@ -397,25 +427,10 @@ export class PluginLoaderService {
 		manifest: PluginManifest,
 		installedDirByName: Map<string, string>
 	): void {
-		for (const dep of manifest.requires ?? []) {
+		const deps = new Set([...(manifest.requires ?? []), ...this.collectPeerDeps(pluginDir, installedDirByName)]);
+		for (const dep of deps) {
 			const depDir = installedDirByName.get(dep);
-			if (!depDir) continue;
-
-			const packageName = this.resolveDepPackageName(depDir, dep);
-			const symlinkPath = path.join(pluginDir, 'node_modules', ...packageName.split('/'));
-
-			if (fs.existsSync(symlinkPath)) continue;
-
-			try {
-				fs.mkdirSync(path.dirname(symlinkPath), { recursive: true });
-				fs.symlinkSync(depDir, symlinkPath);
-			} catch (err) {
-				if ((err as NodeJS.ErrnoException).code !== 'EEXIST') {
-					this.logger.warn(`Failed to wire node_modules for "${dep}" in "${manifest.name}"`, {
-						error: (err as Error).message
-					});
-				}
-			}
+			if (depDir) this.createDepSymlink(dep, depDir, pluginDir, manifest.name);
 		}
 	}
 }

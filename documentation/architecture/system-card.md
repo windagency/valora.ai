@@ -13,7 +13,7 @@ updated: 2026-05-07
 | System name     | Valora                                  |
 | Version         | 2.5.0                                   |
 | Provider entity | Wind Agency / Damien TIVELET            |
-| Contact         | damien.tivelet@qodea.com                |
+| Contact         | damien@wind-agency.com                  |
 | Repository      | https://github.com/windagency/valora.ai |
 | Licence         | MIT                                     |
 

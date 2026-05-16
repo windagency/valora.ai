@@ -15,7 +15,7 @@ updated: 2026-05-06
 
 **Do not open a public GitHub issue for security vulnerabilities.**
 
-Report security issues by e-mail to **damien.tivelet@qodea.com** with the subject line `[Valora Security] <brief description>`.
+Report security issues by e-mail to **damien@wind-agency.com** with the subject line `[Valora Security] <brief description>`.
 
 We follow a **90-day coordinated disclosure** window. You will receive an acknowledgement within 48 hours and a status update within 7 days.
 

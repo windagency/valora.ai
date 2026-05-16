@@ -1,5 +1,5 @@
 commit 7ebd98879e974df228c648e25ee44e8f9ed4a4f0
-Author: Damien Tivelet <damien.tivelet@qodea.com>
+Author: Damien Tivelet <damien@wind-agency.com>
 Date:   Mon Apr 20 20:17:16 2026 +0000
 
     Add RTK plugin
