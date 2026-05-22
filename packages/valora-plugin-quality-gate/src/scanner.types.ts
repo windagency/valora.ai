@@ -10,7 +10,8 @@ export const CONCERN_CATEGORIES = [
 ] as const;
 
 export type ConcernCategory = (typeof CONCERN_CATEGORIES)[number];
-export type Severity = 'high' | 'low' | 'medium';
+// eslint-disable-next-line perfectionist/sort-union-types -- severity is ordered high→medium→low, not alphabetically
+export type Severity = 'high' | 'medium' | 'low';
 export type ViolationConcern = 'import' | ConcernCategory;
 
 export const AUDIT_CONFIG_SCHEMA = z.object({
