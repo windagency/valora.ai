@@ -1,18 +1,15 @@
 {
 	"name": "@windagency/valora-plugin-quality-gate",
 	"version": "1.0.0",
-	"description": "Asserter agent and pre-testing static-assertion commands for Valora (assert).",
+	"description": "Asserter agent and assert command (static pre-testing quality gate) plus audit scan — detects N×M concern accumulation across sibling directories.",
 	"keywords": [
 		"valora",
 		"valora-plugin",
-		"ai",
-		"agent",
 		"quality",
 		"assertion",
-		"static-analysis",
-		"validation",
-		"pre-testing",
-		"workflow"
+		"audit",
+		"architecture",
+		"duplication"
 	],
 	"author": "Damien TIVELET <damien@wind-agency.com>",
 	"repository": {
@@ -21,6 +18,14 @@
 	},
 	"license": "MIT",
 	"type": "module",
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js"
+		}
+	},
 	"engines": {
 		"node": ">=22.0.0"
 	},
@@ -30,19 +35,29 @@
 		"pnpm": "10.19.0"
 	},
 	"scripts": {
-		"build": "true",
-		"clean": "true",
+		"build": "tsc -b && esbuild src/index.ts --bundle --platform=node --format=esm --outfile=dist/index.js --external:@windagency/valora-plugin-api --banner:js=\"import { createRequire } from 'module'; const require = createRequire(import.meta.url);\"",
+		"clean": "rm -rf ./dist",
+		"lint": "eslint --color",
+		"lint:fix": "eslint --color --fix",
 		"beautify": "prettier --check \"**/*.+(js|jsx|ts|tsx|json|md|yml|yaml)\"",
 		"beautify:fix": "prettier --write \"**/*.+(js|jsx|ts|tsx|json|md|yml|yaml)\"",
-		"format": "pnpm beautify:fix",
-		"test": "true"
+		"format": "pnpm beautify:fix && pnpm lint:fix",
+		"test": "vitest run",
+		"prepublishOnly": "pnpm clean && pnpm build && pnpm test"
 	},
 	"files": [
 		"valora-plugin.json",
+		"dist",
 		"agents",
-		"commands"
+		"commands",
+		"prompts"
 	],
 	"peerDependencies": {
-		"@windagency/valora": ">=0.1.0"
+		"@windagency/valora": ">=0.1.0",
+		"@windagency/valora-plugin-api": "workspace:*"
+	},
+	"devDependencies": {
+		"esbuild": "^0.28.0",
+		"zod": "^3.22.4"
 	}
 }

@@ -362,6 +362,16 @@ importers:
       '@windagency/valora':
         specifier: '>=0.1.0'
         version: 2.4.0(ws@8.19.0)
+      '@windagency/valora-plugin-api':
+        specifier: workspace:*
+        version: link:../valora-plugin-api
+    devDependencies:
+      esbuild:
+        specifier: ^0.28.0
+        version: 0.28.0
+      zod:
+        specifier: ^3.22.4
+        version: 3.25.76
 
   packages/valora-plugin-rtk:
     dependencies:
