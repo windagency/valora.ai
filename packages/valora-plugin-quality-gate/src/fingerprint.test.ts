@@ -34,6 +34,12 @@ import path from 'node:path';`;
 		expect(result.size).toBe(1);
 		expect(result.has('lodash')).toBe(true);
 	});
+
+	it('extracts the full scoped package name including scope', () => {
+		const result = extractImports("import { PluginAPI } from '@windagency/valora-plugin-api';");
+		expect(result.has('@windagency/valora-plugin-api')).toBe(true);
+		expect(result.has('@windagency')).toBe(false);
+	});
 });
 
 describe('countConcernHits', () => {

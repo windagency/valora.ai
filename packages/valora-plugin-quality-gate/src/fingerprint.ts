@@ -28,7 +28,8 @@ export function extractImports(content: string): Set<string> {
 	for (const match of content.matchAll(IMPORT_REGEX)) {
 		const raw = match[1];
 		if (raw) {
-			imports.add(raw.split('/')[0] ?? raw);
+			const rootSegment = raw.startsWith('@') ? raw.split('/').slice(0, 2).join('/') : (raw.split('/')[0] ?? raw);
+			imports.add(rootSegment);
 		}
 	}
 	return imports;
