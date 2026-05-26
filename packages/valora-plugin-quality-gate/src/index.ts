@@ -21,15 +21,24 @@ export function register(api: PluginAPI): void {
 				.slice(1)
 				.join('=');
 
+		const parseIntFlag = (name: string, raw: string): number => {
+			const n = parseInt(raw, 10);
+			if (Number.isNaN(n)) throw new Error(`Flag --${name} must be an integer, got: ${raw}`);
+			return n;
+		};
+
+		const depthFlag = getFlag('depth');
+		const thresholdFlag = getFlag('threshold');
+		const excludeFlag = getFlag('exclude');
+		const concernsFlag = getFlag('concerns');
+
 		const baseConfig = getConfig();
 		const config = AUDIT_CONFIG_SCHEMA.parse({
 			...baseConfig,
-			...(getFlag('depth') !== undefined && { depth: parseInt(getFlag('depth')!, 10) }),
-			...(getFlag('threshold') !== undefined && {
-				threshold: parseInt(getFlag('threshold')!, 10)
-			}),
-			...(getFlag('exclude') !== undefined && { exclude: getFlag('exclude')!.split(',') }),
-			...(getFlag('concerns') !== undefined && { concerns: getFlag('concerns')!.split(',') })
+			...(depthFlag !== undefined && { depth: parseIntFlag('depth', depthFlag) }),
+			...(thresholdFlag !== undefined && { threshold: parseIntFlag('threshold', thresholdFlag) }),
+			...(excludeFlag !== undefined && { exclude: excludeFlag.split(',') }),
+			...(concernsFlag !== undefined && { concerns: concernsFlag.split(',') })
 		});
 
 		try {
