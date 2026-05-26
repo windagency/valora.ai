@@ -76,7 +76,15 @@ export default [
 	js.configs.recommended,
 	perfectionist.configs['recommended-natural'],
 	{
-		ignores: ['**/*.spec.ts', '**/*.test.ts', '**/*.config.ts', '**/*.config.cjs', '**/*.config.js', '**/*.config.mjs']
+		ignores: [
+			'**/*.spec.ts',
+			'**/*.test.ts',
+			'**/*.config.ts',
+			'**/*.config.cjs',
+			'**/*.config.js',
+			'**/*.config.mjs',
+			'**/__tests__/fixtures/**'
+		]
 	},
 	// Base config for all files (no type-checking)
 	{
