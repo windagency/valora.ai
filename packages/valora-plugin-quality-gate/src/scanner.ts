@@ -32,8 +32,8 @@ export async function scan(rootPath: string, config: AuditConfig): Promise<Audit
 			highSeverity: allViolations.filter((v) => v.severity === 'high').length,
 			lowSeverity: allViolations.filter((v) => v.severity === 'low').length,
 			mediumSeverity: allViolations.filter((v) => v.severity === 'medium').length,
-			...(parents.length === 0 && {
-				note: `No directories with 2+ siblings found within depth ${config.depth} from ${rootPath}`
+			...(siblingGroups.length === 0 && {
+				note: `No sibling groups with violations found within depth ${config.depth} from ${rootPath}`
 			}),
 			totalViolations: allViolations.length
 		},
