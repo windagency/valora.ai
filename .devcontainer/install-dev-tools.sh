@@ -3,9 +3,13 @@ set -e
 
 echo "Installing development tools..."
 
-# Ensure pnpm global bin directory exists
+# Ensure pnpm global bin directory exists and is on PATH
 echo "Configuring pnpm..."
 mkdir -p /home/node/.local/share/pnpm
+pnpm setup --force
+# shellcheck source=/dev/null
+source /home/node/.bashrc 2>/dev/null || true
+source /home/node/.zshrc 2>/dev/null || true
 
 # Ensure npm global bin directory exists (user-local, no sudo needed)
 echo "Configuring npm..."

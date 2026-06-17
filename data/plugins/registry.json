@@ -65,7 +65,7 @@
 	{
 		"contributes": ["code"],
 		"description": "Bundled vault memory backend — biologically-inspired decay, graph retrieval, cosine + Jaccard consolidation. The default memory.provider.",
-		"integrity": "sha256-AEW5mW6aUkTuoJZAQ75cYyGfoCY/h1hIAkyNF8Xp/Y4=",
+		"integrity": "sha256-XUbpfDgXpmbkskvMA+a2uci1q2J9b9CkMwAQrCvSUQE=",
 		"name": "valora-plugin-memory-vault",
 		"package": "@windagency/valora-plugin-memory-vault",
 		"path": "../../packages/valora-plugin-memory-vault",
@@ -74,7 +74,7 @@
 	{
 		"contributes": ["code"],
 		"description": "Bridges the Valora memory vault to Obsidian — sets up vault config and opens it.",
-		"integrity": "sha256-ZV8BA9WJogPGFljq4RHIBx53L4Tqe4UwLv7FEh6M/uU=",
+		"integrity": "sha256-qDTASD3HqA93M+0CeaU0nHeeD0h5dvjbWey/kK75WwE=",
 		"name": "valora-plugin-obsidian",
 		"package": "@windagency/valora-plugin-obsidian",
 		"path": "../../packages/valora-plugin-obsidian",
@@ -126,9 +126,9 @@
 		"version": "1.0.0"
 	},
 	{
-		"contributes": ["agents", "commands"],
-		"description": "Asserter agent and the assert command — static pre-testing quality gate (completeness, standards, type safety, security, architecture).",
-		"integrity": "sha256-FJKU1hCZVTJHsBvhYR7RqeP7y/7F2kMDfKX1z7wAgfo=",
+		"contributes": ["code", "agents", "commands", "prompts"],
+		"description": "Asserter agent and assert command (static pre-testing quality gate) plus audit scan — detects N×M concern accumulation across sibling directories.",
+		"integrity": "sha256-ef+q2GRA8mVUhsx4x9wTxvHof2sSJXXUZbXoNNQ+C4M=",
 		"name": "valora-plugin-quality-gate",
 		"package": "@windagency/valora-plugin-quality-gate",
 		"path": "../../packages/valora-plugin-quality-gate",
