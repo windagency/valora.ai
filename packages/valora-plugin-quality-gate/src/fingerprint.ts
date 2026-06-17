@@ -11,14 +11,19 @@ export const CONCERN_PATTERNS: Record<ConcernCategory, string[]> = {
 
 const IMPORT_REGEX = /(?:(?:import|from)\s+['"]|require\s*\(\s*['"])([^'"./][^'"]*)['"]/g;
 
+const REGEX_META = /[.*+?^${}()|[\]\\]/g;
+const WORD_EDGE = /[A-Za-z0-9_]/;
+
+/**
+ * Build a case-sensitive matcher that only fires on whole tokens. A `\b` anchor
+ * is added at each end whose adjacent keyword character is a word character, so
+ * `retry` matches `retry()` but not `retryable`, and `Error(` matches
+ * `new Error(` but not `TypeError(`.
+ */
 export function countConcernHits(content: string, keywords: string[]): number {
 	let hits = 0;
 	for (const keyword of keywords) {
-		let pos = 0;
-		while ((pos = content.indexOf(keyword, pos)) !== -1) {
-			hits++;
-			pos += keyword.length;
-		}
+		hits += content.match(buildKeywordMatcher(keyword))?.length ?? 0;
 	}
 	return hits;
 }
@@ -33,4 +38,11 @@ export function extractImports(content: string): Set<string> {
 		}
 	}
 	return imports;
+}
+
+function buildKeywordMatcher(keyword: string): RegExp {
+	const escaped = keyword.replace(REGEX_META, '\\$&');
+	const prefix = WORD_EDGE.test(keyword[0] ?? '') ? '\\b' : '';
+	const suffix = WORD_EDGE.test(keyword.at(-1) ?? '') ? '\\b' : '';
+	return new RegExp(`${prefix}${escaped}${suffix}`, 'g');
 }

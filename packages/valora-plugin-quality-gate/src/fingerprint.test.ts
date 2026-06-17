@@ -61,6 +61,27 @@ describe('countConcernHits', () => {
 		const hits = countConcernHits('CircuitBreaker half-open breaker', CONCERN_PATTERNS['circuit-breaker']);
 		expect(hits).toBe(3);
 	});
+
+	it('does not count a keyword embedded in a larger identifier', () => {
+		// "attempts" contains "attempt"; "retryable" contains "retry" — neither is a retry concern
+		expect(countConcernHits('let attempts = 0; const retryable = true;', CONCERN_PATTERNS['retry'])).toBe(0);
+	});
+
+	it('does not count "timeout" inside a longer camelCase identifier', () => {
+		expect(countConcernHits('const timeoutValue = 5; let mytimeout;', ['timeout'])).toBe(0);
+	});
+
+	it('does not count "try" inside words such as "retry" or "country"', () => {
+		expect(countConcernHits('const country = retry;', ['try'])).toBe(0);
+	});
+
+	it('does not count Error( inside a different error constructor', () => {
+		expect(countConcernHits('throw new TypeError(x);', ['Error('])).toBe(0);
+	});
+
+	it('still counts a standalone Error( constructor', () => {
+		expect(countConcernHits('throw new Error(x);', ['Error('])).toBe(1);
+	});
 });
 
 describe('CONCERN_PATTERNS', () => {
