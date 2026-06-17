@@ -28,10 +28,10 @@
 	"engines": {
 		"node": ">=22.0.0"
 	},
-	"packageManager": "pnpm@10.19.0",
+	"packageManager": "pnpm@11.7.0",
 	"volta": {
 		"node": "22.21.0",
-		"pnpm": "10.19.0"
+		"pnpm": "11.7.0"
 	},
 	"bin": {
 		"valora": "bin/valora.js",
@@ -128,16 +128,6 @@
 		"packages:format": "pnpm -r --filter './packages/*' format",
 		"packages:pack": "pnpm -r --filter './packages/*' pack",
 		"packages:test": "pnpm -r --filter './packages/*' test"
-	},
-	"pnpm": {
-		"onlyBuiltDependencies": [],
-		"overrides": {
-			"minimatch@^5": "5.1.8",
-			"minimatch@^9": "9.0.7",
-			"ajv@>=7.0.0-alpha.0 <8.18.0": "8.18.0",
-			"tmp@<=0.2.3": "0.2.4",
-			"qs@>=6.7.0 <=6.14.1": "6.14.2"
-		}
 	},
 	"dependencies": {
 		"@anthropic-ai/sdk": "^0.69.0",
