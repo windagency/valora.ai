@@ -32,16 +32,19 @@ export function register(api: PluginAPI): void {
 		const excludeFlag = getFlag('exclude');
 		const concernsFlag = getFlag('concerns');
 
-		const baseConfig = getConfig();
-		const config = AUDIT_CONFIG_SCHEMA.parse({
-			...baseConfig,
-			...(depthFlag !== undefined && { depth: parseIntFlag('depth', depthFlag) }),
-			...(thresholdFlag !== undefined && { threshold: parseIntFlag('threshold', thresholdFlag) }),
-			...(excludeFlag !== undefined && { exclude: excludeFlag.split(',') }),
-			...(concernsFlag !== undefined && { concerns: concernsFlag.split(',') })
-		});
-
+		// Resolve config, scan, and emit output under one guard so that any
+		// failure (invalid flag, unreadable root, write error) maps to a single
+		// non-zero exit, and the success path never runs the error handler.
+		let exitCode: number;
 		try {
+			const config = AUDIT_CONFIG_SCHEMA.parse({
+				...getConfig(),
+				...(depthFlag !== undefined && { depth: parseIntFlag('depth', depthFlag) }),
+				...(thresholdFlag !== undefined && { threshold: parseIntFlag('threshold', thresholdFlag) }),
+				...(excludeFlag !== undefined && { exclude: excludeFlag.split(',') }),
+				...(concernsFlag !== undefined && { concerns: concernsFlag.split(',') })
+			});
+
 			const report = await scan(path.resolve(rootArg), config);
 			const json = JSON.stringify(report, null, 2);
 			const outputPath = getFlag('output');
@@ -53,10 +56,12 @@ export function register(api: PluginAPI): void {
 				process.stdout.write(json + '\n');
 			}
 
-			process.exit(report.summary.totalViolations > 0 ? 1 : 0);
+			exitCode = report.summary.totalViolations > 0 ? 1 : 0;
 		} catch (e) {
 			api.logger.error('Audit scan failed', e instanceof Error ? e : new Error(String(e)));
-			process.exit(2);
+			exitCode = 2;
 		}
+
+		process.exit(exitCode);
 	});
 }
