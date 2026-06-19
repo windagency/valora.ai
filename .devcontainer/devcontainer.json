@@ -1,6 +1,6 @@
 {
 	"name": "Valora Sandbox",
-	"image": "mcr.microsoft.com/devcontainers/javascript-node:24",
+	"image": "mcr.microsoft.com/devcontainers/javascript-node:24-bookworm",
 	"features": {
 		"ghcr.io/devcontainers/features/common-utils:2": {
 			"username": "node",
@@ -9,6 +9,7 @@
 			"installOhMyZsh": true,
 			"configureZshAsDefaultShell": true
 		},
+		"ghcr.io/devcontainers/features/desktop-lite:1": {},
 		"ghcr.io/devcontainers/features/git:1": {}
 	},
 	// Mount docker socket for docker-in-docker scenarios
@@ -28,10 +29,21 @@
 		"docker-socket": "[ -S /var/run/docker.sock ] && sudo chmod 666 /var/run/docker.sock || true",
 		"welcome": "echo '✅ Sandbox Ready!'"
 	},
+	"forwardPorts": [6080, 4873, 4874],
+	"portsAttributes": {
+		"6080": { "label": "Desktop (noVNC)", "onAutoForward": "notify" },
+		"4873": { "label": "Verdaccio (local registry)", "onAutoForward": "silent" },
+		"4874": { "label": "Plugin registry JSON", "onAutoForward": "silent" }
+	},
 	"remoteEnv": {
-		"COMPOSE_DOCKER_CLI_BUILD": "1",
+		// Get a display inside the container without any host-side setup
+		"DISPLAY": ":1",
 		// Enable BuildKit for faster builds
+		"COMPOSE_DOCKER_CLI_BUILD": "1",
 		"DOCKER_BUILDKIT": "1",
+		// Local model server — host.docker.internal routes to your Mac from inside the container.
+		// Ollama must be started with OLLAMA_HOST=0.0.0.0 on the Mac host.
+		"LOCAL_BASE_URL": "http://host.docker.internal:11434/v1",
 		// Configure npm to use user-local prefix instead of system directory
 		"NPM_CONFIG_PREFIX": "/home/node/.npm-global",
 		"PATH": "/home/node/.local/bin:/home/node/.npm-global/bin:/home/node/.local/share/pnpm:${containerEnv:PATH}",

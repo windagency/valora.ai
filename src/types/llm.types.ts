@@ -4,11 +4,23 @@
 
 import type { GuidedMode } from './provider.types';
 
+export interface EmbeddingRequest {
+	input: string[];
+	model?: string;
+}
+
+export interface EmbeddingResult {
+	dim: number;
+	model: string;
+	vectors: number[][];
+}
+
 export interface LLMCompletionOptions {
 	max_tokens?: number;
 	messages: LLMMessage[];
 	mode?: string;
 	model?: string;
+	requires_thinking_trace?: boolean;
 	stop?: string[];
 	stream?: boolean;
 	temperature?: number;
@@ -48,6 +60,7 @@ export interface LLMMessage {
 
 export interface LLMProvider {
 	complete(options: LLMCompletionOptions): Promise<LLMCompletionResult>;
+	embed?(req: EmbeddingRequest): Promise<EmbeddingResult>;
 	getAlternativeModels(currentModel?: string): string[];
 	isConfigured(): boolean;
 	name: string;

@@ -1,0 +1,15 @@
+src/executor/output-compression.service.ts(17,10): error TS2345: Argument of type 'string' is not assignable to parameter of type 'number'.
+src/executor/output-compression.service.ts(42,7): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+src/executor/output-compression.service.ts(55,14): error TS2345: Argument of type 'null' is not assignable to parameter of type 'string'.
+src/executor/output-compression.service.ts(67,3): error TS2345: Argument of type 'string' is not assignable to parameter of type 'number'.
+src/executor/output-compression.service.ts(78,9): error TS2345: Argument of type 'boolean | undefined' is not assignable to parameter of type 'boolean'.
+src/plugins-src/valora-plugin-compression-typescript/strategies.ts(12,5): error TS2339: Property 'output' does not exist on type 'string'.
+src/plugins-src/valora-plugin-compression-typescript/strategies.ts(28,17): error TS2339: Property 'match' does not exist on type 'object'.
+src/plugins-src/valora-plugin-compression-typescript/strategies.ts(45,2): error TS2339: Property 'filter' does not exist on type 'string[]'.
+src/plugins-src/valora-plugin-compression-universal/strategies.ts(19,8): error TS2345: Argument of type 'string' is not assignable to parameter of type 'number'.
+src/plugins-src/valora-plugin-compression-universal/strategies.ts(33,12): error TS2339: Property 'split' does not exist on type 'unknown'.
+src/executor/stage-executor.ts(88,6): error TS2454: Variable 'result' is used before being assigned.
+src/executor/stage-executor.ts(102,14): error TS2454: Variable 'metrics' is used before being assigned.
+src/executor/tool-execution.service.ts(201,5): error TS2345: Argument of type 'string' is not assignable to parameter of type 'number'.
+src/cli/index.ts(14,1): error TS2345: Argument of type 'string' is not assignable to parameter of type 'number'.
+Found 14 errors in 6 files.

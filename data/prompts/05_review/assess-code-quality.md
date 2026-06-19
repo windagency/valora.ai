@@ -295,134 +295,19 @@ With:
 
 ## Output Format
 
-```json
-{
-	"quality_score": 72,
-	"quality_grade": "C",
-	"issues_found": {
-		"total": 23,
-		"by_severity": {
-			"critical": 1,
-			"high": 4,
-			"medium": 12,
-			"low": 6
-		},
-		"by_category": {
-			"security": 2,
-			"architecture": 3,
-			"performance": 5,
-			"maintainability": 8,
-			"standards": 4,
-			"type_safety": 1
-		}
-	},
-	"security_concerns": {
-		"critical_count": 1,
-		"high_count": 1,
-		"vulnerabilities": [
-			{
-				"severity": "critical",
-				"type": "sql_injection",
-				"location": "src/api/users.ts:67",
-				"cve": "CWE-89",
-				"description": "User input concatenated into SQL query",
-				"recommendation": "Use parameterized queries"
-			}
-		]
-	},
-	"blocking_issues": [
-		{
-			"id": "SEC-001",
-			"category": "security",
-			"severity": "critical",
-			"location": "src/api/users.ts:67",
-			"description": "SQL injection vulnerability",
-			"must_fix_reason": "Critical security risk, exploitable in production"
-		},
-		{
-			"id": "ARCH-001",
-			"category": "architecture",
-			"severity": "high",
-			"location": "src/components/UserList.tsx:45",
-			"description": "UI component directly imports database repository",
-			"must_fix_reason": "Violates layer separation, makes testing impossible"
-		}
-	],
-	"review_decision": "REQUEST_CHANGES",
-	"review_decision_reasoning": "2 blocking issues must be resolved. SQL injection is critical security risk. Layer violation prevents proper testing. Quality score of 72 is acceptable after fixes.",
-	"validation_results": {
-		"security": {
-			"status": "fail",
-			"critical_issues": 1,
-			"blocking": true
-		},
-		"architecture": {
-			"status": "fail",
-			"critical_issues": 0,
-			"high_issues": 1,
-			"blocking": true
-		},
-		"performance": {
-			"status": "warn",
-			"high_issues": 3,
-			"blocking": false
-		},
-		"maintainability": {
-			"status": "warn",
-			"medium_issues": 8,
-			"blocking": false
-		},
-		"standards": {
-			"status": "pass",
-			"warnings": 4,
-			"blocking": false
-		},
-		"type_safety": {
-			"status": "pass",
-			"blocking": false
-		}
-	},
-	"positive_observations": [
-		"Good test coverage for new features (85%)",
-		"Clear documentation for API changes",
-		"Consistent code style and formatting",
-		"Proper error handling in critical paths"
-	],
-	"recommendations_by_priority": {
-		"priority_1": [
-			{
-				"id": "SEC-001",
-				"action": "Fix SQL injection in users API",
-				"effort": "low",
-				"files": ["src/api/users.ts"]
-			},
-			{
-				"id": "ARCH-001",
-				"action": "Remove direct database import from UI component",
-				"effort": "medium",
-				"files": ["src/components/UserList.tsx"]
-			}
-		],
-		"priority_2": [
-			{
-				"id": "PERF-001",
-				"action": "Fix N+1 query in order service",
-				"effort": "low",
-				"files": ["src/services/order.service.ts"]
-			}
-		],
-		"priority_3": [
-			{
-				"id": "MAINT-001",
-				"action": "Refactor processOrder function (complexity 15)",
-				"effort": "medium",
-				"files": ["src/services/order.service.ts"]
-			}
-		]
-	},
-	"summary": "Code review identified 2 blocking issues requiring immediate attention. Critical SQL injection vulnerability must be fixed before merge. Once blocking issues are resolved, code will be ready for functional review. Good test coverage and documentation are positive aspects."
-}
-```
+Produce a JSON object with the following fields (pipeline enforces `quality_score`, `issues_found`, `security_concerns`, `blocking_issues`, `review_decision`):
+
+- `quality_score`: number 0–100
+- `quality_grade`: `"A"` | `"B"` | `"C"` | `"D"` | `"F"`
+- `issues_found`: `{ total, by_severity: { critical, high, medium, low }, by_category: { security, architecture, performance, maintainability, standards, type_safety } }`
+- `security_concerns`: `{ critical_count, high_count, vulnerabilities: [{ severity, type, location, cve?, description, recommendation }] }`
+- `blocking_issues`: `[{ id, category, severity, location, description, must_fix_reason }]`
+- `review_decision`: `"APPROVE"` | `"REQUEST_CHANGES"` | `"BLOCK"`
+- `review_decision_reasoning`: string
+- `validation_results`: `{ [domain]: { status: "pass"|"warn"|"fail", blocking, critical_issues?, high_issues?, medium_issues?, warnings? } }`
+- `positive_observations`: string[]
+- `recommendations_by_priority`: `{ priority_1, priority_2, priority_3: [{ id, action, effort: "low"|"medium"|"high", files }] }`
+- `summary`: string
 
 ## Success Criteria
 

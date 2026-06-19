@@ -1,3 +1,7 @@
+---
+updated: 2026-05-07
+---
+
 # ADR-002: Guidance vs Knowledge Separation
 
 > **Decision**: Guidance files (AI behaviour instructions) are always loaded for every command, while project knowledge files (PRD, FUNCTIONAL, BACKLOG) are loaded selectively per command via `knowledge_files` configuration.
@@ -6,7 +10,28 @@
 
 Accepted
 
-## Context
+## Consequences
+
+### Positive
+
+- **Token Efficiency**: Commands only load knowledge they need
+- **Cleaner Context**: AI receives relevant information only
+- **Correct Classification**: Knowledge is now properly labelled
+- **Flexibility**: Commands can specify exactly what knowledge they need
+- **Glob Support**: Patterns like `PLAN-*.md` load the most recent plan
+
+### Negative
+
+- **Configuration Overhead**: Each command must specify its knowledge requirements
+- **Potential Gaps**: A command might miss needed knowledge if misconfigured
+
+### Neutral
+
+- **Breaking Change**: Old behaviour of loading all knowledge-base files is removed
+- **Cache Separation**: Guidance and knowledge now have separate caches
+
+<details>
+<summary><strong>Context</strong></summary>
 
 VALORA was loading all knowledge-base files (FUNCTIONAL.md, PRD.md) as "project guidance" alongside actual guidance files (AGENTS.md, CLAUDE.md). This approach had several problems:
 
@@ -21,6 +46,8 @@ VALORA was loading all knowledge-base files (FUNCTIONAL.md, PRD.md) as "project 
 | ------------- | --------------------------------------------- | ----------------------------------------- | ----------------------- |
 | **Guidance**  | AGENTS.md, CLAUDE.md, .cursorrules            | Instructions for how the AI should behave | Always                  |
 | **Knowledge** | FUNCTIONAL.md, PRD.md, BACKLOG.md, PLAN-\*.md | Information about the project             | Selectively per command |
+
+</details>
 
 ## Decision
 
@@ -79,27 +106,8 @@ System message construction follows this priority:
 5. **Output Format Instructions** - Expected response structure
 6. **Escalation Instructions** - When to escalate
 
-## Consequences
-
-### Positive
-
-- **Token Efficiency**: Commands only load knowledge they need
-- **Cleaner Context**: AI receives relevant information only
-- **Correct Classification**: Knowledge is now properly labelled
-- **Flexibility**: Commands can specify exactly what knowledge they need
-- **Glob Support**: Patterns like `PLAN-*.md` load the most recent plan
-
-### Negative
-
-- **Configuration Overhead**: Each command must specify its knowledge requirements
-- **Potential Gaps**: A command might miss needed knowledge if misconfigured
-
-### Neutral
-
-- **Breaking Change**: Old behaviour of loading all knowledge-base files is removed
-- **Cache Separation**: Guidance and knowledge now have separate caches
-
-## Alternatives Considered
+<details>
+<summary><strong>Alternatives considered</strong></summary>
 
 ### Alternative 1: Load All Knowledge Files for Every Command
 
@@ -118,6 +126,8 @@ Use a lightweight relevance model to decide at runtime which knowledge files to 
 Maintain one large merged knowledge document that is always loaded.
 
 **Rejected because**: Merging destroys the structural boundaries between documents and makes selective loading impossible.
+
+</details>
 
 ## Implementation
 
@@ -143,5 +153,5 @@ const knowledge = await loadProjectKnowledge(['PRD.md', 'FUNCTIONAL.md']);
 ## References
 
 - [ADR-001: Multi-Agent Architecture](./001-multi-agent-architecture.md)
-- [Command Registry](../../commands/registry.json)
+- [Command Registry](../../data/commands/registry.json)
 - [Project Guidance Loader](../../src/executor/project-guidance-loader.ts)

@@ -16,7 +16,6 @@ model_requirements:
     - claude-sonnet-4.6
     - claude-sonnet-4.5
 agents:
-  - product-manager
 dependencies:
   requires:
     - context.use-modern-cli-tools

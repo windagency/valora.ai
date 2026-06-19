@@ -2,11 +2,23 @@
  * Tests for provider resolver alignment with config
  */
 
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { ModelName, ProviderName } from 'config/providers.config';
+import { BuiltinProviders, ModelName } from 'config/providers.config';
+import { getProviderRegistry, resetProviderRegistry } from 'llm/registry';
 import { DEFAULT_MODELS } from 'config/validation-helpers';
-import { MODEL_PROVIDER_SUGGESTIONS } from './provider-resolver';
+import { resetProviderCatalogForTests } from 'config/provider-catalog';
+import { CLIProviderResolver, MODEL_PROVIDER_SUGGESTIONS } from './provider-resolver';
+
+const mockConfigLoad = vi.hoisted(() => vi.fn());
+
+vi.mock('config/loader', () => ({
+	getConfigLoader: () => ({ load: mockConfigLoad })
+}));
+
+vi.mock('output/logger', () => ({
+	getLogger: () => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() })
+}));
 
 describe('provider-resolver', () => {
 	describe('MODEL_PROVIDER_SUGGESTIONS alignment', () => {
@@ -25,7 +37,7 @@ describe('provider-resolver', () => {
 		});
 
 		it('should include grok-code for xAI provider', () => {
-			const xaiProvider = MODEL_PROVIDER_SUGGESTIONS[ProviderName.XAI];
+			const xaiProvider = MODEL_PROVIDER_SUGGESTIONS[BuiltinProviders.XAI];
 			expect(xaiProvider).toBeDefined();
 
 			const hasGrokCode = xaiProvider.modelModes.some((mm) => mm.model === ModelName.GROK_CODE);
@@ -33,7 +45,7 @@ describe('provider-resolver', () => {
 		});
 
 		it('should include cursor-sonnet-4.5 for Cursor provider', () => {
-			const cursorProvider = MODEL_PROVIDER_SUGGESTIONS[ProviderName.CURSOR];
+			const cursorProvider = MODEL_PROVIDER_SUGGESTIONS[BuiltinProviders.CURSOR];
 			expect(cursorProvider).toBeDefined();
 
 			const hasCursorSonnet = cursorProvider.modelModes.some((mm) => mm.model === ModelName.CURSOR_SONNET_4_5);
@@ -54,16 +66,193 @@ describe('provider-resolver', () => {
 		});
 
 		it('should have xAI with grok-code as first model', () => {
-			const xaiProvider = MODEL_PROVIDER_SUGGESTIONS[ProviderName.XAI];
+			const xaiProvider = MODEL_PROVIDER_SUGGESTIONS[BuiltinProviders.XAI];
 			expect(xaiProvider.modelModes[0].model).toBe(ModelName.GROK_CODE);
 			expect(xaiProvider.modelModes[0].mode).toBe('default');
 		});
 
 		it('should have Cursor provider with correct structure', () => {
 			const cursorProvider = MODEL_PROVIDER_SUGGESTIONS.cursor;
-			expect(cursorProvider.provider).toBe(ProviderName.CURSOR);
+			expect(cursorProvider.provider).toBe(BuiltinProviders.CURSOR);
 			expect(cursorProvider.modelModes.length).toBeGreaterThan(0);
 			expect(cursorProvider.modelModes.every((mm) => mm.model && mm.mode)).toBe(true);
 		});
+	});
+
+	describe('getProviderForModel — ollama routing', () => {
+		afterEach(() => {
+			resetProviderRegistry();
+			resetProviderCatalogForTests();
+		});
+
+		it('routes "ollama:llama3.1" to OLLAMA provider when the ollama descriptor is registered', () => {
+			getProviderRegistry().registerProvider(
+				'ollama',
+				() => ({ isConfigured: () => false, complete: async () => ({ content: '' }) }) as never,
+				{},
+				{
+					defaultModel: 'llama3.1',
+					label: 'Ollama',
+					modelModes: [{ mode: 'default', model: 'llama3.1' }],
+					modelPrefix: 'ollama:',
+					requiresApiKey: false
+				}
+			);
+			const resolver = new CLIProviderResolver();
+			expect(
+				(resolver as never as { getProviderForModel(m: string): string })['getProviderForModel']('ollama:llama3.1')
+			).toBe('ollama');
+		});
+
+		it('routes "ollama:mistral" to OLLAMA provider when the ollama descriptor is registered', () => {
+			getProviderRegistry().registerProvider(
+				'ollama',
+				() => ({ isConfigured: () => false, complete: async () => ({ content: '' }) }) as never,
+				{},
+				{
+					defaultModel: 'llama3.1',
+					label: 'Ollama',
+					modelModes: [{ mode: 'default', model: 'mistral' }],
+					modelPrefix: 'ollama:',
+					requiresApiKey: false
+				}
+			);
+			const resolver = new CLIProviderResolver();
+			expect(
+				(resolver as never as { getProviderForModel(m: string): string })['getProviderForModel']('ollama:mistral')
+			).toBe('ollama');
+		});
+
+		it('does not route "mistral" to OLLAMA (still goes to LOCAL via keyword matching)', () => {
+			const resolver = new CLIProviderResolver();
+			expect((resolver as never as { getProviderForModel(m: string): string })['getProviderForModel']('mistral')).toBe(
+				'local'
+			);
+		});
+	});
+
+	describe('model prefix routing via descriptors', () => {
+		afterEach(() => {
+			resetProviderRegistry();
+			resetProviderCatalogForTests();
+		});
+
+		it('routes a model with a registered descriptor modelPrefix to that provider', () => {
+			// Register a fake provider with modelPrefix: 'fake:'
+			getProviderRegistry().registerProvider(
+				'fake',
+				// Minimal factory stub — provider routing only checks the descriptor
+				() => ({ isConfigured: () => false, complete: async () => ({ content: '' }) }) as never,
+				{},
+				{
+					defaultModel: 'fake:model',
+					label: 'Fake',
+					modelModes: [{ mode: 'default', model: 'fake:model' }],
+					modelPrefix: 'fake:',
+					requiresApiKey: false
+				}
+			);
+
+			const resolver = new CLIProviderResolver();
+			const result = (resolver as never as { getProviderForModel(m: string): string })['getProviderForModel'](
+				'fake:some-model'
+			);
+			expect(result).toBe('fake');
+		});
+
+		it('falls through to keyword matching when no descriptor prefix matches', () => {
+			const resolver = new CLIProviderResolver();
+			// 'llama3.1' has no prefix — should fall through to keyword matching (LOCAL)
+			const result = (resolver as never as { getProviderForModel(m: string): string })['getProviderForModel'](
+				'llama3.1'
+			);
+			expect(result).toBe(BuiltinProviders.LOCAL);
+		});
+	});
+});
+
+describe('CLIProviderResolver — getConfiguredProviders', () => {
+	type Resolver = { getConfiguredProviders(config: unknown): string[] };
+
+	afterEach(() => {
+		resetProviderRegistry();
+		resetProviderCatalogForTests();
+	});
+
+	it('includes a plugin provider with requiresApiKey=false even when apiKey is empty string', () => {
+		getProviderRegistry().registerProvider(
+			'ollama',
+			() => ({ isConfigured: () => false, complete: async () => ({ content: '' }) }) as never,
+			{},
+			{
+				defaultModel: 'llama3.1',
+				label: 'Ollama',
+				modelModes: [{ mode: 'default', model: 'llama3.1' }],
+				requiresApiKey: false
+			}
+		);
+
+		const config = {
+			defaults: {},
+			providers: { ollama: { apiKey: '', default_model: 'llama3.1' } }
+		};
+		const resolver = new CLIProviderResolver() as unknown as Resolver;
+		const result = resolver.getConfiguredProviders(config);
+		expect(result).toContain('ollama');
+	});
+
+	it('excludes a provider whose apiKey is empty and is not in the catalog', () => {
+		const config = {
+			defaults: {},
+			providers: { unknown_provider: { apiKey: '', default_model: 'some-model' } }
+		};
+		const resolver = new CLIProviderResolver() as unknown as Resolver;
+		const result = resolver.getConfiguredProviders(config);
+		expect(result).not.toContain('unknown_provider');
+	});
+});
+
+describe('CLIProviderResolver — auto-fallback to default provider', () => {
+	beforeEach(() => {
+		getProviderRegistry().registerProvider(
+			'ollama',
+			() => ({ isConfigured: () => false, complete: async () => ({ content: '' }) }) as never,
+			{},
+			{
+				defaultModel: 'llama3.1',
+				label: 'Ollama',
+				modelModes: [{ mode: 'default', model: 'llama3.1' }],
+				requiresApiKey: false
+			}
+		);
+	});
+
+	afterEach(() => {
+		resetProviderRegistry();
+		resetProviderCatalogForTests();
+		vi.clearAllMocks();
+	});
+
+	it('resolves to the configured default_provider when the requested provider is not in config', async () => {
+		mockConfigLoad.mockResolvedValue({
+			defaults: { default_provider: 'ollama' },
+			providers: { ollama: { apiKey: '', default_model: 'llama3.1' } }
+		});
+
+		const resolver = new CLIProviderResolver();
+		const result = await resolver.resolveProvider('claude-opus-4.6', { flags: {} });
+
+		expect(result.providerName).toBe('ollama');
+		expect(result.model).toBe('llama3.1');
+	});
+
+	it('still calls handleMissingProvider when no default_provider is set', async () => {
+		mockConfigLoad.mockResolvedValue({
+			defaults: {},
+			providers: {}
+		});
+
+		const resolver = new CLIProviderResolver();
+		await expect(resolver.resolveProvider('claude-opus-4.6', { flags: {} })).rejects.toThrow();
 	});
 });

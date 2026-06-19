@@ -5,13 +5,13 @@
  * This eliminates duplication across validation-helpers.ts, provider-resolver.ts, and other files.
  */
 
-import { ModelName, ModelNameValue, ProviderName } from 'types/provider-names.types';
+import { BuiltinProviders, ModelName, ModelNameValue, ProviderName } from 'types/provider-names.types';
 
 /**
  * Re-export for backward compatibility
  */
-export { ModelName, ProviderName };
-export type { ModelNameValue };
+export { BuiltinProviders, ModelName };
+export type { ModelNameValue, ProviderName };
 
 export interface ModelMode {
 	mode: string;
@@ -102,10 +102,10 @@ export interface ProviderMetadata {
  * Comprehensive provider registry
  */
 export const PROVIDER_REGISTRY: Record<string, ProviderMetadata> = {
-	[ProviderName.ANTHROPIC]: {
+	[BuiltinProviders.ANTHROPIC]: {
 		defaultModel: ModelName.CLAUDE_OPUS_4_6,
 		description: 'Claude models from Anthropic',
-		key: ProviderName.ANTHROPIC,
+		key: BuiltinProviders.ANTHROPIC,
 		label: 'Anthropic',
 		modelModes: [
 			{ mode: 'normal', model: ModelName.CLAUDE_OPUS_4_6 },
@@ -125,11 +125,11 @@ export const PROVIDER_REGISTRY: Record<string, ProviderMetadata> = {
 		],
 		requiresApiKey: true
 	},
-	[ProviderName.CURSOR]: {
+	[BuiltinProviders.CURSOR]: {
 		defaultModel: ModelName.CURSOR_SONNET_4_5,
 		description: 'Zero config - uses your Cursor subscription',
 		helpText: 'The Cursor provider uses your Cursor subscription via MCP. No API key needed!',
-		key: ProviderName.CURSOR,
+		key: BuiltinProviders.CURSOR,
 		label: 'Cursor',
 		modelModes: [
 			{ mode: 'normal', model: ModelName.CURSOR_SONNET_4_5 },
@@ -138,10 +138,10 @@ export const PROVIDER_REGISTRY: Record<string, ProviderMetadata> = {
 		],
 		requiresApiKey: false
 	},
-	[ProviderName.GOOGLE]: {
+	[BuiltinProviders.GOOGLE]: {
 		defaultModel: ModelName.GEMINI_2_5_PRO,
 		description: 'Gemini models from Google',
-		key: ProviderName.GOOGLE,
+		key: BuiltinProviders.GOOGLE,
 		label: 'Google',
 		modelModes: [
 			{ mode: 'default', model: ModelName.GEMINI_3_PRO },
@@ -155,27 +155,27 @@ export const PROVIDER_REGISTRY: Record<string, ProviderMetadata> = {
 		],
 		requiresApiKey: true
 	},
-	[ProviderName.LOCAL]: {
+	[BuiltinProviders.LOCAL]: {
 		defaultModel: 'llama3.1',
-		description: 'Local models via OpenAI-compatible API (Ollama, LM Studio, etc.)',
-		helpText: 'Connect to a local model server. No API key required. Default: http://localhost:11434/v1',
-		key: ProviderName.LOCAL,
+		description: 'Local OpenAI-compatible model server',
+		helpText: 'Connect to a local OpenAI-compatible server.',
+		key: BuiltinProviders.LOCAL,
 		label: 'Local',
 		modelModes: [{ mode: 'default', model: 'llama3.1' }],
 		requiresApiKey: false
 	},
-	[ProviderName.MOONSHOT]: {
+	[BuiltinProviders.MOONSHOT]: {
 		defaultModel: ModelName.KIMI_K2,
 		description: 'Kimi models from Moonshot',
-		key: ProviderName.MOONSHOT,
+		key: BuiltinProviders.MOONSHOT,
 		label: 'Moonshot',
 		modelModes: [{ mode: 'default', model: ModelName.KIMI_K2 }],
 		requiresApiKey: true
 	},
-	[ProviderName.OPENAI]: {
+	[BuiltinProviders.OPENAI]: {
 		defaultModel: ModelName.GPT_5,
 		description: 'GPT models from OpenAI',
-		key: ProviderName.OPENAI,
+		key: BuiltinProviders.OPENAI,
 		label: 'OpenAI',
 		modelModes: [
 			{ mode: 'minimal reasoning', model: ModelName.GPT_5 },
@@ -204,11 +204,11 @@ export const PROVIDER_REGISTRY: Record<string, ProviderMetadata> = {
 		],
 		requiresApiKey: true
 	},
-	[ProviderName.XAI]: {
+	[BuiltinProviders.XAI]: {
 		defaultModel: ModelName.GROK_CODE,
 		description: 'Grok models from xAI',
 		// TODO: Verify xAI's actual API model names when official documentation is available
-		key: ProviderName.XAI,
+		key: BuiltinProviders.XAI,
 		label: 'xAI',
 		modelModes: [
 			{ mode: 'default', model: ModelName.GROK_CODE },
@@ -224,7 +224,7 @@ export const PROVIDER_REGISTRY: Record<string, ProviderMetadata> = {
 /**
  * Provider keys as a type-safe array
  */
-export const PROVIDER_KEYS = Object.values(ProviderName) as Array<ProviderName>;
+export const PROVIDER_KEYS = Object.values(BuiltinProviders) as Array<ProviderName>;
 
 /**
  * Get all provider keys
@@ -308,5 +308,6 @@ export function getDefaultModel(providerKey: string): string | undefined {
  * Validate provider key
  */
 export function isValidProvider(key: string): key is ProviderName {
-	return Object.values(ProviderName).includes(key as ProviderName);
+	const builtinValues = Object.values(BuiltinProviders) as string[];
+	return builtinValues.includes(key);
 }

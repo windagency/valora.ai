@@ -148,7 +148,7 @@ export interface TracerConfig {
 /**
  * Semantic attribute keys following OpenTelemetry conventions
  */
-// eslint-disable-next-line @typescript-eslint/naming-convention
+
 export const SemanticAttributes = {
 	// Service
 	SERVICE_NAME: 'service.name',

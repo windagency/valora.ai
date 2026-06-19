@@ -1,3 +1,7 @@
+---
+updated: 2026-05-07
+---
+
 # System Architecture
 
 > High-level architectural design of VALORA — a TypeScript CLI that orchestrates 11 AI agents across 24 commands for software development automation.

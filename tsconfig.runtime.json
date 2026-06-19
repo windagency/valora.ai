@@ -1,6 +1,5 @@
 {
 	"compilerOptions": {
-		"baseUrl": ".",
 		"paths": {
 			"src/*": ["./*"],
 			"ast/*": ["./ast/*"],
@@ -16,6 +15,7 @@
 			"output/*": ["./output/*"],
 			"session/*": ["./session/*"],
 			"types/*": ["./types/*"],
+			"updater/*": ["./updater/*"],
 			"utils/*": ["./utils/*"]
 		}
 	}

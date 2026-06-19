@@ -1,0 +1,17 @@
+src/cli/index.ts(3,5): error TS2345: Argument of type 'string[]' is not assignable to parameter of type 'number'.
+src/executor/output-compression.service.ts(6,27): error TS2345: Argument of type 'string' is not assignable to parameter of type 'number'.
+src/executor/output-compression.service.ts(7,27): error TS2345: Argument of type 'string' is not assignable to parameter of type 'number'.
+src/executor/output-compression.service.ts(8,29): error TS2345: Argument of type 'string' is not assignable to parameter of type 'number'.
+src/executor/output-compression.service.ts(9,10): error TS2345: Argument of type 'number' is not assignable to parameter of type 'string'.
+src/executor/output-compression.service.ts(10,10): error TS2345: Argument of type 'string' is not assignable to parameter of type 'number'.
+src/executor/output-compression.service.ts(11,14): error TS2345: Argument of type 'string' is not assignable to parameter of type 'boolean'.
+src/executor/stage-executor.ts(3,10): error TS2454: Variable 'result' is used before being assigned.
+src/executor/stage-executor.ts(8,10): error TS2454: Variable 'metrics' is used before being assigned.
+src/executor/tool-execution.service.ts(2,10): error TS2345: Argument of type 'string' is not assignable to parameter of type 'number'.
+src/executor/tool-execution.service.ts(3,10): error TS2345: Argument of type 'string' is not assignable to parameter of type 'number'.
+src/plugins-src/strategies.ts(6,7): error TS2339: Property 'output' does not exist on type 'string'.
+src/plugins-src/strategies.ts(7,5): error TS2339: Property 'match' does not exist on type 'object'.
+src/plugins-src/strategies.ts(8,5): error TS2339: Property 'nonExistent' does not exist on type 'string[]'.
+═══════════════════════════════════════
+TypeScript: 14 errors in 5 files
+Top codes: TS2345 (9x), TS2339 (3x), TS2454 (2x)

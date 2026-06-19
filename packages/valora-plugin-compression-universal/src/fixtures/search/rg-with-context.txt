@@ -1,0 +1,889 @@
+/workspaces/valora/src/session/session-exporter.ts-
+/workspaces/valora/src/session/session-exporter.ts-			// Create archive using adapter
+/workspaces/valora/src/session/session-exporter.ts:			const result = await this.archiveAdapter.createArchive(outputPath, entries, { compressionLevel: 9 });
+/workspaces/valora/src/session/session-exporter.ts-
+/workspaces/valora/src/session/session-exporter.ts-			logger.info('Session exported successfully', {
+--
+/workspaces/valora/src/di/container.code-plugin.test.ts-});
+/workspaces/valora/src/di/container.code-plugin.test.ts-
+/workspaces/valora/src/di/container.code-plugin.test.ts:describe('initializePlugins — compression strategy registration', () => {
+/workspaces/valora/src/di/container.code-plugin.test.ts-	let tmpDir: string;
+/workspaces/valora/src/di/container.code-plugin.test.ts-
+/workspaces/valora/src/di/container.code-plugin.test.ts-	beforeEach(() => {
+/workspaces/valora/src/di/container.code-plugin.test.ts:		tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'valora-compression-test-'));
+/workspaces/valora/src/di/container.code-plugin.test.ts-	});
+/workspaces/valora/src/di/container.code-plugin.test.ts-
+/workspaces/valora/src/di/container.code-plugin.test.ts-	afterEach(async () => {
+/workspaces/valora/src/di/container.code-plugin.test.ts-		fs.rmSync(tmpDir, { recursive: true, force: true });
+/workspaces/valora/src/di/container.code-plugin.test.ts:		const { resetRegistry } = await import('executor/output-compression.service');
+/workspaces/valora/src/di/container.code-plugin.test.ts-		resetRegistry();
+/workspaces/valora/src/di/container.code-plugin.test.ts-		vi.resetModules();
+/workspaces/valora/src/di/container.code-plugin.test.ts-	});
+/workspaces/valora/src/di/container.code-plugin.test.ts-
+/workspaces/valora/src/di/container.code-plugin.test.ts:	it('registers a compression strategy via api.compression.registerStrategy()', async () => {
+/workspaces/valora/src/di/container.code-plugin.test.ts:		const entrypointPath = path.join(tmpDir, 'compression-plugin.mjs');
+/workspaces/valora/src/di/container.code-plugin.test.ts-		fs.writeFileSync(
+/workspaces/valora/src/di/container.code-plugin.test.ts-			entrypointPath,
+/workspaces/valora/src/di/container.code-plugin.test.ts-			[
+/workspaces/valora/src/di/container.code-plugin.test.ts-				'export async function register(api) {',
+/workspaces/valora/src/di/container.code-plugin.test.ts:				'  api.compression.registerStrategy("mytesttool", (output) => "compressed:" + output.slice(0, 5));',
+/workspaces/valora/src/di/container.code-plugin.test.ts-				'}'
+/workspaces/valora/src/di/container.code-plugin.test.ts-			].join('\n')
+--
+/workspaces/valora/src/di/container.code-plugin.test.ts-						{
+/workspaces/valora/src/di/container.code-plugin.test.ts-							codeEntrypoint: entrypointPath,
+/workspaces/valora/src/di/container.code-plugin.test.ts:							manifest: { name: 'compression-integration-plugin', version: '1.0.0' },
+/workspaces/valora/src/di/container.code-plugin.test.ts-							pluginDir: tmpDir,
+/workspaces/valora/src/di/container.code-plugin.test.ts-							status: 'enabled'
+--
+/workspaces/valora/src/di/container.code-plugin.test.ts-
+/workspaces/valora/src/di/container.code-plugin.test.ts-		const { createContainer, initializePlugins } = await import('di/container');
+/workspaces/valora/src/di/container.code-plugin.test.ts:		const { getStrategy } = await import('executor/output-compression.service');
+/workspaces/valora/src/di/container.code-plugin.test.ts-
+/workspaces/valora/src/di/container.code-plugin.test.ts-		const container = createContainer();
+--
+/workspaces/valora/src/di/container.code-plugin.test.ts-		const strategy = getStrategy('mytesttool');
+/workspaces/valora/src/di/container.code-plugin.test.ts-		expect(strategy).toBeDefined();
+/workspaces/valora/src/di/container.code-plugin.test.ts:		expect(strategy?.('hello world', 'mytesttool run')).toBe('compressed:hello');
+/workspaces/valora/src/di/container.code-plugin.test.ts-	});
+/workspaces/valora/src/di/container.code-plugin.test.ts-});
+--
+/workspaces/valora/src/session/store.ts- * The scheduler will:
+/workspaces/valora/src/session/store.ts- * - Run every N hours (configured in config.json: cleanup_interval_hours)
+/workspaces/valora/src/session/store.ts: * - Compress sessions older than compress_after_days
+/workspaces/valora/src/session/store.ts- * - Delete sessions older than max_age_days
+/workspaces/valora/src/session/store.ts- * - Enforce max_count and max_size_mb limits
+--
+/workspaces/valora/src/plugins-src/plugin-api.types.d.ts-
+/workspaces/valora/src/plugins-src/plugin-api.types.d.ts-export interface PluginAPI {
+/workspaces/valora/src/plugins-src/plugin-api.types.d.ts:	compression: {
+/workspaces/valora/src/plugins-src/plugin-api.types.d.ts-		registerStrategy(tool: string, fn: CompressionStrategy): void;
+/workspaces/valora/src/plugins-src/plugin-api.types.d.ts-	};
+--
+/workspaces/valora/src/session/archive-adapter.interface.ts- */
+/workspaces/valora/src/session/archive-adapter.interface.ts-export interface CreateArchiveOptions {
+/workspaces/valora/src/session/archive-adapter.interface.ts:	/** Compression level (0-9, where 9 is maximum compression) */
+/workspaces/valora/src/session/archive-adapter.interface.ts:	compressionLevel?: number;
+/workspaces/valora/src/session/archive-adapter.interface.ts-}
+/workspaces/valora/src/session/archive-adapter.interface.ts-
+--
+/workspaces/valora/src/session/retention-manager.ts-// Re-export base types with session-specific aliases
+/workspaces/valora/src/session/retention-manager.ts-export interface SessionCleanupResult extends BaseCleanupResult {
+/workspaces/valora/src/session/retention-manager.ts:	compressedSessions: string[];
+/workspaces/valora/src/session/retention-manager.ts-	deletedSessions: string[];
+/workspaces/valora/src/session/retention-manager.ts-}
+--
+/workspaces/valora/src/session/retention-manager.ts-}
+/workspaces/valora/src/session/retention-manager.ts-
+/workspaces/valora/src/session/retention-manager.ts:// SessionRetentionPolicy uses all fields from base (maxAgeDays, maxSizeMB, maxCount, compressAfterDays)
+/workspaces/valora/src/session/retention-manager.ts-export type SessionRetentionPolicy = BaseRetentionPolicy;
+/workspaces/valora/src/session/retention-manager.ts-
+--
+/workspaces/valora/src/session/retention-manager.ts-	async cleanup(sessionDir: string, sessions: SessionSummary[]): Promise<SessionCleanupResult> {
+/workspaces/valora/src/session/retention-manager.ts-		const result: SessionCleanupResult = {
+/workspaces/valora/src/session/retention-manager.ts:			compressedItems: [],
+/workspaces/valora/src/session/retention-manager.ts:			compressedSessions: [],
+/workspaces/valora/src/session/retention-manager.ts-			deletedItems: [],
+/workspaces/valora/src/session/retention-manager.ts-			deletedSessions: [],
+--
+/workspaces/valora/src/session/retention-manager.ts-
+/workspaces/valora/src/session/retention-manager.ts-			// Sync base result fields with session-specific fields
+/workspaces/valora/src/session/retention-manager.ts:			result.compressedItems = [...result.compressedSessions];
+/workspaces/valora/src/session/retention-manager.ts-			result.deletedItems = [...result.deletedSessions];
+/workspaces/valora/src/session/retention-manager.ts-
+/workspaces/valora/src/session/retention-manager.ts-			this.logger.debug('Session cleanup completed');
+/workspaces/valora/src/session/retention-manager.ts-			this.logger.debug('Session cleanup results', {
+/workspaces/valora/src/session/retention-manager.ts:				compressedCount: result.compressedSessions.length,
+/workspaces/valora/src/session/retention-manager.ts-				deletedCount: result.deletedSessions.length,
+/workspaces/valora/src/session/retention-manager.ts-				errors: result.errors.length,
+--
+/workspaces/valora/src/session/retention-manager.ts-
+/workspaces/valora/src/session/retention-manager.ts-	/**
+/workspaces/valora/src/session/retention-manager.ts:	 * Apply compression policy: compress sessions older than compressAfterDays
+/workspaces/valora/src/session/retention-manager.ts-	 */
+/workspaces/valora/src/session/retention-manager.ts-	private async applySessionCompressionPolicy(
+--
+/workspaces/valora/src/session/retention-manager.ts-		result: SessionCleanupResult
+/workspaces/valora/src/session/retention-manager.ts-	): Promise<SessionFileInfo[]> {
+/workspaces/valora/src/session/retention-manager.ts:		if (!this.policy.compressAfterDays) return sessionFiles;
+/workspaces/valora/src/session/retention-manager.ts-
+/workspaces/valora/src/session/retention-manager.ts:		const cutoffDate = this.calculateCutoffDate(this.policy.compressAfterDays);
+/workspaces/valora/src/session/retention-manager.ts-
+/workspaces/valora/src/session/retention-manager.ts-		const filesToCompress = sessionFiles.filter((file) => {
+--
+/workspaces/valora/src/session/retention-manager.ts-		});
+/workspaces/valora/src/session/retention-manager.ts-
+/workspaces/valora/src/session/retention-manager.ts:		const compressionResults = await Promise.allSettled(
+/workspaces/valora/src/session/retention-manager.ts-			filesToCompress.map(async (file) => {
+/workspaces/valora/src/session/retention-manager.ts-				if (!this.dryRun) {
+/workspaces/valora/src/session/retention-manager.ts:					await this.compressFileWithStats(file.filePath);
+/workspaces/valora/src/session/retention-manager.ts-				}
+/workspaces/valora/src/session/retention-manager.ts:				result.compressedSessions.push(file.sessionId);
+/workspaces/valora/src/session/retention-manager.ts-				const sessionDate = new Date(file.session.updated_at);
+/workspaces/valora/src/session/retention-manager.ts-				const ageDays = Math.floor((Date.now() - sessionDate.getTime()) / MS_PER_DAY);
+/workspaces/valora/src/session/retention-manager.ts-				this.logger.debug('Compressed old session file', {
+/workspaces/valora/src/session/retention-manager.ts-					ageDays,
+/workspaces/valora/src/session/retention-manager.ts:					compressAfterDays: this.policy.compressAfterDays,
+/workspaces/valora/src/session/retention-manager.ts-					sessionId: file.sessionId
+/workspaces/valora/src/session/retention-manager.ts-				});
+--
+/workspaces/valora/src/session/retention-manager.ts-		);
+/workspaces/valora/src/session/retention-manager.ts-
+/workspaces/valora/src/session/retention-manager.ts:		compressionResults.forEach((compressionResult, index) => {
+/workspaces/valora/src/session/retention-manager.ts:			if (compressionResult.status === 'rejected') {
+/workspaces/valora/src/session/retention-manager.ts-				const file = filesToCompress[index];
+/workspaces/valora/src/session/retention-manager.ts-				if (!file) return;
+/workspaces/valora/src/session/retention-manager.ts:				const errorMsg = `Failed to compress session ${file.sessionId}: ${formatErrorMessage(compressionResult.reason)}`;
+/workspaces/valora/src/session/retention-manager.ts-				result.errors.push(errorMsg);
+/workspaces/valora/src/session/retention-manager.ts:				this.logger.warn('Failed to compress session file', { error: errorMsg, sessionId: file.sessionId });
+/workspaces/valora/src/session/retention-manager.ts-			}
+/workspaces/valora/src/session/retention-manager.ts-		});
+--
+/workspaces/valora/src/session/retention-manager.ts-
+/workspaces/valora/src/session/retention-manager.ts-	protected recordCompression(item: SessionFileInfo, result: SessionCleanupResult): void {
+/workspaces/valora/src/session/retention-manager.ts:		result.compressedSessions.push(item.sessionId);
+/workspaces/valora/src/session/retention-manager.ts-	}
+/workspaces/valora/src/session/retention-manager.ts-
+--
+/workspaces/valora/src/types/cli.types.ts-	// Retention policy flags
+/workspaces/valora/src/types/cli.types.ts-	cleanupInterval?: number;
+/workspaces/valora/src/types/cli.types.ts:	compressAfter?: number;
+/workspaces/valora/src/types/cli.types.ts-	logsPath?: string;
+/workspaces/valora/src/types/cli.types.ts-	maxAge?: number;
+--
+/workspaces/valora/src/output/cleanup-scheduler.ts-				if (result.errors.length > 0) {
+/workspaces/valora/src/output/cleanup-scheduler.ts-					this.logger.warn('Cleanup completed with errors', {
+/workspaces/valora/src/output/cleanup-scheduler.ts:						compressedCount: result.compressedFiles.length,
+/workspaces/valora/src/output/cleanup-scheduler.ts-						deletedCount: result.deletedFiles.length,
+/workspaces/valora/src/output/cleanup-scheduler.ts-						errorCount: result.errors.length,
+--
+/workspaces/valora/src/output/cleanup-scheduler.ts-				} else {
+/workspaces/valora/src/output/cleanup-scheduler.ts-					this.logger.debug('Cleanup completed successfully', {
+/workspaces/valora/src/output/cleanup-scheduler.ts:						compressedCount: result.compressedFiles.length,
+/workspaces/valora/src/output/cleanup-scheduler.ts-						deletedCount: result.deletedFiles.length,
+/workspaces/valora/src/output/cleanup-scheduler.ts-						logDir,
+--
+/workspaces/valora/src/output/cleanup-scheduler.ts-				if (result.status === 'fulfilled') {
+/workspaces/valora/src/output/cleanup-scheduler.ts-					return {
+/workspaces/valora/src/output/cleanup-scheduler.ts:						totalCompressed: totals.totalCompressed + result.value.compressedFiles.length,
+/workspaces/valora/src/output/cleanup-scheduler.ts-						totalDeleted: totals.totalDeleted + result.value.deletedFiles.length,
+/workspaces/valora/src/output/cleanup-scheduler.ts-						totalErrors: totals.totalErrors + result.value.errors.length
+--
+/workspaces/valora/src/output/cleanup-scheduler.ts-				});
+/workspaces/valora/src/output/cleanup-scheduler.ts-				acc[logDir] = {
+/workspaces/valora/src/output/cleanup-scheduler.ts:					compressedFiles: [],
+/workspaces/valora/src/output/cleanup-scheduler.ts:					compressedItems: [],
+/workspaces/valora/src/output/cleanup-scheduler.ts-					deletedFiles: [],
+/workspaces/valora/src/output/cleanup-scheduler.ts-					deletedItems: [],
+--
+/workspaces/valora/src/session/archive-adapter.ts-
+/workspaces/valora/src/session/archive-adapter.ts-/**
+/workspaces/valora/src/session/archive-adapter.ts: * Default compression level for ZIP archives
+/workspaces/valora/src/session/archive-adapter.ts- */
+/workspaces/valora/src/session/archive-adapter.ts-const DEFAULT_COMPRESSION_LEVEL = 9;
+--
+/workspaces/valora/src/session/archive-adapter.ts-		options: CreateArchiveOptions = {}
+/workspaces/valora/src/session/archive-adapter.ts-	): Promise<ArchiveResult> {
+/workspaces/valora/src/session/archive-adapter.ts:		const compressionLevel = options.compressionLevel ?? DEFAULT_COMPRESSION_LEVEL;
+/workspaces/valora/src/session/archive-adapter.ts-
+/workspaces/valora/src/session/archive-adapter.ts-		return new Promise((resolve, reject) => {
+/workspaces/valora/src/session/archive-adapter.ts-			const output = fs.createWriteStream(outputPath);
+/workspaces/valora/src/session/archive-adapter.ts:			const archive = archiver('zip', { zlib: { level: compressionLevel } });
+/workspaces/valora/src/session/archive-adapter.ts-
+/workspaces/valora/src/session/archive-adapter.ts-			// Handle archive errors
+--
+/workspaces/valora/src/output/retention-manager.ts-// Re-export base types with log-specific aliases for backward compatibility
+/workspaces/valora/src/output/retention-manager.ts-export interface CleanupResult extends BaseCleanupResult {
+/workspaces/valora/src/output/retention-manager.ts:	compressedFiles: string[];
+/workspaces/valora/src/output/retention-manager.ts-	deletedFiles: string[];
+/workspaces/valora/src/output/retention-manager.ts-}
+--
+/workspaces/valora/src/output/retention-manager.ts-				}
+/workspaces/valora/src/output/retention-manager.ts-
+/workspaces/valora/src/output/retention-manager.ts:				// For uncompressed files, check if they contain valid JSON
+/workspaces/valora/src/output/retention-manager.ts-				if (!file.isCompressed) {
+/workspaces/valora/src/output/retention-manager.ts-					const content = await fs.promises.readFile(file.path, 'utf8');
+--
+/workspaces/valora/src/output/retention-manager.ts-	async cleanup(logDir: string): Promise<CleanupResult> {
+/workspaces/valora/src/output/retention-manager.ts-		const result: CleanupResult = {
+/workspaces/valora/src/output/retention-manager.ts:			compressedFiles: [],
+/workspaces/valora/src/output/retention-manager.ts:			compressedItems: [],
+/workspaces/valora/src/output/retention-manager.ts-			deletedFiles: [],
+/workspaces/valora/src/output/retention-manager.ts-			deletedItems: [],
+--
+/workspaces/valora/src/output/retention-manager.ts-			result.totalSizeAfter = this.calculateTotalSize(files);
+/workspaces/valora/src/output/retention-manager.ts-
+/workspaces/valora/src/output/retention-manager.ts:			// Sync compressedItems/deletedItems with compressedFiles/deletedFiles
+/workspaces/valora/src/output/retention-manager.ts:			result.compressedItems = [...result.compressedFiles];
+/workspaces/valora/src/output/retention-manager.ts-			result.deletedItems = [...result.deletedFiles];
+/workspaces/valora/src/output/retention-manager.ts-
+--
+/workspaces/valora/src/output/retention-manager.ts-				const consoleOut = getConsoleOutput();
+/workspaces/valora/src/output/retention-manager.ts-				consoleOut.dim(
+/workspaces/valora/src/output/retention-manager.ts:					`[${MCP_ID}] Log cleanup completed - deleted: ${result.deletedFiles.length}, compressed: ${result.compressedFiles.length}, saved: ${((result.totalSizeBefore - result.totalSizeAfter) / BYTES_PER_MB).toFixed(2)}MB`
+/workspaces/valora/src/output/retention-manager.ts-				);
+/workspaces/valora/src/output/retention-manager.ts-			}
+--
+/workspaces/valora/src/output/retention-manager.ts-
+/workspaces/valora/src/output/retention-manager.ts-	/**
+/workspaces/valora/src/output/retention-manager.ts:	 * Apply compression policy: compress files older than compressAfterDays
+/workspaces/valora/src/output/retention-manager.ts:	 * Enhanced for daily log files - compress entire daily files
+/workspaces/valora/src/output/retention-manager.ts-	 */
+/workspaces/valora/src/output/retention-manager.ts-	private async applyLogCompressionPolicy(files: FileInfo[], result: CleanupResult): Promise<FileInfo[]> {
+/workspaces/valora/src/output/retention-manager.ts:		if (!this.policy.compressAfterDays) return files;
+/workspaces/valora/src/output/retention-manager.ts-
+/workspaces/valora/src/output/retention-manager.ts:		const cutoffDate = this.calculateCutoffDate(this.policy.compressAfterDays);
+/workspaces/valora/src/output/retention-manager.ts-		const cutoffDateStr = cutoffDate.toISOString().split('T')[0] ?? '';
+/workspaces/valora/src/output/retention-manager.ts-		const today = new Date().toISOString().split('T')[0] ?? '';
+--
+/workspaces/valora/src/output/retention-manager.ts-		const filesByDate = this.groupFilesByDate(files);
+/workspaces/valora/src/output/retention-manager.ts-
+/workspaces/valora/src/output/retention-manager.ts:		// Collect all files to compress
+/workspaces/valora/src/output/retention-manager.ts-		const filesToCompress = Object.entries(filesByDate).flatMap(([dateStr, dateFiles]) => {
+/workspaces/valora/src/output/retention-manager.ts:			// Only compress if the date is older than the cutoff (but not today's date)
+/workspaces/valora/src/output/retention-manager.ts-			if (dateStr >= cutoffDateStr || dateStr === today) return [];
+/workspaces/valora/src/output/retention-manager.ts-
+/workspaces/valora/src/output/retention-manager.ts:			// For daily files, compress all uncompressed files for this date (including rotated ones)
+/workspaces/valora/src/output/retention-manager.ts-			return dateFiles.filter((file) => !file.isCompressed).map((file) => ({ dateStr, file }));
+/workspaces/valora/src/output/retention-manager.ts-		});
+--
+/workspaces/valora/src/output/retention-manager.ts-				try {
+/workspaces/valora/src/output/retention-manager.ts-					if (!this.dryRun) {
+/workspaces/valora/src/output/retention-manager.ts:						await this.compressFile(file.path);
+/workspaces/valora/src/output/retention-manager.ts-					}
+/workspaces/valora/src/output/retention-manager.ts:					result.compressedFiles.push(path.basename(file.path));
+/workspaces/valora/src/output/retention-manager.ts-					this.logger.debug('Compressed daily log file', {
+/workspaces/valora/src/output/retention-manager.ts-						ageDays: Math.floor((Date.now() - file.modifiedTime.getTime()) / MS_PER_DAY),
+--
+/workspaces/valora/src/output/retention-manager.ts-					});
+/workspaces/valora/src/output/retention-manager.ts-				} catch (error) {
+/workspaces/valora/src/output/retention-manager.ts:					const errorMsg = `Failed to compress ${path.basename(file.path)}: ${formatErrorMessage(error)}`;
+/workspaces/valora/src/output/retention-manager.ts-					result.errors.push(errorMsg);
+/workspaces/valora/src/output/retention-manager.ts:					this.logger.warn('Failed to compress daily log file', { error: errorMsg, file: path.basename(file.path) });
+/workspaces/valora/src/output/retention-manager.ts-				}
+/workspaces/valora/src/output/retention-manager.ts-			})
+--
+/workspaces/valora/src/output/retention-manager.ts-
+/workspaces/valora/src/output/retention-manager.ts-	protected recordCompression(item: FileInfo, result: CleanupResult): void {
+/workspaces/valora/src/output/retention-manager.ts:		result.compressedFiles.push(path.basename(item.path));
+/workspaces/valora/src/output/retention-manager.ts-	}
+/workspaces/valora/src/output/retention-manager.ts-
+--
+/workspaces/valora/src/session/cleanup-scheduler.ts-
+/workspaces/valora/src/session/cleanup-scheduler.ts-			totalDeleted += result.deletedSessions.length;
+/workspaces/valora/src/session/cleanup-scheduler.ts:			totalCompressed += result.compressedSessions.length;
+/workspaces/valora/src/session/cleanup-scheduler.ts-			totalErrors += result.errors.length;
+/workspaces/valora/src/session/cleanup-scheduler.ts-
+/workspaces/valora/src/session/cleanup-scheduler.ts-			// Show user notification when cleanup actually does something
+/workspaces/valora/src/session/cleanup-scheduler.ts:			const hasActions = result.deletedSessions.length > 0 || result.compressedSessions.length > 0;
+/workspaces/valora/src/session/cleanup-scheduler.ts-
+/workspaces/valora/src/session/cleanup-scheduler.ts-			if (result.errors.length > 0) {
+/workspaces/valora/src/session/cleanup-scheduler.ts-				this.logger.warn('Session cleanup completed with errors', {
+/workspaces/valora/src/session/cleanup-scheduler.ts:					compressedCount: result.compressedSessions.length,
+/workspaces/valora/src/session/cleanup-scheduler.ts-					deletedCount: result.deletedSessions.length,
+/workspaces/valora/src/session/cleanup-scheduler.ts-					errorCount: result.errors.length,
+--
+/workspaces/valora/src/session/cleanup-scheduler.ts-				// Log at INFO level when cleanup actually modified sessions
+/workspaces/valora/src/session/cleanup-scheduler.ts-				this.logger.info('Automatic session cleanup completed', {
+/workspaces/valora/src/session/cleanup-scheduler.ts:					compressedCount: result.compressedSessions.length,
+/workspaces/valora/src/session/cleanup-scheduler.ts-					deletedCount: result.deletedSessions.length
+/workspaces/valora/src/session/cleanup-scheduler.ts-				});
+--
+/workspaces/valora/src/session/cleanup-scheduler.ts-			this.logger.info('Manual session cleanup completed');
+/workspaces/valora/src/session/cleanup-scheduler.ts-			this.logger.info('Manual cleanup details', {
+/workspaces/valora/src/session/cleanup-scheduler.ts:				compressedCount: result.compressedSessions.length,
+/workspaces/valora/src/session/cleanup-scheduler.ts-				deletedCount: result.deletedSessions.length
+/workspaces/valora/src/session/cleanup-scheduler.ts-			});
+--
+/workspaces/valora/src/session/retention-policy-runner.ts-	// Get retention policy from config
+/workspaces/valora/src/session/retention-policy-runner.ts-	const policy: SessionRetentionPolicy = {
+/workspaces/valora/src/session/retention-policy-runner.ts:		compressAfterDays: config.sessions?.compress_after_days,
+/workspaces/valora/src/session/retention-policy-runner.ts-		maxAgeDays: config.sessions?.max_age_days,
+/workspaces/valora/src/session/retention-policy-runner.ts-		maxCount: config.sessions?.max_count,
+--
+/workspaces/valora/src/session/retention-policy-runner.ts-
+/workspaces/valora/src/session/retention-policy-runner.ts-	logger.debug('Session retention policy completed', {
+/workspaces/valora/src/session/retention-policy-runner.ts:		compressed: result.compressedSessions.length,
+/workspaces/valora/src/session/retention-policy-runner.ts-		deleted: result.deletedSessions.length,
+/workspaces/valora/src/session/retention-policy-runner.ts-		errors: result.errors.length
+--
+/workspaces/valora/src/session/retention-policy-runner.ts-		const result = await runRetentionPolicy(false);
+/workspaces/valora/src/session/retention-policy-runner.ts-
+/workspaces/valora/src/session/retention-policy-runner.ts:		if (result.deletedSessions.length > 0 || result.compressedSessions.length > 0) {
+/workspaces/valora/src/session/retention-policy-runner.ts-			logger.debug('Automatic cleanup completed', {
+/workspaces/valora/src/session/retention-policy-runner.ts:				compressed: result.compressedSessions.length,
+/workspaces/valora/src/session/retention-policy-runner.ts-				deleted: result.deletedSessions.length
+/workspaces/valora/src/session/retention-policy-runner.ts-			});
+--
+/workspaces/valora/src/plugins/plugin-api.factory.test.ts-	});
+/workspaces/valora/src/plugins/plugin-api.factory.test.ts-
+/workspaces/valora/src/plugins/plugin-api.factory.test.ts:	it('registers a compression strategy via api.compression.registerStrategy()', async () => {
+/workspaces/valora/src/plugins/plugin-api.factory.test.ts:		const { getStrategy, resetRegistry } = await import('executor/output-compression.service');
+/workspaces/valora/src/plugins/plugin-api.factory.test.ts-
+/workspaces/valora/src/plugins/plugin-api.factory.test.ts-		const fn = (output: string) => output.slice(0, 10);
+/workspaces/valora/src/plugins/plugin-api.factory.test.ts-		const api = createPluginAPI({} as never, makePlugin(), makeRegistry());
+/workspaces/valora/src/plugins/plugin-api.factory.test.ts-
+/workspaces/valora/src/plugins/plugin-api.factory.test.ts:		api.compression.registerStrategy('mytool', fn);
+/workspaces/valora/src/plugins/plugin-api.factory.test.ts-
+/workspaces/valora/src/plugins/plugin-api.factory.test.ts-		expect(getStrategy('mytool')).toBe(fn);
+--
+/workspaces/valora/src/plugins/plugin-api.factory.ts-import type { LoadedPlugin } from 'types/plugin.types';
+/workspaces/valora/src/plugins/plugin-api.factory.ts-
+/workspaces/valora/src/plugins/plugin-api.factory.ts:import { registerStrategy } from 'executor/output-compression.service';
+/workspaces/valora/src/plugins/plugin-api.factory.ts-import { getProviderRegistry } from 'llm/registry';
+/workspaces/valora/src/plugins/plugin-api.factory.ts-import { getLogger } from 'output/logger';
+--
+/workspaces/valora/src/plugins/plugin-api.factory.ts-
+/workspaces/valora/src/plugins/plugin-api.factory.ts-	return {
+/workspaces/valora/src/plugins/plugin-api.factory.ts:		compression: {
+/workspaces/valora/src/plugins/plugin-api.factory.ts-			registerStrategy(tool, fn) {
+/workspaces/valora/src/plugins/plugin-api.factory.ts-				registerStrategy(tool, fn);
+--
+/workspaces/valora/src/plugins/plugin-api.types.ts-import type { ZodTypeAny } from 'zod';
+/workspaces/valora/src/plugins/plugin-api.types.ts-
+/workspaces/valora/src/plugins/plugin-api.types.ts:import type { CompressionStrategy } from 'executor/output-compression.service';
+/workspaces/valora/src/plugins/plugin-api.types.ts-import type { Logger } from 'output/logger';
+/workspaces/valora/src/plugins/plugin-api.types.ts-import type { LLMProvider } from 'types/llm.types';
+--
+/workspaces/valora/src/plugins/plugin-api.types.ts-
+/workspaces/valora/src/plugins/plugin-api.types.ts-export interface PluginAPI {
+/workspaces/valora/src/plugins/plugin-api.types.ts:	compression: {
+/workspaces/valora/src/plugins/plugin-api.types.ts-		registerStrategy(tool: string, fn: CompressionStrategy): void;
+/workspaces/valora/src/plugins/plugin-api.types.ts-	};
+--
+/workspaces/valora/src/cli/index.ts-program.addOption(globalFlags.maxSize);
+/workspaces/valora/src/cli/index.ts-program.addOption(globalFlags.maxFiles);
+/workspaces/valora/src/cli/index.ts:program.addOption(globalFlags.compressAfter);
+/workspaces/valora/src/cli/index.ts-program.addOption(globalFlags.cleanupInterval);
+/workspaces/valora/src/cli/index.ts-program.addOption(globalFlags.retentionDryRun);
+--
+/workspaces/valora/src/cleanup/coordinator.ts-	// Convert config format to RetentionPolicy
+/workspaces/valora/src/cleanup/coordinator.ts-	const retentionPolicy: RetentionPolicy = {
+/workspaces/valora/src/cleanup/coordinator.ts:		compressAfterDays: loggingConfig.compress_after_days,
+/workspaces/valora/src/cleanup/coordinator.ts-		maxAgeDays: loggingConfig.max_age_days,
+/workspaces/valora/src/cleanup/coordinator.ts-		maxFiles: loggingConfig.max_files,
+--
+/workspaces/valora/src/cleanup/coordinator.ts-	// Convert config format to SessionRetentionPolicy
+/workspaces/valora/src/cleanup/coordinator.ts-	const retentionPolicy: SessionRetentionPolicy = {
+/workspaces/valora/src/cleanup/coordinator.ts:		compressAfterDays: sessionConfig.compress_after_days,
+/workspaces/valora/src/cleanup/coordinator.ts-		maxAgeDays: sessionConfig.max_age_days,
+/workspaces/valora/src/cleanup/coordinator.ts-		maxCount: sessionConfig.max_count,
+--
+/workspaces/valora/src/cli/commands/session.ts-${color.bold('Session Retention Policy Results:')}
+/workspaces/valora/src/cli/commands/session.ts-  Deleted:       ${color.cyan(result.deletedSessions.length.toString())} sessions
+/workspaces/valora/src/cli/commands/session.ts:  Compressed:    ${color.cyan(result.compressedSessions.length.toString())} sessions
+/workspaces/valora/src/cli/commands/session.ts-  Size Before:   ${color.cyan(formatBytes(result.totalSizeBefore))}
+/workspaces/valora/src/cli/commands/session.ts-  Size After:    ${color.cyan(formatBytes(result.totalSizeAfter))}
+--
+/workspaces/valora/src/cli/types/cli-options.types.ts-	// Logging retention policy options
+/workspaces/valora/src/cli/types/cli-options.types.ts-	cleanupInterval?: number;
+/workspaces/valora/src/cli/types/cli-options.types.ts:	compressAfter?: number;
+/workspaces/valora/src/cli/types/cli-options.types.ts-	logsPath?: string;
+/workspaces/valora/src/cli/types/cli-options.types.ts-	maxAge?: number;
+--
+/workspaces/valora/src/executor/tool-execution.service.ts-
+/workspaces/valora/src/executor/tool-execution.service.ts-import { getHookExecutionService } from './hook-execution.service';
+/workspaces/valora/src/executor/tool-execution.service.ts:import { compressTerminalOutput, getCompressionStats } from './output-compression.service';
+/workspaces/valora/src/executor/tool-execution.service.ts-import {
+/workspaces/valora/src/executor/tool-execution.service.ts-	type DryRunToolSimulator,
+--
+/workspaces/valora/src/executor/tool-execution.service.ts-
+/workspaces/valora/src/executor/tool-execution.service.ts-			const statsBefore = getCompressionStats();
+/workspaces/valora/src/executor/tool-execution.service.ts:			const compressed = compressTerminalOutput(command, output);
+/workspaces/valora/src/executor/tool-execution.service.ts-			const statsAfter = getCompressionStats();
+/workspaces/valora/src/executor/tool-execution.service.ts-			const filterSavedChars =
+/workspaces/valora/src/executor/tool-execution.service.ts-				statsAfter.inputChars - statsBefore.inputChars - (statsAfter.outputChars - statsBefore.outputChars);
+/workspaces/valora/src/executor/tool-execution.service.ts-			if (filterSavedChars > 0) {
+/workspaces/valora/src/executor/tool-execution.service.ts:				getMetricsCollector().incrementCounter('compression.terminal.saved_chars', filterSavedChars);
+/workspaces/valora/src/executor/tool-execution.service.ts-			}
+/workspaces/valora/src/executor/tool-execution.service.ts:			return compressed || 'Command completed successfully (no output)';
+/workspaces/valora/src/executor/tool-execution.service.ts-		} catch (error) {
+/workspaces/valora/src/executor/tool-execution.service.ts-			const execError = error as { code?: number; stderr?: string; stdout?: string };
+--
+/workspaces/valora/src/executor/tool-execution.service.ts-			if (guidance) return guidance;
+/workspaces/valora/src/executor/tool-execution.service.ts-
+/workspaces/valora/src/executor/tool-execution.service.ts:			throw new Error(`Command failed: ${compressTerminalOutput(command, output) || (error as Error).message}`);
+/workspaces/valora/src/executor/tool-execution.service.ts-		}
+/workspaces/valora/src/executor/tool-execution.service.ts-	}
+--
+/workspaces/valora/src/ui/dashboard/detail-panels/optimization-panel.tsx-	return (
+/workspaces/valora/src/ui/dashboard/detail-panels/optimization-panel.tsx-		<Box>
+/workspaces/valora/src/ui/dashboard/detail-panels/optimization-panel.tsx:			<Text dimColor>Output compression: </Text>
+/workspaces/valora/src/ui/dashboard/detail-panels/optimization-panel.tsx-			<Text bold color="green">
+/workspaces/valora/src/ui/dashboard/detail-panels/optimization-panel.tsx-				{ratioPct !== null ? `${ratioPct}%` : '—'} saved
+--
+/workspaces/valora/src/ui/dashboard/detail-panels/optimization-panel.tsx-function CompressionStatsRows(): React.JSX.Element {
+/workspaces/valora/src/ui/dashboard/detail-panels/optimization-panel.tsx-	const snapshot = getMetricsCollector().getSnapshot();
+/workspaces/valora/src/ui/dashboard/detail-panels/optimization-panel.tsx:	const ratioGauge = snapshot.gauges.find((g) => g.name === 'compression.terminal.ratio');
+/workspaces/valora/src/ui/dashboard/detail-panels/optimization-panel.tsx:	const savedTokens = snapshot.gauges.find((g) => g.name === 'compression.terminal.estimated_saved_tokens')?.value ?? 0;
+/workspaces/valora/src/ui/dashboard/detail-panels/optimization-panel.tsx-	const savedCostUsd =
+/workspaces/valora/src/ui/dashboard/detail-panels/optimization-panel.tsx:		snapshot.gauges.find((g) => g.name === 'compression.terminal.estimated_saved_cost_usd')?.value ?? 0;
+/workspaces/valora/src/ui/dashboard/detail-panels/optimization-panel.tsx:	const prunedMessages = snapshot.counters.find((c) => c.name === 'compression.history.pruned_messages')?.value ?? 0;
+/workspaces/valora/src/ui/dashboard/detail-panels/optimization-panel.tsx:	const dedupHits = snapshot.counters.find((c) => c.name === 'compression.dedup.hits')?.value ?? 0;
+/workspaces/valora/src/ui/dashboard/detail-panels/optimization-panel.tsx-	const ratioPct = ratioGauge ? Math.round(ratioGauge.value * 100) : null;
+/workspaces/valora/src/ui/dashboard/detail-panels/optimization-panel.tsx-	return (
+--
+/workspaces/valora/src/config/constants.ts- * Compression Constants
+/workspaces/valora/src/config/constants.ts- */
+/workspaces/valora/src/config/constants.ts:export const LOG_COMPRESSION_LEVEL = 6; // Default gzip compression level (0-9)
+/workspaces/valora/src/config/constants.ts-
+/workspaces/valora/src/config/constants.ts-/**
+--
+/workspaces/valora/src/config/constants.ts- */
+/workspaces/valora/src/config/constants.ts-export const LOG_FILE_PREFIX = 'ai-'; // Prefix for log files
+/workspaces/valora/src/config/constants.ts:export const LOG_FILE_EXTENSION = '.log'; // Extension for uncompressed log files
+/workspaces/valora/src/config/constants.ts:export const LOG_COMPRESSED_EXTENSION = '.gz'; // Extension for compressed log files
+/workspaces/valora/src/config/constants.ts-export const LOG_DATE_FORMAT = 'YYYY-MM-DD'; // Date format for daily files
+/workspaces/valora/src/config/constants.ts-
+--
+/workspaces/valora/src/config/constants.ts-export const MAX_MCP_OUTPUT_CHARS = 15_000;
+/workspaces/valora/src/config/constants.ts-export const MAX_LIST_DIR_ENTRIES = 200;
+/workspaces/valora/src/config/constants.ts:/** Minimum output length before per-command compression is attempted. */
+/workspaces/valora/src/config/constants.ts-export const OUTPUT_COMPRESSION_THRESHOLD = 500;
+/workspaces/valora/src/config/constants.ts-
+--
+/workspaces/valora/src/config/schema.ts-	// Max size for individual daily log files
+/workspaces/valora/src/config/schema.ts-	cleanup_interval_hours: z.number().min(1).max(168).default(DEFAULT_LOG_CLEANUP_INTERVAL_HOURS),
+/workspaces/valora/src/config/schema.ts:	compress_after_days: z.number().min(1).max(365).optional(),
+/workspaces/valora/src/config/schema.ts-	daily_file_max_size_mb: z.number().min(1).max(1000).default(DEFAULT_DAILY_FILE_MAX_SIZE_MB),
+/workspaces/valora/src/config/schema.ts-	// 1 day max
+--
+/workspaces/valora/src/config/schema.ts-export const SESSION_RETENTION_CONFIG_SCHEMA = z.object({
+/workspaces/valora/src/config/schema.ts-	cleanup_interval_hours: z.number().min(1).max(168).default(DEFAULT_SESSION_CLEANUP_INTERVAL_HOURS),
+/workspaces/valora/src/config/schema.ts:	compress_after_days: z.number().min(1).max(365).optional(),
+/workspaces/valora/src/config/schema.ts-	// 1 day max
+/workspaces/valora/src/config/schema.ts-	dry_run: z.boolean().default(DEFAULT_SESSION_DRY_RUN),
+--
+/workspaces/valora/src/config/schema.ts-	logging: {
+/workspaces/valora/src/config/schema.ts-		cleanup_interval_hours: DEFAULT_LOG_CLEANUP_INTERVAL_HOURS,
+/workspaces/valora/src/config/schema.ts:		compress_after_days: DEFAULT_LOG_COMPRESS_AFTER_DAYS,
+/workspaces/valora/src/config/schema.ts-		daily_file_max_size_mb: DEFAULT_DAILY_FILE_MAX_SIZE_MB,
+/workspaces/valora/src/config/schema.ts-		dry_run: DEFAULT_LOG_DRY_RUN,
+--
+/workspaces/valora/src/config/schema.ts-	sessions: {
+/workspaces/valora/src/config/schema.ts-		cleanup_interval_hours: DEFAULT_SESSION_CLEANUP_INTERVAL_HOURS,
+/workspaces/valora/src/config/schema.ts:		compress_after_days: DEFAULT_SESSION_COMPRESS_AFTER_DAYS,
+/workspaces/valora/src/config/schema.ts-		dry_run: DEFAULT_SESSION_DRY_RUN,
+/workspaces/valora/src/config/schema.ts-		enabled: DEFAULT_SESSION_RETENTION_ENABLED,
+--
+/workspaces/valora/src/config/loader.ts-		this.applyEnvMapping(config.logging, {
+/workspaces/valora/src/config/loader.ts-			cleanup_interval_hours: { env: 'AI_LOG_CLEANUP_INTERVAL_HOURS', parser: ENV_PARSERS.integer },
+/workspaces/valora/src/config/loader.ts:			compress_after_days: { env: 'AI_LOG_COMPRESS_AFTER_DAYS', parser: ENV_PARSERS.integer },
+/workspaces/valora/src/config/loader.ts-			daily_file_max_size_mb: { env: 'AI_LOG_DAILY_FILE_MAX_SIZE_MB', parser: ENV_PARSERS.integer },
+/workspaces/valora/src/config/loader.ts-			dry_run: { env: 'AI_LOG_DRY_RUN', parser: ENV_PARSERS.boolean },
+--
+/workspaces/valora/src/config/loader.ts-		this.applyEnvMapping(config.sessions, {
+/workspaces/valora/src/config/loader.ts-			cleanup_interval_hours: { env: 'AI_SESSION_CLEANUP_INTERVAL_HOURS', parser: ENV_PARSERS.integer },
+/workspaces/valora/src/config/loader.ts:			compress_after_days: { env: 'AI_SESSION_COMPRESS_AFTER_DAYS', parser: ENV_PARSERS.integer },
+/workspaces/valora/src/config/loader.ts-			dry_run: { env: 'AI_SESSION_DRY_RUN', parser: ENV_PARSERS.boolean },
+/workspaces/valora/src/config/loader.ts-			enabled: { env: 'AI_SESSION_RETENTION_ENABLED', parser: ENV_PARSERS.boolean },
+--
+/workspaces/valora/src/cli/config-builder.ts-			{ configPath: 'max_size_mb', optionName: 'maxSize' },
+/workspaces/valora/src/cli/config-builder.ts-			{ configPath: 'max_files', optionName: 'maxFiles' },
+/workspaces/valora/src/cli/config-builder.ts:			{ configPath: 'compress_after_days', optionName: 'compressAfter' },
+/workspaces/valora/src/cli/config-builder.ts-			{ configPath: 'cleanup_interval_hours', optionName: 'cleanupInterval' },
+/workspaces/valora/src/cli/config-builder.ts-			{ configPath: 'dry_run', optionName: 'retentionDryRun' }
+--
+/workspaces/valora/src/cli/config-builder.ts-			{ configPath: 'max_size_mb', optionName: 'sessionMaxSize' },
+/workspaces/valora/src/cli/config-builder.ts-			{ configPath: 'max_count', optionName: 'sessionMaxCount' },
+/workspaces/valora/src/cli/config-builder.ts:			{ configPath: 'compress_after_days', optionName: 'sessionCompressAfter' },
+/workspaces/valora/src/cli/config-builder.ts-			{ configPath: 'cleanup_interval_hours', optionName: 'sessionCleanupInterval' },
+/workspaces/valora/src/cli/config-builder.ts-			{ configPath: 'dry_run', optionName: 'sessionRetentionDryRun' }
+--
+/workspaces/valora/src/cli/config-builder.ts-			{ name: 'max-size', option: 'maxSize' },
+/workspaces/valora/src/cli/config-builder.ts-			{ name: 'max-files', option: 'maxFiles' },
+/workspaces/valora/src/cli/config-builder.ts:			{ name: 'compress-after', option: 'compressAfter' },
+/workspaces/valora/src/cli/config-builder.ts-			{ name: 'cleanup-interval', option: 'cleanupInterval' },
+/workspaces/valora/src/cli/config-builder.ts-			{ name: 'session-max-age', option: 'sessionMaxAge' },
+/workspaces/valora/src/cli/config-builder.ts-			{ name: 'session-max-size', option: 'sessionMaxSize' },
+/workspaces/valora/src/cli/config-builder.ts-			{ name: 'session-max-count', option: 'sessionMaxCount' },
+/workspaces/valora/src/cli/config-builder.ts:			{ name: 'session-compress-after', option: 'sessionCompressAfter' },
+/workspaces/valora/src/cli/config-builder.ts-			{ name: 'session-cleanup-interval', option: 'sessionCleanupInterval' }
+/workspaces/valora/src/cli/config-builder.ts-		];
+--
+/workspaces/valora/src/executor/stage-executor.test.ts-import { describe, expect, it } from 'vitest';
+/workspaces/valora/src/executor/stage-executor.test.ts-import type { LLMMessage } from 'types/llm.types';
+/workspaces/valora/src/executor/stage-executor.test.ts:import { compressMessageHistory, DEFAULT_FAILURE_POLICY, djb2 } from './stage-executor';
+/workspaces/valora/src/executor/stage-executor.test.ts-
+/workspaces/valora/src/executor/stage-executor.test.ts-describe('DEFAULT_FAILURE_POLICY', () => {
+--
+/workspaces/valora/src/executor/stage-executor.test.ts-});
+/workspaces/valora/src/executor/stage-executor.test.ts-
+/workspaces/valora/src/executor/stage-executor.test.ts:// ── compressMessageHistory ────────────────────────────────────────────────────
+/workspaces/valora/src/executor/stage-executor.test.ts-
+/workspaces/valora/src/executor/stage-executor.test.ts:describe('compressMessageHistory', () => {
+/workspaces/valora/src/executor/stage-executor.test.ts-	function toolMsg(content: string): LLMMessage {
+/workspaces/valora/src/executor/stage-executor.test.ts-		return { content, role: 'tool' };
+--
+/workspaces/valora/src/executor/stage-executor.test.ts-			toolMsg('result-5')
+/workspaces/valora/src/executor/stage-executor.test.ts-		];
+/workspaces/valora/src/executor/stage-executor.test.ts:		compressMessageHistory(messages);
+/workspaces/valora/src/executor/stage-executor.test.ts-		// default keepRecent=4: only index 1 (result-1) is old enough to be pruned
+/workspaces/valora/src/executor/stage-executor.test.ts-		expect(messages[1]?.content).toBe(PLACEHOLDER);
+--
+/workspaces/valora/src/executor/stage-executor.test.ts-			toolMsg('recent-4')
+/workspaces/valora/src/executor/stage-executor.test.ts-		];
+/workspaces/valora/src/executor/stage-executor.test.ts:		const count = compressMessageHistory(messages);
+/workspaces/valora/src/executor/stage-executor.test.ts-		expect(count).toBe(2);
+/workspaces/valora/src/executor/stage-executor.test.ts-	});
+--
+/workspaces/valora/src/executor/stage-executor.test.ts-			toolMsg('recent-4')
+/workspaces/valora/src/executor/stage-executor.test.ts-		];
+/workspaces/valora/src/executor/stage-executor.test.ts:		compressMessageHistory(messages);
+/workspaces/valora/src/executor/stage-executor.test.ts-		expect(messages[0]?.content).toBe('user message');
+/workspaces/valora/src/executor/stage-executor.test.ts-		expect(messages[1]?.content).toBe('assistant reply');
+--
+/workspaces/valora/src/executor/stage-executor.test.ts-			toolMsg('recent-4')
+/workspaces/valora/src/executor/stage-executor.test.ts-		];
+/workspaces/valora/src/executor/stage-executor.test.ts:		const count = compressMessageHistory(messages);
+/workspaces/valora/src/executor/stage-executor.test.ts-		expect(count).toBe(0);
+/workspaces/valora/src/executor/stage-executor.test.ts-	});
+--
+/workspaces/valora/src/executor/stage-executor.test.ts-	it('does nothing when message count is within keepRecent', () => {
+/workspaces/valora/src/executor/stage-executor.test.ts-		const messages: LLMMessage[] = [userMsg('task'), toolMsg('result-1'), toolMsg('result-2')];
+/workspaces/valora/src/executor/stage-executor.test.ts:		const count = compressMessageHistory(messages);
+/workspaces/valora/src/executor/stage-executor.test.ts-		expect(count).toBe(0);
+/workspaces/valora/src/executor/stage-executor.test.ts-		expect(messages[1]?.content).toBe('result-1');
+--
+/workspaces/valora/src/executor/stage-executor.test.ts-			toolMsg('recent-2')
+/workspaces/valora/src/executor/stage-executor.test.ts-		];
+/workspaces/valora/src/executor/stage-executor.test.ts:		const count = compressMessageHistory(messages, 2);
+/workspaces/valora/src/executor/stage-executor.test.ts-		expect(count).toBe(3);
+/workspaces/valora/src/executor/stage-executor.test.ts-		expect(messages[1]?.content).toBe(PLACEHOLDER);
+--
+/workspaces/valora/src/cli/flags.ts-	batch: OptionAdapter;
+/workspaces/valora/src/cli/flags.ts-	cleanupInterval: OptionAdapter;
+/workspaces/valora/src/cli/flags.ts:	compressAfter: OptionAdapter;
+/workspaces/valora/src/cli/flags.ts-	documentAutoApprove: OptionAdapter;
+/workspaces/valora/src/cli/flags.ts-	documentCategory: OptionAdapter;
+--
+/workspaces/valora/src/cli/flags.ts-	cleanupInterval: createOption('--cleanup-interval <hours>', 'Run cleanup every N hours').argParser(parseInt),
+/workspaces/valora/src/cli/flags.ts-
+/workspaces/valora/src/cli/flags.ts:	compressAfter: createOption('--compress-after <days>', 'Compress log files after this many days').argParser(parseInt),
+/workspaces/valora/src/cli/flags.ts-
+/workspaces/valora/src/cli/flags.ts-	// Document output flags
+--
+/workspaces/valora/src/cli/flags.ts-
+/workspaces/valora/src/cli/flags.ts-	sessionCompressAfter: createOption(
+/workspaces/valora/src/cli/flags.ts:		'--session-compress-after <days>',
+/workspaces/valora/src/cli/flags.ts-		'Compress sessions after this many days'
+/workspaces/valora/src/cli/flags.ts-	).argParser(parseInt),
+--
+/workspaces/valora/src/executor/output-compression.service.ts- * Output Compression Service
+/workspaces/valora/src/executor/output-compression.service.ts- *
+/workspaces/valora/src/executor/output-compression.service.ts: * RTK-style content-aware compression for terminal command output.
+/workspaces/valora/src/executor/output-compression.service.ts- * Applies per-command intelligent filters to reduce token consumption
+/workspaces/valora/src/executor/output-compression.service.ts- * while preserving the most useful information for the LLM.
+--
+/workspaces/valora/src/executor/output-compression.service.ts- * - Per-command filters reduce structure-specific noise (git metadata, pass
+/workspaces/valora/src/executor/output-compression.service.ts- *   suites, progress spinners, duplicate type errors, etc.)
+/workspaces/valora/src/executor/output-compression.service.ts: * - truncateTerminalOutput() acts as a safety net after compression; it is
+/workspaces/valora/src/executor/output-compression.service.ts- *   never skipped so the MAX_TERMINAL_OUTPUT_CHARS cap always holds
+/workspaces/valora/src/executor/output-compression.service.ts- */
+--
+/workspaces/valora/src/executor/output-compression.service.ts-
+/workspaces/valora/src/executor/output-compression.service.ts-/**
+/workspaces/valora/src/executor/output-compression.service.ts: * Returns a snapshot of terminal output compression statistics for the current
+/workspaces/valora/src/executor/output-compression.service.ts: * process lifetime. Counts only calls that triggered actual compression
+/workspaces/valora/src/executor/output-compression.service.ts- * (outputs above OUTPUT_COMPRESSION_THRESHOLD).
+/workspaces/valora/src/executor/output-compression.service.ts- */
+--
+/workspaces/valora/src/executor/output-compression.service.ts-
+/workspaces/valora/src/executor/output-compression.service.ts-/**
+/workspaces/valora/src/executor/output-compression.service.ts: * Reset compression statistics. Called by session cleanup and tests.
+/workspaces/valora/src/executor/output-compression.service.ts- */
+/workspaces/valora/src/executor/output-compression.service.ts-export function resetCompressionStats(): void {
+--
+/workspaces/valora/src/executor/output-compression.service.ts- * 4. Apply head+tail truncation as a final safety net.
+/workspaces/valora/src/executor/output-compression.service.ts- */
+/workspaces/valora/src/executor/output-compression.service.ts:export function compressTerminalOutput(command: string, output: string): string {
+/workspaces/valora/src/executor/output-compression.service.ts-	const clean = stripAnsiCodes(output);
+/workspaces/valora/src/executor/output-compression.service.ts-
+--
+/workspaces/valora/src/executor/output-compression.service.ts-	const tool = resolveStrategyKey(command);
+/workspaces/valora/src/executor/output-compression.service.ts-	const strategy = registry.get(tool);
+/workspaces/valora/src/executor/output-compression.service.ts:	let compressed: string;
+/workspaces/valora/src/executor/output-compression.service.ts-	if (strategy) {
+/workspaces/valora/src/executor/output-compression.service.ts-		try {
+/workspaces/valora/src/executor/output-compression.service.ts:			compressed = strategy(clean, command);
+/workspaces/valora/src/executor/output-compression.service.ts-		} catch {
+/workspaces/valora/src/executor/output-compression.service.ts:			compressed = clean;
+/workspaces/valora/src/executor/output-compression.service.ts-		}
+/workspaces/valora/src/executor/output-compression.service.ts-	} else {
+/workspaces/valora/src/executor/output-compression.service.ts:		compressed = clean;
+/workspaces/valora/src/executor/output-compression.service.ts-	}
+/workspaces/valora/src/executor/output-compression.service.ts-
+/workspaces/valora/src/executor/output-compression.service.ts:	const result = truncateTerminalOutput(compressed);
+/workspaces/valora/src/executor/output-compression.service.ts-	recordCompression(output.length, result.length);
+/workspaces/valora/src/executor/output-compression.service.ts-	return result;
+--
+/workspaces/valora/src/executor/output-compression.service.test.ts-
+/workspaces/valora/src/executor/output-compression.service.test.ts-import {
+/workspaces/valora/src/executor/output-compression.service.test.ts:	compressTerminalOutput,
+/workspaces/valora/src/executor/output-compression.service.test.ts-	getCompressionStats,
+/workspaces/valora/src/executor/output-compression.service.test.ts-	registerStrategy,
+/workspaces/valora/src/executor/output-compression.service.test.ts-	resetCompressionStats,
+/workspaces/valora/src/executor/output-compression.service.test.ts-	resetRegistry
+/workspaces/valora/src/executor/output-compression.service.test.ts:} from './output-compression.service';
+/workspaces/valora/src/executor/output-compression.service.test.ts-
+/workspaces/valora/src/executor/output-compression.service.test.ts-const LONG = 'x'.repeat(600);
+--
+/workspaces/valora/src/executor/output-compression.service.test.ts-});
+/workspaces/valora/src/executor/output-compression.service.test.ts-
+/workspaces/valora/src/executor/output-compression.service.test.ts:describe('compressTerminalOutput — stats baseline equals raw input length (B2)', () => {
+/workspaces/valora/src/executor/output-compression.service.test.ts-	it('counts raw input bytes (including ANSI codes) in inputChars, not post-strip bytes', () => {
+/workspaces/valora/src/executor/output-compression.service.test.ts-		const ESC = '\x1b[31m';
+/workspaces/valora/src/executor/output-compression.service.test.ts-		const RESET = '\x1b[0m';
+/workspaces/valora/src/executor/output-compression.service.test.ts-		const rawOutput = ESC + 'x'.repeat(600) + RESET;
+/workspaces/valora/src/executor/output-compression.service.test.ts:		compressTerminalOutput('git status', rawOutput);
+/workspaces/valora/src/executor/output-compression.service.test.ts-		const { inputChars } = getCompressionStats();
+/workspaces/valora/src/executor/output-compression.service.test.ts-		expect(inputChars).toBe(rawOutput.length);
+--
+/workspaces/valora/src/executor/output-compression.service.test.ts-});
+/workspaces/valora/src/executor/output-compression.service.test.ts-
+/workspaces/valora/src/executor/output-compression.service.test.ts:describe('compressTerminalOutput — wrapper-aware dispatch (B1)', () => {
+/workspaces/valora/src/executor/output-compression.service.test.ts-	it('dispatches to the wrapped tool when first token is a package-manager wrapper', () => {
+/workspaces/valora/src/executor/output-compression.service.test.ts-		registerStrategy('tsc', () => 'TSC_RESULT');
+/workspaces/valora/src/executor/output-compression.service.test.ts-		registerStrategy('pnpm', () => 'PNPM_RESULT');
+/workspaces/valora/src/executor/output-compression.service.test.ts:		expect(compressTerminalOutput('pnpm tsc --noEmit', LONG)).toBe('TSC_RESULT');
+/workspaces/valora/src/executor/output-compression.service.test.ts-	});
+/workspaces/valora/src/executor/output-compression.service.test.ts-
+--
+/workspaces/valora/src/executor/output-compression.service.test.ts-		registerStrategy('tsc', () => 'TSC_RESULT');
+/workspaces/valora/src/executor/output-compression.service.test.ts-		registerStrategy('pnpm', () => 'PNPM_RESULT');
+/workspaces/valora/src/executor/output-compression.service.test.ts:		expect(compressTerminalOutput('pnpm install', LONG)).toBe('PNPM_RESULT');
+/workspaces/valora/src/executor/output-compression.service.test.ts-	});
+/workspaces/valora/src/executor/output-compression.service.test.ts-
+/workspaces/valora/src/executor/output-compression.service.test.ts-	it('dispatches to the first token when second token is not in the registry', () => {
+/workspaces/valora/src/executor/output-compression.service.test.ts-		registerStrategy('pnpm', () => 'PNPM_RESULT');
+/workspaces/valora/src/executor/output-compression.service.test.ts:		expect(compressTerminalOutput('pnpm unknown-tool --flag', LONG)).toBe('PNPM_RESULT');
+/workspaces/valora/src/executor/output-compression.service.test.ts-	});
+/workspaces/valora/src/executor/output-compression.service.test.ts-
+--
+/workspaces/valora/src/executor/output-compression.service.test.ts-		registerStrategy('vitest', () => 'VITEST_RESULT');
+/workspaces/valora/src/executor/output-compression.service.test.ts-		registerStrategy('npx', () => 'NPX_RESULT');
+/workspaces/valora/src/executor/output-compression.service.test.ts:		expect(compressTerminalOutput('npx vitest run', LONG)).toBe('VITEST_RESULT');
+/workspaces/valora/src/executor/output-compression.service.test.ts-	});
+/workspaces/valora/src/executor/output-compression.service.test.ts-
+--
+/workspaces/valora/src/executor/output-compression.service.test.ts-		registerStrategy('eslint', () => 'ESLINT_RESULT');
+/workspaces/valora/src/executor/output-compression.service.test.ts-		registerStrategy('yarn', () => 'YARN_RESULT');
+/workspaces/valora/src/executor/output-compression.service.test.ts:		expect(compressTerminalOutput('yarn eslint .', LONG)).toBe('ESLINT_RESULT');
+/workspaces/valora/src/executor/output-compression.service.test.ts-	});
+/workspaces/valora/src/executor/output-compression.service.test.ts-
+--
+/workspaces/valora/src/executor/output-compression.service.test.ts-		registerStrategy('tsc', () => 'TSC_RESULT');
+/workspaces/valora/src/executor/output-compression.service.test.ts-		registerStrategy('bun', () => 'BUN_RESULT');
+/workspaces/valora/src/executor/output-compression.service.test.ts:		expect(compressTerminalOutput('bun tsc', LONG)).toBe('TSC_RESULT');
+/workspaces/valora/src/executor/output-compression.service.test.ts-	});
+/workspaces/valora/src/executor/output-compression.service.test.ts-
+/workspaces/valora/src/executor/output-compression.service.test.ts-	it('does not treat run as a wrapped tool — pnpm run test dispatches to pnpm', () => {
+/workspaces/valora/src/executor/output-compression.service.test.ts-		registerStrategy('pnpm', () => 'PNPM_RESULT');
+/workspaces/valora/src/executor/output-compression.service.test.ts:		expect(compressTerminalOutput('pnpm run test', LONG)).toBe('PNPM_RESULT');
+/workspaces/valora/src/executor/output-compression.service.test.ts-	});
+/workspaces/valora/src/executor/output-compression.service.test.ts-
+--
+/workspaces/valora/src/executor/output-compression.service.test.ts-		registerStrategy('npm', () => 'NPM_RESULT');
+/workspaces/valora/src/executor/output-compression.service.test.ts-		registerStrategy('tsc', () => 'TSC_RESULT');
+/workspaces/valora/src/executor/output-compression.service.test.ts:		expect(compressTerminalOutput('npm exec tsc', LONG)).toBe('NPM_RESULT');
+/workspaces/valora/src/executor/output-compression.service.test.ts-	});
+/workspaces/valora/src/executor/output-compression.service.test.ts-
+/workspaces/valora/src/executor/output-compression.service.test.ts-	it('non-wrapper commands dispatch directly to their own strategy', () => {
+/workspaces/valora/src/executor/output-compression.service.test.ts-		registerStrategy('git', () => 'GIT_RESULT');
+/workspaces/valora/src/executor/output-compression.service.test.ts:		expect(compressTerminalOutput('git log --oneline', LONG)).toBe('GIT_RESULT');
+/workspaces/valora/src/executor/output-compression.service.test.ts-	});
+/workspaces/valora/src/executor/output-compression.service.test.ts-});
+--
+/workspaces/valora/src/executor/stage-executor.ts-import { type EscalationHandlerService, getEscalationHandlerService } from './escalation-handler.service';
+/workspaces/valora/src/executor/stage-executor.ts-import { getMessageBuilderService, type MessageBuilderService } from './message-builder.service';
+/workspaces/valora/src/executor/stage-executor.ts:import { getCompressionStats, stripAnsiCodes } from './output-compression.service';
+/workspaces/valora/src/executor/stage-executor.ts-import { getOutputParsingService, type OutputParsingService } from './output-parsing.service';
+/workspaces/valora/src/executor/stage-executor.ts-import { getPipelineEmitter, type PipelineEventEmitter } from './pipeline-events';
+--
+/workspaces/valora/src/executor/stage-executor.ts-
+/workspaces/valora/src/executor/stage-executor.ts-/**
+/workspaces/valora/src/executor/stage-executor.ts: * Iteration at which the tool loop proactively compresses old tool results.
+/workspaces/valora/src/executor/stage-executor.ts- * Fires once at 40% of the default 20-iteration maximum to bound message growth
+/workspaces/valora/src/executor/stage-executor.ts- * before the LLM is deep into exploration. The reactive path (on provider error)
+--
+/workspaces/valora/src/executor/stage-executor.ts- * Returns the number of messages replaced.
+/workspaces/valora/src/executor/stage-executor.ts- *
+/workspaces/valora/src/executor/stage-executor.ts: * Extracted from `StageExecutor.compressToolResults` for unit testing.
+/workspaces/valora/src/executor/stage-executor.ts- */
+/workspaces/valora/src/executor/stage-executor.ts:export function compressMessageHistory(messages: LLMMessage[], keepRecent = 4): number {
+/workspaces/valora/src/executor/stage-executor.ts-	const cutoff = messages.length - keepRecent;
+/workspaces/valora/src/executor/stage-executor.ts-	let pruned = 0;
+--
+/workspaces/valora/src/executor/stage-executor.ts-			dedupHits += await this.processToolCallsInLoop(completion, messages, stage, iterations, logger, toolResultHashes);
+/workspaces/valora/src/executor/stage-executor.ts-
+/workspaces/valora/src/executor/stage-executor.ts:			// Proactive history compression at iteration threshold
+/workspaces/valora/src/executor/stage-executor.ts-			if (iterations === PROACTIVE_COMPRESS_AFTER_ITERATIONS) {
+/workspaces/valora/src/executor/stage-executor.ts:				prunedCount += this.compressToolResults(messages);
+/workspaces/valora/src/executor/stage-executor.ts-			}
+/workspaces/valora/src/executor/stage-executor.ts-		}
+--
+/workspaces/valora/src/executor/stage-executor.ts-	/**
+/workspaces/valora/src/executor/stage-executor.ts-	 * Execute a single LLM iteration
+/workspaces/valora/src/executor/stage-executor.ts:	 * If the prompt is too long, compresses older tool results and retries once
+/workspaces/valora/src/executor/stage-executor.ts-	 */
+/workspaces/valora/src/executor/stage-executor.ts-	private async executeLLMIteration(
+--
+/workspaces/valora/src/executor/stage-executor.ts-		} catch (error) {
+/workspaces/valora/src/executor/stage-executor.ts-			if (this.isPromptTooLongError(error)) {
+/workspaces/valora/src/executor/stage-executor.ts:				logger.warn('Prompt too long — compressing tool results in message history and retrying', {
+/workspaces/valora/src/executor/stage-executor.ts-					iteration,
+/workspaces/valora/src/executor/stage-executor.ts-					messageCount: messages.length
+/workspaces/valora/src/executor/stage-executor.ts-				});
+/workspaces/valora/src/executor/stage-executor.ts:				this.compressToolResults(messages);
+/workspaces/valora/src/executor/stage-executor.ts-				const completion = await executionContext.provider.complete(completionOptions);
+/workspaces/valora/src/executor/stage-executor.ts-				this.logLLMResponse(logger, completion);
+--
+/workspaces/valora/src/executor/stage-executor.ts-	 * Keeps the system message, first user message, and the most recent 4 messages intact.
+/workspaces/valora/src/executor/stage-executor.ts-	 */
+/workspaces/valora/src/executor/stage-executor.ts:	private compressToolResults(messages: LLMMessage[]): number {
+/workspaces/valora/src/executor/stage-executor.ts:		return compressMessageHistory(messages);
+/workspaces/valora/src/executor/stage-executor.ts-	}
+/workspaces/valora/src/executor/stage-executor.ts-
+/workspaces/valora/src/executor/stage-executor.ts-	/**
+/workspaces/valora/src/executor/stage-executor.ts:	 * Emit compression and deduplication metrics to MetricsCollector.
+/workspaces/valora/src/executor/stage-executor.ts-	 * Called once per tool loop, at both the normal-exit and max-iterations paths.
+/workspaces/valora/src/executor/stage-executor.ts-	 */
+--
+/workspaces/valora/src/executor/stage-executor.ts-		const metrics = getMetricsCollector();
+/workspaces/valora/src/executor/stage-executor.ts-		if (prunedCount > 0) {
+/workspaces/valora/src/executor/stage-executor.ts:			metrics.incrementCounter('compression.history.pruned_messages', prunedCount);
+/workspaces/valora/src/executor/stage-executor.ts-		}
+/workspaces/valora/src/executor/stage-executor.ts-		if (dedupHits > 0) {
+/workspaces/valora/src/executor/stage-executor.ts:			metrics.incrementCounter('compression.dedup.hits', dedupHits);
+/workspaces/valora/src/executor/stage-executor.ts-		}
+/workspaces/valora/src/executor/stage-executor.ts:		const compressionStats = getCompressionStats();
+/workspaces/valora/src/executor/stage-executor.ts:		if (compressionStats.inputChars > 0) {
+/workspaces/valora/src/executor/stage-executor.ts:			metrics.setGauge('compression.terminal.ratio', 1 - compressionStats.outputChars / compressionStats.inputChars);
+/workspaces/valora/src/executor/stage-executor.ts:			const savedChars = compressionStats.inputChars - compressionStats.outputChars;
+/workspaces/valora/src/executor/stage-executor.ts-			const savedTokens = Math.ceil(savedChars / 4); // CHARS_PER_TOKEN heuristic
+/workspaces/valora/src/executor/stage-executor.ts-			const pricing = getModelPricing(modelOverride ?? '');
+/workspaces/valora/src/executor/stage-executor.ts-			const costPerToken = (pricing?.input ?? 3.0) / 1_000_000; // default $3/M input tokens
+/workspaces/valora/src/executor/stage-executor.ts:			metrics.setGauge('compression.terminal.estimated_saved_tokens', savedTokens);
+/workspaces/valora/src/executor/stage-executor.ts:			metrics.setGauge('compression.terminal.estimated_saved_cost_usd', savedTokens * costPerToken);
+/workspaces/valora/src/executor/stage-executor.ts-		}
+/workspaces/valora/src/executor/stage-executor.ts-	}
+--
+/workspaces/valora/src/utils/base-retention-manager.ts- * - Size-based cleanup
+/workspaces/valora/src/utils/base-retention-manager.ts- * - Count-based cleanup
+/workspaces/valora/src/utils/base-retention-manager.ts: * - File compression
+/workspaces/valora/src/utils/base-retention-manager.ts- * - Policy management
+/workspaces/valora/src/utils/base-retention-manager.ts- *
+--
+/workspaces/valora/src/utils/base-retention-manager.ts- */
+/workspaces/valora/src/utils/base-retention-manager.ts-export interface BaseRetentionPolicy {
+/workspaces/valora/src/utils/base-retention-manager.ts:	compressAfterDays?: number; // Compress files older than this many days
+/workspaces/valora/src/utils/base-retention-manager.ts-	maxAgeDays?: number; // Delete files older than this many days
+/workspaces/valora/src/utils/base-retention-manager.ts-	maxCount?: number; // Keep maximum this many files
+--
+/workspaces/valora/src/utils/base-retention-manager.ts- */
+/workspaces/valora/src/utils/base-retention-manager.ts-export interface BaseCleanupResult {
+/workspaces/valora/src/utils/base-retention-manager.ts:	compressedItems: string[];
+/workspaces/valora/src/utils/base-retention-manager.ts-	deletedItems: string[];
+/workspaces/valora/src/utils/base-retention-manager.ts-	errors: string[];
+--
+/workspaces/valora/src/utils/base-retention-manager.ts-
+/workspaces/valora/src/utils/base-retention-manager.ts-	/**
+/workspaces/valora/src/utils/base-retention-manager.ts:	 * Record a compression in the result.
+/workspaces/valora/src/utils/base-retention-manager.ts-	 */
+/workspaces/valora/src/utils/base-retention-manager.ts-	protected abstract recordCompression(item: TFileInfo, result: TResult): void;
+--
+/workspaces/valora/src/utils/base-retention-manager.ts-	 * Shared implementation for both log and session files
+/workspaces/valora/src/utils/base-retention-manager.ts-	 */
+/workspaces/valora/src/utils/base-retention-manager.ts:	protected async compressFile(filePath: string): Promise<void> {
+/workspaces/valora/src/utils/base-retention-manager.ts-		const zlib = await import('zlib');
+/workspaces/valora/src/utils/base-retention-manager.ts-		const fsPromises = fs.promises;
+/workspaces/valora/src/utils/base-retention-manager.ts-
+/workspaces/valora/src/utils/base-retention-manager.ts:		const compressedPath = `${filePath}.gz`;
+/workspaces/valora/src/utils/base-retention-manager.ts-		const readStream = fs.createReadStream(filePath);
+/workspaces/valora/src/utils/base-retention-manager.ts:		const writeStream = fs.createWriteStream(compressedPath);
+/workspaces/valora/src/utils/base-retention-manager.ts-		const gzip = zlib.createGzip();
+/workspaces/valora/src/utils/base-retention-manager.ts-
+--
+/workspaces/valora/src/utils/base-retention-manager.ts-		await pipeline(readStream, gzip, writeStream);
+/workspaces/valora/src/utils/base-retention-manager.ts-
+/workspaces/valora/src/utils/base-retention-manager.ts:		// Remove original file after successful compression
+/workspaces/valora/src/utils/base-retention-manager.ts-		await fsPromises.unlink(filePath);
+/workspaces/valora/src/utils/base-retention-manager.ts-	}
+--
+/workspaces/valora/src/utils/base-retention-manager.ts-	 * Compress a file with optional size logging
+/workspaces/valora/src/utils/base-retention-manager.ts-	 */
+/workspaces/valora/src/utils/base-retention-manager.ts:	protected async compressFileWithStats(filePath: string): Promise<{ compressionRatio: number; savedBytes: number }> {
+/workspaces/valora/src/utils/base-retention-manager.ts-		const fsPromises = fs.promises;
+/workspaces/valora/src/utils/base-retention-manager.ts-		const zlib = await import('zlib');
+--
+/workspaces/valora/src/utils/base-retention-manager.ts-		const originalSizeBytes = originalStats.size;
+/workspaces/valora/src/utils/base-retention-manager.ts-
+/workspaces/valora/src/utils/base-retention-manager.ts:		const compressedPath = `${filePath}.gz`;
+/workspaces/valora/src/utils/base-retention-manager.ts-		const readStream = fs.createReadStream(filePath);
+/workspaces/valora/src/utils/base-retention-manager.ts:		const writeStream = fs.createWriteStream(compressedPath);
+/workspaces/valora/src/utils/base-retention-manager.ts-		const gzip = zlib.createGzip();
+/workspaces/valora/src/utils/base-retention-manager.ts-
+/workspaces/valora/src/utils/base-retention-manager.ts-		await pipeline(readStream, gzip, writeStream);
+/workspaces/valora/src/utils/base-retention-manager.ts-
+/workspaces/valora/src/utils/base-retention-manager.ts:		// Get compressed file size for logging
+/workspaces/valora/src/utils/base-retention-manager.ts:		const compressedStats = await fsPromises.stat(compressedPath);
+/workspaces/valora/src/utils/base-retention-manager.ts:		const compressedSizeBytes = compressedStats.size;
+/workspaces/valora/src/utils/base-retention-manager.ts:		const compressionRatio = (1 - compressedSizeBytes / originalSizeBytes) * 100;
+/workspaces/valora/src/utils/base-retention-manager.ts:		const savedBytes = originalSizeBytes - compressedSizeBytes;
+/workspaces/valora/src/utils/base-retention-manager.ts-
+/workspaces/valora/src/utils/base-retention-manager.ts:		// Remove original file after successful compression
+/workspaces/valora/src/utils/base-retention-manager.ts-		await fsPromises.unlink(filePath);
+/workspaces/valora/src/utils/base-retention-manager.ts-
+/workspaces/valora/src/utils/base-retention-manager.ts:		return { compressionRatio, savedBytes };
+/workspaces/valora/src/utils/base-retention-manager.ts-	}
+/workspaces/valora/src/utils/base-retention-manager.ts-
+--
+/workspaces/valora/src/utils/base-retention-manager.ts-
+/workspaces/valora/src/utils/base-retention-manager.ts-	/**
+/workspaces/valora/src/utils/base-retention-manager.ts:	 * Apply compression policy: compress items older than compressAfterDays
+/workspaces/valora/src/utils/base-retention-manager.ts-	 */
+/workspaces/valora/src/utils/base-retention-manager.ts-	protected async applyCompressionPolicy(
+--
+/workspaces/valora/src/utils/base-retention-manager.ts-		getCutoffDate: () => Date
+/workspaces/valora/src/utils/base-retention-manager.ts-	): Promise<TFileInfo[]> {
+/workspaces/valora/src/utils/base-retention-manager.ts:		if (!this.policy.compressAfterDays) return items;
+/workspaces/valora/src/utils/base-retention-manager.ts-
+/workspaces/valora/src/utils/base-retention-manager.ts-		const cutoffDate = getCutoffDate();
+--
+/workspaces/valora/src/utils/base-retention-manager.ts-		});
+/workspaces/valora/src/utils/base-retention-manager.ts-
+/workspaces/valora/src/utils/base-retention-manager.ts:		const compressionResults = await Promise.allSettled(
+/workspaces/valora/src/utils/base-retention-manager.ts-			filesToCompress.map(async (item) => {
+/workspaces/valora/src/utils/base-retention-manager.ts-				if (!this.dryRun) {
+/workspaces/valora/src/utils/base-retention-manager.ts:					await this.compressFile(item.filePath);
+/workspaces/valora/src/utils/base-retention-manager.ts-				}
+/workspaces/valora/src/utils/base-retention-manager.ts-				this.recordCompression(item, result);
+/workspaces/valora/src/utils/base-retention-manager.ts-				this.logger.debug(`Compressed file`, {
+/workspaces/valora/src/utils/base-retention-manager.ts-					ageDays: this.getItemAgeDays(item),
+/workspaces/valora/src/utils/base-retention-manager.ts:					compressAfterDays: this.policy.compressAfterDays,
+/workspaces/valora/src/utils/base-retention-manager.ts-					item: this.getItemDisplayId(item)
+/workspaces/valora/src/utils/base-retention-manager.ts-				});
+--
+/workspaces/valora/src/utils/base-retention-manager.ts-		);
+/workspaces/valora/src/utils/base-retention-manager.ts-
+/workspaces/valora/src/utils/base-retention-manager.ts:		compressionResults.forEach((compressionResult, index) => {
+/workspaces/valora/src/utils/base-retention-manager.ts:			if (compressionResult.status === 'rejected') {
+/workspaces/valora/src/utils/base-retention-manager.ts-				const item = filesToCompress[index];
+/workspaces/valora/src/utils/base-retention-manager.ts-				if (!item) return;
+/workspaces/valora/src/utils/base-retention-manager.ts:				const errorMsg = `Failed to compress ${this.getItemDisplayId(item)}: ${formatErrorMessage(compressionResult.reason)}`;
+/workspaces/valora/src/utils/base-retention-manager.ts-				result.errors.push(errorMsg);
+/workspaces/valora/src/utils/base-retention-manager.ts:				this.logger.warn('Failed to compress file', {
+/workspaces/valora/src/utils/base-retention-manager.ts-					error: errorMsg,
+/workspaces/valora/src/utils/base-retention-manager.ts-					item: this.getItemDisplayId(item)
+--
+/workspaces/valora/src/utils/help-content.ts-	{ category: 'Log Retention', description: 'Maximum total log size in MB', flag: '--max-size <mb>' },
+/workspaces/valora/src/utils/help-content.ts-	{ category: 'Log Retention', description: 'Maximum number of log files', flag: '--max-files <count>' },
+/workspaces/valora/src/utils/help-content.ts:	{ category: 'Log Retention', description: 'Compress logs after N days', flag: '--compress-after <days>' },
+/workspaces/valora/src/utils/help-content.ts-	{ category: 'Log Retention', description: 'Run cleanup every N hours', flag: '--cleanup-interval <hours>' },
+/workspaces/valora/src/utils/help-content.ts-	{ category: 'Log Retention', description: 'Preview retention actions', flag: '--retention-dry-run' },
+--
+/workspaces/valora/src/utils/help-content.ts-		category: 'Session Retention',
+/workspaces/valora/src/utils/help-content.ts-		description: 'Compress sessions after N days',
+/workspaces/valora/src/utils/help-content.ts:		flag: '--session-compress-after <days>'
+/workspaces/valora/src/utils/help-content.ts-	},
+/workspaces/valora/src/utils/help-content.ts-	{

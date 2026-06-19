@@ -1,3 +1,7 @@
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { ExternalMCPTool } from 'types/mcp-client.types';
@@ -24,14 +28,17 @@ function makeTools(...names: string[]): ExternalMCPTool[] {
 
 describe('ToolIntegrityMonitor', () => {
 	let monitor: ToolIntegrityMonitor;
+	let dataDir: string;
 
 	beforeEach(() => {
 		resetToolIntegrityMonitor();
-		monitor = new ToolIntegrityMonitor();
+		dataDir = mkdtempSync(join(tmpdir(), 'valora-mcp-monitor-test-'));
+		monitor = new ToolIntegrityMonitor({ baselineFilePath: join(dataDir, 'baselines.json') });
 	});
 
 	afterEach(() => {
 		monitor.clearEvents();
+		rmSync(dataDir, { recursive: true, force: true });
 	});
 
 	describe('computeFingerprint', () => {

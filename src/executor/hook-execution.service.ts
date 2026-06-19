@@ -5,7 +5,7 @@
  * running user-configured shell commands that can validate, block, modify, or
  * observe tool operations.
  *
- * Hooks are configured in data/hooks.default.json (built-in) or .valora/hooks.json (project-level override).
+ * Hooks are contributed by plugins (e.g. valora-defaults) or .valora/hooks.json (project-level override).
  * Hook commands receive tool call info via stdin JSON and control execution
  * via exit codes (0=allow, 2=deny for PreToolUse; PostToolUse is non-blocking).
  */
@@ -39,7 +39,20 @@ export class HookExecutionService {
 	private hooksFileCache: null | { hooks?: HooksConfig } = null;
 	private hooksFileMtime: number = 0;
 	private readonly logger = getLogger();
+	private pluginHooks: HooksConfig[] = [];
+	private readonly registeredPluginHooks = new Set<HooksConfig>();
 	private sessionId?: string;
+
+	/**
+	 * Register hook configuration contributed by a plugin.
+	 * Plugin hooks are merged with lower priority than built-in and config hooks.
+	 */
+	registerPluginHooks(hooks: HooksConfig): void {
+		if (!this.registeredPluginHooks.has(hooks)) {
+			this.registeredPluginHooks.add(hooks);
+			this.pluginHooks.push(hooks);
+		}
+	}
 
 	/**
 	 * Fast check to skip processing when no hooks are configured.
@@ -354,7 +367,7 @@ export class HookExecutionService {
 
 	/**
 	 * Load hooks from data/hooks.default.json with mtime-based caching.
-	 * Returns null if the file doesn't exist or can't be parsed.
+	 * Returns null if the file doesn't exist (e.g. after migration to valora-defaults plugin) or can't be parsed.
 	 */
 	private loadHooksFile(): null | { hooks?: HooksConfig } {
 		try {
@@ -378,25 +391,30 @@ export class HookExecutionService {
 	}
 
 	/**
-	 * Read hooks config, merging data/hooks.default.json (primary) with config.json (fallback).
-	 * For each event name, hooks.json matchers come first; duplicates by matcher pattern
-	 * are resolved in favour of hooks.json.
+	 * Read hooks config, merging the legacy hooks.default.json (if present) with config.json and any plugin hooks.
+	 * Priority (highest first): hooks.default.json → config.json → plugin hooks.
 	 */
 	private getHooksConfig(): HooksConfig | undefined {
 		const hooksFromFile = this.loadHooksFile()?.hooks;
 
 		let hooksFromConfig: HooksConfig | undefined;
 		try {
-			hooksFromConfig = getConfigLoader().get().hooks as HooksConfig | undefined;
+			hooksFromConfig = getConfigLoader().get().hooks;
 		} catch {
 			// Config not yet loaded
 		}
 
+		let merged: HooksConfig | undefined;
 		if (hooksFromFile && hooksFromConfig) {
-			return this.mergeHooksConfigs(hooksFromFile, hooksFromConfig);
+			merged = this.mergeHooksConfigs(hooksFromFile, hooksFromConfig);
+		} else {
+			merged = hooksFromFile ?? hooksFromConfig;
 		}
 
-		return hooksFromFile ?? hooksFromConfig;
+		return this.pluginHooks.reduce(
+			(acc, pluginHook) => (acc ? (this.mergeHooksConfigs(acc, pluginHook) ?? acc) : pluginHook),
+			merged
+		);
 	}
 
 	/**

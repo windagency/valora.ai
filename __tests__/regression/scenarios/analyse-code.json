@@ -1,0 +1,14 @@
+{
+	"id": "analyse-code",
+	"description": "Verify the model produces a structured analysis with a summary and file list",
+	"messages": [
+		{
+			"role": "user",
+			"content": "Analyse this TypeScript function and identify any issues:\n\nfunction add(a, b) { return a + b; }"
+		}
+	],
+	"expectedOutputShape": {
+		"minLength": 50,
+		"mustContainAny": ["type", "parameter", "TypeScript", "string", "number"]
+	}
+}

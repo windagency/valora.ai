@@ -1,3 +1,7 @@
+---
+updated: 2026-05-07
+---
+
 # API Reference
 
 > VALORA exposes two specialised APIs beyond the CLI: an MCP server for IDE integration and a TypeScript API for programmatic use. CLI flags and configuration schema are documented separately.

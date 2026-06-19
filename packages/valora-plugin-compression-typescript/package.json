@@ -1,0 +1,47 @@
+{
+	"name": "@windagency/valora-plugin-compression-typescript",
+	"version": "1.0.0",
+	"description": "Compression strategies for the TypeScript/JavaScript ecosystem: tsc, eslint, jest, vitest, pnpm, npm, npx, yarn.",
+	"keywords": [
+		"valora",
+		"valora-plugin",
+		"compression",
+		"typescript",
+		"eslint",
+		"vitest",
+		"jest"
+	],
+	"author": "Damien TIVELET <damien@wind-agency.com>",
+	"license": "MIT",
+	"type": "module",
+	"engines": {
+		"node": ">=22.0.0"
+	},
+	"packageManager": "pnpm@10.19.0",
+	"volta": {
+		"node": "22.21.0",
+		"pnpm": "10.19.0"
+	},
+	"scripts": {
+		"build": "tsc -p tsconfig.json",
+		"clean": "rm -rf ./dist",
+		"lint": "eslint --color",
+		"lint:fix": "eslint --color --fix",
+		"beautify": "prettier --check \"**/*.+(js|jsx|ts|tsx|json|md|yml|yaml)\"",
+		"beautify:fix": "prettier --write \"**/*.+(js|jsx|ts|tsx|json|md|yml|yaml)\"",
+		"format": "pnpm beautify:fix && pnpm lint:fix",
+		"test": "vitest run",
+		"prepublishOnly": "pnpm clean && pnpm build"
+	},
+	"files": [
+		"valora-plugin.json",
+		"dist"
+	],
+	"peerDependencies": {
+		"@windagency/valora": ">=0.1.0"
+	},
+	"devDependencies": {
+		"@windagency/valora-plugin-api": "workspace:*",
+		"vitest": "^1.0.0"
+	}
+}

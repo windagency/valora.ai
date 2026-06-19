@@ -1,3 +1,7 @@
+---
+updated: 2026-05-07
+---
+
 # Contributing Guidelines
 
 > How to contribute to VALORA. Naming conventions and commit format are defined here; `code-quality.md` defers to this file on those topics.
@@ -193,12 +197,12 @@ The project enforces supply chain security. See [ADR-009](../adr/009-supply-chai
 
 ## Testing Requirements
 
-| Type        | Location             | Minimum requirement           |
-| ----------- | -------------------- | ----------------------------- |
-| Unit        | `src/**/*.test.ts`   | All new functions and classes |
-| Integration | `tests/integration/` | Module interaction paths      |
-| E2E         | `tests/e2e/`         | Complete user-facing flows    |
-| Security    | `tests/security/`    | Any security-relevant change  |
+| Type        | Location                 | Minimum requirement           |
+| ----------- | ------------------------ | ----------------------------- |
+| Unit        | `src/**/*.test.ts`       | All new functions and classes |
+| Integration | `__tests__/integration/` | Module interaction paths      |
+| E2E         | `__tests__/e2e/`         | Complete user-facing flows    |
+| Security    | `__tests__/security/`    | Any security-relevant change  |
 
 Aim for 80 % coverage on new code. All bug fixes must include a regression test.
 
@@ -228,9 +232,35 @@ describe('CommandExecutor', () => {
 
 ## Adding New Commands
 
-### 1. Create the command specification
+Built-in commands (shipped with Valora) must live inside a plugin bundle under `data/plugins/<plugin-name>/commands/`. For project-level overrides that only apply to one repository, use `.valora/commands/` instead.
 
-Add a Markdown file with YAML frontmatter in `data/commands/` (built-in) or `.valora/commands/` (project-level override):
+### 1. Choose or create the plugin bundle
+
+If your command belongs to an existing bundle (e.g., `valora-plugin-engineering`), add your file there. Otherwise, create a new bundle:
+
+```bash
+mkdir -p data/plugins/my-bundle/commands
+```
+
+Create `data/plugins/my-bundle/valora-plugin.json`:
+
+```json
+{
+	"name": "my-bundle",
+	"version": "1.0.0",
+	"description": "Short description of what this bundle contributes.",
+	"engines": { "valora": ">=0.1.0" },
+	"contributes": ["commands"]
+}
+```
+
+If your plugin's agents or commands depend on resources contributed by another plugin (for example, using an agent defined in `valora-plugin-engineering`), add a `"requires": ["valora-plugin-engineering"]` field to declare the dependency.
+
+Valid `contributes` values are: `"agents"`, `"commands"`, `"hooks"`, `"mcps"`, `"prompts"`, `"templates"`, `"agent-context"`.
+
+### 2. Create the command specification
+
+Add a Markdown file with YAML frontmatter in the bundle's `commands/` directory:
 
 ```markdown
 ---
@@ -260,23 +290,6 @@ Describe expected outputs.
 Define execution stages.
 ```
 
-### 2. Register the command
-
-Update `data/commands/registry.json`:
-
-```json
-{
-	"commands": {
-		"my-command": {
-			"name": "my-command",
-			"description": "...",
-			"agent": "lead",
-			"model": "claude-sonnet-4.6"
-		}
-	}
-}
-```
-
 ### 3. Add tests
 
 ```typescript
@@ -291,13 +304,21 @@ describe('my-command', () => {
 
 ## Adding New Agents
 
-### 1. Create the agent definition
+Built-in agents (shipped with Valora) must live inside a plugin bundle under `data/plugins/<plugin-name>/agents/`. For project-level overrides that only apply to one repository, use `.valora/agents/` instead.
 
-Add a Markdown file with YAML frontmatter in `data/agents/` (built-in) or `.valora/agents/` (project-level override):
+### 1. Choose or create the plugin bundle
+
+If your agent belongs to an existing bundle, add your file there. Otherwise, create a new bundle (see "Adding New Commands" for the manifest structure; set `"contributes": ["agents"]` or `["agents", "commands"]` as appropriate).
+
+### 2. Create the agent definition
+
+Add a Markdown file with YAML frontmatter in the bundle's `agents/` directory:
 
 ```markdown
 ---
-name: my-agent
+role: my-agent
+version: '1.0.0'
+description: "Brief description of the agent's role."
 expertise:
   - Area 1
   - Area 2
@@ -320,9 +341,9 @@ Detail specific expertise areas.
 Define operational constraints and boundaries.
 ```
 
-### 2. Register the agent
+### 3. Register the agent's capabilities
 
-Update `data/agents/registry.json` with capabilities and selection criteria.
+Update `data/agents/registry.json` with the agent's domains, expertise, selection criteria, and priority. This file drives dynamic agent selection — it is read at runtime by `AgentCapabilityRegistryService` and must stay in sync with the agent's `.md` definition.
 
 ---
 

@@ -1,0 +1,7 @@
+{
+	"name": "valora-plugin-implement",
+	"version": "1.0.0",
+	"description": "TypeScript software engineer agent family (base, backend, frontend, frontend-react) and the implement command with dynamic agent selection.",
+	"engines": { "valora": ">=0.1.0" },
+	"contributes": ["agents", "commands"]
+}

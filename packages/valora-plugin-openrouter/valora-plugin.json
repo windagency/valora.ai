@@ -1,0 +1,9 @@
+{
+	"name": "valora-plugin-openrouter",
+	"version": "1.0.0",
+	"description": "OpenRouter provider — connects to openrouter.ai for unified access to models via an OpenAI-compatible API. Requires OPENROUTER_API_KEY.",
+	"engines": { "valora": ">=0.1.0" },
+	"contributes": ["code"],
+	"permissions": ["code-exec", "network"],
+	"codeEntrypoint": "dist/index.js"
+}

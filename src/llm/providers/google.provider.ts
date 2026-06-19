@@ -9,17 +9,19 @@
  * Self-registers with the LLM Provider Registry using dependency inversion pattern
  */
 
+import type { ProviderDescriptor } from 'plugins/plugin-api.types';
+
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
 import type { LLMCompletionOptions, LLMCompletionResult, LLMUsage } from 'types/llm.types';
 
-import { getProviderModels, ProviderName } from 'config/providers.config';
+import { BuiltinProviders, getProviderModels, ModelName } from 'config/providers.config';
 import { BaseLLMProvider } from 'llm/provider.interface';
 import { getProviderRegistry } from 'llm/registry';
 import { ProviderError } from 'utils/error-handler';
 
 export class GoogleProvider extends BaseLLMProvider {
-	name = ProviderName.GOOGLE;
+	name = BuiltinProviders.GOOGLE;
 	private client: GoogleGenerativeAI | null = null;
 
 	async complete(options: LLMCompletionOptions): Promise<LLMCompletionResult> {
@@ -45,7 +47,7 @@ export class GoogleProvider extends BaseLLMProvider {
 	}
 
 	override getAlternativeModels(currentModel?: string): string[] {
-		const alternatives = getProviderModels(ProviderName.GOOGLE);
+		const alternatives = getProviderModels(BuiltinProviders.GOOGLE);
 		if (currentModel) {
 			return alternatives.filter((m) => m !== currentModel);
 		}
@@ -87,7 +89,7 @@ export class GoogleProvider extends BaseLLMProvider {
 
 	override validateModel(modelName: string): Promise<boolean> {
 		// Get known models from MODEL_PROVIDER_SUGGESTIONS
-		const knownModels = getProviderModels(ProviderName.GOOGLE);
+		const knownModels = getProviderModels(BuiltinProviders.GOOGLE);
 
 		// Check if model is in known list
 		if (knownModels.includes(modelName)) {
@@ -244,17 +246,32 @@ export class GoogleProvider extends BaseLLMProvider {
 				`The model '${modelName}' is not available or not supported by the Google API. Please check the model name or try a supported model (e.g., gemini-3.0-pro, gemini-2.5-pro, gemini-2.5-flash).`,
 				{
 					error: typedError,
-					provider: ProviderName.GOOGLE
+					provider: BuiltinProviders.GOOGLE
 				}
 			);
 		}
 
 		throw new ProviderError(`Google ${context} error: ${errorMessage}`, {
 			error: typedError,
-			provider: ProviderName.GOOGLE
+			provider: BuiltinProviders.GOOGLE
 		});
 	}
 }
 
 // Self-register this provider with the registry when module is loaded
-getProviderRegistry().registerProvider(ProviderName.GOOGLE, GoogleProvider);
+getProviderRegistry().registerProvider(BuiltinProviders.GOOGLE, GoogleProvider, { owner: 'core' }, {
+	defaultModel: ModelName.GEMINI_2_5_PRO,
+	description: 'Gemini models from Google',
+	label: 'Google',
+	modelModes: [
+		{ mode: 'default', model: ModelName.GEMINI_3_PRO },
+		{ mode: 'deep-think', model: ModelName.GEMINI_3_PRO },
+		{ mode: 'default', model: ModelName.GEMINI_2_5_PRO },
+		{ mode: 'default', model: ModelName.GEMINI_2_5_FLASH },
+		{ mode: 'default', model: ModelName.GEMINI_2_5_FLASH_LITE },
+		{ mode: 'default', model: ModelName.GEMMA_3N },
+		{ mode: 'default', model: ModelName.GEMMA_3 },
+		{ mode: 'default', model: ModelName.GEMMA_2 }
+	],
+	requiresApiKey: true
+} satisfies ProviderDescriptor);

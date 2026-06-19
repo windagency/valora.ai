@@ -4,6 +4,8 @@
 
 import * as path from 'path';
 
+import { getProviderRegistry } from 'llm/registry';
+import { getLogger } from 'output/logger';
 import { ConfigurationError } from 'utils/error-handler';
 import { formatErrorMessage } from 'utils/error-utils';
 import { ensureDir, fileExists, readJSON, writeJSON } from 'utils/file-utils';
@@ -18,6 +20,7 @@ import {
 	DEFAULT_SESSION_DRY_RUN,
 	DEFAULT_SESSION_RETENTION_ENABLED
 } from './constants';
+import { assertNoLegacyMemoryKeys } from './memory-config-guard';
 import { type Config, CONFIG_SCHEMA, DEFAULT_CONFIG } from './schema';
 
 /**
@@ -32,6 +35,7 @@ const ENV_PARSERS = {
 export class ConfigLoader {
 	private config: Config | null = null;
 	private configPath: string;
+	private rawConfig: null | Record<string, unknown> = null;
 
 	constructor(configPath?: string) {
 		this.configPath =
@@ -59,6 +63,15 @@ export class ConfigLoader {
 		const projectConfig = await this.loadProjectConfig();
 		const envConfig = this.loadFromEnv();
 
+		// Capture unknown top-level keys (e.g. plugin config) before mergeConfigs drops them.
+		// Uses package → global → project precedence (last-wins), matching mergeConfigs priority.
+		this.rawConfig = Object.assign(
+			{},
+			packageConfig as Record<string, unknown>,
+			globalConfig as Record<string, unknown>,
+			projectConfig as Record<string, unknown>
+		);
+
 		const globalCliFlags = getGlobalCliOverrides();
 		const mergedConfig = this.mergeConfigs(
 			DEFAULT_CONFIG,
@@ -69,6 +82,10 @@ export class ConfigLoader {
 			globalCliFlags ?? {},
 			cliOverrides ?? {}
 		);
+
+		// Reject the legacy `memory.*` shape with a targeted message before
+		// Zod's strict parser surfaces a generic "unrecognized key" error.
+		assertNoLegacyMemoryKeys(mergedConfig);
 
 		try {
 			this.config = CONFIG_SCHEMA.parse(mergedConfig);
@@ -130,6 +147,24 @@ export class ConfigLoader {
 		} catch {
 			// Non-fatal: skip invalid project config
 			return {};
+		}
+	}
+
+	/**
+	 * Emit a one-time warning for any provider key in config that has no registered descriptor.
+	 * Call this after plugin initialisation so plugin-contributed providers are already registered.
+	 */
+	warnUnknownProviders(): void {
+		if (!this.config?.providers) {
+			return;
+		}
+		for (const key of Object.keys(this.config.providers)) {
+			if (!getProviderRegistry().getDescriptor(key) && !warnedUnknownProviders.has(key)) {
+				warnedUnknownProviders.add(key);
+				getLogger().warn(
+					`Provider "${key}" is configured but no plugin registers it — install the plugin or remove the entry`
+				);
+			}
 		}
 	}
 
@@ -201,8 +236,8 @@ export class ConfigLoader {
 		const vertexProjectId = process.env['ANTHROPIC_VERTEX_PROJECT_ID'];
 
 		if (useVertex && config.providers) {
-			config.providers.anthropic = {
-				...(config.providers.anthropic ?? {}),
+			config.providers['anthropic'] = {
+				...(config.providers['anthropic'] ?? {}),
 				vertexAI: useVertex === '1' || useVertex.toLowerCase() === 'true',
 				vertexProjectId: vertexProjectId,
 				vertexRegion: vertexRegion
@@ -343,6 +378,7 @@ export class ConfigLoader {
 	 */
 	private mergeConfigs(...configs: Array<Partial<Config>>): Config {
 		const merged: Config = {
+			autoUpdate: { ...DEFAULT_CONFIG.autoUpdate! },
 			defaults: { ...DEFAULT_CONFIG.defaults },
 			features: { ...DEFAULT_CONFIG.features! },
 			paths: { ...DEFAULT_CONFIG.paths },
@@ -356,6 +392,9 @@ export class ConfigLoader {
 	 * Merge a single config into the result
 	 */
 	private mergeSingleConfig(result: Config, config: Partial<Config>): Config {
+		if (config.autoUpdate) {
+			result.autoUpdate = { ...result.autoUpdate, ...config.autoUpdate };
+		}
 		if (config.providers) {
 			result.providers = this.mergeProviderConfigs(result.providers, config.providers);
 		}
@@ -475,6 +514,17 @@ export class ConfigLoader {
 	}
 
 	/**
+	 * Get the merged config before schema validation — preserves keys that CONFIG_SCHEMA strips.
+	 * Intended for plugin config consumption via api.config.extend().
+	 */
+	getRaw(): Record<string, unknown> {
+		if (!this.rawConfig) {
+			throw new ConfigurationError('Configuration not loaded. Call load() first.');
+		}
+		return this.rawConfig;
+	}
+
+	/**
 	 * Check if configuration file exists
 	 */
 	exists(): boolean {
@@ -528,8 +578,19 @@ export class ConfigLoader {
 	 */
 	async reload(): Promise<Config> {
 		this.config = null;
+		this.rawConfig = null;
 		return this.load();
 	}
+}
+
+// Tracks provider keys that have already been warned about in this process run
+const warnedUnknownProviders = new Set<string>();
+
+/**
+ * Resets the warned-unknown-providers tracking set. Intended for use in tests only.
+ */
+export function resetUnknownProviderWarningsForTests(): void {
+	warnedUnknownProviders.clear();
 }
 
 // Singleton instance

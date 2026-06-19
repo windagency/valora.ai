@@ -30,6 +30,7 @@ export { TabBar } from './components/tab-bar';
 // Panels
 export { ActiveSessionsPanel } from './panels/active-sessions-panel';
 export { BackgroundTasksPanel } from './panels/background-tasks-panel';
+export { DriftPanel } from './panels/drift-panel';
 export { MetricsSummaryPanel } from './panels/metrics-summary-panel';
 export { RecentCommandsPanel } from './panels/recent-commands-panel';
 export { MCPMetricsPanel } from './panels/server-metrics-panel';

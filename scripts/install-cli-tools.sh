@@ -5,7 +5,7 @@
 #   bash install-tools.sh --all
 #   bash install-tools.sh --check
 #
-# Supported tools: jq, yq, rg, fd, fzf, lazygit, zoxide, eza
+# Supported tools: jq, yq, rg, fd, fzf, lazygit, zoxide, eza, rtk
 
 set -euo pipefail
 
@@ -18,6 +18,7 @@ FZF_VERSION="0.57.0"
 LAZYGIT_VERSION="0.44.1"
 ZOXIDE_VERSION="0.9.6"
 EZA_VERSION="0.20.12"
+RTK_VERSION="0.37.2"
 
 # ── Platform detection ──────────────────────────────────────────────────────
 OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
@@ -194,6 +195,20 @@ install_zoxide() {
   echo "zoxide: installed → $(zoxide --version)"
 }
 
+install_rtk() {
+  if installed rtk; then echo "rtk: already installed ($(rtk --version))"; return; fi
+  echo "Installing rtk..."
+  local rtk_arch="x86_64"
+  [[ "$ARCH_ALT" == "arm64" ]] && rtk_arch="aarch64"
+  local archive="rtk-${rtk_arch}-unknown-linux-musl.tar.gz"
+  [[ "$OS" == "darwin" ]] && archive="rtk-${rtk_arch}-apple-darwin.tar.gz"
+  download "https://github.com/rtk-ai/rtk/releases/download/v${RTK_VERSION}/${archive}" "$TMP_DIR/rtk.tar.gz"
+  tar xzf "$TMP_DIR/rtk.tar.gz" -C "$TMP_DIR"
+  cp "$TMP_DIR/rtk" "$INSTALL_DIR/rtk"
+  chmod +x "$INSTALL_DIR/rtk"
+  echo "rtk: installed → $(rtk --version)"
+}
+
 install_eza() {
   if installed eza; then echo "eza: already installed ($(eza --version | head -1))"; return; fi
   echo "Installing eza..."
@@ -226,7 +241,7 @@ install_eza() {
 
 # ── Main ────────────────────────────────────────────────────────────────────
 
-ALL_TOOLS=(jq yq rg fd fzf lazygit zoxide eza)
+ALL_TOOLS=(jq yq rg fd fzf lazygit zoxide eza rtk)
 
 check_tools() {
   echo "Tool availability:"
@@ -242,6 +257,7 @@ check_tools() {
         lazygit) ver=$(lazygit --version 2>&1 | head -1) ;;
         zoxide) ver=$(zoxide --version 2>&1) ;;
         eza) ver=$(eza --version 2>&1 | head -1) ;;
+        rtk) ver=$(rtk --version 2>&1) ;;
       esac
       echo "  ✓ $tool: $ver"
     else
@@ -272,6 +288,7 @@ for tool in "${TOOLS[@]}"; do
     lazygit) install_lazygit ;;
     zoxide)  install_zoxide ;;
     eza)     install_eza ;;
+    rtk)     install_rtk ;;
     *) echo "Unknown tool: $tool (supported: ${ALL_TOOLS[*]})"; exit 1 ;;
   esac
 done

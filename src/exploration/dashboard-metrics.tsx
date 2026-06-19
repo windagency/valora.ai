@@ -42,7 +42,7 @@ function formatDuration(ms: number): string {
 
 	return parts.join(' ');
 }
-// eslint-disable-next-line @typescript-eslint/naming-convention -- React components must be PascalCase
+
 const { Box, Text } = tui;
 
 interface MetricsHistory {
@@ -54,7 +54,7 @@ interface MetricsHistory {
 /**
  * Sparkline chart component for terminal
  */
-// eslint-disable-next-line @typescript-eslint/naming-convention -- React component must be PascalCase
+
 export const Sparkline: React.FC<{
 	color?: string;
 	data: number[];
@@ -136,7 +136,7 @@ function buildChartLine(data: number[], threshold: number, width: number): strin
 /**
  * Resource usage gauge
  */
-// eslint-disable-next-line @typescript-eslint/naming-convention -- React component must be PascalCase
+
 export const ResourceGauge: React.FC<{
 	label: string;
 	max: number;
@@ -168,7 +168,7 @@ export const ResourceGauge: React.FC<{
 /**
  * Container metrics panel
  */
-// eslint-disable-next-line @typescript-eslint/naming-convention -- React component must be PascalCase
+
 export const ContainerMetricsPanel: React.FC<{
 	history?: MetricsHistory[];
 	stats: ContainerStats;
@@ -223,7 +223,7 @@ export const ContainerMetricsPanel: React.FC<{
 /**
  * Exploration summary statistics
  */
-// eslint-disable-next-line @typescript-eslint/naming-convention -- React component must be PascalCase
+
 export const ExplorationStats: React.FC<{
 	decisionsCount: number;
 	duration?: number;
@@ -294,7 +294,7 @@ export const ExplorationStats: React.FC<{
 /**
  * Timeline component showing stage progression
  */
-// eslint-disable-next-line @typescript-eslint/naming-convention -- React component must be PascalCase
+
 export const StageTimeline: React.FC<{
 	worktree: WorktreeExploration;
 }> = ({ worktree }) => {
@@ -329,7 +329,7 @@ export const StageTimeline: React.FC<{
 /**
  * Comparison table for multiple worktrees
  */
-// eslint-disable-next-line @typescript-eslint/naming-convention -- React component must be PascalCase
+
 export const WorktreeComparisonTable: React.FC<{
 	containerStats: Map<number, ContainerStats>;
 	worktrees: WorktreeExploration[];

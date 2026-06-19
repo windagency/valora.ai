@@ -1,0 +1,8 @@
+{
+	"name": "valora-defaults",
+	"version": "1.0.0",
+	"description": "Default hooks (PreToolUse CLI enforcement) and default external MCP server registry (Playwright, Figma, GitHub, Chrome DevTools, Context7, Serena, Terraform, MongoDB, Elastic, BrowserStack, DeepResearch, Firebase, GCloud, Grafana, Storybook).",
+	"engines": { "valora": ">=0.1.0" },
+	"contributes": ["hooks", "mcps"],
+	"permissions": ["shell-hooks", "mcp-connect"]
+}

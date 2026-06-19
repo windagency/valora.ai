@@ -1,3 +1,7 @@
+---
+updated: 2026-05-07
+---
+
 # Quick Start
 
 Get Valora installed and running your first command in 5 minutes.
@@ -13,7 +17,7 @@ Get Valora installed and running your first command in 5 minutes.
 npm install -g @windagency/valora
 # pnpm add -g @windagency/valora
 # yarn global add @windagency/valora
-valora --version  # 2.4.0
+valora --version  # 2.5.0
 ```
 
 ## Initialise your project

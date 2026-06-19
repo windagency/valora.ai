@@ -1,0 +1,45 @@
+{
+	"name": "@windagency/valora-runtime",
+	"version": "1.0.0",
+	"description": "Pure-leaf runtime utilities shared across Valora packages: path resolution, ID generation, minimal error and logger types. Has no host dependencies — safe to consume from any plugin package.",
+	"keywords": [
+		"valora",
+		"runtime",
+		"utilities",
+		"shared"
+	],
+	"author": "Damien TIVELET <damien@wind-agency.com>",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/windagency/valora.ai"
+	},
+	"license": "MIT",
+	"type": "module",
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js"
+		}
+	},
+	"engines": {
+		"node": ">=22.0.0"
+	},
+	"packageManager": "pnpm@10.19.0",
+	"volta": {
+		"node": "22.21.0",
+		"pnpm": "10.19.0"
+	},
+	"scripts": {
+		"build": "tsc -b",
+		"clean": "rm -rf ./dist",
+		"lint": "eslint --color",
+		"lint:fix": "eslint --color --fix",
+		"test": "vitest run"
+	},
+	"files": [
+		"dist",
+		"valora-plugin.json"
+	]
+}

@@ -1,0 +1,18 @@
+{
+	"name": "valora-plugin-ollama",
+	"version": "1.0.0",
+	"description": "Self-managed Ollama provider — downloads the Ollama binary on first use and runs it locally. Supports any model available via ollama pull.",
+	"engines": { "valora": ">=0.1.0" },
+	"contributes": ["code"],
+	"permissions": ["code-exec", "fs-write", "network"],
+	"requiresBinary": [
+		{
+			"autoInstall": true,
+			"install": "https://ollama.com",
+			"installCommand": "command -v zstd >/dev/null 2>&1 || sudo apt-get install -y zstd; curl -fsSL https://github.com/ollama/ollama/releases/latest/download/install.sh | sh",
+			"name": "ollama",
+			"postInstallCommand": "ollama serve >/dev/null 2>&1 & TRIES=0; until curl -sf http://localhost:11434/api/tags >/dev/null 2>&1 || [ $TRIES -ge 10 ]; do sleep 1; TRIES=$((TRIES+1)); done"
+		}
+	],
+	"codeEntrypoint": "dist/index.js"
+}

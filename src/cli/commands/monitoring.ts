@@ -16,6 +16,7 @@ import { getCurrentResourceUsage, getResourceMonitor, getResourceStats } from 'u
 import { type GetRecordsOptions, getSpendingTracker } from 'utils/spending-tracker';
 
 import { configureUsageSubcommand } from './usage';
+import { configureUsageOptimizeSubcommand } from './usage-optimize';
 
 /**
  * Display CPU information
@@ -156,28 +157,30 @@ function displayByModel(
 	color: ReturnType<typeof getColorAdapter>,
 	isJson: boolean
 ): void {
+	interface ModelAccum {
+		cacheSavingsUsd: number;
+		requestCount: number;
+		totalCostUsd: number;
+		totalTokens: number;
+	}
 	const records = tracker.getRecords(opts);
-	const modelMap = new Map<
-		string,
-		{ cacheSavingsUsd: number; requestCount: number; totalCostUsd: number; totalTokens: number }
-	>();
-
-	for (const r of records) {
-		const existing = modelMap.get(r.model);
+	const modelMap = records.reduce((map, r) => {
+		const existing = map.get(r.model);
 		if (existing) {
 			existing.totalCostUsd += r.costUsd;
 			existing.totalTokens += r.totalTokens;
 			existing.requestCount += 1;
 			existing.cacheSavingsUsd += r.cacheSavingsUsd;
 		} else {
-			modelMap.set(r.model, {
+			map.set(r.model, {
 				cacheSavingsUsd: r.cacheSavingsUsd,
 				requestCount: 1,
 				totalCostUsd: r.costUsd,
 				totalTokens: r.totalTokens
 			});
 		}
-	}
+		return map;
+	}, new Map<string, ModelAccum>());
 
 	const summaries = Array.from(modelMap.entries())
 		.map(([model, data]) => ({ model, ...data }))
@@ -487,8 +490,12 @@ export function configureMonitoringCommand(program: CommandAdapter): void {
 					if (results.length > 0) {
 						console.log(`\n${color.red('🚨 Issues Found:')}`);
 						results.slice(0, 20).forEach((result, i) => {
-							const severityColor =
-								result.severity === 'error' ? color.red : result.severity === 'warning' ? color.yellow : color.blue;
+							const severityColorMap: Record<string, (s: string) => string> = {
+								error: color.red,
+								info: color.blue,
+								warning: color.yellow
+							};
+							const severityColor = severityColorMap[result.severity] ?? color.blue;
 
 							console.log(
 								`${i + 1}. ${severityColor(result.severity.toUpperCase())} ${result.file}:${result.line ?? '?'} - ${result.message}`
@@ -625,5 +632,6 @@ export function configureMonitoringCommand(program: CommandAdapter): void {
 			}
 		});
 
-	configureUsageSubcommand(monitoringCmd);
+	const usageCmd = configureUsageSubcommand(monitoringCmd);
+	configureUsageOptimizeSubcommand(usageCmd);
 }

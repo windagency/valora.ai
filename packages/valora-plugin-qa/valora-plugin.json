@@ -1,0 +1,7 @@
+{
+	"name": "valora-plugin-qa",
+	"version": "1.0.0",
+	"description": "QA Engineer agent and test-execution workflow commands (test, validate-coverage, pre-check).",
+	"engines": { "valora": ">=0.1.0" },
+	"contributes": ["agents", "commands"]
+}

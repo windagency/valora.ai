@@ -10,6 +10,7 @@
 
 import type { BatchableProvider } from 'batch/batch-provider.interface';
 import type { BatchRequest, BatchResult, BatchStatusInfo, BatchSubmission } from 'batch/batch.types';
+import type { ProviderDescriptor } from 'plugins/plugin-api.types';
 
 import { generateLocalId } from 'batch/batch-session';
 import {
@@ -23,14 +24,14 @@ import OpenAI from 'openai';
 
 import type { LLMCompletionOptions, LLMCompletionResult, LLMUsage } from 'types/llm.types';
 
-import { getProviderModels, ProviderName } from 'config/providers.config';
+import { BuiltinProviders, getProviderModels, ModelName } from 'config/providers.config';
 import { BaseLLMProvider } from 'llm/provider.interface';
 import { getProviderRegistry } from 'llm/registry';
 import { createErrorContext, ProviderError, withCircuitBreaker, withRetry } from 'utils/error-handler';
 import { checkRateLimit, getRateLimitStatus } from 'utils/rate-limiter';
 
 export class OpenAIProvider extends BaseLLMProvider implements BatchableProvider {
-	name = ProviderName.OPENAI;
+	name = BuiltinProviders.OPENAI;
 	private client: null | OpenAI = null;
 
 	async complete(options: LLMCompletionOptions): Promise<LLMCompletionResult> {
@@ -47,7 +48,7 @@ export class OpenAIProvider extends BaseLLMProvider implements BatchableProvider
 				`OpenAI API rate limit exceeded. Try again in ${Math.ceil((status.resetTime - Date.now()) / 1000)} seconds.`,
 				{
 					blockedUntil: status.blockedUntil,
-					provider: ProviderName.OPENAI,
+					provider: BuiltinProviders.OPENAI,
 					remaining: status.remaining,
 					resetTime: status.resetTime
 				},
@@ -87,7 +88,7 @@ export class OpenAIProvider extends BaseLLMProvider implements BatchableProvider
 				throw new ProviderError(
 					'OpenAI API returned no choices in response',
 					{
-						provider: ProviderName.OPENAI,
+						provider: BuiltinProviders.OPENAI,
 						response: response
 					},
 					context
@@ -126,7 +127,7 @@ export class OpenAIProvider extends BaseLLMProvider implements BatchableProvider
 				{
 					error: error,
 					model: options.model,
-					provider: ProviderName.OPENAI
+					provider: BuiltinProviders.OPENAI
 				},
 				context
 			);
@@ -134,7 +135,7 @@ export class OpenAIProvider extends BaseLLMProvider implements BatchableProvider
 	}
 
 	override getAlternativeModels(currentModel?: string): string[] {
-		const alternatives = getProviderModels(ProviderName.OPENAI);
+		const alternatives = getProviderModels(BuiltinProviders.OPENAI);
 		if (currentModel) {
 			return alternatives.filter((m) => m !== currentModel);
 		}
@@ -166,7 +167,7 @@ export class OpenAIProvider extends BaseLLMProvider implements BatchableProvider
 		} catch (error) {
 			throw new ProviderError(`OpenAI streaming error: ${(error as Error).message}`, {
 				error: error,
-				provider: ProviderName.OPENAI
+				provider: BuiltinProviders.OPENAI
 			});
 		}
 	}
@@ -176,7 +177,7 @@ export class OpenAIProvider extends BaseLLMProvider implements BatchableProvider
 	 */
 	override validateModel(modelName: string): Promise<boolean> {
 		// Get known models from MODEL_PROVIDER_SUGGESTIONS
-		const knownModels = getProviderModels(ProviderName.OPENAI);
+		const knownModels = getProviderModels(BuiltinProviders.OPENAI);
 
 		// Check if model is in known list
 		if (knownModels.includes(modelName)) {
@@ -317,4 +318,34 @@ export class OpenAIProvider extends BaseLLMProvider implements BatchableProvider
 }
 
 // Self-register this provider with the registry when module is loaded
-getProviderRegistry().registerProvider(ProviderName.OPENAI, OpenAIProvider);
+getProviderRegistry().registerProvider(BuiltinProviders.OPENAI, OpenAIProvider, { owner: 'core' }, {
+	defaultModel: ModelName.GPT_5,
+	description: 'GPT models from OpenAI',
+	label: 'OpenAI',
+	modelModes: [
+		{ mode: 'minimal reasoning', model: ModelName.GPT_5 },
+		{ mode: 'low reasoning', model: ModelName.GPT_5 },
+		{ mode: 'medium reasoning', model: ModelName.GPT_5 },
+		{ mode: 'high reasoning', model: ModelName.GPT_5 },
+		{ mode: 'minimal reasoning', model: ModelName.GPT_5_MINI },
+		{ mode: 'low reasoning', model: ModelName.GPT_5_MINI },
+		{ mode: 'medium reasoning', model: ModelName.GPT_5_MINI },
+		{ mode: 'high reasoning', model: ModelName.GPT_5_MINI },
+		{ mode: 'minimal reasoning', model: ModelName.GPT_5_NANO },
+		{ mode: 'low reasoning', model: ModelName.GPT_5_NANO },
+		{ mode: 'medium reasoning', model: ModelName.GPT_5_NANO },
+		{ mode: 'high reasoning', model: ModelName.GPT_5_NANO },
+		{ mode: 'none reasoning', model: ModelName.GPT_5_1 },
+		{ mode: 'low reasoning', model: ModelName.GPT_5_1 },
+		{ mode: 'medium reasoning', model: ModelName.GPT_5_1 },
+		{ mode: 'high reasoning', model: ModelName.GPT_5_1 },
+		{ mode: 'low reasoning', model: ModelName.O3 },
+		{ mode: 'medium reasoning', model: ModelName.O3 },
+		{ mode: 'high reasoning', model: ModelName.O3 },
+		{ mode: 'high reasoning', model: ModelName.O3_PRO },
+		{ mode: 'low reasoning', model: ModelName.O4_MINI },
+		{ mode: 'medium reasoning', model: ModelName.O4_MINI },
+		{ mode: 'high reasoning', model: ModelName.O4_MINI }
+	],
+	requiresApiKey: true
+} satisfies ProviderDescriptor);

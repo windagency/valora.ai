@@ -106,23 +106,23 @@ export class MCPToolHandler {
 			feedback.showMCPToolCall(serverId, toolName, result.success, durationMs);
 
 			// Scan output for credentials and prompt injection
-			let sanitisedOutput: unknown = result.content;
+			let sanitizedOutput: unknown = result.content;
 			if (typeof result.content === 'string') {
 				const scanned = getCredentialGuard().scanOutput(result.content);
-				sanitisedOutput = getPromptInjectionDetector().sanitiseToolResult(toolName, scanned);
+				sanitizedOutput = getPromptInjectionDetector().sanitizeToolResult(toolName, scanned);
 			} else if (result.content && typeof result.content === 'object') {
 				const outputStr = JSON.stringify(result.content);
 				const scannedStr = getCredentialGuard().scanOutput(outputStr);
-				const sanitisedStr = getPromptInjectionDetector().sanitiseToolResult(toolName, scannedStr);
-				if (sanitisedStr !== outputStr) {
-					sanitisedOutput = sanitisedStr;
+				const sanitizedStr = getPromptInjectionDetector().sanitizeToolResult(toolName, scannedStr);
+				if (sanitizedStr !== outputStr) {
+					sanitizedOutput = sanitizedStr;
 				}
 			}
 
 			return {
 				durationMs,
 				error: result.error,
-				output: sanitisedOutput,
+				output: sanitizedOutput,
 				serverId,
 				success: result.success,
 				toolName

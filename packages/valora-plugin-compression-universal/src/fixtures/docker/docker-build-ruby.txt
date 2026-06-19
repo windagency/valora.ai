@@ -1,0 +1,119 @@
+#0 building with "default" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile4
+#1 transferring dockerfile: 102B done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/ruby:3.3-slim
+#2 DONE 1.6s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 2B done
+#3 DONE 0.0s
+
+#4 [1/3] FROM docker.io/library/ruby:3.3-slim@sha256:12c91f1452e44e1ec3740b7da5a9b7dce296aad6026aece5ec280ece352e37c9
+#4 resolve docker.io/library/ruby:3.3-slim@sha256:12c91f1452e44e1ec3740b7da5a9b7dce296aad6026aece5ec280ece352e37c9 done
+#4 sha256:12c91f1452e44e1ec3740b7da5a9b7dce296aad6026aece5ec280ece352e37c9 10.32kB / 10.32kB done
+#4 sha256:260357a46185bdb05b7863b24e5e96af9c3360048f72624f472c0fbfcb6e767e 1.93kB / 1.93kB done
+#4 sha256:90a86954a437e40d77ec4150a3afe9ea3c1171c4ebe931754a11fe4853215274 5.93kB / 5.93kB done
+#4 sha256:fe2b61e97ede59bcbe3d9106e6b33f736f8441123af79769a00a733f4833e495 0B / 1.26MB 0.1s
+#4 sha256:4562459b9bbb7e819e50df7850e182b639f648b76d75795700ba1b4a23b5e2fa 0B / 190B 0.1s
+#4 sha256:9bae09aa897b89359da29369c6da5500481e73edd36ea40467e35a90d9acb560 0B / 38.34MB 0.1s
+#4 extracting sha256:fe2b61e97ede59bcbe3d9106e6b33f736f8441123af79769a00a733f4833e495
+#4 sha256:fe2b61e97ede59bcbe3d9106e6b33f736f8441123af79769a00a733f4833e495 1.26MB / 1.26MB 0.4s done
+#4 sha256:95e5f3fae947623c231af9226820cdcce4e03836a3921f7c374686bf27e19e54 0B / 143B 0.4s
+#4 sha256:4562459b9bbb7e819e50df7850e182b639f648b76d75795700ba1b4a23b5e2fa 190B / 190B 0.5s done
+#4 extracting sha256:fe2b61e97ede59bcbe3d9106e6b33f736f8441123af79769a00a733f4833e495 0.2s done
+#4 extracting sha256:4562459b9bbb7e819e50df7850e182b639f648b76d75795700ba1b4a23b5e2fa done
+#4 sha256:9bae09aa897b89359da29369c6da5500481e73edd36ea40467e35a90d9acb560 2.10MB / 38.34MB 0.7s
+#4 sha256:95e5f3fae947623c231af9226820cdcce4e03836a3921f7c374686bf27e19e54 143B / 143B 0.7s done
+#4 sha256:9bae09aa897b89359da29369c6da5500481e73edd36ea40467e35a90d9acb560 18.87MB / 38.34MB 0.9s
+#4 sha256:9bae09aa897b89359da29369c6da5500481e73edd36ea40467e35a90d9acb560 30.41MB / 38.34MB 1.0s
+#4 sha256:9bae09aa897b89359da29369c6da5500481e73edd36ea40467e35a90d9acb560 38.34MB / 38.34MB 1.1s
+#4 sha256:9bae09aa897b89359da29369c6da5500481e73edd36ea40467e35a90d9acb560 38.34MB / 38.34MB 1.1s done
+#4 extracting sha256:9bae09aa897b89359da29369c6da5500481e73edd36ea40467e35a90d9acb560 0.1s
+#4 extracting sha256:9bae09aa897b89359da29369c6da5500481e73edd36ea40467e35a90d9acb560 1.7s done
+#4 extracting sha256:95e5f3fae947623c231af9226820cdcce4e03836a3921f7c374686bf27e19e54 done
+#4 DONE 3.0s
+
+#5 [2/3] RUN gem install sinatra json
+#5 1.698 Successfully installed tilt-2.7.0
+#5 1.698 Successfully installed rack-3.2.6
+#5 1.698 Successfully installed rack-session-2.1.2
+#5 1.698 Successfully installed rack-protection-4.2.1
+#5 1.698 Successfully installed mustermann-3.1.1
+#5 1.698 Successfully installed sinatra-4.2.1
+#5 1.698 Building native extensions. This could take a while...
+#5 1.732 ERROR:  Error installing json:
+#5 1.732 	ERROR: Failed to build gem native extension.
+#5 1.732 
+#5 1.732     current directory: /usr/local/bundle/gems/json-2.19.4/ext/json/ext/generator
+#5 1.732 /usr/local/bin/ruby extconf.rb
+#5 1.732 checking for whether -std=c99 is accepted as CFLAGS... *** extconf.rb failed ***
+#5 1.732 Could not create Makefile due to some reason, probably lack of necessary
+#5 1.732 libraries and/or headers.  Check the mkmf.log file for more details.  You may
+#5 1.732 need configuration options.
+#5 1.732 
+#5 1.732 Provided configuration options:
+#5 1.732 	--with-opt-dir
+#5 1.732 	--without-opt-dir
+#5 1.732 	--with-opt-include=${opt-dir}/include
+#5 1.732 	--without-opt-include
+#5 1.732 	--with-opt-lib=${opt-dir}/lib
+#5 1.732 	--without-opt-lib
+#5 1.732 	--with-make-prog
+#5 1.732 	--without-make-prog
+#5 1.732 	--srcdir=.
+#5 1.732 	--curdir
+#5 1.732 	--ruby=/usr/local/bin/$(RUBY_BASE_NAME)
+#5 1.732 /usr/local/lib/ruby/3.3.0/mkmf.rb:480:in `try_do': The compiler failed to generate an executable file. (RuntimeError)
+#5 1.732 You have to install development tools first.
+#5 1.732 
+#5 1.732 	from /usr/local/lib/ruby/3.3.0/mkmf.rb:606:in `block in try_compile'
+#5 1.732 	from /usr/local/lib/ruby/3.3.0/mkmf.rb:553:in `with_werror'
+#5 1.732 	from /usr/local/lib/ruby/3.3.0/mkmf.rb:606:in `try_compile'
+#5 1.732 	from /usr/local/lib/ruby/3.3.0/mkmf.rb:670:in `try_cflags'
+#5 1.732 	from /usr/local/lib/ruby/3.3.0/mkmf.rb:1019:in `block (2 levels) in append_cflags'
+#5 1.732 	from /usr/local/lib/ruby/3.3.0/mkmf.rb:983:in `block in checking_for'
+#5 1.732 	from /usr/local/lib/ruby/3.3.0/mkmf.rb:344:in `block (2 levels) in postpone'
+#5 1.732 	from /usr/local/lib/ruby/3.3.0/mkmf.rb:314:in `open'
+#5 1.732 	from /usr/local/lib/ruby/3.3.0/mkmf.rb:344:in `block in postpone'
+#5 1.732 	from /usr/local/lib/ruby/3.3.0/mkmf.rb:314:in `open'
+#5 1.732 	from /usr/local/lib/ruby/3.3.0/mkmf.rb:340:in `postpone'
+#5 1.732 	from /usr/local/lib/ruby/3.3.0/mkmf.rb:982:in `checking_for'
+#5 1.732 	from /usr/local/lib/ruby/3.3.0/mkmf.rb:1018:in `block in append_cflags'
+#5 1.732 	from /usr/local/lib/ruby/3.3.0/mkmf.rb:1017:in `each'
+#5 1.732 	from /usr/local/lib/ruby/3.3.0/mkmf.rb:1017:in `append_cflags'
+#5 1.732 	from extconf.rb:7:in `<main>'
+#5 1.732 
+#5 1.732 To see why this extension failed to compile, please check the mkmf.log which can be found here:
+#5 1.732 
+#5 1.732   /usr/local/bundle/extensions/aarch64-linux/3.3.0/json-2.19.4/mkmf.log
+#5 1.732 
+#5 1.732 extconf failed, exit code 1
+#5 1.732 
+#5 1.732 Gem files will remain installed in /usr/local/bundle/gems/json-2.19.4 for inspection.
+#5 1.732 Results logged to /usr/local/bundle/extensions/aarch64-linux/3.3.0/json-2.19.4/gem_make.out
+#5 1.734 6 gems installed
+#5 ERROR: process "/bin/sh -c gem install sinatra json" did not complete successfully: exit code: 1
+------
+ > [2/3] RUN gem install sinatra json:
+1.732 
+1.732 To see why this extension failed to compile, please check the mkmf.log which can be found here:
+1.732 
+1.732   /usr/local/bundle/extensions/aarch64-linux/3.3.0/json-2.19.4/mkmf.log
+1.732 
+1.732 extconf failed, exit code 1
+1.732 
+1.732 Gem files will remain installed in /usr/local/bundle/gems/json-2.19.4 for inspection.
+1.732 Results logged to /usr/local/bundle/extensions/aarch64-linux/3.3.0/json-2.19.4/gem_make.out
+1.734 6 gems installed
+------
+Dockerfile4:2
+--------------------
+   1 |     FROM ruby:3.3-slim
+   2 | >>> RUN gem install sinatra json
+   3 |     RUN echo "DONE"
+   4 |     
+--------------------
+ERROR: failed to build: failed to solve: process "/bin/sh -c gem install sinatra json" did not complete successfully: exit code: 1

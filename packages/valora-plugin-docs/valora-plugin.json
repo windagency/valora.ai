@@ -1,0 +1,8 @@
+{
+	"name": "valora-plugin-docs",
+	"version": "1.0.0",
+	"description": "Documentation generation commands (generate-docs, generate-all-documentation). Depends on the lead agent contributed by valora-plugin-engineering.",
+	"engines": { "valora": ">=0.1.0" },
+	"contributes": ["commands"],
+	"requires": ["valora-plugin-engineering"]
+}

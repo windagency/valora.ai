@@ -1,3 +1,7 @@
+---
+updated: 2026-05-07
+---
+
 # Code Quality Standards
 
 > Quick reference for code quality rules enforced in VALORA. For naming conventions and commit format, see [Contributing Guidelines](./contributing.md). For deep rationale and extended examples, see [CODE-QUALITY-GUIDELINES.md](./CODE-QUALITY-GUIDELINES.md).
@@ -19,7 +23,7 @@
 | Error handling               | All async paths must handle errors                                 | Code review                                         |
 | Validation                   | All external input validated with Zod                              | Code review                                         |
 | Tests                        | All new logic must have unit tests                                 | Code review                                         |
-| Architecture                 | Dependency rules validated with `arch-unit-ts`                     | `tests/architecture/`                               |
+| Architecture                 | Dependency rules validated with `arch-unit-ts`                     | `__tests__/architecture/`                           |
 
 ---
 
@@ -232,7 +236,7 @@ Run `pnpm lint:fix` to apply all auto-fixable rules. Non-fixable violations must
 <details>
 <summary><strong>Architecture testing with arch-unit-ts</strong></summary>
 
-Architectural rules are validated in `tests/architecture/`. Every dependency direction enforced at the module level must have a corresponding arch-unit-ts test. Example:
+Architectural rules are validated in `__tests__/architecture/`. Every dependency direction enforced at the module level must have a corresponding arch-unit-ts test. Example:
 
 ```typescript
 import { filesOfProject } from 'arch-unit-ts';

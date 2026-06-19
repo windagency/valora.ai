@@ -3,12 +3,7 @@
  *
  * Wraps tree-sitter to parse source files and extract symbols, imports,
  * and structural information.
- *
- * Tree-sitter nodes are dynamically typed through WASM — ESLint unsafe
- * rules are suppressed where node property access is unavoidable.
  */
-
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call */
 
 import { createHash } from 'crypto';
 import { extname } from 'path';
@@ -61,8 +56,8 @@ export async function parseFile(filePath: string, content: string): Promise<null
 		if (!tree) return { contentHash, imports: [], language, symbols: [] };
 		const rootNode = tree.rootNode;
 
-		const symbols = extractSymbols(rootNode, filePath, language, content);
-		const imports = extractImports(rootNode, language, content);
+		const symbols = extractSymbols(rootNode as TSNode, filePath, language, content);
+		const imports = extractImports(rootNode as TSNode, language, content);
 
 		return { contentHash, imports, language, symbols };
 	} catch {
@@ -74,8 +69,30 @@ export async function parseFile(filePath: string, content: string): Promise<null
 /**
  * Compute content hash without full parse
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type TSNode = any;
+
+interface ExtractedSymbolInfo {
+	exported: boolean;
+	kind: SymbolKind;
+	name: string;
+}
+
+type LanguageSymbolExtractor = (
+	node: TSNode,
+	nodeType: string,
+	lines: string[],
+	startLine: number
+) => ExtractedSymbolInfo | null;
+
+interface TSNode {
+	child(index: number): null | TSNode;
+	readonly childCount: number;
+	childForFieldName(fieldName: string): null | TSNode;
+	readonly endPosition: { readonly row: number };
+	readonly id: number;
+	readonly startPosition: { readonly row: number };
+	readonly text: string;
+	readonly type: string;
+}
 
 export function computeContentHash(content: string): string {
 	return createHash('sha256').update(content).digest('hex');
@@ -84,82 +101,6 @@ export function computeContentHash(content: string): string {
 /**
  * Extract symbols from the AST root node
  */
-function extractSymbols(rootNode: TSNode, filePath: string, language: ASTLanguage, content: string): IndexedSymbol[] {
-	const symbols: IndexedSymbol[] = [];
-	const lines = content.split('\n');
-	const visitedNodes = new Set<number>();
-
-	visitNode(rootNode, null);
-
-	function visitNode(node: TSNode, parentId: null | string): void {
-		const nodeId = node.id as number;
-		if (visitedNodes.has(nodeId)) return;
-		visitedNodes.add(nodeId);
-
-		const nodeType = node.type as string;
-
-		// For export_statement nodes in TS/JS, mark the inner declaration as visited
-		if ((language === 'typescript' || language === 'javascript') && nodeType === 'export_statement') {
-			markExportDeclarationVisited(node, visitedNodes);
-		}
-
-		const extracted = extractSymbolFromNode(node, filePath, language, lines, parentId);
-		if (extracted) {
-			symbols.push(extracted);
-			visitChildren(node, nodeType, extracted.id, visitNode);
-		} else {
-			for (let i = 0; i < node.childCount; i++) {
-				visitNode(node.child(i), parentId);
-			}
-		}
-	}
-
-	return symbols;
-}
-
-/**
- * Mark export_statement's declaration child as visited to prevent duplicates
- */
-function markExportDeclarationVisited(node: TSNode, visitedNodes: Set<number>): void {
-	const decl = node.childForFieldName?.('declaration');
-	if (decl) {
-		visitedNodes.add(decl.id as number);
-	}
-}
-
-/**
- * Visit children of an extracted symbol node
- */
-function visitChildren(
-	node: TSNode,
-	nodeType: string,
-	parentId: string,
-	visitNode: (node: TSNode, parentId: null | string) => void
-): void {
-	if (nodeType === 'export_statement') {
-		// Traverse the inner declaration's children directly
-		const decl = node.childForFieldName?.('declaration');
-		if (decl) {
-			for (let i = 0; i < decl.childCount; i++) {
-				visitNode(decl.child(i), parentId);
-			}
-		}
-	} else {
-		for (let i = 0; i < node.childCount; i++) {
-			visitNode(node.child(i), parentId);
-		}
-	}
-}
-
-/**
- * Extract a symbol from a single AST node
- */
-interface ExtractedSymbolInfo {
-	exported: boolean;
-	kind: SymbolKind;
-	name: string;
-}
-
 function extractSymbolFromNode(
 	node: TSNode,
 	filePath: string,
@@ -196,6 +137,85 @@ function extractSymbolFromNode(
 	};
 }
 
+function extractSymbols(rootNode: TSNode, filePath: string, language: ASTLanguage, content: string): IndexedSymbol[] {
+	const symbols: IndexedSymbol[] = [];
+	const lines = content.split('\n');
+	const visitedNodes = new Set<number>();
+
+	visitNode(rootNode, null);
+
+	function visitNode(node: TSNode, parentId: null | string): void {
+		const nodeId = node.id as number;
+		if (visitedNodes.has(nodeId)) return;
+		visitedNodes.add(nodeId);
+
+		const nodeType = node.type as string;
+
+		// For export_statement nodes in TS/JS, mark the inner declaration as visited
+		if ((language === 'typescript' || language === 'javascript') && nodeType === 'export_statement') {
+			markExportDeclarationVisited(node, visitedNodes);
+		}
+
+		const extracted = extractSymbolFromNode(node, filePath, language, lines, parentId);
+		if (extracted) {
+			symbols.push(extracted);
+			visitChildren(node, nodeType, extracted.id, visitNode);
+		} else {
+			for (let i = 0; i < node.childCount; i++) {
+				const child = node.child(i);
+				if (child) visitNode(child, parentId);
+			}
+		}
+	}
+
+	return symbols;
+}
+
+/**
+ * Mark export_statement's declaration child as visited to prevent duplicates
+ */
+function markExportDeclarationVisited(node: TSNode, visitedNodes: Set<number>): void {
+	const decl = node.childForFieldName?.('declaration');
+	if (decl) {
+		visitedNodes.add(decl.id as number);
+	}
+}
+
+/**
+ * Maps node types to the named field whose children should be traversed.
+ * Absent entries fall back to traversing the node's own children.
+ */
+const CHILD_FIELD_MAP: Record<string, string> = {
+	export_statement: 'declaration'
+};
+
+/**
+ * Visit children of an extracted symbol node
+ */
+function visitChildren(
+	node: TSNode,
+	nodeType: string,
+	parentId: string,
+	visitNode: (node: TSNode, parentId: null | string) => void
+): void {
+	const fieldName = CHILD_FIELD_MAP[nodeType];
+	const source: null | TSNode = fieldName ? (node.childForFieldName?.(fieldName) ?? null) : node;
+	if (!source) return;
+	for (let i = 0; i < source.childCount; i++) {
+		const child = source.child(i);
+		if (child) visitNode(child, parentId);
+	}
+}
+
+const LANGUAGE_SYMBOL_EXTRACTORS: Record<ASTLanguage, LanguageSymbolExtractor> = {
+	go: extractGoSymbol,
+	java: extractJavaSymbol,
+	javascript: extractTSSymbol,
+	python: extractPythonSymbol,
+	rust: extractRustSymbol,
+	typescript: extractTSSymbol
+};
+
 /**
  * Dispatch to language-specific symbol extractor
  */
@@ -206,21 +226,7 @@ function extractLanguageSymbol(
 	lines: string[],
 	startLine: number
 ): ExtractedSymbolInfo | null {
-	switch (language) {
-		case 'go':
-			return extractGoSymbol(node, nodeType);
-		case 'java':
-			return extractJavaSymbol(node, nodeType);
-		case 'javascript':
-		case 'typescript':
-			return extractTSSymbol(node, nodeType, lines, startLine);
-		case 'python':
-			return extractPythonSymbol(node, nodeType);
-		case 'rust':
-			return extractRustSymbol(node, nodeType);
-		default:
-			return null;
-	}
+	return LANGUAGE_SYMBOL_EXTRACTORS[language](node, nodeType, lines, startLine);
 }
 
 function extractTSExportStatement(node: TSNode, lines: string[], startLine: number): ExtractedSymbolInfo | null {
@@ -280,7 +286,11 @@ function inferVariableKind(declarator: TSNode, name: string): SymbolKind {
 	return 'variable';
 }
 
-function nameFromNode(nameNode: TSNode, kind: SymbolKind, exported: boolean): ExtractedSymbolInfo | null {
+function nameFromNode(
+	nameNode: null | TSNode | undefined,
+	kind: SymbolKind,
+	exported: boolean
+): ExtractedSymbolInfo | null {
 	const n = nameNode?.text as string | undefined;
 	return n ? { exported, kind, name: n } : null;
 }
@@ -304,41 +314,32 @@ function tsNodeKindMap(nodeType: string): null | SymbolKind {
 /**
  * Extract Python symbol info
  */
+const PYTHON_NODE_KIND_MAP: Record<string, SymbolKind> = {
+	class_definition: 'class',
+	function_definition: 'function'
+};
+
 function extractPythonSymbol(node: TSNode, nodeType: string): ExtractedSymbolInfo | null {
-	const nameNode = node.childForFieldName?.('name');
-
-	switch (nodeType) {
-		case 'class_definition': {
-			const n = nameNode?.text as string | undefined;
-			if (n) return { exported: !n.startsWith('_'), kind: 'class', name: n };
-			break;
-		}
-		case 'function_definition': {
-			const n = nameNode?.text as string | undefined;
-			if (n) return { exported: !n.startsWith('_'), kind: 'function', name: n };
-			break;
-		}
-	}
-
-	return null;
+	const kind = PYTHON_NODE_KIND_MAP[nodeType];
+	if (!kind) return null;
+	const n = node.childForFieldName?.('name')?.text as string | undefined;
+	if (!n) return null;
+	return { exported: !n.startsWith('_'), kind, name: n };
 }
 
 /**
  * Extract Go symbol info
  */
-function extractGoSymbol(node: TSNode, nodeType: string): ExtractedSymbolInfo | null {
-	const nameNode = node.childForFieldName?.('name');
+const GO_NAMED_KIND_MAP: Record<string, SymbolKind> = {
+	function_declaration: 'function',
+	method_declaration: 'method'
+};
 
-	switch (nodeType) {
-		case 'function_declaration':
-			return goNamedSymbol(nameNode, 'function');
-		case 'method_declaration':
-			return goNamedSymbol(nameNode, 'method');
-		case 'type_declaration':
-			return extractGoTypeDecl(node);
-		default:
-			return null;
-	}
+function extractGoSymbol(node: TSNode, nodeType: string): ExtractedSymbolInfo | null {
+	const namedKind = GO_NAMED_KIND_MAP[nodeType];
+	if (namedKind) return goNamedSymbol(node.childForFieldName?.('name'), namedKind);
+	if (nodeType === 'type_declaration') return extractGoTypeDecl(node);
+	return null;
 }
 
 function extractGoTypeDecl(node: TSNode): ExtractedSymbolInfo | null {
@@ -352,7 +353,7 @@ function extractGoTypeDecl(node: TSNode): ExtractedSymbolInfo | null {
 	return { exported: isExported, kind, name: n };
 }
 
-function goNamedSymbol(nameNode: TSNode, kind: SymbolKind): ExtractedSymbolInfo | null {
+function goNamedSymbol(nameNode: null | TSNode | undefined, kind: SymbolKind): ExtractedSymbolInfo | null {
 	const n = nameNode?.text as string | undefined;
 	if (!n) return null;
 	const isExported = n[0] === (n[0] as string | undefined)?.toUpperCase();

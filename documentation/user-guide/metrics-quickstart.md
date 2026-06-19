@@ -1,3 +1,7 @@
+---
+updated: 2026-05-07
+---
+
 # Metrics Quick Start
 
 Get workflow metrics running in 5 minutes.

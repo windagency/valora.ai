@@ -1,0 +1,56 @@
+{
+	"name": "@windagency/valora-plugin-openrouter",
+	"version": "1.0.0",
+	"description": "OpenRouter provider plugin for Valora — connects to openrouter.ai for unified access to hundreds of LLM models via an OpenAI-compatible API. Requires OPENROUTER_API_KEY.",
+	"keywords": [
+		"valora",
+		"valora-plugin",
+		"ai",
+		"llm",
+		"openrouter",
+		"api-gateway",
+		"cloud-llm",
+		"provider",
+		"open-source",
+		"typescript"
+	],
+	"author": "Damien TIVELET <damien@wind-agency.com>",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/windagency/valora.ai"
+	},
+	"license": "MIT",
+	"type": "module",
+	"engines": {
+		"node": ">=22.0.0"
+	},
+	"packageManager": "pnpm@10.19.0",
+	"volta": {
+		"node": "22.21.0",
+		"pnpm": "10.19.0"
+	},
+	"scripts": {
+		"build": "esbuild src/index.ts --bundle --platform=node --format=esm --outfile=dist/index.js --external:openai --banner:js=\"import { createRequire } from 'module'; const require = createRequire(import.meta.url);\"",
+		"clean": "rm -rf ./dist",
+		"lint": "eslint --color",
+		"lint:fix": "eslint --color --fix",
+		"beautify": "prettier --check \"**/*.+(js|jsx|ts|tsx|json|md|yml|yaml)\"",
+		"beautify:fix": "prettier --write \"**/*.+(js|jsx|ts|tsx|json|md|yml|yaml)\"",
+		"format": "pnpm beautify:fix && pnpm lint:fix",
+		"test": "vitest run",
+		"prepublishOnly": "pnpm clean && pnpm build && pnpm test"
+	},
+	"files": [
+		"valora-plugin.json",
+		"dist"
+	],
+	"peerDependencies": {
+		"@windagency/valora": ">=0.1.0",
+		"openai": "^4.67.0"
+	},
+	"devDependencies": {
+		"@windagency/valora-plugin-api": "workspace:*",
+		"esbuild": "^0.28.0",
+		"openai": "^4.67.0"
+	}
+}

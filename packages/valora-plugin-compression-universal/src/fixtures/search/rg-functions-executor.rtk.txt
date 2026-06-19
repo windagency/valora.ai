@@ -1,0 +1,91 @@
+/workspaces/valora/src/executor/stage-validation.service.ts:			'functional requirements': ['functional_requirements', 'functionalRequirements', 'requirements', 'features'],
+/workspaces/valora/src/executor/stage-validation.service.ts:export function getStageValidationService(): StageValidationService {
+/workspaces/valora/src/executor/dry-run-preview.service.ts:export function getDryRunPreviewService(): DryRunPreviewService {
+/workspaces/valora/src/executor/command-loader.ts:		// commandsDir is handled by the imported functions
+/workspaces/valora/src/executor/memory-formatter.ts:export function formatMemoryForInjection(results: MemoryQueryResult[], tokenBudget = 2000): null | string {
+/workspaces/valora/src/executor/dry-run-strategy.ts:export function createDryRunStrategy(): DryRunExecutionStrategy {
+/workspaces/valora/src/executor/escalation-handler.service.ts:	 * Get color function for risk level
+/workspaces/valora/src/executor/escalation-handler.service.ts:export function getEscalationHandlerService(): EscalationHandlerService {
+/workspaces/valora/src/executor/message-builder.service.ts:export function getMessageBuilderService(): MessageBuilderService {
+/workspaces/valora/src/executor/message-builder.service.ts:export function resetMessageBuilderService(): void {
+/workspaces/valora/src/executor/stage-output-cache.ts:export function getStageOutputCache(): StageOutputCache {
+/workspaces/valora/src/executor/output-compression.service.ts:export function getStrategy(tool: string): CompressionStrategy | undefined {
+/workspaces/valora/src/executor/output-compression.service.ts:export function registerStrategy(tool: string, fn: CompressionStrategy): void {
+/workspaces/valora/src/executor/output-compression.service.ts:export function resetRegistry(): void {
+/workspaces/valora/src/executor/output-compression.service.ts:function recordCompression(inputLen: number, outputLen: number): void {
+/workspaces/valora/src/executor/output-compression.service.ts:export function getCompressionStats(): Readonly<CompressionStats> {
+/workspaces/valora/src/executor/output-compression.service.ts:export function resetCompressionStats(): void {
+/workspaces/valora/src/executor/output-compression.service.ts:export function stripAnsiCodes(text: string): string {
+/workspaces/valora/src/executor/output-compression.service.ts:export function truncateTerminalOutput(output: string): string {
+/workspaces/valora/src/executor/output-compression.service.ts:function extractPriorityLines(text: string): string {
+/workspaces/valora/src/executor/output-compression.service.ts:export function compressTerminalOutput(command: string, output: string): string {
+/workspaces/valora/src/executor/output-compression.service.ts:function resolveStrategyKey(command: string): string {
+/workspaces/valora/src/executor/output-parsing.service.ts:export function getOutputParsingService(): OutputParsingService {
+/workspaces/valora/src/executor/output-parsing.service.ts:export function resetOutputParsingService(): void {
+/workspaces/valora/src/executor/project-guidance-loader.ts:export function getProjectRoot(): string {
+/workspaces/valora/src/executor/project-guidance-loader.ts:async function loadGuidanceFile(
+/workspaces/valora/src/executor/project-guidance-loader.ts:async function loadRootGuidanceFiles(
+/workspaces/valora/src/executor/project-guidance-loader.ts:export async function loadProjectGuidance(): Promise<null | string> {
+/workspaces/valora/src/executor/project-guidance-loader.ts:function formatGuidanceContent(guidance: GuidanceFile[]): string {
+/workspaces/valora/src/executor/project-guidance-loader.ts:export function clearGuidanceCache(): void {
+/workspaces/valora/src/executor/project-guidance-loader.ts:async function loadKnowledgeFile(
+/workspaces/valora/src/executor/project-guidance-loader.ts: * - review-functional command: loadProjectKnowledge(['PRD.md', 'FUNCTIONAL.md'])
+/workspaces/valora/src/executor/project-guidance-loader.ts:export async function loadProjectKnowledge(knowledgeFiles: string[]): Promise<null | string> {
+/workspaces/valora/src/executor/project-guidance-loader.ts:function getCachedKnowledge(
+/workspaces/valora/src/executor/project-guidance-loader.ts:async function loadAllKnowledgeFiles(
+/workspaces/valora/src/executor/project-guidance-loader.ts:async function loadKnowledgePattern(
+/workspaces/valora/src/executor/project-guidance-loader.ts:function displayLoadedKnowledgeFeedback(
+/workspaces/valora/src/executor/project-guidance-loader.ts:async function resolveGlobPattern(
+/workspaces/valora/src/executor/project-guidance-loader.ts:function formatKnowledgeContent(knowledge: KnowledgeFile[]): string {
+/workspaces/valora/src/executor/project-guidance-loader.ts:export function clearKnowledgeCache(): void {
+/workspaces/valora/src/executor/project-guidance-loader.ts:export function hasProjectGuidance(): boolean {
+/workspaces/valora/src/executor/project-guidance-loader.ts:export function getGuidanceFilePatterns(): readonly string[] {
+/workspaces/valora/src/executor/project-guidance-loader.ts:export async function loadAvailableAgents(agentRoles: string[]): Promise<null | string> {
+/workspaces/valora/src/executor/project-guidance-loader.ts:function getCachedAgents(
+/workspaces/valora/src/executor/project-guidance-loader.ts:async function loadAgentFiles(
+/workspaces/valora/src/executor/project-guidance-loader.ts:function displayLoadedAgentsFeedback(
+/workspaces/valora/src/executor/project-guidance-loader.ts:function formatAgentContent(agents: Array<{ content: string; role: string }>): string {
+/workspaces/valora/src/executor/project-guidance-loader.ts:export function clearAgentContentCache(): void {
+/workspaces/valora/src/executor/stage-executor.test.ts:	function toolMsg(content: string): LLMMessage {
+/workspaces/valora/src/executor/stage-executor.test.ts:	function userMsg(content: string): LLMMessage {
+/workspaces/valora/src/executor/dry-run-cache.ts:export function getDryRunCache(): DryRunCache {
+/workspaces/valora/src/executor/command-validation.ts:export function validateCommandMetadata(metadata: CommandMetadata, filePath: string): void {
+/workspaces/valora/src/executor/command-validation.ts:export function validatePipelineStages(pipeline: unknown[], filePath: string): void {
+/workspaces/valora/src/executor/command-validation.ts:export function handleCommandLoadError(error: unknown, commandName: string, filePath: string): never {
+/workspaces/valora/src/executor/command-discovery.ts:export function validateCommandName(commandName: string): void {
+/workspaces/valora/src/executor/command-discovery.ts:export function validateCommandsDirectory(commandsDir: string): void {
+/workspaces/valora/src/executor/command-discovery.ts:export async function discoverCommandFiles(commandsDir: string = DEFAULT_COMMANDS_DIR): Promise<string[]> {
+/workspaces/valora/src/executor/command-discovery.ts:export function filterCommandFiles(files: string[]): string[] {
+/workspaces/valora/src/executor/command-discovery.ts:export function extractCommandName(fileName: string): string {
+/workspaces/valora/src/executor/command-discovery.ts:export function filesToCommandNames(files: string[]): string[] {
+/workspaces/valora/src/executor/command-discovery.ts:export async function listAvailableCommands(commandsDir: string = DEFAULT_COMMANDS_DIR): Promise<string[]> {
+/workspaces/valora/src/executor/command-discovery.ts:export async function commandFileExists(
+/workspaces/valora/src/executor/command-discovery.ts:export function getCommandFilePath(commandName: string, commandsDir: string = DEFAULT_COMMANDS_DIR): string {
+/workspaces/valora/src/executor/command-discovery.ts:export async function validateCommandFile(filePath: string, commandName: string): Promise<void> {
+/workspaces/valora/src/executor/command-discovery.ts:export async function loadAllCommandFiles(
+/workspaces/valora/src/executor/tool-execution.service.ts:			'Get a structured outline of a file showing all symbols (functions, classes, types) with their signatures and line numbers. ' +
+/workspaces/valora/src/executor/tool-execution.service.ts:			'Find functions, classes, types, and other symbols by name using the AST index. ' +
+/workspaces/valora/src/executor/tool-execution.service.ts:					description: 'Filter by symbol kind: function, class, interface, type, enum, method, variable, constant',
+/workspaces/valora/src/executor/tool-execution.service.ts:			suggestion = `run_terminal_cmd("rg -A 10 'class|function|export' ${path}")  # Extract key definitions`;
+/workspaces/valora/src/executor/tool-execution.service.ts:function truncateMcpOutput(output: unknown): string {
+/workspaces/valora/src/executor/tool-execution.service.ts:function exitCodeOneGuidance(code: number | undefined, command: string): string | undefined {
+/workspaces/valora/src/executor/tool-execution.service.ts:function isNoMatchesExitCode(command: string): boolean {
+/workspaces/valora/src/executor/tool-execution.service.ts:export function isExploratoryExitCode(command: string): boolean {
+/workspaces/valora/src/executor/tool-execution.service.ts:export function getToolExecutionService(workingDir?: string): ToolExecutionService {
+/workspaces/valora/src/executor/stage-executor.ts:export function djb2(s: string): number {
+/workspaces/valora/src/executor/stage-executor.ts:export function compressMessageHistory(messages: LLMMessage[], keepRecent = 4): number {
+/workspaces/valora/src/executor/stage-executor.ts:function deduplicateLines(text: string): string {
+/workspaces/valora/src/executor/interactive-question-handler.service.ts:export function getInteractiveQuestionHandler(): InteractiveQuestionHandlerService {
+/workspaces/valora/src/executor/pipeline.ts:function detectWorktreeInfo(): undefined | WorktreeInfoContext {
+/workspaces/valora/src/executor/pipeline.ts:function evaluateConditional(value: unknown): boolean {
+/workspaces/valora/src/executor/input-pre-resolver.ts:export function getInputPreResolver(): InputPreResolver {
+/workspaces/valora/src/executor/input-pre-resolver.ts:export function resetInputPreResolver(): void {
+/workspaces/valora/src/executor/tools/search-tools.service.ts:export function getSearchToolsService(workingDir?: string): SearchToolsService {
+/workspaces/valora/src/executor/tools/search-tools.service.ts:export function resetSearchToolsService(): void {
+/workspaces/valora/src/executor/tools/dry-run-simulator.service.ts:export function getDryRunSimulator(workingDir?: string): DryRunToolSimulator {
+/workspaces/valora/src/executor/tools/dry-run-simulator.service.ts:export function resetDryRunSimulator(): void {
+/workspaces/valora/src/executor/tools/session-tools.service.ts:export function getSessionToolsService(workingDir?: string): SessionToolsService {
+/workspaces/valora/src/executor/tools/session-tools.service.ts:export function resetSessionToolsService(): void {
+/workspaces/valora/src/executor/hook-execution.service.ts:export function getHookExecutionService(): HookExecutionService {
+/workspaces/valora/src/executor/hook-execution.service.ts:export function setHookExecutionService(service: HookExecutionService): void {
+/workspaces/valora/src/executor/escalation-detection.service.ts:export function getEscalationDetectionService(config?: Partial<EscalationConfig>): EscalationDetectionService {

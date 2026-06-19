@@ -68,6 +68,11 @@ export interface CommandAdapter {
 	action(fn: (...args: Array<Record<string, unknown>>) => Promise<void> | void): CommandAdapter;
 
 	/**
+	 * Register a life-cycle hook that fires before or after every action in this command tree
+	 */
+	hook(event: 'postAction' | 'preAction', fn: () => Promise<void> | void): CommandAdapter;
+
+	/**
 	 * Set program name
 	 */
 	name(str: string): CommandAdapter;

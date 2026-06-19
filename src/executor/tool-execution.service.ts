@@ -42,25 +42,21 @@
  * not when the LLM is working through normal search/navigation patterns.
  */
 
-import { type ASTToolsService, getASTToolsService } from 'ast/ast-tools.service';
 import { exec } from 'child_process';
 import { existsSync, readdirSync, rmSync, statSync } from 'fs';
 import { getLSPToolsService, type LSPToolsService } from 'lsp/lsp-tools.service';
 import { dirname, resolve } from 'path';
 import { getCommandGuard } from 'security/command-guard';
 import { getCredentialGuard } from 'security/credential-guard';
+import { type EffectivePermissions, getPermissionPropagationService } from 'security/permission-propagation.service';
 import { fileURLToPath } from 'url';
 import { promisify } from 'util';
 
 import type { MCPClientManagerService } from 'mcp/mcp-client-manager.service';
 import type { LLMToolCall, LLMToolDefinition, LLMToolResult } from 'types/llm.types';
 
-import {
-	DEFAULT_TIMEOUT_MS,
-	MAX_LIST_DIR_ENTRIES,
-	MAX_MCP_OUTPUT_CHARS,
-	MAX_TERMINAL_OUTPUT_CHARS
-} from 'config/constants';
+import { type ASTToolsService, getASTToolsService } from 'ast/ast-tools.service';
+import { DEFAULT_TIMEOUT_MS, MAX_LIST_DIR_ENTRIES, MAX_MCP_OUTPUT_CHARS } from 'config/constants';
 import { type MCPToolHandler } from 'mcp/mcp-tool-handler';
 import { getColorAdapter } from 'output/color-adapter.interface';
 import { getConsoleOutput } from 'output/console-output';
@@ -75,10 +71,11 @@ import { getPromptAdapter } from 'ui/prompt-adapter.interface';
 import { formatErrorMessage } from 'utils/error-utils';
 import { readFile, writeFile } from 'utils/file-utils';
 import { validateNotForbiddenPath } from 'utils/input-validator';
-import { getMetricsCollector } from 'utils/metrics-collector';
+import { getMetricsCollector, observeHistogram } from 'utils/metrics-collector';
 import { getTracer, type Span } from 'utils/tracing';
 
 import { getHookExecutionService } from './hook-execution.service';
+import { compressTerminalOutput, getCompressionStats } from './output-compression.service';
 import {
 	type DryRunToolSimulator,
 	getDryRunSimulator,
@@ -617,6 +614,17 @@ export class ToolExecutionService {
 	 */
 	private dryRunSimulator: DryRunToolSimulator | null = null;
 
+	/**
+	 * Effective permission constraints propagated from the parent execution context.
+	 * Writes and deletes are blocked for paths in forbidden_paths; paths matching
+	 * requires_approval_for are queued for human confirmation.
+	 */
+	private effectiveConstraints: EffectivePermissions = {
+		delegationDepth: 0,
+		forbidden_paths: [],
+		requires_approval_for: []
+	};
+
 	constructor(workingDir: string = process.cwd()) {
 		this.workingDir = workingDir;
 		this.idempotencyStore = getIdempotencyStore();
@@ -704,6 +712,14 @@ export class ToolExecutionService {
 	 */
 	isDryRunMode(): boolean {
 		return this.dryRunMode;
+	}
+
+	/**
+	 * Set the effective permission constraints for this execution context.
+	 * Must be called before any tool execution to enforce path restrictions.
+	 */
+	setEffectiveConstraints(constraints: EffectivePermissions): void {
+		this.effectiveConstraints = constraints;
 	}
 
 	/**
@@ -966,6 +982,11 @@ export class ToolExecutionService {
 			span.addEvent('tool_execution_complete');
 			span.setOk();
 
+			// Track character consumption per tool for token budget analysis
+			const inputChars = JSON.stringify(args).length;
+			observeHistogram('tool_input_chars', inputChars, { tool: name });
+			observeHistogram('tool_output_chars', output.length, { tool: name });
+
 			this.logger.debug(`Tool ${name} completed successfully`, {
 				outputLength: output.length
 			});
@@ -1051,7 +1072,6 @@ export class ToolExecutionService {
 	 * Route tool execution to the appropriate handler
 	 */
 	private async executeToolByName(name: AllowedTool, args: Record<string, unknown>): Promise<string> {
-		// Check if this is an MCP tool (handled separately in Phase 2)
 		if (isMCPTool(name)) {
 			return this.executeMcpTool(name, args);
 		}
@@ -1164,6 +1184,12 @@ export class ToolExecutionService {
 
 		const fullPath = this.validateAndResolvePath(path, 'write to');
 
+		// Enforce effective permission constraints: block writes to forbidden paths
+		const permSvc = getPermissionPropagationService();
+		if (permSvc.isForbidden(fullPath, this.effectiveConstraints.forbidden_paths)) {
+			return `Cannot write to forbidden path: ${path}. This path is restricted by the active permission constraints.`;
+		}
+
 		// Check if this is a protected file that already exists
 		const fileName = path.split('/').pop() ?? path;
 		const isProtectedFile = ToolExecutionService.PROTECTED_FILES.some(
@@ -1180,10 +1206,18 @@ export class ToolExecutionService {
 			);
 		}
 
-		// Check if this path requires confirmation
-		const requiresConfirmation = ToolExecutionService.CONFIRM_WRITE_PATHS.some(
-			(confirmPath) => path.includes(confirmPath) || fullPath.includes(confirmPath)
+		// Check if this path requires approval per effective constraints (requires_approval_for)
+		const requiresConstraintApproval = permSvc.requiresApproval(
+			fullPath,
+			this.effectiveConstraints.requires_approval_for
 		);
+
+		// Check if this path requires confirmation via static config paths
+		const requiresConfirmation =
+			requiresConstraintApproval ||
+			ToolExecutionService.CONFIRM_WRITE_PATHS.some(
+				(confirmPath) => path.includes(confirmPath) || fullPath.includes(confirmPath)
+			);
 
 		if (requiresConfirmation) {
 			// Queue the write for confirmation at the end of pipeline
@@ -1409,6 +1443,14 @@ export class ToolExecutionService {
 
 		const fullPath = this.validateAndResolvePath(path, 'modify');
 
+		// Enforce effective permission constraints: block edits to forbidden paths.
+		// Same guard as `write` and `delete_file`; a child agent's narrowed
+		// forbidden_paths must apply to all mutating tools.
+		const permSvc = getPermissionPropagationService();
+		if (permSvc.isForbidden(fullPath, this.effectiveConstraints.forbidden_paths)) {
+			return `Cannot modify forbidden path: ${path}. This path is restricted by the active permission constraints.`;
+		}
+
 		if (!existsSync(fullPath)) {
 			return (
 				`File not found: ${path}\n\n` +
@@ -1448,6 +1490,14 @@ export class ToolExecutionService {
 
 		try {
 			const fullPath = this.validateAndResolvePath(path, 'delete');
+
+			// Enforce effective permission constraints: block deletes to forbidden paths
+			const permSvc = getPermissionPropagationService();
+			if (permSvc.isForbidden(fullPath, this.effectiveConstraints.forbidden_paths)) {
+				return Promise.resolve(
+					`Cannot delete forbidden path: ${path}. This path is restricted by the active permission constraints.`
+				);
+			}
 
 			if (!existsSync(fullPath)) {
 				return Promise.resolve(`File not found: ${path} (nothing to delete)`);
@@ -1603,22 +1653,35 @@ export class ToolExecutionService {
 		try {
 			const { stderr, stdout } = await execAsync(command, {
 				cwd: this.workingDir,
-				env: { ...credentialGuard.sanitiseEnvironment(process.env), PATH: this.buildAugmentedPath() },
+				env: { ...credentialGuard.sanitizeEnvironment(process.env), PATH: this.buildAugmentedPath() },
 				timeout: timeoutMs
 			});
 
 			const rawOutput = stdout + (stderr ? `\nStderr: ${stderr}` : '');
 			const output = credentialGuard.scanOutput(rawOutput);
 
-			return truncateTerminalOutput(output) || 'Command completed successfully (no output)';
+			const statsBefore = getCompressionStats();
+			const compressed = compressTerminalOutput(command, output);
+			const statsAfter = getCompressionStats();
+			const filterSavedChars =
+				statsAfter.inputChars - statsBefore.inputChars - (statsAfter.outputChars - statsBefore.outputChars);
+			if (filterSavedChars > 0) {
+				getMetricsCollector().incrementCounter('compression.terminal.saved_chars', filterSavedChars);
+			}
+			return compressed || 'Command completed successfully (no output)';
 		} catch (error) {
 			const execError = error as { code?: number; stderr?: string; stdout?: string };
-			const output = [execError.stdout, execError.stderr].filter(Boolean).join('');
+			const rawOutput = [execError.stdout, execError.stderr].filter(Boolean).join('');
+			// Redact before either returning guidance or throwing — both surface
+			// directly to the LLM and an unredacted credential here is a leak.
+			const safeOutput = credentialGuard.scanOutput(rawOutput);
 
 			const guidance = exitCodeOneGuidance(execError.code, command);
 			if (guidance) return guidance;
 
-			throw new Error(`Command failed: ${truncateTerminalOutput(output) || (error as Error).message}`);
+			throw new Error(
+				`Command failed: ${compressTerminalOutput(command, safeOutput) || credentialGuard.scanOutput((error as Error).message)}`
+			);
 		}
 	}
 
@@ -1759,10 +1822,6 @@ function truncateMcpOutput(output: unknown): string {
 }
 
 /**
- * Truncate terminal command output to MAX_TERMINAL_OUTPUT_CHARS using head+tail,
- * so the LLM sees both the beginning (command context) and the end (summary/errors).
- */
-/**
  * Returns true if a command is a search tool that exits with code 1 to signal
  * "no matches found" rather than an actual error.
  *
@@ -1809,18 +1868,6 @@ export function isExploratoryExitCode(command: string): boolean {
 	if (/^cd\b/.test(trimmed)) return true;
 
 	return false;
-}
-
-function truncateTerminalOutput(output: string): string {
-	if (output.length <= MAX_TERMINAL_OUTPUT_CHARS) return output;
-	const HEAD = Math.floor(MAX_TERMINAL_OUTPUT_CHARS * 0.8);
-	const TAIL = MAX_TERMINAL_OUTPUT_CHARS - HEAD;
-	const omitted = output.length - HEAD - TAIL;
-	return (
-		output.substring(0, HEAD) +
-		`\n\n[... ${omitted} characters omitted ...]\n\n` +
-		output.substring(output.length - TAIL)
-	);
 }
 
 /**

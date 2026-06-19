@@ -5,7 +5,7 @@
 import type { CommandDefinition, CommandMetadata } from 'types/command.types';
 
 import { getLogger } from 'output/logger';
-import { readFile } from 'utils/file-utils';
+import { fileExists, readFile } from 'utils/file-utils';
 import { parseMarkdownWithFrontmatter } from 'utils/yaml-parser';
 
 import { commandFileExists, getCommandFilePath, listAvailableCommands, validateCommandName } from './command-discovery';
@@ -13,9 +13,30 @@ import { handleCommandLoadError, validateCommandMetadata } from './command-valid
 
 export class CommandLoader {
 	private cache: Map<string, CommandDefinition> = new Map();
+	private pluginByCommand: Map<string, string> = new Map();
+	private pluginDirs = new Set<string>();
 
 	constructor(private commandsDir?: string) {
 		// commandsDir is handled by the imported functions
+	}
+
+	/**
+	 * Register an additional command directory contributed by a plugin.
+	 */
+	private pendingPluginDirNames: Map<string, string> = new Map();
+
+	registerPluginDir(dir: string, pluginName?: string): void {
+		this.pluginDirs.add(dir);
+		if (pluginName !== undefined) {
+			this.pendingPluginDirNames.set(dir, pluginName);
+		}
+	}
+
+	/**
+	 * Return the plugin name that owns the given command, if known.
+	 */
+	getPluginFor(commandName: string): string | undefined {
+		return this.pluginByCommand.get(commandName);
 	}
 
 	/**
@@ -30,7 +51,7 @@ export class CommandLoader {
 			return this.cache.get(commandName)!;
 		}
 
-		const filePath = getCommandFilePath(commandName, this.commandsDir);
+		const filePath = this.resolveCommandFilePath(commandName);
 
 		try {
 			const content = await readFile(filePath);
@@ -54,11 +75,37 @@ export class CommandLoader {
 	}
 
 	/**
+	 * Resolve the file path for a command, checking plugin dirs if not in the primary dir.
+	 * Records the owning plugin name in pluginByCommand when the command is found in a plugin dir.
+	 */
+	private resolveCommandFilePath(commandName: string): string {
+		const primary = getCommandFilePath(commandName, this.commandsDir);
+		if (fileExists(primary)) return primary;
+
+		for (const pluginDir of this.pluginDirs) {
+			const candidate = getCommandFilePath(commandName, pluginDir);
+			if (fileExists(candidate)) {
+				const pluginName = this.pendingPluginDirNames.get(pluginDir);
+				if (pluginName !== undefined) {
+					this.pluginByCommand.set(commandName, pluginName);
+				}
+				return candidate;
+			}
+		}
+
+		return primary;
+	}
+
+	/**
 	 * Load all commands
 	 */
 	async loadAllCommands(): Promise<Map<string, CommandDefinition>> {
 		const logger = getLogger();
-		const commandNames = await listAvailableCommands(this.commandsDir);
+		const primaryNames = await listAvailableCommands(this.commandsDir);
+		const pluginNames = (
+			await Promise.all([...this.pluginDirs].map((dir) => listAvailableCommands(dir).catch(() => [] as string[])))
+		).flat();
+		const commandNames = [...new Set([...pluginNames, ...primaryNames])];
 
 		// Load all commands in parallel
 		const commandEntries = await Promise.all(
@@ -82,19 +129,26 @@ export class CommandLoader {
 	}
 
 	/**
-	 * List available command names
+	 * List available command names from primary and plugin directories.
 	 */
 	async listCommands(): Promise<string[]> {
-		return listAvailableCommands(this.commandsDir);
+		const primary = await listAvailableCommands(this.commandsDir);
+		const plugin = (
+			await Promise.all([...this.pluginDirs].map((dir) => listAvailableCommands(dir).catch(() => [] as string[])))
+		).flat();
+		return [...new Set([...plugin, ...primary])];
 	}
 
 	/**
-	 * Check if a command exists
+	 * Check if a command exists across primary and plugin directories.
 	 */
 	async commandExists(commandName: string): Promise<boolean> {
-		// Validate command name for security
 		validateCommandName(commandName);
-		return commandFileExists(commandName, this.commandsDir);
+		if (await commandFileExists(commandName, this.commandsDir)) return true;
+		for (const dir of this.pluginDirs) {
+			if (await commandFileExists(commandName, dir).catch(() => false)) return true;
+		}
+		return false;
 	}
 
 	/**

@@ -1,0 +1,16 @@
+{
+	"hooks": {
+		"PreToolUse": [
+			{
+				"matcher": "^run_terminal_cmd$",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "bash {pluginDir}/hooks/rtk-rewrite.sh",
+						"timeout": 3000
+					}
+				]
+			}
+		]
+	}
+}

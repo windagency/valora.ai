@@ -1,0 +1,9 @@
+[
+	{ "domain": "cli", "score": 72, "lastUpdated": "2026-05-06" },
+	{ "domain": "executor", "score": 68, "lastUpdated": "2026-05-06" },
+	{ "domain": "llm", "score": 75, "lastUpdated": "2026-05-06" },
+	{ "domain": "mcp", "score": 70, "lastUpdated": "2026-05-06" },
+	{ "domain": "memory", "score": 78, "lastUpdated": "2026-05-06" },
+	{ "domain": "plugins", "score": 65, "lastUpdated": "2026-05-06" },
+	{ "domain": "session", "score": 73, "lastUpdated": "2026-05-06" }
+]

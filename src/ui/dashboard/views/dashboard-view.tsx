@@ -8,6 +8,7 @@ import type { DashboardData } from 'ui/dashboard/types';
 
 import { ActiveSessionsPanel } from 'ui/dashboard/panels/active-sessions-panel';
 import { BackgroundTasksPanel } from 'ui/dashboard/panels/background-tasks-panel';
+import { DriftPanel } from 'ui/dashboard/panels/drift-panel';
 import { MetricsSummaryPanel } from 'ui/dashboard/panels/metrics-summary-panel';
 import { RecentCommandsPanel } from 'ui/dashboard/panels/recent-commands-panel';
 import { MCPMetricsPanel } from 'ui/dashboard/panels/server-metrics-panel';
@@ -16,10 +17,9 @@ import { WorktreeDiagramPanel } from 'ui/dashboard/panels/worktree-diagram-panel
 import { getTUIAdapter } from 'ui/tui-adapter.interface';
 
 const tui = getTUIAdapter();
-// eslint-disable-next-line @typescript-eslint/naming-convention -- Box and Text are React components which require PascalCase
+
 const { Box } = tui;
 
-// eslint-disable-next-line @typescript-eslint/naming-convention -- React components must use PascalCase
 export function DashboardView({
 	data,
 	selectedIndex
@@ -53,6 +53,9 @@ export function DashboardView({
 					)}
 					<Box marginTop={1}>
 						<RecentCommandsPanel commands={data.recentCommands} />
+					</Box>
+					<Box marginTop={1}>
+						<DriftPanel />
 					</Box>
 				</Box>
 			</Box>

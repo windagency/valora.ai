@@ -1,0 +1,71 @@
+name: Security Vulnerability Report
+description: Report a security vulnerability in Valora (please redact all credentials before submitting)
+title: '[Security] '
+labels: ['security', 'triage']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ⚠️ **Do not include real API keys, tokens, passwords, or secrets in this report.**
+        Redact any sensitive values as `REDACTED` before submitting.
+
+        For critical or sensitive vulnerabilities, please report privately by e-mail to
+        **damien@wind-agency.com** instead of using this public template.
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      options:
+        - Critical (immediate impact, exploit available)
+        - High (significant impact, no public exploit)
+        - Medium (limited impact or requires specific conditions)
+        - Low (minimal impact)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: Category
+      options:
+        - Silent agent failure (action taken without required human approval)
+        - Prompt injection bypass (safety constraint overridden via crafted input)
+        - Credential leakage (secrets in logs, traces, or output)
+        - Unintended destructive action (deletion, force-push, migration without approval)
+        - Permission escalation between agents
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: Describe the vulnerability and its potential impact. Redact any real credentials.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: Provide reproduction steps or a proof-of-concept. **Remove all real secrets.**
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Valora Version
+      placeholder: 'e.g. 2.5.0'
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: redaction
+    attributes:
+      label: Redaction Confirmation
+      options:
+        - label: I have removed all real API keys, tokens, passwords, and secrets from this report
+          required: true

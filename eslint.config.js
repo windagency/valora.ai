@@ -1,3 +1,4 @@
+import { includeIgnoreFile } from '@eslint/compat';
 import js from '@eslint/js';
 import tseslint from '@typescript-eslint/eslint-plugin';
 import tsparser from '@typescript-eslint/parser';
@@ -9,26 +10,80 @@ import prettierPlugin from 'eslint-plugin-prettier';
 import sortPlugin from 'eslint-plugin-sort';
 import sortDestructureKeys from 'eslint-plugin-sort-destructure-keys';
 import unusedImports from 'eslint-plugin-unused-imports';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+const LAYER_ORDER = ['types', 'config', 'repo', 'services', 'runtime', 'ui'];
+
+const importLayerRemedyRule = {
+	create(context) {
+		function detectLayer(segment) {
+			return LAYER_ORDER.find((layer) => segment === layer);
+		}
+		function layerIndex(importPath) {
+			const segment = importPath.split('/')[0];
+			const layer = detectLayer(segment ?? '');
+			return layer !== undefined ? LAYER_ORDER.indexOf(layer) : -1;
+		}
+		function fileLayerIndex(filename) {
+			for (const layer of LAYER_ORDER) {
+				if (filename.includes(`/src/${layer}/`) || filename.includes(`/${layer}/`)) {
+					return LAYER_ORDER.indexOf(layer);
+				}
+			}
+			return -1;
+		}
+		return {
+			ImportDeclaration(node) {
+				const importPath = node.source.value;
+				const importIdx = layerIndex(importPath);
+				const fileIdx = fileLayerIndex(context.filename);
+				if (importIdx === -1 || fileIdx === -1) return;
+				if (importIdx <= fileIdx) return;
+				const suggested =
+					importPath
+						.split('/')
+						.pop()
+						?.replace(/\.(service|repo|runtime|ui)$/, '') ?? 'shared';
+				context.report({
+					data: { importPath, layer: LAYER_ORDER[fileIdx], suggested },
+					messageId: 'layerViolation',
+					node
+				});
+			}
+		};
+	},
+	meta: {
+		docs: {
+			description: 'Enforce forward-only layer imports and surface agent-targeted remediation instructions'
+		},
+		messages: {
+			layerViolation:
+				"Layer violation: '{{importPath}}' is a higher-layer module imported from '{{layer}}' layer. " +
+				"Fix: extract the shared contract into 'types/{{suggested}}.types.ts' and import from there. " +
+				'Allowed direction: types → config → repo → services → runtime → ui. ' +
+				'Cross-cutting concerns must enter through Providers only.'
+		},
+		schema: [],
+		type: 'problem'
+	}
+};
 
 export default [
+	includeIgnoreFile(path.resolve(__dirname, '.gitignore')),
 	js.configs.recommended,
 	perfectionist.configs['recommended-natural'],
 	{
 		ignores: [
-			'.pnpm-store/**',
-			'.stryker-tmp/**',
-			'coverage/**',
-			'dist/**',
-			'node_modules/**',
-			'reportss/**',
-			'tests/**',
-			'__tests__/**',
 			'**/*.spec.ts',
 			'**/*.test.ts',
 			'**/*.config.ts',
 			'**/*.config.cjs',
 			'**/*.config.js',
-			'**/*.config.mjs'
+			'**/*.config.mjs',
+			'**/__tests__/fixtures/**'
 		]
 	},
 	// Base config for all files (no type-checking)
@@ -40,7 +95,13 @@ export default [
 				__dirname: 'readonly',
 				__filename: 'readonly',
 				afterAll: 'readonly',
+				afterEach: 'readonly',
 				beforeAll: 'readonly',
+				beforeEach: 'readonly',
+				describe: 'readonly',
+				expect: 'readonly',
+				it: 'readonly',
+				test: 'readonly',
 				Buffer: 'readonly',
 				clearInterval: 'readonly',
 				clearTimeout: 'readonly',
@@ -48,9 +109,13 @@ export default [
 				global: 'readonly',
 				NodeJS: 'readonly',
 				process: 'readonly',
+				AbortSignal: 'readonly',
+				fetch: 'readonly',
+				Response: 'readonly',
 				require: 'readonly',
 				setInterval: 'readonly',
 				setTimeout: 'readonly',
+				TextDecoder: 'readonly',
 				vi: 'readonly'
 			},
 			parser: tsparser,
@@ -63,7 +128,12 @@ export default [
 			prettier: prettierPlugin,
 			sort: sortPlugin,
 			'sort-destructure-keys': sortDestructureKeys,
-			'unused-imports': unusedImports
+			'unused-imports': unusedImports,
+			'valora-local': {
+				rules: {
+					'import-layer-remedy': importLayerRemedyRule
+				}
+			}
 		},
 		rules: {
 			// ESLint recommended rules
@@ -218,7 +288,7 @@ export default [
 					],
 					ignoreCase: true,
 					internalPattern: [
-						'^(?:cleanup|cli|config|di|executor|exploration|llm|mcp|output|services|session|src|types|ui|utils)/.+'
+						'^(?:analysis|ast|cleanup|cli|config|di|executor|exploration|lint|llm|mcp|observability|output|services|session|src|types|ui|utils)/.+'
 					],
 					maxLineLength: undefined,
 					newlinesBetween: 'always',
@@ -328,6 +398,9 @@ export default [
 				}
 			],
 
+			// Layer direction enforcement with agent-targeted remediation text
+			'valora-local/import-layer-remedy': 'error',
+
 			// Prettier rules (via eslint-config-prettier)
 			...prettierConfig.rules,
 
@@ -407,11 +480,15 @@ export default [
 					selector: ['class', 'interface', 'typeAlias']
 				},
 				{
-					format: ['camelCase'],
-					selector: ['function', 'method']
+					format: ['camelCase', 'PascalCase'],
+					selector: 'function'
 				},
 				{
-					format: ['camelCase', 'UPPER_CASE'],
+					format: ['camelCase'],
+					selector: 'method'
+				},
+				{
+					format: ['camelCase', 'UPPER_CASE', 'PascalCase'],
 					selector: 'variable'
 				},
 				{
@@ -458,6 +535,44 @@ export default [
 					allowString: false
 				}
 			]
+		}
+	},
+	// Scripts live outside src/ so allow parent-relative imports to reach src/
+	{
+		files: ['scripts/**/*.{ts,js,mjs}'],
+		rules: {
+			'no-restricted-imports': 'off'
+		}
+	},
+	// Workspace packages: parent-relative imports reach sibling subdirectories
+	// inside the same package, which is the conventional pattern. The
+	// host-wide rule is to prevent host code from reaching across module
+	// boundaries; inside a single package the boundary is the package itself.
+	{
+		files: ['packages/*/src/**/*.{ts,tsx}'],
+		rules: {
+			'no-restricted-imports': 'off'
+		}
+	},
+	// Type-only declaration files in shared packages: parameter names are
+	// documentation, not runtime variables. The unused-args rule fights
+	// against meaningful naming in interface signatures.
+	{
+		files: [
+			'packages/valora-plugin-memory-vault/src/embeddings/embedder.port.ts',
+			'packages/valora-plugin-memory-vault/src/embeddings/llm-provider-embedder.ts',
+			'packages/valora-plugin-memory-vault/src/embeddings/vector-store.ts',
+			'packages/valora-plugin-memory-vault/src/vault/vault-store.ts',
+			'packages/valora-plugin-memory-vault/src/vault/vault-index.ts',
+			'packages/valora-plugin-memory-vault/src/manager.ts',
+			'packages/valora-plugin-memory-vault/src/store.ts',
+			'packages/valora-plugin-memory-vault/src/vault-memory-provider.ts',
+			'packages/valora-runtime/src/logger.ts',
+			'packages/valora-runtime/src/safe-exec.ts'
+		],
+		rules: {
+			'no-unused-vars': 'off',
+			'@typescript-eslint/no-unused-vars': 'off'
 		}
 	}
 ];

@@ -1,0 +1,3 @@
+src/analysis.types.ts(1,33): error TS2307: Cannot find module 'tslib' or its corresponding type declarations.
+═══════════════════════════════════════
+TypeScript: 1 errors in 1 files

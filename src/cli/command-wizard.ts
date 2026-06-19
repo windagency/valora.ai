@@ -6,7 +6,7 @@
 
 import { getColorAdapter } from 'output/color-adapter.interface';
 import { getHeaderFormatter } from 'output/header-formatter';
-import { getPromptAdapter } from 'ui/prompt-adapter.interface';
+import { getPromptAdapter, type PromptQuestion } from 'ui/prompt-adapter.interface';
 
 import type {
 	BaseWizardAnswers,
@@ -143,7 +143,7 @@ export class CommandWizard {
 							{ name: 'Anthropic', value: 'anthropic' },
 							{ name: 'OpenAI', value: 'openai' },
 							{ name: 'Google', value: 'google' },
-							{ name: 'Local (Ollama, LM Studio, etc.)', value: 'local' }
+							{ name: 'Local (OpenAI-compatible server)', value: 'local' }
 						],
 						default: 'cursor',
 						message: 'AI Provider:',
@@ -236,8 +236,7 @@ export class CommandWizard {
 				console.log(color.bold(`\n  Step ${index + 1} of ${config.steps.length}: ${step.message}`));
 
 				try {
-					// eslint-disable-next-line @typescript-eslint/no-explicit-any
-					const answer = await prompt.prompt([step as any]);
+					const answer = await prompt.prompt([step as unknown as PromptQuestion]);
 					const answerRecord = answer as Record<string, unknown>;
 					answers[step.name] = answerRecord[step.name];
 					return answers;
@@ -331,7 +330,7 @@ ${color.green('  $ ' + config.preview(answers))}
 						{ name: 'Cursor', value: 'cursor' },
 						{ name: 'Anthropic', value: 'anthropic' },
 						{ name: 'OpenAI', value: 'openai' },
-						{ name: 'Local (Ollama, LM Studio, etc.)', value: 'local' }
+						{ name: 'Local (OpenAI-compatible server)', value: 'local' }
 					],
 					default: '',
 					message: 'Provider override (optional):',

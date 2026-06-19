@@ -1,6 +1,10 @@
+---
+updated: 2026-05-07
+---
+
 # Developer Guide
 
-Technical documentation for developers contributing to or extending Valora.
+> Technical documentation for contributors to and extenders of Valora.
 
 ## Contents
 
@@ -12,6 +16,7 @@ Technical documentation for developers contributing to or extending Valora.
 | [Code Quality](./code-quality.md)                       | Coding standards and enforcement       |
 | [Code Quality Guidelines](./CODE-QUALITY-GUIDELINES.md) | Detailed quality reference             |
 | [Language Convention](./LANGUAGE_CONVENTION.md)         | Language usage rules for docs and code |
+| [Writing Plugins](./writing-plugins.md)                 | Build and distribute Valora plugins    |
 
 ## Quick Setup
 

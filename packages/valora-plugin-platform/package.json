@@ -1,0 +1,48 @@
+{
+	"name": "@windagency/valora-plugin-platform",
+	"version": "1.0.0",
+	"description": "Platform Engineer agent for Valora (cloud-native architecture, Kubernetes, CI/CD, infrastructure reliability).",
+	"keywords": [
+		"valora",
+		"valora-plugin",
+		"ai",
+		"agent",
+		"platform",
+		"kubernetes",
+		"devops",
+		"ci-cd",
+		"infrastructure",
+		"cloud",
+		"workflow"
+	],
+	"author": "Damien TIVELET <damien@wind-agency.com>",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/windagency/valora.ai"
+	},
+	"license": "MIT",
+	"type": "module",
+	"engines": {
+		"node": ">=22.0.0"
+	},
+	"packageManager": "pnpm@10.19.0",
+	"volta": {
+		"node": "22.21.0",
+		"pnpm": "10.19.0"
+	},
+	"scripts": {
+		"build": "true",
+		"clean": "true",
+		"beautify": "prettier --check \"**/*.+(js|jsx|ts|tsx|json|md|yml|yaml)\"",
+		"beautify:fix": "prettier --write \"**/*.+(js|jsx|ts|tsx|json|md|yml|yaml)\"",
+		"format": "pnpm beautify:fix",
+		"test": "true"
+	},
+	"files": [
+		"valora-plugin.json",
+		"agents"
+	],
+	"peerDependencies": {
+		"@windagency/valora": ">=0.1.0"
+	}
+}

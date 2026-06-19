@@ -1,0 +1,10 @@
+{
+	"name": "valora-plugin-rtk",
+	"version": "1.0.0",
+	"description": "RTK (Rust Token Killer) integration for Valora — transparently prepends rtk to known-noisy CLI tools, reducing LLM token consumption by 60–90%.",
+	"engines": { "valora": ">=0.1.0" },
+	"contributes": ["hooks", "code"],
+	"permissions": ["shell-hooks", "code-exec", "fs-write", "network"],
+	"codeEntrypoint": "dist/index.js",
+	"requiresBinary": [{ "name": "jq", "version": ">=1.6" }]
+}

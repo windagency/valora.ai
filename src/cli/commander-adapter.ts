@@ -76,17 +76,13 @@ export class CommanderCommandAdapter implements CommanderCommandContract {
 		fn?: (value: string, previous: T) => T,
 		defaultValue?: T
 	): CommandAdapter {
-		// Use any[] here because we're building a dynamic argument list for Commander's variadic method
-		// The actual type safety is enforced by the CommandAdapter interface
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		const args: [string, ...any[]] = [
-			name,
-			...(description || fn || defaultValue !== undefined ? [description ?? ''] : []),
-			...(fn ? [fn] : []),
-			...(fn && defaultValue !== undefined ? [defaultValue] : !fn && defaultValue !== undefined ? [defaultValue] : [])
-		];
-
-		this.cmd.argument(...args);
+		const variant = fn ? 'fn' : description !== undefined || defaultValue !== undefined ? 'extra' : 'simple';
+		const INVOKERS = {
+			extra: () => this.cmd.argument(name, description ?? '', defaultValue),
+			fn: () => this.cmd.argument(name, description ?? '', fn!, defaultValue),
+			simple: () => this.cmd.argument(name)
+		};
+		INVOKERS[variant]();
 		return this;
 	}
 
@@ -104,6 +100,11 @@ export class CommanderCommandAdapter implements CommanderCommandContract {
 		return this.cmd;
 	}
 
+	hook(event: 'postAction' | 'preAction', fn: () => Promise<void> | void): CommandAdapter {
+		this.cmd.hook(event, fn as Parameters<CommanderCommand['hook']>[1]);
+		return this;
+	}
+
 	name(str: string): CommandAdapter {
 		this.cmd.name(str);
 		return this;
@@ -115,20 +116,15 @@ export class CommanderCommandAdapter implements CommanderCommandContract {
 		fn?: ((value: string, previous: T) => T) | T,
 		defaultValue?: T
 	): CommandAdapter {
-		const isFn = typeof fn === 'function';
-		const hasValue = fn !== undefined || defaultValue !== undefined;
-
-		// Use any[] here because we're building a dynamic argument list for Commander's variadic method
-		// The actual type safety is enforced by the CommandAdapter interface
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		const args: [string, ...any[]] = [
-			flags,
-			...(description || hasValue ? [description ?? ''] : []),
-			...(isFn ? [fn as (value: string, previous: T) => T] : fn !== undefined ? [fn as T] : []),
-			...(isFn && defaultValue !== undefined ? [defaultValue] : [])
-		];
-
-		this.cmd.option(...args);
+		const variant =
+			typeof fn === 'function' ? 'fn' : fn !== undefined ? 'value' : description !== undefined ? 'desc' : 'flags';
+		const INVOKERS = {
+			desc: () => this.cmd.option(flags, description!),
+			flags: () => this.cmd.option(flags),
+			fn: () => this.cmd.option(flags, description ?? '', fn as (value: string, previous: T) => T, defaultValue),
+			value: () => this.cmd.option(flags, description ?? '', fn as boolean | string | string[])
+		};
+		INVOKERS[variant]();
 		return this;
 	}
 
@@ -204,3 +200,5 @@ export function createCommand(nameAndArgs?: string): CommandAdapter {
 export function createOption(flags: string, description?: string): OptionAdapter {
 	return new CommanderOptionAdapter(flags, description);
 }
+
+export type { Command } from 'commander';

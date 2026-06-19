@@ -1,0 +1,25 @@
+import type { PluginAPI } from '@windagency/valora-plugin-api';
+
+import {
+	filterBiome,
+	filterEslint,
+	filterPackageManager,
+	filterPrettier,
+	filterTestRunner,
+	filterTsc
+} from './strategies.js';
+
+export function register(api: PluginAPI): void {
+	api.compression.registerStrategy('tsc', filterTsc);
+	api.compression.registerStrategy('eslint', filterEslint);
+	api.compression.registerStrategy('jest', filterTestRunner);
+	api.compression.registerStrategy('vitest', filterTestRunner);
+	api.compression.registerStrategy('pnpm', filterPackageManager);
+	api.compression.registerStrategy('npm', filterPackageManager);
+	api.compression.registerStrategy('npx', filterPackageManager);
+	api.compression.registerStrategy('yarn', filterPackageManager);
+	api.compression.registerStrategy('prettier', filterPrettier);
+	api.compression.registerStrategy('bun', filterPackageManager);
+	api.compression.registerStrategy('bunx', filterPackageManager);
+	api.compression.registerStrategy('biome', filterBiome);
+}

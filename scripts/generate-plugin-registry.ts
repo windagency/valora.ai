@@ -1,0 +1,77 @@
+#!/usr/bin/env node
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'fs';
+import { dirname, join, relative, resolve } from 'path';
+import { fileURLToPath } from 'url';
+
+import { computeIntegrity } from './compute-registry-integrity.ts';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const repoRoot = resolve(__dirname, '..');
+const packagesDir = join(repoRoot, 'packages');
+const outputPath = join(repoRoot, 'data', 'plugins', 'registry.json');
+
+// When set, integrity is computed by downloading from the live registry (matches
+// exactly what the installer downloads). Required when pnpm publish rewrites JSON
+// field order — otherwise pnpm pack locally and npm pack from registry diverge.
+const registryUrl = process.env['VALORA_NPM_REGISTRY_URL'];
+
+interface PluginManifest {
+	contributes?: string[];
+	description?: string;
+	name?: string;
+	version?: string;
+}
+
+interface RegistryEntry {
+	contributes: string[];
+	description: string;
+	integrity: string;
+	name: string;
+	package: string;
+	path: string;
+	version: string;
+}
+
+const entries: RegistryEntry[] = [];
+
+for (const dirName of readdirSync(packagesDir)) {
+	const packageDir = join(packagesDir, dirName);
+	const manifestPath = join(packageDir, 'valora-plugin.json');
+	if (!existsSync(manifestPath)) continue;
+
+	let manifest: PluginManifest;
+	try {
+		manifest = JSON.parse(readFileSync(manifestPath, 'utf-8')) as PluginManifest;
+	} catch {
+		console.warn(`Skipping ${dirName}: could not parse valora-plugin.json`);
+		continue;
+	}
+
+	const packageName = `@windagency/${dirName}`;
+
+	let integrity: string;
+	try {
+		integrity = computeIntegrity(packageDir, packageName, registryUrl);
+	} catch (err) {
+		console.warn(`Skipping ${dirName}: failed to compute integrity (${(err as Error).message})`);
+		continue;
+	}
+
+	entries.push({
+		contributes: manifest.contributes ?? [],
+		description: manifest.description ?? '',
+		integrity,
+		name: dirName,
+		package: packageName,
+		// Relative to the registry file so it resolves correctly regardless of CWD
+		path: relative(dirname(outputPath), packageDir),
+		version: manifest.version ?? '0.0.0'
+	});
+}
+
+entries.sort((a, b) => a.name.localeCompare(b.name));
+
+mkdirSync(dirname(outputPath), { recursive: true });
+writeFileSync(outputPath, JSON.stringify(entries, null, '\t') + '\n');
+
+console.log(`Written ${String(entries.length)} entries (with sha256 integrity) to data/plugins/registry.json`);

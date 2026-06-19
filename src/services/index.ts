@@ -22,13 +22,17 @@ export {
 	GitStashProtectionService
 } from './git-stash-protection.service';
 export { getIdempotencyStore, IdempotencyStoreService, resetIdempotencyStore } from './idempotency-store.service';
+export { TaskClassifierService } from './task-classifier.service';
 export {
 	getMemoryConsolidation,
 	MemoryConsolidationService,
 	resetMemoryConsolidation
-} from './memory-consolidation.service';
-export { getMemoryExtraction, MemoryExtractionService, resetMemoryExtraction } from './memory-extraction.service';
-export { TaskClassifierService } from './task-classifier.service';
+} from '@windagency/valora-plugin-memory-vault';
+export {
+	getMemoryExtraction,
+	MemoryExtractionService,
+	resetMemoryExtraction
+} from '@windagency/valora-plugin-memory-vault';
 export {
 	DomainKeywordRegistry,
 	getDomainKeywordRegistry,

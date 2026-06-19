@@ -8,6 +8,8 @@
  * - Context isolation to prevent cross-command interference
  */
 
+import { getPermissionPropagationService } from 'security/permission-propagation.service';
+
 import type {
 	CommandIsolationMode,
 	CommandResult,
@@ -166,15 +168,25 @@ export class CommandIsolationExecutor {
 			baseContext.getVariableResolver().getContext().context
 		);
 
+		// Derive child permissions — child inherits all parent restrictions (never gains scope)
+		const derivedConstraints = getPermissionPropagationService().derive(
+			baseContext.effectiveConstraints,
+			{},
+			baseContext.delegationDepth
+		);
+
 		// Create new execution context with isolated variable resolver
 		const isolatedContext = new ExecutionContext(
 			{
+				agentConstraints: derivedConstraints,
 				agentRole: baseContext.agentRole,
 				args: baseContext.args,
 				commandName: `${commandName}:${stage.stage}`,
+				delegationDepth: derivedConstraints.delegationDepth,
 				flags: baseContext.flags,
 				initialStageOutputs: { [stage.stage]: mockInputs },
 				knowledgeFiles: baseContext.knowledgeFiles,
+				parentAgentRole: baseContext.agentRole,
 				provider: baseContext.provider,
 				sessionContext: baseContext.getVariableResolver().getContext().context
 			},
@@ -200,13 +212,23 @@ export class CommandIsolationExecutor {
 			{} as Record<string, Record<string, unknown>>
 		);
 
+		// Derive child permissions — child inherits all parent restrictions (never gains scope)
+		const derivedConstraints = getPermissionPropagationService().derive(
+			baseContext.effectiveConstraints,
+			{},
+			baseContext.delegationDepth
+		);
+
 		return new ExecutionContext({
+			agentConstraints: derivedConstraints,
 			agentRole: baseContext.agentRole,
 			args: baseContext.args,
 			commandName,
+			delegationDepth: derivedConstraints.delegationDepth,
 			flags: baseContext.flags,
 			initialStageOutputs: initialOutputs,
 			knowledgeFiles: baseContext.knowledgeFiles,
+			parentAgentRole: baseContext.agentRole,
 			provider: baseContext.provider,
 			sessionContext: baseContext.getVariableResolver().getContext().context
 		});

@@ -7,12 +7,12 @@ import React from 'react';
 import type { OptimizationMetrics, Session, SessionCommand } from 'types/session.types';
 
 import { getTUIAdapter } from 'ui/tui-adapter.interface';
+import { getMetricsCollector } from 'utils/metrics-collector';
 
 const tui = getTUIAdapter();
-// eslint-disable-next-line @typescript-eslint/naming-convention -- Box and Text are React components which require PascalCase
+
 const { Box, Text } = tui;
 
-// eslint-disable-next-line @typescript-eslint/naming-convention -- React components must use PascalCase
 export function OptimizationPanel({ session }: { session: Session }): React.JSX.Element {
 	const commandsWithMetrics = session.commands.filter((cmd) => cmd.optimization_metrics);
 
@@ -77,8 +77,64 @@ export function OptimizationPanel({ session }: { session: Session }): React.JSX.
 						</>
 					)}
 				</Box>
+				<CompressionStatsRows />
 			</Box>
 		</Box>
+	);
+}
+
+function CompressionHistoryRow({ dedup, pruned }: { dedup: number; pruned: number }): null | React.JSX.Element {
+	if (pruned === 0 && dedup === 0) return null;
+	return (
+		<Box>
+			<Text dimColor>History: </Text>
+			<Text bold>{pruned} tool results pruned</Text>
+			<Text dimColor>, </Text>
+			<Text bold>{dedup} deduplicated</Text>
+		</Box>
+	);
+}
+
+function CompressionOutputRow({
+	ratioPct,
+	savedCostUsd,
+	savedTokens
+}: {
+	ratioPct: null | number;
+	savedCostUsd: number;
+	savedTokens: number;
+}): null | React.JSX.Element {
+	if (ratioPct === null && savedTokens === 0) return null;
+	return (
+		<Box>
+			<Text dimColor>Output compression: </Text>
+			<Text bold color="green">
+				{ratioPct !== null ? `${ratioPct}%` : '—'} saved
+			</Text>
+			{savedTokens > 0 && (
+				<Text dimColor>
+					{' '}
+					(~{(savedTokens / 1000).toFixed(1)}k tokens, ~${savedCostUsd.toFixed(4)})
+				</Text>
+			)}
+		</Box>
+	);
+}
+
+function CompressionStatsRows(): React.JSX.Element {
+	const snapshot = getMetricsCollector().getSnapshot();
+	const ratioGauge = snapshot.gauges.find((g) => g.name === 'compression.terminal.ratio');
+	const savedTokens = snapshot.gauges.find((g) => g.name === 'compression.terminal.estimated_saved_tokens')?.value ?? 0;
+	const savedCostUsd =
+		snapshot.gauges.find((g) => g.name === 'compression.terminal.estimated_saved_cost_usd')?.value ?? 0;
+	const prunedMessages = snapshot.counters.find((c) => c.name === 'compression.history.pruned_messages')?.value ?? 0;
+	const dedupHits = snapshot.counters.find((c) => c.name === 'compression.dedup.hits')?.value ?? 0;
+	const ratioPct = ratioGauge ? Math.round(ratioGauge.value * 100) : null;
+	return (
+		<>
+			<CompressionOutputRow ratioPct={ratioPct} savedCostUsd={savedCostUsd} savedTokens={savedTokens} />
+			<CompressionHistoryRow dedup={dedupHits} pruned={prunedMessages} />
+		</>
 	);
 }
 
@@ -88,7 +144,6 @@ function getComplexityColor(score: number): string {
 	return 'green';
 }
 
-// eslint-disable-next-line @typescript-eslint/naming-convention -- React components must use PascalCase
 function OptimizationDetailsRow({ m }: { m: OptimizationMetrics }): React.JSX.Element {
 	return (
 		<Box>
@@ -115,7 +170,6 @@ function OptimizationDetailsRow({ m }: { m: OptimizationMetrics }): React.JSX.El
 	);
 }
 
-// eslint-disable-next-line @typescript-eslint/naming-convention -- React components must use PascalCase
 function OptimizationModeRow({ m }: { m: OptimizationMetrics }): React.JSX.Element {
 	return (
 		<Box>
@@ -132,7 +186,6 @@ function OptimizationModeRow({ m }: { m: OptimizationMetrics }): React.JSX.Eleme
 	);
 }
 
-// eslint-disable-next-line @typescript-eslint/naming-convention -- React components must use PascalCase
 function OptimizationRow({ cmd, m }: { cmd: SessionCommand; m: OptimizationMetrics }): React.JSX.Element {
 	return (
 		<Box flexDirection="column" marginBottom={1}>

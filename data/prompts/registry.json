@@ -2222,6 +2222,44 @@
 				"requires": ["documentation.generate-feedback-report", "review.identify-improvement-areas"]
 			},
 			"inputs": []
+		},
+		"06_test.execute-pre-checks": {
+			"id": "06_test.execute-pre-checks",
+			"version": " 1.0.0",
+			"category": " test",
+			"experimental": true,
+			"name": " Execute Pre-Checks",
+			"description": " Detect the project ecosystem then run language-appropriate quality checks (type checking, linting, formatting, security audit, quick tests) in parallel",
+			"tags": ["pre-check", "linting", "type-checking", "security-audit", "multi-language"],
+			"agents": ["qa"],
+			"outputs": ["check_results", "issues_found", "auto_fixes_applied", "overall_status"],
+			"model_requirements": {
+				"min_context": 32000,
+				"recommended": ["claude-haiku-4.5", "claude-sonnet-4.6"]
+			},
+			"dependencies": {
+				"requires": ["context.use-modern-cli-tools"]
+			},
+			"inputs": []
+		},
+		"06_test.generate-precheck-report": {
+			"id": "06_test.generate-precheck-report",
+			"version": " 1.0.0",
+			"category": " test",
+			"experimental": true,
+			"name": " Generate Pre-Check Report",
+			"description": " Format pre-check results from any language ecosystem into a structured summary, detailed, or JSON report",
+			"tags": ["pre-check", "reporting", "quality-assessment", "multi-language"],
+			"agents": ["qa"],
+			"outputs": ["precheck_report", "recommendations"],
+			"model_requirements": {
+				"min_context": 16000,
+				"recommended": ["claude-haiku-4.5", "claude-sonnet-4.6"]
+			},
+			"dependencies": {
+				"requires": ["test.execute-pre-checks"]
+			},
+			"inputs": []
 		}
 	}
 }

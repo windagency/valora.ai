@@ -5,6 +5,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { DEFAULT_MAX_TOKENS } from 'config/constants';
+import { getProviderRegistry } from 'llm/registry';
 import { LLMCompletionOptions } from 'types/llm.types';
 import { MCPSamplingService } from 'types/mcp.types';
 
@@ -118,7 +119,6 @@ describe('CursorProvider', () => {
 			const result = await provider.complete(options);
 
 			expect(result.finish_reason).toBe('guided_completion');
-			expect(result.guidedCompletion).toBeDefined();
 			expect(result.guidedCompletion?.mode).toBe('guided');
 			expect(result.guidedCompletion?.systemPrompt).toContain('helpful assistant');
 			expect(result.guidedCompletion?.userPrompt).toContain('Hello');
@@ -248,7 +248,7 @@ describe('CursorProvider', () => {
 			const result = await provider.complete(options);
 
 			expect(result.finish_reason).toBe('guided_completion');
-			expect(result.guidedCompletion).toBeDefined();
+			expect(result.guidedCompletion?.mode).toBe('guided');
 			expect(result.content).toContain('CURSOR GUIDED COMPLETION MODE');
 		});
 
@@ -262,7 +262,7 @@ describe('CursorProvider', () => {
 			const result = await provider.complete(options);
 
 			expect(result.finish_reason).toBe('guided_completion');
-			expect(result.guidedCompletion).toBeDefined();
+			expect(result.guidedCompletion?.mode).toBe('guided');
 		});
 	});
 
@@ -279,7 +279,7 @@ describe('CursorProvider', () => {
 				chunks.push(chunk);
 			});
 
-			expect(result.guidedCompletion).toBeDefined();
+			expect(result.guidedCompletion?.mode).toBe('guided');
 			expect(chunks.length).toBe(1);
 			expect(chunks[0]).toContain('CURSOR GUIDED COMPLETION MODE');
 		});
@@ -298,5 +298,15 @@ describe('CursorProvider', () => {
 
 			expect(capturedChunk).toContain('CURSOR GUIDED COMPLETION MODE');
 		});
+	});
+});
+
+describe('CursorProvider — descriptor registration', () => {
+	it('registers a descriptor with label "Cursor"', () => {
+		expect(getProviderRegistry().getDescriptor('cursor')?.label).toBe('Cursor');
+	});
+
+	it('registers a descriptor with requiresApiKey: false', () => {
+		expect(getProviderRegistry().getDescriptor('cursor')?.requiresApiKey).toBe(false);
 	});
 });

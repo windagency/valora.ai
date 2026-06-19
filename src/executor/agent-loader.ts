@@ -8,16 +8,25 @@ import type { AgentDefinition, AgentMetadata } from 'types/agent.types';
 
 import { getLogger } from 'output/logger';
 import { ValidationError } from 'utils/error-handler';
-import { listFiles, readFile } from 'utils/file-utils';
+import { fileExists, listFiles, readFile } from 'utils/file-utils';
 import { getPackageDataDir } from 'utils/paths';
 import { parseMarkdownWithFrontmatter, validateRequiredFields, YamlParseError } from 'utils/yaml-parser';
 
 export class AgentLoader {
 	private agentsDir: string;
 	private cache: Map<string, AgentDefinition> = new Map();
+	private pluginDirs = new Set<string>();
 
 	constructor(agentsDir?: string) {
 		this.agentsDir = agentsDir ?? path.join(getPackageDataDir(), 'agents');
+	}
+
+	/**
+	 * Register an additional agent directory contributed by a plugin.
+	 * Plugin agents are available as fallbacks when the primary directory lacks the role.
+	 */
+	registerPluginDir(dir: string): void {
+		this.pluginDirs.add(dir);
 	}
 
 	/**
@@ -29,7 +38,7 @@ export class AgentLoader {
 			return this.cache.get(role)!;
 		}
 
-		const filePath = path.join(this.agentsDir, `${role}.md`);
+		const filePath = this.resolveAgentPath(role);
 
 		try {
 			const content = await readFile(filePath);
@@ -77,15 +86,32 @@ export class AgentLoader {
 	}
 
 	/**
+	 * Resolve the file path for an agent role, checking plugin dirs if not in the primary dir.
+	 */
+	private resolveAgentPath(role: string): string {
+		const primary = path.join(this.agentsDir, `${role}.md`);
+		if (fileExists(primary)) return primary;
+
+		for (const pluginDir of this.pluginDirs) {
+			const candidate = path.join(pluginDir, `${role}.md`);
+			if (fileExists(candidate)) return candidate;
+		}
+
+		return primary; // Preserve existing error path when role is not found
+	}
+
+	/**
 	 * Load all agents
 	 */
 	async loadAllAgents(): Promise<Map<string, AgentDefinition>> {
-		const files = await listFiles(this.agentsDir, '.md');
+		const allDirs = [this.agentsDir, ...this.pluginDirs];
+		const dirFileLists = await Promise.all(allDirs.map((dir) => listFiles(dir, '.md').catch(() => [] as string[])));
+		const allFiles = [...new Set(dirFileLists.flat())];
 		const logger = getLogger();
 
 		// Filter out template files and load agents in parallel
 		const agentEntries = await Promise.all(
-			files
+			allFiles
 				.filter((file) => !file.startsWith('_'))
 				.map(async (file) => {
 					const role = file.replace('.md', '');
@@ -108,11 +134,20 @@ export class AgentLoader {
 	}
 
 	/**
-	 * List available agent roles
+	 * List available agent roles from primary and plugin directories.
 	 */
 	async listAgents(): Promise<string[]> {
-		const files = await listFiles(this.agentsDir, '.md');
-		return files.filter((f) => !f.startsWith('_')).map((f) => f.replace('.md', ''));
+		const allDirs = [this.agentsDir, ...this.pluginDirs];
+		const seen = new Set<string>();
+
+		for (const dir of allDirs) {
+			const files = await listFiles(dir, '.md').catch(() => [] as string[]);
+			for (const f of files) {
+				if (!f.startsWith('_')) seen.add(f.replace('.md', ''));
+			}
+		}
+
+		return Array.from(seen);
 	}
 
 	/**

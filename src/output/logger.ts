@@ -441,8 +441,8 @@ function getLogsDirectory(): { configLoadError: unknown; logsDir: string } {
 	let configLoadError: unknown = null;
 
 	try {
-		// Lazy import to break circular dependency: logger -> config/loader -> error-handler -> logger
-		// eslint-disable-next-line @typescript-eslint/no-require-imports -- lazy import to break circular dependency
+		// Lazy import to break circular dependency: output/logger -> config/loader -> utils/error-handler -> output/logger
+		// eslint-disable-next-line @typescript-eslint/no-require-imports
 		const { getConfigLoader } = require('config/loader') as typeof ConfigLoaderModule;
 		const configLoader = getConfigLoader();
 		const config = configLoader.get();
@@ -465,7 +465,8 @@ function configureLoggerFromConfig(logger: Logger, existingError: unknown): void
 	let configLoadError = existingError;
 
 	try {
-		// eslint-disable-next-line @typescript-eslint/no-require-imports -- lazy import to break circular dependency
+		// Lazy import to break circular dependency: output/logger -> config/loader -> utils/error-handler -> output/logger
+		// eslint-disable-next-line @typescript-eslint/no-require-imports
 		const { getConfigLoader } = require('config/loader') as typeof ConfigLoaderModule;
 		const configLoader = getConfigLoader();
 		const config = configLoader.get();
@@ -494,7 +495,8 @@ function applyMCPSuppressionIfNeeded(): void {
 	}
 
 	try {
-		// eslint-disable-next-line @typescript-eslint/no-require-imports -- lazy import to break circular dependency
+		// Lazy import to break circular dependency: output/logger -> config/loader -> utils/error-handler -> output/logger
+		// eslint-disable-next-line @typescript-eslint/no-require-imports
 		const { getConfigLoader } = require('config/loader') as typeof ConfigLoaderModule;
 		const config = getConfigLoader().get();
 		const logLevel = config.defaults?.log_level ?? 'info';
@@ -540,8 +542,8 @@ function createMCPSuppressionProxy(logger: Logger): Logger {
  * Note: Scheduler is now initialized via cleanup/coordinator.ts
  */
 export function getCleanupScheduler(): CleanupScheduler | null {
-	// Lazy import to break circular dependency: logger -> cleanup/coordinator -> config/loader -> error-handler -> logger
-	// eslint-disable-next-line @typescript-eslint/no-require-imports -- lazy import to break circular dependency
+	// Lazy import to break circular dependency: output/logger -> cleanup/coordinator -> output/logger
+	// eslint-disable-next-line @typescript-eslint/no-require-imports
 	const { getLogCleanupScheduler } = require('cleanup/coordinator') as typeof CleanupCoordinatorModule;
 	return getLogCleanupScheduler();
 }

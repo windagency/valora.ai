@@ -3,9 +3,13 @@ set -e
 
 echo "Installing development tools..."
 
-# Ensure pnpm global bin directory exists
+# Ensure pnpm global bin directory exists and is on PATH
 echo "Configuring pnpm..."
 mkdir -p /home/node/.local/share/pnpm
+pnpm setup --force
+# shellcheck source=/dev/null
+source /home/node/.bashrc 2>/dev/null || true
+source /home/node/.zshrc 2>/dev/null || true
 
 # Ensure npm global bin directory exists (user-local, no sudo needed)
 echo "Configuring npm..."
@@ -45,6 +49,14 @@ if [ -S /var/run/docker.sock ]; then
     echo "Fixing docker socket permissions..."
     sudo chown root:docker /var/run/docker.sock
     sudo chmod 666 /var/run/docker.sock
+fi
+
+# Install Verdaccio (local npm registry for testing packed packages)
+if ! command -v verdaccio &> /dev/null; then
+    echo "Installing Verdaccio..."
+    pnpm add -g verdaccio
+else
+    echo "Verdaccio already installed."
 fi
 
 # Install modern CLI tools (from documentation modern-cli-toolkit)

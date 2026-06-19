@@ -1,6 +1,12 @@
+---
+updated: 2026-05-07
+---
+
 # Architecture
 
-Valora follows a modular, layered architecture built on five core principles:
+> Modular, layered architecture reference for VALORA — covering system design, component responsibilities, data flow, session optimisation, and the metrics system.
+
+## Design Principles
 
 | Principle         | Description                                     |
 | ----------------- | ----------------------------------------------- |

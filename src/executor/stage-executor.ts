@@ -4,8 +4,6 @@
  * MAINT-002: Large Files Need Splitting - Extracted from pipeline.ts
  */
 
-import { getASTIndexService } from 'ast/ast-index.service';
-import { generateCodebaseMap } from 'ast/ast-query.service';
 import { isEligible } from 'batch/batch-eligibility';
 import { getBatchOrchestrator } from 'batch/batch-orchestrator';
 import { isBatchableProvider } from 'batch/batch-provider.interface';
@@ -26,19 +24,25 @@ import type {
 } from 'types/llm.types';
 import type { PromptDefinition } from 'types/prompt.types';
 
+import { getASTIndexService } from 'ast/ast-index.service';
+import { generateCodebaseMap } from 'ast/ast-query.service';
 import { DEFAULT_MAX_TOKENS, DEFAULT_TEMPERATURE } from 'config/constants';
-import { ProviderName } from 'config/providers.config';
+import { getConfigLoader } from 'config/loader';
+import { BuiltinProviders } from 'config/providers.config';
 import { MCPApprovalCacheService } from 'mcp/mcp-approval-cache.service';
 import { MCPApprovalWorkflow } from 'mcp/mcp-approval-workflow';
 import { MCPAuditLoggerService } from 'mcp/mcp-audit-logger.service';
 import { MCPAvailabilityService } from 'mcp/mcp-availability.service';
 import { MCPClientManagerService } from 'mcp/mcp-client-manager.service';
 import { getMCPToolHandler, type MCPToolHandler } from 'mcp/mcp-tool-handler';
+import { ReasoningTraceRecorder } from 'observability/reasoning-trace-recorder';
 import { getLogger } from 'output/logger';
 import { ResolutionPath } from 'types/provider.types';
 import { formatErrorMessage } from 'utils/error-utils';
 import { readFile } from 'utils/file-utils';
 import { getMetricsCollector } from 'utils/metrics-collector';
+import { getSpendingTracker } from 'utils/spending-tracker';
+import { getModelPricing } from 'utils/token-estimator';
 
 import type { AgentLoader } from './agent-loader';
 import type { ExecutionContext } from './execution-context';
@@ -47,12 +51,42 @@ import type { PromptLoader } from './prompt-loader';
 import { type EscalationDetectionService, getEscalationDetectionService } from './escalation-detection.service';
 import { type EscalationHandlerService, getEscalationHandlerService } from './escalation-handler.service';
 import { getMessageBuilderService, type MessageBuilderService } from './message-builder.service';
+import { compressMessageHistory, deduplicateLines, djb2 } from './message-compression';
+import { getCompressionStats, stripAnsiCodes } from './output-compression.service';
 import { getOutputParsingService, type OutputParsingService } from './output-parsing.service';
 import { getPipelineEmitter, type PipelineEventEmitter } from './pipeline-events';
 import { loadAvailableAgents, loadProjectGuidance, loadProjectKnowledge } from './project-guidance-loader';
+import { getSessionBudgetService, type SessionBudgetService } from './session-budget.service';
 import { getStageOutputCache, type StageOutputCache } from './stage-output-cache';
 import { getStageValidationService, type StageValidationService } from './stage-validation.service';
 import { getToolExecutionService, type ToolExecutionService } from './tool-execution.service';
+
+export { compressMessageHistory, djb2 } from './message-compression';
+
+/** Returns true when every tool result in an iteration was a dedup hit, indicating the LLM is spinning with no new information. */
+export function isToolLoopSpinning(batchDedupHits: number, toolCallCount: number): boolean {
+	return toolCallCount > 0 && batchDedupHits === toolCallCount;
+}
+
+const TOOL_BLOCKED_PREFIX = 'Tool call blocked by hook:';
+
+/** Returns true when a tool result was produced by a PreToolUse hook block rather than actual execution. */
+export function isToolBlockedResult(output: string): boolean {
+	return output.startsWith(TOOL_BLOCKED_PREFIX);
+}
+
+/**
+ * Build the dedup key for a tool result.
+ *
+ * Keys include BOTH the input arguments AND the output so that two different
+ * commands that happen to produce the same result (e.g. multiple `git log`
+ * variants on an empty repo all returning "") are never treated as duplicates.
+ * Only an identical call — same tool, same arguments, same output — is a true
+ * duplicate.
+ */
+export function buildDedupKey(toolName: string, args: Record<string, unknown>, result: string): string {
+	return `${toolName}:${djb2(JSON.stringify(args, Object.keys(args).sort()))}:${djb2(result)}`;
+}
 
 /**
  * If this many tool calls fail within a single stage, the stage is hard-stopped
@@ -73,6 +107,14 @@ const MAX_TOOL_FAILURES_BEFORE_HARD_STOP = 5;
  * All other tools are considered *recoverable* (read-only / exploratory).
  */
 const FATAL_TOOLS = new Set(['delete_file', 'search_replace', 'write']);
+
+/**
+ * Iteration at which the tool loop proactively compresses old tool results.
+ * Fires once at 40% of the default 20-iteration maximum to bound message growth
+ * before the LLM is deep into exploration. The reactive path (on provider error)
+ * remains as a second safety net.
+ */
+const PROACTIVE_COMPRESS_AFTER_ITERATIONS = 8;
 
 /**
  * Default failure policy per stage type.
@@ -143,6 +185,7 @@ interface ExecutionSummary {
 }
 
 export class StageExecutor {
+	private currentTracer?: ReasoningTraceRecorder;
 	private escalationDetectionService: EscalationDetectionService;
 	private escalationHandlerService: EscalationHandlerService;
 	private eventEmitter: PipelineEventEmitter;
@@ -150,6 +193,7 @@ export class StageExecutor {
 	private mcpToolHandler: MCPToolHandler;
 	private messageBuilderService: MessageBuilderService;
 	private outputParsingService: OutputParsingService;
+	private sessionBudgetService: SessionBudgetService;
 	private stageOutputCache: StageOutputCache;
 	private toolExecutionService: ToolExecutionService;
 	private validationService: StageValidationService;
@@ -167,6 +211,8 @@ export class StageExecutor {
 		this.outputParsingService = getOutputParsingService();
 		this.messageBuilderService = getMessageBuilderService();
 		this.stageOutputCache = getStageOutputCache();
+		const appConfig = getConfigLoader().get();
+		this.sessionBudgetService = getSessionBudgetService(getSpendingTracker(), appConfig.budgets);
 
 		// Initialize MCP services for external tool calls
 		const approvalCache = new MCPApprovalCacheService();
@@ -467,6 +513,22 @@ export class StageExecutor {
 			logger.info('Dry-run mode enabled - tools will be simulated');
 		}
 
+		// Propagate effective permission constraints to tool execution service
+		this.toolExecutionService.setEffectiveConstraints(executionContext.effectiveConstraints);
+
+		// Budget circuit-breaker — halt before LLM call if session budget is exhausted
+		const sessionId = executionContext.sessionInfo?.sessionId;
+		if (sessionId) {
+			const budgetBreach = this.checkBudget(
+				sessionId,
+				`${stage.stage}.${stage.prompt}`,
+				startTime,
+				enrichedInputs,
+				logger
+			);
+			if (budgetBreach) return budgetBreach;
+		}
+
 		// Emit LLM request event
 		this.eventEmitter.emitLLMRequest({
 			model: config.modelOverride ?? executionContext.model,
@@ -486,6 +548,7 @@ export class StageExecutor {
 			logger
 		);
 		const duration = Date.now() - startTime;
+		this.recordStageComplete(completion, summary, duration);
 
 		// Emit LLM response event - prefer actual model returned by provider over configured model
 		const model = completion.model ?? config.modelOverride ?? executionContext.model ?? 'default';
@@ -627,29 +690,15 @@ export class StageExecutor {
 		const projectKnowledge = await loadProjectKnowledge(executionContext.knowledgeFiles ?? []);
 		const agentMemory = await this.loadAgentMemory(executionContext);
 
-		// Filter agents to only load the one matching the current execution context
-		// This avoids loading unnecessary agents (e.g., backend agent for a frontend task)
+		// Filter agents to only load the one matching the current execution context.
+		// Skip entirely when the prompt declares no agents — avoids a redundant I/O call.
 		const promptAgents = prompt.agents ?? [];
 		const filteredAgents = promptAgents.includes(executionContext.agentRole)
 			? [executionContext.agentRole]
 			: promptAgents;
-		const availableAgents = await loadAvailableAgents(filteredAgents);
+		const availableAgents = promptAgents.length > 0 ? await loadAvailableAgents(filteredAgents) : null;
 
-		// Build AST index if not already built, and generate codebase map
-		let codebaseMap: null | string = null;
-		try {
-			const indexService = getASTIndexService();
-			if (!indexService.isBuilt() && !indexService.isBuilding()) {
-				if (!indexService.loadIndex()) {
-					await indexService.buildIndex();
-				}
-			}
-			if (indexService.isBuilt()) {
-				codebaseMap = generateCodebaseMap();
-			}
-		} catch {
-			// Non-fatal: continue without codebase map
-		}
+		const codebaseMap = await this.loadCodebaseMap(stage);
 
 		return {
 			agent,
@@ -661,6 +710,29 @@ export class StageExecutor {
 			projectKnowledge,
 			prompt
 		};
+	}
+
+	/**
+	 * Build AST codebase map for a stage, skipping onboard-category prompts.
+	 * Onboard prompts (requirements analysis, clarification, dependency mapping) operate
+	 * on specification documents — they never inspect code structure, so the AST map
+	 * wastes 2,000-10,000 tokens with no benefit. Non-fatal: returns null on any error.
+	 */
+	private async loadCodebaseMap(stage: PipelineStage): Promise<null | string> {
+		const promptCategory = stage.prompt.split('.')[0] ?? '';
+		if (promptCategory === 'onboard') return null;
+
+		try {
+			const indexService = getASTIndexService();
+			if (!indexService.isBuilt() && !indexService.isBuilding()) {
+				if (!indexService.loadIndex()) {
+					await indexService.buildIndex();
+				}
+			}
+			return indexService.isBuilt() ? generateCodebaseMap() : null;
+		} catch {
+			return null;
+		}
 	}
 
 	/**
@@ -814,26 +886,45 @@ export class StageExecutor {
 		stage: PipelineStage,
 		logger: ReturnType<typeof getLogger>
 	): Promise<{ completion: LLMCompletionResult; summary: ExecutionSummary }> {
+		const stageId = `${stage.stage}.${stage.prompt}`;
+		const sessionId = executionContext.sessionInfo?.sessionId;
+		if (sessionId) {
+			this.currentTracer = new ReasoningTraceRecorder(sessionId, stageId);
+		}
+
 		const maxToolIterations = stage.max_tool_iterations ?? 20;
 		const messages: LLMMessage[] = [
 			{ content: systemMessage, role: 'system' },
 			{ content: userMessage, role: 'user' }
 		];
+		const toolResultHashes = new Map<string, number>();
+		let dedupHits = 0;
+		let prunedCount = 0;
+		// Counts only iterations where at least one tool was actually executed (not just blocked by a hook).
+		// Hook blocks are behavioural guidance — they do not constitute meaningful loop progress.
+		let effectiveIterations = 0;
+		let totalIterations = 0;
 
-		for (let iterations = 1; iterations <= maxToolIterations; iterations++) {
+		while (effectiveIterations < maxToolIterations) {
+			totalIterations++;
 			const completion = await this.executeLLMIteration(
 				executionContext,
 				messages,
 				tools,
 				modelOverride,
 				modeOverride,
-				iterations,
+				totalIterations,
 				logger
 			);
 
 			// No tool calls means we're done
 			if (!completion.tool_calls || completion.tool_calls.length === 0) {
-				logger.debug('LLM completed without tool calls', { iterations, stage: `${stage.stage}.${stage.prompt}` });
+				logger.debug('LLM completed without tool calls', {
+					effectiveIterations,
+					stage: `${stage.stage}.${stage.prompt}`,
+					totalIterations
+				});
+				this.emitCompressionMetrics(prunedCount, dedupHits, modelOverride);
 				return {
 					completion,
 					summary: {
@@ -847,10 +938,41 @@ export class StageExecutor {
 			}
 
 			// Process tool calls and add to conversation
-			await this.processToolCallsInLoop(completion, messages, stage, iterations, logger);
+			const { batchDedupHits, blockedCount } = await this.processToolCallsInLoop(
+				completion,
+				messages,
+				stage,
+				totalIterations,
+				logger,
+				toolResultHashes
+			);
+			dedupHits += batchDedupHits;
+
+			// Only count this as a productive iteration if at least one tool was actually executed.
+			// Blocked-only rounds are hook guidance, not real work, so they don't count toward the budget.
+			if (blockedCount < completion.tool_calls.length) {
+				effectiveIterations++;
+			}
+
+			// Early exit: every result this iteration was a duplicate — LLM is spinning with no new information
+			if (isToolLoopSpinning(batchDedupHits, completion.tool_calls.length)) {
+				logger.warn('Tool loop spinning: all results were duplicates, exiting early', {
+					effectiveIterations,
+					stage: stageId,
+					totalIterations
+				});
+				this.emitCompressionMetrics(prunedCount, dedupHits, modelOverride);
+				return this.handleMaxIterationsExceeded(executionContext, messages, stage, modelOverride, modeOverride, logger);
+			}
+
+			// Proactive history compression at iteration threshold
+			if (effectiveIterations === PROACTIVE_COMPRESS_AFTER_ITERATIONS) {
+				prunedCount += this.compressToolResults(messages);
+			}
 		}
 
 		// Exceeded max iterations
+		this.emitCompressionMetrics(prunedCount, dedupHits, modelOverride);
 		return this.handleMaxIterationsExceeded(executionContext, messages, stage, modelOverride, modeOverride, logger);
 	}
 
@@ -887,8 +1009,7 @@ export class StageExecutor {
 					iteration,
 					messageCount: messages.length
 				});
-				const compressedMessages = this.compressToolResults(messages);
-				completionOptions.messages = compressedMessages;
+				this.compressToolResults(messages);
 				const completion = await executionContext.provider.complete(completionOptions);
 				this.logLLMResponse(logger, completion);
 				return completion;
@@ -914,16 +1035,32 @@ export class StageExecutor {
 	 * Compress message history by replacing old tool results with a placeholder.
 	 * Keeps the system message, first user message, and the most recent 4 messages intact.
 	 */
-	private compressToolResults(messages: LLMMessage[]): LLMMessage[] {
-		const KEEP_RECENT = 4;
-		const cutoff = messages.length - KEEP_RECENT;
+	private compressToolResults(messages: LLMMessage[]): number {
+		return compressMessageHistory(messages);
+	}
 
-		return messages.map((msg, i) => {
-			if (msg.role === 'tool' && i < cutoff) {
-				return { ...msg, content: '[Tool result omitted to reduce context length]' };
-			}
-			return msg;
-		});
+	/**
+	 * Emit compression and deduplication metrics to MetricsCollector.
+	 * Called once per tool loop, at both the normal-exit and max-iterations paths.
+	 */
+	private emitCompressionMetrics(prunedCount: number, dedupHits: number, modelOverride: string | undefined): void {
+		const metrics = getMetricsCollector();
+		if (prunedCount > 0) {
+			metrics.incrementCounter('compression.history.pruned_messages', prunedCount);
+		}
+		if (dedupHits > 0) {
+			metrics.incrementCounter('compression.dedup.hits', dedupHits);
+		}
+		const compressionStats = getCompressionStats();
+		if (compressionStats.inputChars > 0) {
+			metrics.setGauge('compression.terminal.ratio', 1 - compressionStats.outputChars / compressionStats.inputChars);
+			const savedChars = compressionStats.inputChars - compressionStats.outputChars;
+			const savedTokens = Math.ceil(savedChars / 4); // CHARS_PER_TOKEN heuristic
+			const pricing = getModelPricing(modelOverride ?? '');
+			const costPerToken = (pricing?.input ?? 3.0) / 1_000_000; // default $3/M input tokens
+			metrics.setGauge('compression.terminal.estimated_saved_tokens', savedTokens);
+			metrics.setGauge('compression.terminal.estimated_saved_cost_usd', savedTokens * costPerToken);
+		}
 	}
 
 	/**
@@ -939,6 +1076,11 @@ export class StageExecutor {
 			iteration,
 			toolCount: tools?.length ?? 0,
 			toolNames: tools?.map((t) => t.name)
+		});
+		this.currentTracer?.record('llm_request', {
+			iteration,
+			toolCount: tools?.length ?? 0,
+			toolNames: tools?.map((t) => t.name) ?? []
 		});
 	}
 
@@ -969,24 +1111,75 @@ export class StageExecutor {
 	 * Log LLM response information
 	 */
 	private logLLMResponse(logger: ReturnType<typeof getLogger>, completion: LLMCompletionResult): void {
+		const contentLength = completion.content?.length ?? 0;
+		const finishReason = completion.finish_reason ?? null;
+		const toolCalls = completion.tool_calls;
+		const toolCallCount = toolCalls?.length ?? 0;
+		const toolCallNames = toolCalls?.map((tc) => tc.name) ?? [];
+
 		logger.info('LLM response received', {
-			contentLength: completion.content?.length ?? 0,
-			finishReason: completion.finish_reason,
-			hasToolCalls: !!completion.tool_calls,
-			toolCallCount: completion.tool_calls?.length ?? 0
+			contentLength,
+			finishReason,
+			hasToolCalls: toolCalls != null,
+			toolCallCount
 		});
+		this.currentTracer?.record('llm_response', {
+			contentLength,
+			finishReason,
+			model: completion.model ?? null,
+			toolCallCount,
+			toolCallNames
+		});
+	}
+
+	private recordStageComplete(
+		completion: LLMCompletionResult,
+		summary: { wasLoopExhausted: boolean },
+		durationMs: number
+	): void {
+		this.currentTracer?.record('stage_complete', {
+			durationMs,
+			finishReason: completion.finish_reason ?? null,
+			model: completion.model ?? null,
+			wasLoopExhausted: summary.wasLoopExhausted
+		});
+		this.currentTracer = undefined;
 	}
 
 	/**
 	 * Process tool calls and add results to conversation
 	 */
+	private appendToolResultMessage(
+		messages: LLMMessage[],
+		toolResultHashes: Map<string, number>,
+		result: { tool_call_id: string },
+		toolName: string,
+		args: Record<string, unknown>,
+		sanitized: string
+	): boolean {
+		const hashKey = buildDedupKey(toolName, args, sanitized);
+		const existingIndex = toolResultHashes.get(hashKey);
+		if (existingIndex !== undefined) {
+			messages.push({
+				content: `[Same result as message #${existingIndex} — omitted]`,
+				name: result.tool_call_id,
+				role: 'tool'
+			});
+			return true;
+		}
+		toolResultHashes.set(hashKey, messages.length + 1);
+		messages.push({ content: sanitized, name: result.tool_call_id, role: 'tool' });
+		return false;
+	}
+
 	private async processToolCallsInLoop(
 		completion: LLMCompletionResult,
 		messages: LLMMessage[],
 		stage: PipelineStage,
 		iterations: number,
-		logger: ReturnType<typeof getLogger>
-	): Promise<void> {
+		logger: ReturnType<typeof getLogger>,
+		toolResultHashes: Map<string, number>
+	): Promise<{ batchDedupHits: number; blockedCount: number }> {
 		const toolCalls = completion.tool_calls!;
 
 		logger.info('Processing tool calls from LLM', {
@@ -1003,20 +1196,52 @@ export class StageExecutor {
 			tool_calls: toolCalls
 		});
 
+		this.traceToolCalls(toolCalls);
+
 		// Execute tools and add results (with prompt injection scanning)
 		const toolResults = await this.toolExecutionService.executeTools(toolCalls);
 		const injectionDetector = getPromptInjectionDetector();
-		toolResults.forEach((result) => {
-			const formatted = this.formatToolResult(result);
-			const sanitised = injectionDetector.sanitiseToolResult(result.tool_call_id, formatted);
-			messages.push({
-				content: sanitised,
-				name: result.tool_call_id,
-				role: 'tool'
-			});
-		});
+		let batchDedupHits = 0;
+		let blockedCount = 0;
 
-		logger.debug('Tool results added to conversation', { iterations, resultCount: toolResults.length });
+		for (let i = 0; i < toolResults.length; i++) {
+			const result = toolResults[i]!;
+			const toolName = toolCalls[i]?.name ?? result.tool_call_id;
+			const formatted = this.formatToolResult(result);
+
+			this.currentTracer?.record('tool_result', {
+				contentLength: formatted.length,
+				toolCallId: result.tool_call_id,
+				toolName
+			});
+			const sanitized = injectionDetector.sanitizeToolResult(result.tool_call_id, formatted);
+			if (isToolBlockedResult(sanitized)) {
+				blockedCount++;
+			}
+			const isDup = this.appendToolResultMessage(
+				messages,
+				toolResultHashes,
+				result,
+				toolName,
+				toolCalls[i]?.arguments ?? {},
+				sanitized
+			);
+			if (isDup) batchDedupHits++;
+		}
+
+		logger.debug('Tool results added to conversation', {
+			blockedCount,
+			dedupHits: batchDedupHits,
+			iterations,
+			resultCount: toolResults.length
+		});
+		return { batchDedupHits, blockedCount };
+	}
+
+	private traceToolCalls(toolCalls: LLMToolCall[]): void {
+		for (const tc of toolCalls) {
+			this.currentTracer?.record('tool_call', { arguments: tc.arguments, toolCallId: tc.id, toolName: tc.name });
+		}
 	}
 
 	/**
@@ -1263,15 +1488,20 @@ Summarize ALL changes you made during tool execution. Output ONLY the JSON code 
 	 * Truncates large results to prevent exceeding LLM context limits
 	 */
 	private formatToolResult(result: LLMToolResult): string {
-		const output = result.output;
 		const MAX_TOOL_RESULT_CHARS = 20_000;
 		const HEAD_CHARS = 15_000;
 		const TAIL_CHARS = 5_000;
 
+		// Strip ANSI codes — MCP tools and read_file results can contain them
+		const stripped = stripAnsiCodes(result.output);
+
+		// Collapse consecutive repeated lines to "<line> (×N)"
+		const output = deduplicateLines(stripped);
+
 		if (output.length > MAX_TOOL_RESULT_CHARS) {
 			const logger = getLogger();
 			logger.warn('Tool result truncated due to length', {
-				originalLength: output.length,
+				originalLength: result.output.length,
 				toolCallId: result.tool_call_id,
 				truncatedLength: MAX_TOOL_RESULT_CHARS
 			});
@@ -1319,7 +1549,7 @@ Summarize ALL changes you made during tool execution. Output ONLY the JSON code 
 			duration_ms: duration,
 			metadata: {
 				guidedMode: true,
-				provider: ProviderName.CURSOR,
+				provider: BuiltinProviders.CURSOR,
 				resolutionPath: ResolutionPath.GUIDED,
 				stageContext: {
 					inputs: resolvedInputs,
@@ -1541,6 +1771,43 @@ Summarize ALL changes you made during tool execution. Output ONLY the JSON code 
 		return enriched;
 	}
 	// Output parsing methods extracted to OutputParsingService (see output-parsing.service.ts)
+
+	private checkBudget(
+		sessionId: string,
+		stageName: string,
+		startTime: number,
+		resolvedInputs: Record<string, unknown>,
+		logger: ReturnType<typeof getLogger>
+	): null | StageOutput {
+		const { totalCostUsd } = this.sessionBudgetService.getSessionTotal(sessionId);
+		const budgetConfig = getConfigLoader().get().budgets;
+		const limit = budgetConfig?.per_session_usd;
+
+		if (!this.sessionBudgetService.wouldExceed(sessionId, { estimatedCostUsd: 0 })) return null;
+
+		logger.warn('Session budget exceeded — halting before LLM call', { sessionId, stageName, totalCostUsd });
+
+		const signal = this.sessionBudgetService.buildBudgetEscalationSignal(
+			totalCostUsd,
+			limit ?? totalCostUsd,
+			stageName
+		);
+		const [stageKey, promptKey] = stageName.split('.');
+		return {
+			duration_ms: Date.now() - startTime,
+			error: signal.proposed_action,
+			metadata: {
+				resolutionPath: 'budget_halt',
+				stageContext: { inputs: resolvedInputs, stage: stageName },
+				stopPipeline: true
+			},
+			outputs: { escalationSignal: signal },
+			prompt: promptKey ?? stageName,
+			stage: stageKey ?? stageName,
+			success: false
+		};
+	}
+
 	/**
 	 * Process escalation for a stage response
 	 * Returns StageOutput if escalation results in abort or needs to stop pipeline
@@ -1686,37 +1953,45 @@ Summarize ALL changes you made during tool execution. Output ONLY the JSON code 
 	 */
 	private async loadAgentMemory(executionContext: ExecutionContext): Promise<null | string> {
 		try {
-			const storeModule = await import('memory/store');
-			const managerModule = await import('memory/manager');
+			const { getMemoryRegistry } = await import('memory/registry');
 			const { formatMemoryForInjection } = await import('./memory-formatter');
 			const { getConfigLoader } = await import('config/loader');
+			const { parseVaultPluginConfig } = await import('@windagency/valora-plugin-memory-vault');
 
 			const config = getConfigLoader().get();
-			const memConfig = config.memory;
-			if (memConfig?.enabled === false) {
+			if (config.memory?.enabled === false) {
 				return null;
 			}
 
-			const store = new storeModule.MemoryStore();
-			const manager = new managerModule.MemoryManager(store, memConfig);
+			const registry = getMemoryRegistry();
+			if (!registry.hasActive()) {
+				return null;
+			}
+			const provider = registry.getActive();
+
+			// Memory injection thresholds live in the vault plugin's namespace;
+			// pull them from the raw plugin config and fall back to defaults if unset.
+			const rawPlugins = getConfigLoader().getRaw()['plugins'] as Record<string, unknown> | undefined;
+			const vaultConfig = parseVaultPluginConfig(rawPlugins?.['memory-vault']);
 
 			const tags = [executionContext.commandName, executionContext.agentRole].filter(Boolean);
-			const minStrength = memConfig?.injection_strength_threshold ?? 0.2;
-			const tokenBudget = memConfig?.injection_token_budget ?? 2000;
+			const minStrength = vaultConfig.injection_strength_threshold;
+			const tokenBudget = vaultConfig.injection_token_budget;
 
-			const results = await manager.query({
+			const results = await provider.query({
 				agentRole: executionContext.agentRole,
 				limit: 20,
 				minStrength,
 				strengthen: true,
-				tags
+				tags,
+				tokenBudget
 			});
 
 			if (results.length === 0) {
 				return null;
 			}
 
-			await manager.flush();
+			await provider.flush();
 			return formatMemoryForInjection(results, tokenBudget);
 		} catch {
 			// Non-fatal: memory injection failure must never block pipeline execution

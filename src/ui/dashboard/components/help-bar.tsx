@@ -9,10 +9,9 @@ import type { DashboardTab, ViewMode } from 'ui/dashboard/types';
 import { getTUIAdapter } from 'ui/tui-adapter.interface';
 
 const tui = getTUIAdapter();
-// eslint-disable-next-line @typescript-eslint/naming-convention -- Box and Text are React components which require PascalCase
+
 const { Box, Text } = tui;
 
-// eslint-disable-next-line @typescript-eslint/naming-convention -- React components must use PascalCase
 export function HelpBar({
 	activeTab,
 	hasSubTabs,

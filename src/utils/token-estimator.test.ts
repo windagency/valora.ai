@@ -158,9 +158,6 @@ describe('getModelPricing', () => {
 	it('should return cache pricing for Anthropic models', () => {
 		const pricing = getModelPricing('claude-sonnet-4.6');
 
-		expect(pricing).toBeDefined();
-		expect(pricing?.cache_read).toBeDefined();
-		expect(pricing?.cache_write).toBeDefined();
 		expect(pricing?.cache_read).toBeLessThan(pricing!.input);
 		expect(pricing?.cache_write).toBeGreaterThan(pricing!.input);
 	});
@@ -168,8 +165,6 @@ describe('getModelPricing', () => {
 	it('should include cache_read pricing for OpenAI models with automatic caching', () => {
 		const pricing = getModelPricing('gpt-5');
 
-		expect(pricing).toBeDefined();
-		expect(pricing?.cache_read).toBeDefined();
 		expect(pricing?.cache_read).toBeLessThan(pricing!.input);
 		// OpenAI automatic caching has no write surcharge
 		expect(pricing?.cache_write).toBeUndefined();
@@ -178,8 +173,6 @@ describe('getModelPricing', () => {
 	it('should include cache_read pricing for Google models with context caching', () => {
 		const pricing = getModelPricing('gemini-2.5-pro');
 
-		expect(pricing).toBeDefined();
-		expect(pricing?.cache_read).toBeDefined();
 		expect(pricing?.cache_read).toBeLessThan(pricing!.input);
 	});
 

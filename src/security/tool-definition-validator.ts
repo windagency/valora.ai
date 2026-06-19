@@ -11,6 +11,7 @@ import type { ExternalMCPTool } from 'types/mcp-client.types';
 
 import { getLogger } from 'output/logger';
 
+import { getAuditSink } from './audit-sink';
 import { createSecurityEvent, type SecurityEvent } from './security-event.types';
 
 /**
@@ -94,7 +95,7 @@ export class ToolDefinitionValidator {
 	 */
 	validateToolDefinition(tool: ExternalMCPTool): ToolValidationResult {
 		const issues: string[] = [];
-		const sanitised = { ...tool };
+		const sanitized = { ...tool };
 
 		// Validate name
 		if (!VALID_NAME_PATTERN.test(tool.name)) {
@@ -110,12 +111,12 @@ export class ToolDefinitionValidator {
 		if (descIssues.length > 0) {
 			issues.push(...descIssues);
 			// Strip injection-like content from description
-			sanitised.description = this.sanitiseDescription(tool.description);
+			sanitized.description = this.sanitizeDescription(tool.description);
 		}
 
 		if (tool.description.length > MAX_DESCRIPTION_LENGTH) {
 			issues.push(`Description too long: ${tool.description.length} chars (max ${MAX_DESCRIPTION_LENGTH})`);
-			sanitised.description = sanitised.description.slice(0, MAX_DESCRIPTION_LENGTH) + '…';
+			sanitized.description = sanitized.description.slice(0, MAX_DESCRIPTION_LENGTH) + '…';
 		}
 
 		// Validate schema
@@ -130,7 +131,7 @@ export class ToolDefinitionValidator {
 
 		return {
 			issues,
-			tool: sanitised,
+			tool: sanitized,
 			valid: issues.length === 0
 		};
 	}
@@ -167,7 +168,7 @@ export class ToolDefinitionValidator {
 	/**
 	 * Remove injection-like content from a description.
 	 */
-	private sanitiseDescription(description: string): string {
+	private sanitizeDescription(description: string): string {
 		let result = description;
 		for (const pattern of DESCRIPTION_INJECTION_PATTERNS) {
 			result = result.replace(new RegExp(pattern.source, pattern.flags + 'g'), '[REMOVED]');
@@ -245,6 +246,7 @@ export class ToolDefinitionValidator {
 			toolName: tool.name
 		});
 		this.events.push(event);
+		getAuditSink().append(event);
 
 		const logger = getLogger();
 		logger.warn(`[Security] Suspicious tool definition: ${tool.name}`, { issues, serverId: tool.serverId });

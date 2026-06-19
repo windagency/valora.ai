@@ -8,16 +8,39 @@ import type { PromptDefinition, PromptMetadata } from 'types/prompt.types';
 
 import { getLogger } from 'output/logger';
 import { ValidationError } from 'utils/error-handler';
-import { findFiles, readFile } from 'utils/file-utils';
+import { fileExists, FileNotFoundError, findFiles, readFile } from 'utils/file-utils';
 import { getPackageDataDir } from 'utils/paths';
 import { parseMarkdownWithFrontmatter, validateRequiredFields, YamlParseError } from 'utils/yaml-parser';
 
 export class PromptLoader {
+	private static readonly CATEGORY_DIR_MAP: Record<string, string> = {
+		code: '04_code',
+		context: '02_context',
+		deployment: '08_deployment',
+		documentation: '07_documentation',
+		generator: '00_generator',
+		maintenance: '10_maintenance',
+		onboard: '01_onboard',
+		plan: '03_plan',
+		refactor: '09_refactor',
+		review: '05_review',
+		test: '06_test'
+	};
+
 	private cache: Map<string, PromptDefinition> = new Map();
+	private pluginPromptsDirs = new Set<string>();
 	private promptsDir: string;
 
 	constructor(promptsDir?: string) {
 		this.promptsDir = promptsDir ?? path.join(getPackageDataDir(), 'prompts');
+	}
+
+	/**
+	 * Register an additional prompts root contributed by a plugin.
+	 * Plugin prompts must use existing categories; new categories are not supported.
+	 */
+	registerPluginPromptsDir(dir: string): void {
+		this.pluginPromptsDirs.add(dir);
 	}
 
 	/**
@@ -61,7 +84,7 @@ export class PromptLoader {
 
 			const prompt: PromptDefinition = {
 				...parsed.metadata,
-				content: parsed.content
+				content: await this.resolveIncludes(parsed.content)
 			};
 
 			// Cache the prompt
@@ -80,60 +103,44 @@ export class PromptLoader {
 	}
 
 	/**
-	 * Find prompt file by category and name
+	 * Find prompt file by category and name.
+	 * Checks the primary prompts directory first, then plugin prompt directories.
 	 */
 	private findPromptFile(category: string, name: string): string {
-		// Map category to directory prefix
-		const categoryMap: Record<string, string> = {
-			code: '04_code',
-			context: '02_context',
-			deployment: '08_deployment',
-			documentation: '07_documentation',
-			maintenance: '10_maintenance',
-			onboard: '01_onboard',
-			plan: '03_plan',
-			refactor: '09_refactor',
-			review: '05_review',
-			test: '06_test'
-		};
-
-		const dirPrefix = categoryMap[category];
+		const dirPrefix = PromptLoader.CATEGORY_DIR_MAP[category];
 		if (!dirPrefix) {
 			throw new ValidationError(`Unknown prompt category: ${category}`);
 		}
 
-		const categoryDir = path.join(this.promptsDir, dirPrefix);
-		const promptFile = path.join(categoryDir, `${name}.md`);
+		const primaryFile = path.join(this.promptsDir, dirPrefix, `${name}.md`);
+		if (fileExists(primaryFile)) return primaryFile;
 
-		return promptFile;
+		for (const pluginDir of this.pluginPromptsDirs) {
+			const candidate = path.join(pluginDir, dirPrefix, `${name}.md`);
+			if (fileExists(candidate)) return candidate;
+		}
+
+		return primaryFile; // Preserve existing error path when prompt is not found
 	}
 
 	/**
 	 * Load all prompts in a category
 	 */
 	async loadCategoryPrompts(category: string): Promise<Map<string, PromptDefinition>> {
-		const categoryMap: Record<string, string> = {
-			code: '04_code',
-			context: '02_context',
-			deployment: '08_deployment',
-			documentation: '07_documentation',
-			maintenance: '10_maintenance',
-			onboard: '01_onboard',
-			plan: '03_plan',
-			refactor: '09_refactor',
-			review: '05_review',
-			test: '06_test'
-		};
-
-		const dirPrefix = categoryMap[category];
+		const dirPrefix = PromptLoader.CATEGORY_DIR_MAP[category];
 		if (!dirPrefix) {
 			throw new ValidationError(`Unknown prompt category: ${category}`);
 		}
 
-		const categoryDir = path.join(this.promptsDir, dirPrefix);
-		const files = await findFiles(categoryDir, /\.md$/);
+		const dirsToSearch = [
+			path.join(this.promptsDir, dirPrefix),
+			...[...this.pluginPromptsDirs].map((d) => path.join(d, dirPrefix))
+		];
 
 		const logger = getLogger();
+
+		const fileLists = await Promise.all(dirsToSearch.map((dir) => findFiles(dir, /\.md$/).catch(() => [] as string[])));
+		const files = [...new Set(fileLists.flat())];
 
 		const promptEntries = await Promise.all(
 			files.map(async (file) => {
@@ -185,6 +192,54 @@ export class PromptLoader {
 		);
 
 		return promptIds.filter((id): id is string => id !== null);
+	}
+
+	/**
+	 * Resolve {{include:path/to/file.md}} directives in prompt content.
+	 *
+	 * Each directive is replaced with the verbatim contents of the referenced
+	 * file under the prompts directory. Resolution is **single-pass**: if an
+	 * included file itself contains `{{include:...}}` directives, those are left
+	 * unexpanded. Missing files produce a warning and are replaced with an empty
+	 * string so the calling prompt still loads cleanly. All other read errors are
+	 * re-thrown as `ValidationError` to preserve full context up the call stack.
+	 */
+	private async resolveIncludes(content: string): Promise<string> {
+		const matches = [...content.matchAll(/\{\{include:([^}]+)\}\}/g)];
+
+		if (matches.length === 0) {
+			return content;
+		}
+
+		const logger = getLogger();
+		let resolved = content;
+
+		for (const match of matches) {
+			const directive = match[0];
+			const relativePath = (match[1] ?? '').trim();
+			const absolutePath = path.join(this.promptsDir, relativePath);
+
+			try {
+				const included = await readFile(absolutePath);
+				resolved = resolved.replace(directive, included);
+			} catch (error) {
+				if (error instanceof FileNotFoundError) {
+					logger.warn(`{{include}} target not found, skipping directive`, {
+						directive,
+						path: absolutePath
+					});
+					resolved = resolved.replace(directive, '');
+				} else {
+					throw new ValidationError(`Failed to resolve include directive`, {
+						directive,
+						error: (error as Error).message,
+						path: absolutePath
+					});
+				}
+			}
+		}
+
+		return resolved;
 	}
 
 	/**

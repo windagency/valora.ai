@@ -9,7 +9,7 @@
 import type { LLMProvider } from 'types/llm.types';
 import type { MCPSamplingService } from 'types/mcp.types';
 
-import { ProviderName } from 'config/providers.config';
+import { BuiltinProviders } from 'config/providers.config';
 import { getProviderRegistry } from 'llm/registry';
 import { GUIDED_MODE, type GuidedMode, type ProviderResolutionPath, ResolutionPath } from 'types/provider.types';
 import { formatErrorMessage } from 'utils/error-utils';
@@ -63,21 +63,25 @@ export class ProviderFallbackService {
 		const logger = await import('output/logger').then((m) => m.getLogger());
 
 		// TIER 1: Try MCP Sampling (if provider is cursor and MCP is available)
-		if (context.providerName === ProviderName.CURSOR && mcpSampling) {
+		if (context.providerName === BuiltinProviders.CURSOR && mcpSampling) {
 			try {
 				logger.debug('Attempting Tier 1: MCP Sampling');
-				const provider = this.providerRegistry.createProvider(ProviderName.CURSOR, context.providerConfig, mcpSampling);
+				const provider = this.providerRegistry.createProvider(
+					BuiltinProviders.CURSOR,
+					context.providerConfig,
+					mcpSampling
+				);
 
 				// Test if provider is properly configured
 				if (provider.isConfigured()) {
 					logger.always('✅ Using MCP Sampling (Tier 1: Zero-config mode)', {
-						provider: ProviderName.CURSOR,
+						provider: BuiltinProviders.CURSOR,
 						resolutionPath: ResolutionPath.MCP
 					});
 
 					return {
 						provider,
-						providerName: ProviderName.CURSOR,
+						providerName: BuiltinProviders.CURSOR,
 						resolutionPath: ResolutionPath.MCP
 					};
 				}
@@ -90,7 +94,10 @@ export class ProviderFallbackService {
 
 		// TIER 2 & 3: Check if we should use guided completion or API fallback
 		// Only apply fallback if we're trying to use CURSOR provider or if provider is not configured
-		if (context.inMCPContext && (context.providerName === ProviderName.CURSOR || !context.providerConfig['apiKey'])) {
+		if (
+			context.inMCPContext &&
+			(context.providerName === BuiltinProviders.CURSOR || !context.providerConfig['apiKey'])
+		) {
 			// In MCP context (Cursor), check for API key fallback first
 			const apiFallback = await this.providerResolver.getFallbackProvider();
 

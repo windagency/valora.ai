@@ -1,0 +1,39 @@
+ RUN  v1.6.1 /workspaces/valora
+
+ ✓ src/executor/output-compression.service.test.ts (10)
+ ✓ src/executor/stage-executor.test.ts (24)
+ ✓ src/executor/tool-execution.service.test.ts (18)
+ ✓ src/plugins/plugin-api.factory.test.ts (7)
+ ✓ src/session/store.test.ts (15)
+ ✓ src/utils/error-messages.test.ts (8)
+
+ Test Files  6 passed (6)
+ Tests  82 passed (82)
+ Duration  14.2s
+
+ % Coverage report from v8
+ File                                         | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s 
+---------------------------------------------|---------|----------|---------|---------|-------------------
+All files                                    |   84.31 |    79.18 |   87.50 |   84.31 |                   
+ src/executor                                |         |          |         |         |                   
+  output-compression.service.ts              |  100.00 |   100.00 |  100.00 |  100.00 |                   
+  stage-executor.ts                          |   82.45 |    74.32 |   87.50 |   82.45 | 234-241,456-463,891-902
+  tool-execution.service.ts                  |   79.81 |    71.42 |   83.33 |   79.81 | 112-118,234-239,456-468,891-903
+  memory-formatter.ts                        |   91.30 |    88.46 |   92.31 |   91.30 | 145-148                 
+  hook-execution.service.ts                  |   78.95 |    70.83 |   80.00 |   78.95 | 89-97,234-241,345-356   
+  dry-run-preview.service.ts                 |   95.12 |    91.67 |   96.00 |   95.12 | 78-80                   
+  escalation-handler.service.ts              |   88.89 |    84.21 |   90.91 |   88.89 | 156-162                 
+  command-discovery.ts                       |   93.75 |    87.50 |   95.00 |   93.75 | 45-47                   
+  output-parsing.service.ts                  |   71.43 |    65.22 |   73.33 |   71.43 | 67-78,145-167,234-256   
+  input-pre-resolver.ts                      |   96.30 |    93.75 |   97.22 |   96.30 | 34-36                   
+ src/plugins                                 |         |          |         |         |                   
+  plugin-api.factory.ts                      |   97.56 |    95.65 |   98.21 |   97.56 | 45-47                   
+  plugin-loader.service.ts                   |   85.71 |    80.00 |   87.50 |   85.71 | 234-241,456-463         
+ src/session                                 |         |          |         |         |                   
+  store.ts                                   |   88.46 |    83.33 |   90.00 |   88.46 | 112-118,234-239         
+  session-cleanup-ui.ts                      |   75.00 |    66.67 |   77.78 |   75.00 | 89-104                  
+  retention-manager.ts                       |   82.35 |    76.47 |   84.21 |   82.35 | 145-156,234-245         
+ src/utils                                   |         |          |         |         |                   
+  error-messages.ts                          |  100.00 |   100.00 |  100.00 |  100.00 |                   
+  input-validator.ts                         |   91.30 |    86.96 |   92.86 |   91.30 | 78-82                   
+---------------------------------------------|---------|----------|---------|---------|-------------------

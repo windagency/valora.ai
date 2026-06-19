@@ -1,0 +1,17 @@
+{
+	"extends": "../../tsconfig.json",
+	"compilerOptions": {
+		"declaration": false,
+		"declarationMap": false,
+		"module": "ESNext",
+		"moduleResolution": "bundler",
+		"outDir": "dist",
+		"paths": {
+			"@windagency/valora-plugin-api": ["../../packages/valora-plugin-api/dist/index"]
+		},
+		"rootDir": "src",
+		"sourceMap": false
+	},
+	"include": ["src/**/*"],
+	"exclude": ["node_modules", "dist", "src/**/*.test.ts", "src/**/*.spec.ts"]
+}

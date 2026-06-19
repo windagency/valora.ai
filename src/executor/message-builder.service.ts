@@ -11,7 +11,7 @@
  * - User message formatting with input resolution
  */
 
-import type { getLogger } from 'output/logger';
+import { getLogger } from 'output/logger';
 
 type Logger = ReturnType<typeof getLogger>;
 
@@ -43,8 +43,10 @@ export interface SystemMessageOptions {
  * Service for building LLM messages
  */
 export class MessageBuilderService {
-	constructor(_logger?: Logger) {
-		// Logger available for future debugging needs
+	private readonly logger: Logger;
+
+	constructor(logger?: Logger) {
+		this.logger = logger ?? getLogger();
 	}
 
 	/**
@@ -72,60 +74,47 @@ export class MessageBuilderService {
 			promptContent
 		} = options;
 
-		const messageParts: string[] = [];
+		const parts: string[] = [];
 
-		// 1. Prepend project-level guidance if available (highest priority - AI behaviour)
-		if (projectGuidance) {
-			messageParts.push(projectGuidance);
-			messageParts.push('');
-		}
+		if (projectGuidance) parts.push(projectGuidance, '');
+		parts.push(agentProfile, '', '---', '', promptContent);
 
-		// 2. Add agent profile
-		messageParts.push(agentProfile);
-		messageParts.push('');
-		messageParts.push('---');
-		messageParts.push('');
+		this.appendOptional(parts, availableAgents);
+		this.appendOptional(parts, projectKnowledge);
+		this.appendOptional(parts, agentMemory);
+		this.appendOptional(parts, codebaseMap);
 
-		// 3. Add prompt content (task-specific instructions)
-		messageParts.push(promptContent);
+		let message = parts.join('\n');
 
-		// 4. Add available agents if provided (pre-loaded team references)
-		if (availableAgents) {
-			messageParts.push('');
-			messageParts.push(availableAgents);
-		}
-
-		// 5. Append project knowledge if available (context for this task)
-		if (projectKnowledge) {
-			messageParts.push('');
-			messageParts.push(projectKnowledge);
-		}
-
-		// 5.25. Append agent memory if available (learned patterns & decisions)
-		if (agentMemory) {
-			messageParts.push('');
-			messageParts.push(agentMemory);
-		}
-
-		// 5.5. Append codebase map if available (AST-generated overview)
-		if (codebaseMap) {
-			messageParts.push('');
-			messageParts.push(codebaseMap);
-		}
-
-		let message = messageParts.join('\n');
-
-		// Append output format enforcement if expected outputs are defined
 		if (expectedOutputs && expectedOutputs.length > 0) {
 			message += '\n\n' + this.buildOutputFormatInstruction(expectedOutputs);
 		}
-
-		// Append escalation instructions if criteria are defined
 		if (escalationCriteria && escalationCriteria.length > 0) {
 			message += '\n\n' + this.buildEscalationInstruction(escalationCriteria);
 		}
 
+		this.logMessageStats(options, message.length);
 		return message;
+	}
+
+	private appendOptional(parts: string[], content: null | string | undefined): void {
+		if (content) parts.push('', content);
+	}
+
+	private logMessageStats(options: SystemMessageOptions, totalLength: number): void {
+		const len = (s: null | string | undefined): number => (s ? s.length : 0);
+		this.logger.debug('System message assembled', {
+			breakdown: {
+				agent: options.agentProfile.length,
+				agents: len(options.availableAgents),
+				codebaseMap: len(options.codebaseMap),
+				guidance: len(options.projectGuidance),
+				knowledge: len(options.projectKnowledge),
+				memory: len(options.agentMemory),
+				prompt: options.promptContent.length
+			},
+			total: totalLength
+		});
 	}
 
 	/**

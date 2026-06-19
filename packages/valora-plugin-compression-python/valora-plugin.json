@@ -1,0 +1,9 @@
+{
+	"name": "valora-plugin-compression-python",
+	"version": "1.0.0",
+	"description": "Compression strategies for Python tooling: python, pytest, pip, pip3, cargo, ruff (6 strategies).",
+	"engines": { "valora": ">=0.1.0" },
+	"contributes": ["code"],
+	"permissions": ["code-exec"],
+	"codeEntrypoint": "dist/index.js"
+}

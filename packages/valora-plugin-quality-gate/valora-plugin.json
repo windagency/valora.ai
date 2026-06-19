@@ -1,0 +1,10 @@
+{
+	"name": "valora-plugin-quality-gate",
+	"version": "1.0.0",
+	"description": "Asserter agent and assert command (static pre-testing quality gate) plus audit scan — detects N×M concern accumulation across sibling directories.",
+	"engines": { "valora": ">=0.1.0" },
+	"contributes": ["code", "agents", "commands", "prompts"],
+	"permissions": ["code-exec", "fs-read"],
+	"codeEntrypoint": "dist/index.js",
+	"cli": [{ "name": "audit scan", "description": "Static cross-sibling duplication scan — outputs JSON, CI-safe" }]
+}

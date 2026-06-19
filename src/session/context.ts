@@ -22,28 +22,24 @@ export class SessionContextManager {
 		flags: Record<string, boolean | string | undefined>,
 		outputs: Record<string, unknown>,
 		success: boolean,
-		// eslint-disable-next-line @typescript-eslint/naming-convention -- duration_ms matches SessionCommand interface property name
-		duration_ms: number,
+		durationMs: number,
 		error?: string,
-		// eslint-disable-next-line @typescript-eslint/naming-convention -- tokens_used matches SessionCommand interface property name
-		tokens_used?: number,
-		// eslint-disable-next-line @typescript-eslint/naming-convention -- optimization_metrics matches SessionCommand interface property name
-		optimization_metrics?: OptimizationMetrics,
-		// eslint-disable-next-line @typescript-eslint/naming-convention -- quality_metrics matches SessionCommand interface property name
-		quality_metrics?: QualityMetrics
+		tokensUsed?: number,
+		optimizationMetrics?: OptimizationMetrics,
+		qualityMetrics?: QualityMetrics
 	): void {
 		const sessionCommand: SessionCommand = {
 			args,
 			command,
-			duration_ms,
+			duration_ms: durationMs,
 			error,
 			flags,
-			optimization_metrics,
+			optimization_metrics: optimizationMetrics,
 			outputs,
-			quality_metrics,
+			quality_metrics: qualityMetrics,
 			success,
 			timestamp: new Date().toISOString(),
-			tokens_used
+			tokens_used: tokensUsed
 		};
 
 		this.session.commands.push(sessionCommand);

@@ -4,7 +4,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-import { ProviderName } from 'config/providers.config';
+import { BuiltinProviders } from 'config/providers.config';
 import { getProviderRegistry } from 'llm/registry';
 import { LLMProvider } from 'types/llm.types';
 import { MCPSamplingService, ProviderConfig } from 'types/index';
@@ -71,7 +71,7 @@ describe('ProviderFallbackService', () => {
 			const mockCursorProvider = {
 				...mockProvider,
 				isConfigured: vi.fn().mockReturnValue(true),
-				name: ProviderName.CURSOR
+				name: BuiltinProviders.CURSOR
 			};
 
 			vi.mocked(mockProviderRegistry.createProvider).mockReturnValue(mockCursorProvider);
@@ -80,15 +80,15 @@ describe('ProviderFallbackService', () => {
 				{
 					inMCPContext: true,
 					providerConfig: {},
-					providerName: ProviderName.CURSOR
+					providerName: BuiltinProviders.CURSOR
 				},
 				mockMCPSampling
 			);
 
 			expect(result.resolutionPath).toBe('mcp');
-			expect(result.providerName).toBe(ProviderName.CURSOR);
+			expect(result.providerName).toBe(BuiltinProviders.CURSOR);
 			expect(result.provider).toBe(mockCursorProvider);
-			expect(mockProviderRegistry.createProvider).toHaveBeenCalledWith(ProviderName.CURSOR, {}, mockMCPSampling);
+			expect(mockProviderRegistry.createProvider).toHaveBeenCalledWith(BuiltinProviders.CURSOR, {}, mockMCPSampling);
 		});
 
 		it('should fall through to tier 2/3 if cursor provider is not configured', async () => {
@@ -99,7 +99,7 @@ describe('ProviderFallbackService', () => {
 			const mockCursorProvider = {
 				...mockProvider,
 				isConfigured: vi.fn().mockReturnValue(false),
-				name: ProviderName.CURSOR
+				name: BuiltinProviders.CURSOR
 			};
 
 			vi.mocked(mockProviderRegistry.createProvider).mockReturnValue(mockCursorProvider);
@@ -109,7 +109,7 @@ describe('ProviderFallbackService', () => {
 				{
 					inMCPContext: true,
 					providerConfig: {},
-					providerName: ProviderName.CURSOR
+					providerName: BuiltinProviders.CURSOR
 				},
 				mockMCPSampling
 			);
@@ -129,7 +129,7 @@ describe('ProviderFallbackService', () => {
 			const result = await service.resolveWithFallback({
 				inMCPContext: true,
 				providerConfig: {},
-				providerName: ProviderName.ANTHROPIC
+				providerName: BuiltinProviders.ANTHROPIC
 			});
 
 			expect(result.resolutionPath).toBe('guided');
@@ -143,7 +143,7 @@ describe('ProviderFallbackService', () => {
 			const result = await service.resolveWithFallback({
 				inMCPContext: true,
 				providerConfig: {},
-				providerName: ProviderName.CURSOR
+				providerName: BuiltinProviders.CURSOR
 			});
 
 			expect(result.fallbackReason).toContain('guided_mode');
@@ -160,20 +160,20 @@ describe('ProviderFallbackService', () => {
 			vi.mocked(mockProviderResolver.getFallbackProvider).mockResolvedValue({
 				config: mockFallbackConfig,
 				model: 'claude-sonnet-4.5',
-				name: ProviderName.ANTHROPIC
+				name: BuiltinProviders.ANTHROPIC
 			});
 
 			const result = await service.resolveWithFallback({
 				inMCPContext: true,
 				providerConfig: {},
-				providerName: ProviderName.CURSOR
+				providerName: BuiltinProviders.CURSOR
 			});
 
 			expect(result.resolutionPath).toBe('api_fallback');
-			expect(result.providerName).toBe(ProviderName.ANTHROPIC);
+			expect(result.providerName).toBe(BuiltinProviders.ANTHROPIC);
 			expect(result.fallbackReason).toBe('mcp_sampling_unavailable_using_api_keys');
 			expect(mockProviderRegistry.createProvider).toHaveBeenCalledWith(
-				ProviderName.ANTHROPIC,
+				BuiltinProviders.ANTHROPIC,
 				mockFallbackConfig,
 				undefined
 			);
@@ -192,7 +192,7 @@ describe('ProviderFallbackService', () => {
 			const unconfiguredCursorProvider = {
 				...mockProvider,
 				isConfigured: vi.fn().mockReturnValue(false),
-				name: ProviderName.CURSOR
+				name: BuiltinProviders.CURSOR
 			};
 
 			// First call (Tier 1 MCP) returns unconfigured provider
@@ -204,7 +204,7 @@ describe('ProviderFallbackService', () => {
 			vi.mocked(mockProviderResolver.getFallbackProvider).mockResolvedValue({
 				config: mockFallbackConfig,
 				model: 'gpt-4',
-				name: ProviderName.OPENAI
+				name: BuiltinProviders.OPENAI
 			});
 
 			// Use cursor as providerName to trigger fallback resolution
@@ -214,14 +214,14 @@ describe('ProviderFallbackService', () => {
 				{
 					inMCPContext: true,
 					providerConfig: {},
-					providerName: ProviderName.CURSOR
+					providerName: BuiltinProviders.CURSOR
 				},
 				mockMCPSampling
 			);
 
 			// The implementation uses getFallbackProvider() which returns 'openai' as the best available provider
 			expect(mockProviderRegistry.createProvider).toHaveBeenCalledWith(
-				ProviderName.OPENAI,
+				BuiltinProviders.OPENAI,
 				mockFallbackConfig,
 				mockMCPSampling
 			);
@@ -238,14 +238,14 @@ describe('ProviderFallbackService', () => {
 			const result = await service.resolveWithFallback({
 				inMCPContext: false,
 				providerConfig,
-				providerName: ProviderName.ANTHROPIC
+				providerName: BuiltinProviders.ANTHROPIC
 			});
 
 			expect(result.resolutionPath).toBe('api_fallback');
-			expect(result.providerName).toBe(ProviderName.ANTHROPIC);
+			expect(result.providerName).toBe(BuiltinProviders.ANTHROPIC);
 			expect(result.fallbackReason).toBeUndefined();
 			expect(mockProviderRegistry.createProvider).toHaveBeenCalledWith(
-				ProviderName.ANTHROPIC,
+				BuiltinProviders.ANTHROPIC,
 				providerConfig,
 				undefined
 			);
@@ -263,7 +263,7 @@ describe('ProviderFallbackService', () => {
 			process.env['AI_MCP_ENABLED'] = 'true';
 			vi.mocked(mockProviderResolver.getFallbackProvider).mockResolvedValue({
 				config: { apiKey: 'key' } as ProviderConfig,
-				name: ProviderName.ANTHROPIC
+				name: BuiltinProviders.ANTHROPIC
 			});
 
 			const result = await service.shouldUseGuidedCompletion();

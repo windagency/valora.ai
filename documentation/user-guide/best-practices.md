@@ -1,3 +1,7 @@
+---
+updated: 2026-05-07
+---
+
 # Best Practices
 
 A quick-reference summary of recommended practices for VALORA. For command sequences and detailed rationale, see the [Workflows guide](./workflows.md).

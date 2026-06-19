@@ -1,0 +1,38 @@
+diff --git a/src/executor/output-compression.service.ts b/src/executor/output-compression.service.ts
+index 3a7c832..6d40b79 100644
+--- a/src/executor/output-compression.service.ts
++++ b/src/executor/output-compression.service.ts
+@@ -117,7 +117,7 @@ export function compressTerminalOutput(command: string, output: string): string
+ 		return clean;
+ 	}
+ 
+-	const tool = firstToken(command);
++	const tool = resolveStrategyKey(command);
+ 	const strategy = registry.get(tool);
+ 	let compressed: string;
+ 	if (strategy) {
+@@ -131,12 +131,21 @@ export function compressTerminalOutput(command: string, output: string): string
+ 	}
+ 
+ 	const result = truncateTerminalOutput(compressed);
+-	recordCompression(clean.length, result.length);
++	recordCompression(output.length, result.length);
+ 	return result;
+ }
+ 
+ // ── Internal helpers ──────────────────────────────────────────────────────────
+ 
+-function firstToken(command: string): string {
+-	return command.trimStart().split(/\s+/)[0] ?? '';
++const WRAPPER_COMMANDS = new Set(['pnpm', 'npm', 'npx', 'yarn', 'bun', 'bunx']);
++
++const PM_SUBCOMMANDS = new Set(['install', 'add', 'remove', 'i', 'audit', 'outdated', 'run', 'exec', 'dlx', 'test']);
++
++function resolveStrategyKey(command: string): string {
++	const tokens = command.trimStart().split(/\s+/);
++	const first = tokens[0] ?? '';
++	if (!WRAPPER_COMMANDS.has(first)) return first;
++	const second = tokens[1] ?? '';
++	if (!PM_SUBCOMMANDS.has(second) && registry.has(second)) return second;
++	return first;
+ }

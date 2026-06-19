@@ -1,0 +1,9 @@
+++++++++++++++++++++++++++++++++++++++++++++++++++++++
+added 842 packages (34s)
++ @types/node@20.11.5
++ @types/react@18.2.48
++ @types/react-dom@18.2.18
++ typescript@5.3.3
++ eslint@8.56.0
+[47 more packages]
+3 vulnerabilities (1 moderate, 2 high)

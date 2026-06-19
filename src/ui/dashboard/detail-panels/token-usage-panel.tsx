@@ -13,10 +13,9 @@ import { formatNumber } from 'utils/number-format';
 import { type EndpointSummary, getSpendingTracker, type SpendingTotals } from 'utils/spending-tracker';
 
 const tui = getTUIAdapter();
-// eslint-disable-next-line @typescript-eslint/naming-convention -- Box and Text are React components which require PascalCase
+
 const { Box, Text } = tui;
 
-// eslint-disable-next-line @typescript-eslint/naming-convention -- React components must use PascalCase
 export function TokenUsagePanel({ session }: { session: Session }): React.JSX.Element {
 	const tracker = getSpendingTracker();
 	const sessionStart = session.created_at;
@@ -86,7 +85,6 @@ export function TokenUsagePanel({ session }: { session: Session }): React.JSX.El
 	);
 }
 
-// eslint-disable-next-line @typescript-eslint/naming-convention -- React component must use PascalCase
 function CommandRow({ e, maxTokens }: { e: EndpointSummary; maxTokens: number }): React.JSX.Element {
 	const barWidth = 20;
 	const filled = Math.max(1, Math.floor((e.totalTokens / maxTokens) * barWidth));
@@ -121,7 +119,6 @@ function getContextInfo(
 	return { contextWindowSize, utilizationPercent };
 }
 
-// eslint-disable-next-line @typescript-eslint/naming-convention -- React component must use PascalCase
 function TokenBreakdown({ totals }: { totals: SpendingTotals }): React.JSX.Element {
 	return (
 		<Box flexDirection="column" marginTop={1}>

@@ -1,0 +1,9 @@
+{
+	"name": "valora-core-generators",
+	"version": "1.0.0",
+	"description": "Meta-workflow prompts for generating new Valora agents and commands.",
+	"engines": {
+		"valora": ">=0.1.0"
+	},
+	"contributes": ["prompts"]
+}

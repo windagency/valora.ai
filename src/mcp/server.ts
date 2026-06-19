@@ -5,17 +5,21 @@
  * Exposes orchestration commands as MCP tools for Cursor integration
  */
 
-import path from 'path';
-
 import type { CommandExecutor } from 'cli/command-executor';
 import type { CommandLoader } from 'executor/command-loader';
 import type { MCPSamplingOptions, MCPSamplingResult, MCPSamplingService } from 'types/mcp.types';
 
 import { getConfigLoader, setGlobalCliOverrides } from 'config/loader';
-import { createContainer, type DIContainer, SERVICE_IDENTIFIERS, setupMCPServices } from 'di/container';
+import {
+	createContainer,
+	type DIContainer,
+	dispatchDeactivateHooks,
+	initializePlugins,
+	SERVICE_IDENTIFIERS,
+	setupMCPServices
+} from 'di/container';
 import { getLogger, type Logger } from 'output/logger';
-import { readJSON } from 'utils/file-utils';
-import { getPackageRoot } from 'utils/paths';
+import { getValoraVersion } from 'utils/paths';
 
 import type { MCPRequestHandler } from './request-handler';
 import type { MCPSamplingServiceImpl } from './sampling-service';
@@ -31,9 +35,6 @@ process.env['AI_INTERACTIVE'] = 'false';
 // Mark that we're running in MCP/Cursor context
 process.env['AI_MCP_ENABLED'] = 'true';
 
-/**
- * Get the version from package.json
- */
 export class MCPOrchestratorServer implements MCPSamplingService {
 	private serverManager: MCPServerManager;
 	// @ts-expect-error - Kept for service lifecycle
@@ -44,13 +45,12 @@ export class MCPOrchestratorServer implements MCPSamplingService {
 	private logger: Logger;
 	private samplingService: MCPSamplingServiceImpl;
 	private toolRegistry: MCPToolRegistry;
-	// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-	// @ts-ignore - Kept for service lifecycle
+
+	// @ts-expect-error — kept for service lifecycle; assigned but only consumed externally
 	private requestHandler: MCPRequestHandler;
-	private systemMonitor: SystemMonitorService;
-	// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-	// @ts-ignore - Planned for future use
 	private shutdownManager: ShutdownManager;
+
+	private systemMonitor: SystemMonitorService;
 
 	constructor(logger?: Logger, version?: string) {
 		this.logger = logger ?? getLogger(); // Fallback to default logger if none provided
@@ -108,6 +108,26 @@ export class MCPOrchestratorServer implements MCPSamplingService {
 		// Use logger exclusively - it already uses stderr with proper formatting
 		this.logger.info('MCP Orchestrator Server starting', { mode, port });
 
+		// Load plugins before any commands are registered
+		await initializePlugins(this.container);
+		this.shutdownManager.registerCleanup(() => dispatchDeactivateHooks(this.container));
+
+		// Flush memory on shutdown so any in-flight writes (debounced or
+		// otherwise) are persisted before the process exits. ADR-011 promises
+		// that memory operations are graceful — losing data on SIGTERM would
+		// silently violate that contract.
+		this.shutdownManager.registerCleanup(async () => {
+			try {
+				const { getMemoryRegistry } = await import('memory/registry');
+				const registry = getMemoryRegistry();
+				if (registry.hasActive()) {
+					await registry.getActive().flush();
+				}
+			} catch (err) {
+				this.logger.warn(`Memory flush failed during shutdown: ${String(err)}`);
+			}
+		});
+
 		// Start system monitoring
 		this.systemMonitor.startMonitoring();
 
@@ -143,22 +163,6 @@ export class MCPOrchestratorServer implements MCPSamplingService {
 		} else {
 			this.logger.debug('Client capabilities pending (will be available after first request)');
 		}
-	}
-}
-
-async function getPackageVersion(): Promise<string> {
-	try {
-		// Read version from the package root's package.json
-		const packageRoot = getPackageRoot();
-		const packageJsonPath = path.join(packageRoot, 'package.json');
-
-		const packageJson = await readJSON<{ version: string }>(packageJsonPath);
-		return packageJson.version;
-	} catch (error) {
-		// Fallback to hardcoded version if package.json can't be read
-
-		console.warn('Failed to read package.json version, using fallback:', error);
-		return '1.0.0';
 	}
 }
 
@@ -276,7 +280,7 @@ async function startMCPServer(): Promise<void> {
 	await configLoader.load();
 
 	const logger = getLogger();
-	const version = await getPackageVersion();
+	const version = getValoraVersion();
 	const server = new MCPOrchestratorServer(logger, version);
 
 	// Only auto-start server in production/development, not in tests

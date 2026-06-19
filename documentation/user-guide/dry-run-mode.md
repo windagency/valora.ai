@@ -1,3 +1,7 @@
+---
+updated: 2026-05-07
+---
+
 # Dry Run Mode
 
 Preview what a command would do without making any changes.

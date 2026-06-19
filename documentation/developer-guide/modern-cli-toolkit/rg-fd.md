@@ -1,4 +1,10 @@
+---
+updated: 2026-05-07
+---
+
 # ripgrep (rg) and fd reference
+
+> Command reference for searching file contents (`rg`) and finding files by name or pattern (`fd`).
 
 ## Quick Reference
 

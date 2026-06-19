@@ -50,6 +50,24 @@ if [ -d "$CLAUDE_VOL" ]; then
 fi
 
 # --------------------------------------------------
+# Valora .env — export workspace env vars into every shell session
+# --------------------------------------------------
+VALORA_ENV="/workspaces/valora/.env"
+if [ -f "$VALORA_ENV" ]; then
+    grep -qF "valora .env" ~/.bashrc 2>/dev/null || cat >> ~/.bashrc << 'BASH_ENV'
+
+# Valora .env
+set -a; source /workspaces/valora/.env; set +a
+BASH_ENV
+
+    grep -qF "valora .env" ~/.zshrc 2>/dev/null || cat >> ~/.zshrc << 'ZSH_ENV'
+
+# Valora .env
+set -a; source /workspaces/valora/.env; set +a
+ZSH_ENV
+fi
+
+# --------------------------------------------------
 # Zsh plugins
 # --------------------------------------------------
 ZSH_CUSTOM="${ZSH_CUSTOM:-/home/node/.oh-my-zsh/custom}"

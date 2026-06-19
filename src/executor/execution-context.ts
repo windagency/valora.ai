@@ -12,6 +12,9 @@
  * - State management is centralized in the context
  */
 
+import type { EffectivePermissions } from 'security/permission-propagation.service';
+
+import type { AgentConstraints } from 'types/agent.types';
 import type { AllowedTool, IsolatedExecutionOptions, StageOutput } from 'types/command.types';
 import type { LLMProvider } from 'types/llm.types';
 
@@ -21,10 +24,12 @@ import { VariableResolutionService } from './variable-resolution.service';
  * Session information for tracking execution mode
  */
 export interface ExecutionContextOptions {
+	agentConstraints?: AgentConstraints;
 	agentRole: string;
 	allowedTools?: AllowedTool[];
 	args: string[];
 	commandName: string;
+	delegationDepth?: number;
 	flags: Record<string, boolean | string | undefined>;
 	initialStageOutputs?: Record<string, Record<string, unknown>>;
 	interactive?: boolean;
@@ -36,6 +41,7 @@ export interface ExecutionContextOptions {
 	knowledgeFiles?: string[];
 	mode?: string;
 	model?: string;
+	parentAgentRole?: string;
 	provider: LLMProvider;
 	sessionContext?: Record<string, unknown>;
 	/**
@@ -64,12 +70,15 @@ export class ExecutionContext {
 	public readonly allowedTools?: AllowedTool[];
 	public readonly args: string[];
 	public readonly commandName: string;
+	public readonly delegationDepth: number;
+	public readonly effectiveConstraints: EffectivePermissions;
 	public readonly flags: Record<string, boolean | string | undefined>;
 	public readonly interactive?: boolean;
 	public readonly isolation?: IsolatedExecutionOptions;
 	public readonly knowledgeFiles?: string[];
 	public readonly mode?: string;
 	public readonly model?: string;
+	public readonly parentAgentRole?: string;
 	public readonly provider: LLMProvider;
 	public readonly sessionInfo?: SessionInfo;
 
@@ -91,6 +100,14 @@ export class ExecutionContext {
 		this.allowedTools = options.allowedTools;
 		this.knowledgeFiles = options.knowledgeFiles;
 		this.sessionInfo = options.sessionInfo;
+		this.parentAgentRole = options.parentAgentRole;
+		this.delegationDepth = options.delegationDepth ?? 0;
+		const constraints = options.agentConstraints ?? {};
+		this.effectiveConstraints = {
+			delegationDepth: this.delegationDepth,
+			forbidden_paths: constraints.forbidden_paths ?? [],
+			requires_approval_for: constraints.requires_approval_for ?? []
+		};
 
 		// Initialize variable resolution service with initial context or use provided one
 		this.variableResolutionService = variableResolutionService ?? this.createVariableResolutionService(options);

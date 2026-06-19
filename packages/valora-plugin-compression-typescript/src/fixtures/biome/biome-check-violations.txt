@@ -1,0 +1,56 @@
+packages/app/src/compare.ts:12:3 lint/suspicious/noDoubleEquals ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  ✖ Use === instead of ==. == is only allowed when comparing against null.
+
+    10 │ function isEqual(a: number, b: number) {
+    11 │   const threshold = 0;
+  > 12 │   if (a == b) {
+       │      ^^
+    13 │     return true;
+    14 │   }
+
+  ℹ Unsafe fix: Use ===
+
+    12 │   if (a === b) {
+       │       +++
+
+packages/app/src/validate.ts:5:7 lint/suspicious/noDoubleEquals ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  ✖ Use === instead of ==.
+
+     3 │ export function validate(val: unknown) {
+     4 │   const zero = 0;
+  >  5 │   if (val == zero) {
+       │       ^^
+     6 │   }
+
+packages/lib/src/format.ts:21:14 lint/suspicious/noDoubleEquals ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  ✖ Use === instead of ==.
+
+    19 │ function format(x: number) {
+    20 │   const y = 2;
+  > 21 │   return x == y ? 'yes' : 'no';
+       │            ^^
+
+packages/app/src/api.ts:8:15 lint/suspicious/noExplicitAny ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  ✖ Unexpected any. Specify a different type.
+
+     6 │ interface Config {
+     7 │   name: string;
+  >  8 │   handler: (e: any) => void;
+       │               ^^^
+     9 │ }
+
+packages/lib/src/util.ts:3:22 lint/suspicious/noExplicitAny ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  ✖ Unexpected any. Specify a different type.
+
+     1 │ export function process(
+     2 │   items: string[],
+  >  3 │   transform: (x: any) => string
+       │                  ^^^
+     4 │ ) {}
+
+Found 5 diagnostics.

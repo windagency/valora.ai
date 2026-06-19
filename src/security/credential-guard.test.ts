@@ -68,6 +68,19 @@ describe('CredentialGuard', () => {
 			expect(guard.isSensitiveEnvVar('TERM')).toBe(false);
 			expect(guard.isSensitiveEnvVar('SHELL')).toBe(false);
 		});
+
+		// --- New explicit env-var names ---
+		it('blocks explicit CI/CD credential variable names', () => {
+			expect(guard.isSensitiveEnvVar('GH_TOKEN')).toBe(true);
+			expect(guard.isSensitiveEnvVar('NPM_TOKEN')).toBe(true);
+			expect(guard.isSensitiveEnvVar('DOCKER_PASSWORD')).toBe(true);
+			expect(guard.isSensitiveEnvVar('DOCKER_AUTH')).toBe(true);
+			expect(guard.isSensitiveEnvVar('SLACK_TOKEN')).toBe(true);
+			expect(guard.isSensitiveEnvVar('CIRCLE_TOKEN')).toBe(true);
+			expect(guard.isSensitiveEnvVar('BUILDKITE_AGENT_TOKEN')).toBe(true);
+			expect(guard.isSensitiveEnvVar('VAULT_TOKEN')).toBe(true);
+			expect(guard.isSensitiveEnvVar('KUBECONFIG')).toBe(true);
+		});
 	});
 
 	describe('sanitiseEnvironment', () => {
@@ -80,17 +93,17 @@ describe('CredentialGuard', () => {
 				PATH: '/usr/bin'
 			};
 
-			const sanitised = guard.sanitiseEnvironment(env);
+			const sanitized = guard.sanitizeEnvironment(env);
 
-			expect(sanitised['ANTHROPIC_API_KEY']).toBe('[REDACTED]');
-			expect(sanitised['OPENAI_API_KEY']).toBe('[REDACTED]');
-			expect(sanitised['HOME']).toBe('/home/user');
-			expect(sanitised['NODE_ENV']).toBe('production');
-			expect(sanitised['PATH']).toBe('/usr/bin');
+			expect(sanitized['ANTHROPIC_API_KEY']).toBe('[REDACTED]');
+			expect(sanitized['OPENAI_API_KEY']).toBe('[REDACTED]');
+			expect(sanitized['HOME']).toBe('/home/user');
+			expect(sanitized['NODE_ENV']).toBe('production');
+			expect(sanitized['PATH']).toBe('/usr/bin');
 		});
 
 		it('records events for redacted variables', () => {
-			guard.sanitiseEnvironment({ MY_API_KEY: 'secret' });
+			guard.sanitizeEnvironment({ MY_API_KEY: 'secret' });
 			const events = guard.getEvents();
 			expect(events.length).toBeGreaterThan(0);
 			expect(events[0]!.type).toBe('credential_redacted');
@@ -137,6 +150,89 @@ describe('CredentialGuard', () => {
 		it('handles null/empty input', () => {
 			expect(guard.scanOutput('')).toBe('');
 			expect(guard.scanOutput(null as unknown as string)).toBeNull();
+		});
+
+		// --- New patterns: GitHub tokens ---
+		it('redacts GitHub personal access tokens (ghp_)', () => {
+			const output = 'export GITHUB_TOKEN=ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghij';
+			const scanned = guard.scanOutput(output);
+			expect(scanned).not.toContain('ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghij');
+			expect(scanned).toContain('[REDACTED]');
+		});
+
+		it('redacts GitHub Actions tokens (ghs_)', () => {
+			const output = 'token: ghs_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghij';
+			const scanned = guard.scanOutput(output);
+			expect(scanned).not.toContain('ghs_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghij');
+			expect(scanned).toContain('[REDACTED]');
+		});
+
+		it('redacts GitHub Actions runner tokens (ghu_)', () => {
+			const output = 'runner token: ghu_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghij';
+			const scanned = guard.scanOutput(output);
+			expect(scanned).not.toContain('ghu_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghij');
+			expect(scanned).toContain('[REDACTED]');
+		});
+
+		it('redacts GitHub App installation tokens (ghr_)', () => {
+			const output = 'app token: ghr_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghij';
+			const scanned = guard.scanOutput(output);
+			expect(scanned).not.toContain('ghr_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghij');
+			expect(scanned).toContain('[REDACTED]');
+		});
+
+		// --- New patterns: JWT ---
+		it('redacts JWT tokens', () => {
+			const jwt =
+				'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c';
+			const output = `Authorization header contains ${jwt}`;
+			const scanned = guard.scanOutput(output);
+			expect(scanned).not.toContain(jwt);
+			expect(scanned).toContain('[REDACTED]');
+		});
+
+		// --- New patterns: high-entropy fallback ---
+		it('redacts high-entropy strings adjacent to credential-suggesting words', () => {
+			// 32+ char alphanumeric with entropy >= 4.5 next to "token"
+			const output = 'token=xK9mP2vQrL4nJ8wZ1aY5bC7dF3gH6eI0';
+			const scanned = guard.scanOutput(output);
+			expect(scanned).not.toContain('xK9mP2vQrL4nJ8wZ1aY5bC7dF3gH6eI0');
+			expect(scanned).toContain('[REDACTED]');
+		});
+
+		it('redacts high-entropy strings adjacent to "secret" keyword', () => {
+			const output = 'secret: aBcDeFgHiJkLmNoPqRsTuVwXyZ1234567890ab';
+			const scanned = guard.scanOutput(output);
+			expect(scanned).not.toContain('aBcDeFgHiJkLmNoPqRsTuVwXyZ1234567890ab');
+			expect(scanned).toContain('[REDACTED]');
+		});
+
+		// --- False-positive avoidance ---
+		it('does not redact 40-char git SHAs', () => {
+			const sha = 'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2';
+			const output = `commit ${sha}`;
+			const scanned = guard.scanOutput(output);
+			expect(scanned).toContain(sha);
+		});
+
+		it('does not redact npm lockfile sha512 hashes', () => {
+			const hash = 'sha512-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
+			const output = `integrity: ${hash}`;
+			const scanned = guard.scanOutput(output);
+			expect(scanned).toContain(hash);
+		});
+
+		it('does not redact short 16-char hex identifiers', () => {
+			const hex = 'deadbeefcafebabe';
+			const output = `trace_id=${hex}`;
+			const scanned = guard.scanOutput(output);
+			expect(scanned).toContain(hex);
+		});
+
+		it('does not redact plain dictionary words like node_modules path', () => {
+			const output = 'Scanning /workspace/project/node_modules/some-package/dist/index.js for issues';
+			const scanned = guard.scanOutput(output);
+			expect(scanned).toContain('node_modules');
 		});
 	});
 

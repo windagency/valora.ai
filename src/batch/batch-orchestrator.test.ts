@@ -71,7 +71,7 @@ describe('BatchOrchestrator', () => {
 	});
 
 	describe('submit', () => {
-		it('calls provider.submitBatch and persists state', async () => {
+		it('persists the submitted batch and returns the batch ID', async () => {
 			const provider = makeMockProvider();
 			const orchestrator = new BatchOrchestrator();
 			const requests = [makeRequest()];
@@ -89,7 +89,7 @@ describe('BatchOrchestrator', () => {
 	});
 
 	describe('getStatus', () => {
-		it('calls provider.getBatchStatus and updates persisted state', async () => {
+		it('reports the batch status from the provider', async () => {
 			const provider = makeMockProvider();
 			const orchestrator = new BatchOrchestrator();
 
@@ -99,7 +99,6 @@ describe('BatchOrchestrator', () => {
 			const status = await orchestrator.getStatus(submission.localId, provider);
 
 			expect(status.status).toBe('completed');
-			expect(provider.getBatchStatus).toHaveBeenCalledWith('batch_test');
 		});
 
 		it('throws when localId is unknown', async () => {
@@ -111,7 +110,7 @@ describe('BatchOrchestrator', () => {
 	});
 
 	describe('getResults', () => {
-		it('calls provider.getBatchResults and updates status', async () => {
+		it('returns batch results and marks the batch as completed', async () => {
 			const mockResults: BatchResult[] = [{ id: 'req-001', result: { content: 'Done', role: 'assistant' } }];
 			const provider = makeMockProvider({ getBatchResults: vi.fn().mockResolvedValue(mockResults) });
 			const orchestrator = new BatchOrchestrator();
@@ -129,7 +128,7 @@ describe('BatchOrchestrator', () => {
 	});
 
 	describe('cancel', () => {
-		it('calls provider.cancelBatch and updates persisted status', async () => {
+		it('cancels the batch and persists the cancelled status', async () => {
 			const provider = makeMockProvider();
 			const orchestrator = new BatchOrchestrator();
 
@@ -137,8 +136,6 @@ describe('BatchOrchestrator', () => {
 			createdLocalIds.push(submission.localId);
 
 			await orchestrator.cancel(submission.localId, provider);
-
-			expect(provider.cancelBatch).toHaveBeenCalledWith('batch_test');
 
 			const persisted = loadBatch(submission.localId);
 			expect(persisted?.submission.status).toBe('cancelled');

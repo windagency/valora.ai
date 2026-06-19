@@ -1,8 +1,27 @@
+---
+updated: 2026-05-07
+---
+
 # Logo
 
 The Valora logo is an indigo/cyan gradient hexagonal badge enclosing a tapered V shape, with the wordmark "VALORA" in a geometric sans-serif and a monospace tagline. See `assets/` for logo files.
 
+## Colour System at a Glance
+
+| Name      | Hex                 | Role                                            |
+| --------- | ------------------- | ----------------------------------------------- |
+| Abyss     | `#060b17`           | Page background — deep, near-void navy          |
+| Deep Navy | `#0b1422`           | Hexagon interior — slightly lifted surface      |
+| Surface   | `#121f38`           | Cards, secondary backgrounds                    |
+| Quantum   | `#00d4ff`           | Primary accent — input, activity, energy        |
+| Violet    | `#8b5cf6`           | Secondary accent — synthesis, intelligence      |
+| Pipeline  | `#00d4ff → #8b5cf6` | The gradient — the journey from input to output |
+| Ice White | `#eef4ff`           | Wordmark and text on dark backgrounds           |
+
 ---
+
+<details>
+<summary><strong>Creative process and design rationale</strong></summary>
 
 ## Creative Process
 
@@ -121,3 +140,5 @@ Any future extensions of this identity — light-mode variants, illustrations, d
 - **Dark-first.** The identity was designed for dark surfaces. Light-mode variants should use the monochrome version of the mark (deep navy on white) rather than inverting the gradient, which loses the energy.
 - **Gradients run input-to-output.** Cyan is always the starting state; violet is always the resolved state. Reversing the gradient direction would contradict the visual narrative.
 - **Monospace for technical context.** Any instance of code, commands, or CLI output associated with the brand should use a monospace face, maintaining the terminal aesthetic.
+
+</details>

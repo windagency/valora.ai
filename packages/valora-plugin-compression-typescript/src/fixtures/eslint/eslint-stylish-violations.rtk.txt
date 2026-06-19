@@ -1,0 +1,12 @@
+/workspaces/valora/src/analysis/code-analyser.ts
+  no-unused-vars (6 errors), no-floating-promises (4 errors), complexity (3 errors)
+/workspaces/valora/src/batch/batch-processor.ts
+  no-unused-vars (4 errors), no-floating-promises (3 errors), no-console (5 warnings)
+/workspaces/valora/src/cli/command-handler.ts
+  no-unused-vars (3 errors), no-floating-promises (3 errors), complexity (2 errors)
+/workspaces/valora/src/executor/output-compression.service.ts
+  no-unused-vars (3 errors), no-floating-promises (2 errors), complexity (2 errors)
+/workspaces/valora/src/session/store.ts
+  no-unused-vars (2 errors), no-floating-promises (2 errors)
+
+52 problems (47 errors, 5 warnings)

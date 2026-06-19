@@ -1,3 +1,7 @@
+---
+updated: 2026-05-07
+---
+
 # ADR-004: Pipeline Execution Model
 
 > **Decision**: Commands are executed as configurable pipelines of sequential, parallel, conditional, and interactive stages, enabling composition, parallel execution, and centralised error handling.
@@ -6,7 +10,30 @@
 
 Accepted
 
-## Context
+## Consequences
+
+### Positive
+
+- **Composability**: Stages can be reused across commands
+- **Flexibility**: Mix sequential and parallel execution
+- **Error Handling**: Centralised error and rollback handling
+- **Observability**: Clear execution flow for debugging
+- **Testability**: Stages can be tested in isolation
+
+### Negative
+
+- **Complexity**: More abstraction than simple sequential code
+- **Learning Curve**: Contributors need to understand pipeline model
+- **Overhead**: Small commands may feel over-engineered
+- **Debugging**: Pipeline issues can be harder to trace
+
+### Neutral
+
+- **Configuration-Driven**: Pipelines defined in command specifications
+- **Event Emission**: Stages emit events for monitoring
+
+<details>
+<summary><strong>Context</strong></summary>
 
 Commands in VALORA often require multiple steps:
 
@@ -22,6 +49,8 @@ A simple sequential execution model would be:
 - Difficult to compose stages
 - Hard to implement parallel execution
 - Challenging to handle errors and rollbacks
+
+</details>
 
 ## Decision
 
@@ -133,27 +162,40 @@ Interactive stages integrate with the `onboard.collect-clarifications` prompt wh
 - Permits skipping non-critical questions
 - Generates a formatted summary for inclusion in final documents
 
-## Consequences
+<details>
+<summary><strong>Alternatives considered</strong></summary>
 
-### Positive
+### Alternative 1: Simple Function Chains
 
-- **Composability**: Stages can be reused across commands
-- **Flexibility**: Mix sequential and parallel execution
-- **Error Handling**: Centralised error and rollback handling
-- **Observability**: Clear execution flow for debugging
-- **Testability**: Stages can be tested in isolation
+Chain of function calls without abstraction.
 
-### Negative
+**Rejected because**:
 
-- **Complexity**: More abstraction than simple sequential code
-- **Learning Curve**: Contributors need to understand pipeline model
-- **Overhead**: Small commands may feel over-engineered
-- **Debugging**: Pipeline issues can be harder to trace
+- No parallel execution
+- Difficult error handling
+- Hard to extend
 
-### Neutral
+### Alternative 2: Event-Driven Architecture
 
-- **Configuration-Driven**: Pipelines defined in command specifications
-- **Event Emission**: Stages emit events for monitoring
+Pure event-driven with message queues.
+
+**Rejected because**:
+
+- Overcomplicated for CLI tool
+- Harder to reason about
+- Unnecessary infrastructure
+
+### Alternative 3: Workflow Engine (Temporal/Cadence)
+
+Full workflow orchestration platform.
+
+**Rejected because**:
+
+- Heavy dependency
+- Overcomplicated for local tool
+- Better suited for distributed systems
+
+</details>
 
 ## Implementation Details
 
@@ -236,38 +278,6 @@ pipeline:
         - action: validatePlan
         - action: saveToSession
 ```
-
-## Alternatives Considered
-
-### Alternative 1: Simple Function Chains
-
-Chain of function calls without abstraction.
-
-**Rejected because**:
-
-- No parallel execution
-- Difficult error handling
-- Hard to extend
-
-### Alternative 2: Event-Driven Architecture
-
-Pure event-driven with message queues.
-
-**Rejected because**:
-
-- Overcomplicated for CLI tool
-- Harder to reason about
-- Unnecessary infrastructure
-
-### Alternative 3: Workflow Engine (Temporal/Cadence)
-
-Full workflow orchestration platform.
-
-**Rejected because**:
-
-- Heavy dependency
-- Overcomplicated for local tool
-- Better suited for distributed systems
 
 ## References
 

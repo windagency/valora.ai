@@ -1,3 +1,7 @@
+---
+updated: 2026-05-07
+---
+
 # Workflow Metrics and Optimisation
 
 VALORA automatically collects data about workflow efficiency and surfaces actionable recommendations via a weekly dashboard.

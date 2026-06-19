@@ -2,8 +2,8 @@
  * Welcome banner for first-run experience
  */
 
-// eslint-disable-next-line no-restricted-imports -- no path alias exists for root package.json
-import pkg from '../../package.json' with { type: 'json' };
+import { getValoraVersion } from 'utils/paths';
+
 import { getColorAdapter } from './color-adapter.interface';
 import { getHeaderFormatter } from './header-formatter';
 
@@ -11,11 +11,7 @@ import { getHeaderFormatter } from './header-formatter';
  * Get package version
  */
 function getVersion(): string {
-	try {
-		return pkg.version ?? '1.0.0';
-	} catch {
-		return '1.0.0';
-	}
+	return getValoraVersion();
 }
 
 /**

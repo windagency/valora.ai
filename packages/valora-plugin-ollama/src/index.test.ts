@@ -1,0 +1,91 @@
+import { describe, expect, it, vi } from 'vitest';
+
+import type { PluginAPI, ProviderDescriptor } from '@windagency/valora-plugin-api';
+
+import { register } from './index.js';
+
+function makeApi(): PluginAPI & {
+	capturedDescriptor: ProviderDescriptor | undefined;
+	capturedName: string | undefined;
+	deactivateHooks: Array<() => Promise<void>>;
+	registeredProviders: Record<string, unknown>;
+} {
+	const registeredProviders: Record<string, unknown> = {};
+	const deactivateHooks: Array<() => Promise<void>> = [];
+	let capturedDescriptor: ProviderDescriptor | undefined;
+	let capturedName: string | undefined;
+
+	return {
+		capturedDescriptor: undefined,
+		capturedName: undefined,
+		config: { extend: vi.fn() },
+		compression: { registerStrategy: vi.fn() },
+		deactivateHooks,
+		lifecycle: {
+			onActivate: vi.fn(),
+			onDeactivate: (fn) => {
+				deactivateHooks.push(fn);
+			}
+		},
+		logger: { debug: vi.fn(), error: vi.fn(), info: vi.fn(), warn: vi.fn() },
+		providers: {
+			register: (name, cls, descriptor) => {
+				registeredProviders[name] = cls;
+				capturedName = name;
+				capturedDescriptor = descriptor;
+			}
+		},
+		get capturedDescriptor() {
+			return capturedDescriptor;
+		},
+		get capturedName() {
+			return capturedName;
+		},
+		registeredProviders
+	};
+}
+
+describe('valora-plugin-ollama register()', () => {
+	it('registers "ollama" provider via api.providers.register()', () => {
+		const api = makeApi();
+		register(api);
+		expect(api.registeredProviders['ollama']).toBeDefined();
+	});
+
+	it('registers the provider with the name "ollama"', () => {
+		const api = makeApi();
+		register(api);
+		expect(api.capturedName).toBe('ollama');
+	});
+
+	it('passes a descriptor with label "Ollama"', () => {
+		const api = makeApi();
+		register(api);
+		expect(api.capturedDescriptor?.label).toBe('Ollama');
+	});
+
+	it('passes a descriptor with modelPrefix "ollama:"', () => {
+		const api = makeApi();
+		register(api);
+		expect(api.capturedDescriptor?.modelPrefix).toBe('ollama:');
+	});
+
+	it('passes a descriptor with requiresApiKey false', () => {
+		const api = makeApi();
+		register(api);
+		expect(api.capturedDescriptor?.requiresApiKey).toBe(false);
+	});
+
+	it('passes a descriptor whose modelModes includes an entry for llama3.1', () => {
+		const api = makeApi();
+		register(api);
+		const modes = api.capturedDescriptor?.modelModes ?? [];
+		expect(modes.some((m) => m.model === 'llama3.1')).toBe(true);
+	});
+
+	it('registers a deactivate hook via api.lifecycle.onDeactivate()', () => {
+		const api = makeApi();
+		register(api);
+		expect(api.deactivateHooks).toHaveLength(1);
+	});
+});

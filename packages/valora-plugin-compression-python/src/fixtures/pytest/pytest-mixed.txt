@@ -1,0 +1,50 @@
+============================= test session starts ==============================
+platform linux -- Python 3.11.0, pytest-7.4.0, pluggy-1.3.0
+rootdir: /workspaces/myproject
+collected 18 items
+
+PASSED tests/test_auth.py::test_login_valid_credentials
+PASSED tests/test_auth.py::test_logout_clears_session
+PASSED tests/test_auth.py::test_register_new_user
+PASSED tests/test_user.py::test_get_user_by_id
+PASSED tests/test_user.py::test_update_user_profile
+PASSED tests/test_user.py::test_list_users_paginated
+PASSED tests/test_service.py::test_process_valid_input
+PASSED tests/test_service.py::test_process_empty_input
+PASSED tests/test_service.py::test_transform_data_format
+PASSED tests/test_api.py::test_get_endpoint_returns_200
+PASSED tests/test_api.py::test_get_nonexistent_returns_404
+PASSED tests/test_api.py::test_unauthorized_returns_401
+PASSED tests/test_db.py::test_connection_pool
+PASSED tests/test_db.py::test_transaction_commit
+PASSED tests/test_db.py::test_query_with_filter
+FAILED tests/test_service.py::test_process_invalid
+
+tests/test_service.py::test_process_invalid
+  def test_process_invalid():
+      result = process_value(-1)
+>     assert result == 0
+E     AssertionError: assert 42 == 0
+E     where 42 = process_value(-1)
+
+FAILED tests/test_service.py::test_validate_overflow
+
+tests/test_service.py::test_validate_overflow
+  def test_validate_overflow():
+      value = compute_max(100)
+>     assert value <= 100
+E     AssertionError: assert 999 <= 100
+
+FAILED tests/test_db.py::test_concurrent_writes_conflict
+
+tests/test_db.py::test_concurrent_writes_conflict
+  def test_concurrent_writes_conflict():
+      with session.begin():
+>         db.write(record, db.write(record))
+E     AssertionError: deadlock detected
+
+=========================== short test summary info ============================
+FAILED tests/test_service.py::test_process_invalid - AssertionError: assert 42 == 0
+FAILED tests/test_service.py::test_validate_overflow - AssertionError: assert 999 <= 100
+FAILED tests/test_db.py::test_concurrent_writes_conflict - AssertionError: deadlock detected
+=================== 3 failed, 15 passed in 2.15s ==============================

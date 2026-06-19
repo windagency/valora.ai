@@ -6,24 +6,41 @@
  */
 
 /**
- * Type-safe provider names enum
- * Use this instead of hard-coded strings for provider comparisons
+ * Branded string type for provider names.
+ * Prevents accidental use of raw strings where a ProviderName is expected,
+ * while allowing plugin-contributed names (arbitrary strings) to share the type.
+ * Use `providerName(s)` to brand a raw string at system boundaries.
  */
-export enum ProviderName {
-	ANTHROPIC = 'anthropic',
-	CURSOR = 'cursor',
-	GOOGLE = 'google',
-	LOCAL = 'local',
-	MOONSHOT = 'moonshot',
-	OPENAI = 'openai',
-	XAI = 'xai'
+export type ProviderName = string & { readonly __brand: 'ProviderName' };
+
+/**
+ * Brand a raw string as a ProviderName.
+ * Call this at system boundaries (CLI arg parsing, config loading, plugin registration)
+ * where a raw string enters the system and must become a ProviderName.
+ */
+export function providerName(s: string): ProviderName {
+	return s as ProviderName;
 }
+
+/**
+ * Built-in provider name constants.
+ * Use these wherever the old `ProviderName.ANTHROPIC` enum members were used as values.
+ */
+export const BuiltinProviders = {
+	ANTHROPIC: providerName('anthropic'),
+	CURSOR: providerName('cursor'),
+	GOOGLE: providerName('google'),
+	LOCAL: providerName('local'),
+	MOONSHOT: providerName('moonshot'),
+	OPENAI: providerName('openai'),
+	XAI: providerName('xai')
+} as const;
 
 /**
  * Commonly used model names as constants
  * Use these for type-safe model comparisons
  */
-// eslint-disable-next-line @typescript-eslint/naming-convention -- PascalCase for const enum object following TypeScript enum pattern
+
 export const ModelName = {
 	// Anthropic models
 	CLAUDE_HAIKU_3_5: 'claude-haiku-3.5',

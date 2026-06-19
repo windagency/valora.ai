@@ -1,0 +1,49 @@
+{
+	"name": "@windagency/valora-plugin-api",
+	"version": "1.0.0",
+	"description": "Public plugin API types for Valora plugins.",
+	"keywords": [
+		"valora",
+		"valora-plugin",
+		"plugin-api",
+		"types",
+		"typescript"
+	],
+	"author": "Damien TIVELET <damien@wind-agency.com>",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/windagency/valora.ai"
+	},
+	"license": "MIT",
+	"type": "module",
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"import": "./dist/index.js",
+			"types": "./dist/index.d.ts"
+		}
+	},
+	"engines": {
+		"node": ">=22.0.0"
+	},
+	"packageManager": "pnpm@10.19.0",
+	"volta": {
+		"node": "22.21.0",
+		"pnpm": "10.19.0"
+	},
+	"scripts": {
+		"build": "tsc",
+		"clean": "rm -rf ./dist",
+		"prepublishOnly": "pnpm clean && pnpm build"
+	},
+	"files": [
+		"dist/"
+	],
+	"peerDependencies": {
+		"zod": "^3.22.4"
+	},
+	"devDependencies": {
+		"zod": "^3.22.4"
+	}
+}

@@ -1,0 +1,120 @@
+commit 7ebd98879e974df228c648e25ee44e8f9ed4a4f0
+Author: Damien Tivelet <damien@wind-agency.com>
+Date:   Mon Apr 20 20:17:16 2026 +0000
+
+    Add RTK plugin
+
+commit 23ca93681d61c18859e797e5d497140b0417df2f
+Author: Damien Tivelet <damien@wind-agency.com>
+Date:   Mon Apr 20 19:37:17 2026 +0000
+
+    Documentation
+
+commit aa937577b00c654a19c2975641bbee762ca41ebb
+Author: Damien Tivelet <damien@wind-agency.com>
+Date:   Mon Apr 20 18:18:51 2026 +0000
+
+    Add auto updater
+
+commit b156b8793384e1f6c342a812bcf8d5d8169d4df5
+Merge: dc60ba8 21fed02
+Author: Damien Tivelet <damien@wind-agency.com>
+Date:   Mon Apr 20 16:39:11 2026 +0000
+
+    feat: auto-update feature — background check, valora update command, reminder banner
+
+commit 21fed02a1707b58ab1a42c0957237ec8b34193ce
+Author: Damien Tivelet <damien@wind-agency.com>
+Date:   Mon Apr 20 16:26:06 2026 +0000
+
+    docs(auto-update): add arch boundary rule and user documentation
+
+commit dc60ba89d117a1696a2e4f523e01b27f8696a1d4
+Author: Damien Tivelet <damien@wind-agency.com>
+Date:   Mon Apr 20 13:07:49 2026 +0000
+
+    Add packager
+
+commit b1c5cab3d87ab728db53b6a1475400671235e303
+Author: Damien Tivelet <damien@wind-agency.com>
+Date:   Mon Apr 20 13:07:37 2026 +0000
+
+    fix(cli): use stderr.isTTY and extract rawProgram to reduce cast duplication
+
+commit 3fd630d8f52806fefc00c4e9953a66e092c9a937
+Author: Damien Tivelet <damien@wind-agency.com>
+Date:   Mon Apr 20 13:02:03 2026 +0000
+
+    feat(cli): wire auto-update check and update command into CLI entry point
+
+commit 946c10df6d2684e2343d9c1628d003ab925978c3
+Author: Damien Tivelet <damien@wind-agency.com>
+Date:   Mon Apr 20 12:49:18 2026 +0000
+
+    fix(cli): update state fields and --force --check output in update command
+
+commit 2bc34a75fd25771697faeb00c9b446e279e61313
+Author: Damien Tivelet <damien@wind-agency.com>
+Date:   Mon Apr 20 12:46:44 2026 +0000
+
+    Clean
+
+commit 35e7ccb3a5699bb9dcb4b772e56382d380d2f6c2
+Author: Damien Tivelet <damien@wind-agency.com>
+Date:   Mon Apr 20 12:45:16 2026 +0000
+
+    test(cli): add --force scenario to update command tests
+
+commit bd138fd04c7e1ea52e8b503da6af3a328b86212d
+Author: Damien Tivelet <damien@wind-agency.com>
+Date:   Mon Apr 20 12:42:23 2026 +0000
+
+    feat(cli): add valora update command
+
+commit 1fb68d88f7cf3c5cd296c25ed2ee863e2bc6d7e9
+Author: Damien Tivelet <damien@wind-agency.com>
+Date:   Mon Apr 20 12:33:16 2026 +0000
+
+    feat(config): add autoUpdate schema with reminder/auto/disabled mode
+
+commit 05bc547ee15e789481b9d01c887bbc5306c7291c
+Author: Damien Tivelet <damien@wind-agency.com>
+Date:   Mon Apr 20 12:30:24 2026 +0000
+
+    fix(updater): add runtime path alias; clean up test imports and pending reset
+
+commit e0295cce43c6877173a31a9fba7ba2153dc91bbd
+Author: Damien Tivelet <damien@wind-agency.com>
+Date:   Mon Apr 20 12:21:52 2026 +0000
+
+    fix(updater): store pending check synchronously to prevent race condition
+
+commit b3eae80ffd0cb1ecd70e8a29efece8f358dc1389
+Author: Damien Tivelet <damien@wind-agency.com>
+Date:   Mon Apr 20 12:17:28 2026 +0000
+
+    feat(updater): add core auto-update module
+
+commit 9def755d2ff4575c617203ada6a127693af816a6
+Author: Damien Tivelet <damien@wind-agency.com>
+Date:   Mon Apr 20 10:49:34 2026 +0000
+
+    Update documentation
+
+commit ef02a526e41b1d82486e063d9c5444faa2b71e60
+Author: Damien Tivelet <damien@wind-agency.com>
+Date:   Mon Apr 20 10:14:23 2026 +0000
+
+    Update package.json files
+
+commit 7650c61addd0bfa3dadf7de2d4aa2d0a23c3fd90
+Author: Damien Tivelet <damien@wind-agency.com>
+Date:   Mon Apr 20 09:50:01 2026 +0000
+
+    Update package, tsconfig, eslint, prettier, etc config
+
+commit 8b185defc39d705160f1fb0889f33569324345e9
+Author: Damien Tivelet <damien@wind-agency.com>
+Date:   Mon Apr 20 09:11:03 2026 +0000
+
+    fix: clean:build removes any leaked JS files from src/

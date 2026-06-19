@@ -1,0 +1,530 @@
+commit 7ebd98879e974df228c648e25ee44e8f9ed4a4f0
+Author: Damien Tivelet <damien@wind-agency.com>
+Date:   Mon Apr 20 20:17:16 2026 +0000
+
+    Add RTK plugin
+
+diff --git a/packages/valora-plugin-rtk/.editorconfig b/packages/valora-plugin-rtk/.editorconfig
+new file mode 100644
+index 0000000..095cb35
+--- /dev/null
++++ b/packages/valora-plugin-rtk/.editorconfig
+@@ -0,0 +1,17 @@
++root = true
++
++# EditorConfig : https://EditorConfig.org
++# AirBnB style : https://github.com/airbnb/javascript/blob/master/.editorconfig
++
++[*]
++charset = utf-8
++end_of_line = lf
++indent_size = 2
++indent_style = tab
++insert_final_newline = true
++# editorconfig-tools is unable to ignore longs strings or urls
++max_line_length = 120
++trim_trailing_whitespace = true
++
++[*.md]
++trim_trailing_whitespace = false
+diff --git a/packages/valora-plugin-rtk/.gitattributes b/packages/valora-plugin-rtk/.gitattributes
+new file mode 100644
+index 0000000..2338772
+--- /dev/null
++++ b/packages/valora-plugin-rtk/.gitattributes
+@@ -0,0 +1,25 @@
++*						text 		eol=lf
++*.md        text		diff=markdown
++*.mdx       text		diff=markdown
++
++*.png       binary
++*.jpg       binary
++*.jpeg      binary
++*.webp      binary
++*.gif       binary
++*.mov       binary
++*.mp4       binary
++*.webm      binary
++
++#
++# Exclude files from exporting
++#
++.gitattributes  export-ignore
++.gitignore      export-ignore
++
++#
++# Enable syntax highlighting for files with `.gitattributes` extensions.
++#
++*.gitattributes linguist-language=gitattributes
++*.gitattributes linguist-detectable=true
++*.gitattributes linguist-documentation=false
+diff --git a/packages/valora-plugin-rtk/.gitignore b/packages/valora-plugin-rtk/.gitignore
+new file mode 100644
+index 0000000..91e7c17
+--- /dev/null
++++ b/packages/valora-plugin-rtk/.gitignore
+@@ -0,0 +1,50 @@
++### macOS ###
++.DS_Store
++.AppleDouble
++.LSOverride
++._*
++.DocumentRevisions-V100
++.fseventsd
++.Spotlight-V100
++.TemporaryItems
++.Trashes
++.VolumeIcon.icns
++.com.apple.timemachine.donotpresent
++*.iCloud
++
++### Windows ###
++Thumbs.db
++ehthumbs.db
++[Dd]esktop.ini
++$RECYCLE.BIN/
++*.lnk
++
++### Linux ###
++*~
++.fuse_hidden*
++.directory
++.Trash-*
++.nfs*
++
++### IDE ###
++.idea/
++.vscode/*
++!.vscode/extensions.json
++!.vscode/tasks.json
++!.vscode/launch.json
++.history/
++
++### Node ###
++node_modules/
++*.log
++npm-debug.log*
++yarn-debug.log*
++*.tsbuildinfo
++.npm
++.eslintcache
++*.tgz
++.env*
++!.env.sample
++!.env.example
++.pnp.*
++.yarn-integrity
+diff --git a/packages/valora-plugin-rtk/.npmignore b/packages/valora-plugin-rtk/.npmignore
+new file mode 100644
+index 0000000..0b8e336
+--- /dev/null
++++ b/packages/valora-plugin-rtk/.npmignore
+@@ -0,0 +1,11 @@
++src/
++tsconfig.json
++eslint.config.js
++vitest.config.ts
++node_modules/
++.gitignore
++.gitattributes
++.editorconfig
++.npmrc
++.nvmrc
++.prettierrc.json
+diff --git a/packages/valora-plugin-rtk/.npmrc b/packages/valora-plugin-rtk/.npmrc
+new file mode 100644
+index 0000000..b6f27f1
+--- /dev/null
++++ b/packages/valora-plugin-rtk/.npmrc
+@@ -0,0 +1 @@
++engine-strict=true
+diff --git a/packages/valora-plugin-rtk/.nvmrc b/packages/valora-plugin-rtk/.nvmrc
+new file mode 100644
+index 0000000..b09ba46
+--- /dev/null
++++ b/packages/valora-plugin-rtk/.nvmrc
+@@ -0,0 +1 @@
++v22.21.0
+diff --git a/packages/valora-plugin-rtk/.prettierrc.json b/packages/valora-plugin-rtk/.prettierrc.json
+new file mode 100644
+index 0000000..32f0dfd
+--- /dev/null
++++ b/packages/valora-plugin-rtk/.prettierrc.json
+@@ -0,0 +1,12 @@
++{
++	"arrowParens": "always",
++	"bracketSameLine": true,
++	"bracketSpacing": true,
++	"endOfLine": "auto",
++	"printWidth": 120,
++	"semi": true,
++	"singleQuote": true,
++	"tabWidth": 2,
++	"trailingComma": "none",
++	"useTabs": true
++}
+diff --git a/packages/valora-plugin-rtk/eslint.config.js b/packages/valora-plugin-rtk/eslint.config.js
+new file mode 100644
+index 0000000..b07677c
+--- /dev/null
++++ b/packages/valora-plugin-rtk/eslint.config.js
+@@ -0,0 +1,38 @@
++import rootConfig from '../../eslint.config.js';
++import path from 'node:path';
++import { fileURLToPath } from 'node:url';
++
++const __dirname = path.dirname(fileURLToPath(import.meta.url));
++
++// This package contains only TypeScript test files.
++// Filter out the root config's global test-file ignore so ESLint can reach src/*.test.ts.
++// Restore the other config-file ignores individually (without *.test.ts) so this
++// file is never self-linted (which would cause the import resolver to rewrite the
++// relative path above as an npm package path).
++const baseConfig = rootConfig.filter(
++	(cfg) => !(Array.isArray(cfg.ignores) && !('files' in cfg) && cfg.ignores.includes('**/*.test.ts'))
++);
++
++export default [
++	...baseConfig,
++	{
++		ignores: ['**/*.spec.ts', '**/*.config.ts', '**/*.config.cjs', '**/*.config.js', '**/*.config.mjs']
++	},
++	{
++		files: ['src/**/*.test.ts'],
++		languageOptions: {
++			parserOptions: {
++				project: './tsconfig.json',
++				tsconfigRootDir: __dirname
++			}
++		},
++		settings: {
++			'import/resolver': {
++				typescript: {
++					alwaysTryTypes: true,
++					project: path.resolve(__dirname, 'tsconfig.json')
++				}
++			}
++		}
++	}
++];
+diff --git a/packages/valora-plugin-rtk/hooks.json b/packages/valora-plugin-rtk/hooks.json
+new file mode 100644
+index 0000000..39d4755
+--- /dev/null
++++ b/packages/valora-plugin-rtk/hooks.json
+@@ -0,0 +1,16 @@
++{
++	"hooks": {
++		"PreToolUse": [
++			{
++				"matcher": "^run_terminal_cmd$",
++				"hooks": [
++					{
++						"type": "command",
++						"command": "bash {pluginDir}/hooks/rtk-rewrite.sh",
++						"timeout": 3000
++					}
++				]
++			}
++		]
++	}
++}
+diff --git a/packages/valora-plugin-rtk/hooks/rtk-rewrite.sh b/packages/valora-plugin-rtk/hooks/rtk-rewrite.sh
+new file mode 100755
+index 0000000..dc75cf7
+--- /dev/null
++++ b/packages/valora-plugin-rtk/hooks/rtk-rewrite.sh
+@@ -0,0 +1,43 @@
++#!/usr/bin/env bash
++# rtk-rewrite.sh — PreToolUse hook for run_terminal_cmd
++# Prepends "rtk" to filterable commands when RTK is installed.
++# Exit 0 with no output = pass through unchanged.
++# Exit 0 with JSON on stdout = rewrite tool input.
++set -euo pipefail
++
++if ! command -v rtk &>/dev/null; then
++	exit 0
++fi
++
++INPUT=$(cat)
++
++# Guard against malformed JSON — fail-open rather than producing a noisy hook error.
++COMMAND=$(echo "$INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null) || exit 0
++
++if [[ -z "$COMMAND" ]]; then
++	exit 0
++fi
++
++# Already prefixed — avoid double-wrapping.
++if echo "$COMMAND" | grep -qE '^rtk[[:space:]]'; then
++	exit 0
++fi
++
++# Skip sudo-prefixed commands — rtk's handling of sudo as a first argument is
++# undefined. Pass through unchanged; the command runs without token filtering.
++if echo "$COMMAND" | grep -qE '^sudo[[:space:]]'; then
++	exit 0
++fi
++
++FIRST_TOKEN=$(echo "$COMMAND" | awk '{print $1}')
++
++RTK_TOOLS="git cargo npm docker kubectl make python pip yarn bun pnpm"
++
++for tool in $RTK_TOOLS; do
++	if [[ "$FIRST_TOKEN" == "$tool" ]]; then
++		jq -n --arg cmd "rtk $COMMAND" '{"hookSpecificOutput":{"hookEventName":"PreToolUse","updatedInput":{"command":$cmd}}}'
++		exit 0
++	fi
++done
++
++exit 0
+diff --git a/packages/valora-plugin-rtk/package.json b/packages/valora-plugin-rtk/package.json
+new file mode 100644
+index 0000000..3988968
+--- /dev/null
++++ b/packages/valora-plugin-rtk/package.json
+@@ -0,0 +1,49 @@
++{
++	"name": "@windagency/valora-plugin-rtk",
++	"version": "1.0.0",
++	"description": "RTK (Rust Token Killer) integration for Valora — transparently prepends rtk to known-noisy CLI tools, reducing LLM token consumption by 60–90%.",
++	"keywords": [
++		"valora",
++		"valora-plugin",
++		"rtk",
++		"token-reduction",
++		"hooks",
++		"cli",
++		"rust"
++	],
++	"author": "Damien TIVELET <damien@wind-agency.com>",
++	"repository": {
++		"type": "git",
++		"url": "https://github.com/windagency/valora.ai"
++	},
++	"license": "MIT",
++	"type": "module",
++	"engines": {
++		"node": ">=22.0.0"
++	},
++	"packageManager": "pnpm@10.19.0",
++	"volta": {
++		"node": "22.21.0",
++		"pnpm": "10.19.0"
++	},
++	"scripts": {
++		"lint": "eslint --color",
++		"lint:fix": "eslint --color --fix",
++		"beautify": "prettier --check \"**/*.+(js|ts|json|md|yml|yaml)\"",
++		"beautify:fix": "prettier --write \"**/*.+(js|ts|json|md|yml|yaml)\"",
++		"format": "pnpm beautify:fix && pnpm lint:fix",
++		"test": "vitest run",
++		"prepublishOnly": "pnpm test"
++	},
++	"files": [
++		"valora-plugin.json",
++		"hooks.json",
++		"hooks/"
++	],
++	"peerDependencies": {
++		"@windagency/valora": ">=0.1.0"
++	},
++	"devDependencies": {
++		"vitest": "^1.0.0"
++	}
++}
+diff --git a/packages/valora-plugin-rtk/src/rtk-rewrite.test.ts b/packages/valora-plugin-rtk/src/rtk-rewrite.test.ts
+new file mode 100644
+index 0000000..2fce686
+--- /dev/null
++++ b/packages/valora-plugin-rtk/src/rtk-rewrite.test.ts
+@@ -0,0 +1,94 @@
++import { execFile } from 'child_process';
++import { chmodSync, mkdirSync, rmSync, writeFileSync } from 'fs';
++import { tmpdir } from 'os';
++import { join } from 'path';
++import { afterAll, beforeAll, describe, expect, it } from 'vitest';
++
++const SCRIPT = join(import.meta.dirname, '../hooks/rtk-rewrite.sh');
++
++interface HookOutput {
++	hookSpecificOutput: { hookEventName: string; updatedInput: { command: string } };
++}
++
++function run(
++	input: Record<string, unknown>,
++	env: Record<string, string>
++): Promise<{ exitCode: number; stdout: string }> {
++	return new Promise((resolve) => {
++		const child = execFile('bash', [SCRIPT], { env: { ...process.env, ...env } }, (error, stdout) => {
++			const rawCode = error?.code;
++			resolve({ exitCode: typeof rawCode === 'number' ? rawCode : 0, stdout });
++		});
++		child.stdin!.write(JSON.stringify(input));
++		child.stdin!.end();
++	});
++}
++
++describe('rtk-rewrite.sh', () => {
++	let rtkBinDir: string;
++	let pathWithRtk: string;
++
++	beforeAll(() => {
++		rtkBinDir = join(tmpdir(), `valora-rtk-test-${Date.now()}`);
++		mkdirSync(rtkBinDir, { recursive: true });
++		writeFileSync(join(rtkBinDir, 'rtk'), '#!/usr/bin/env bash\n');
++		chmodSync(join(rtkBinDir, 'rtk'), 0o755);
++		pathWithRtk = `${rtkBinDir}:${process.env['PATH'] ?? ''}`;
++	});
++
++	afterAll(() => {
++		rmSync(rtkBinDir, { force: true, recursive: true });
++	});
++
++	it('passes through when rtk is not on PATH', async () => {
++		// Use the real system PATH minus the fake rtk bin dir — avoids PATH replacement
++		// breaking jq/bash lookups on non-standard hosts.
++		const pathWithoutRtk = (process.env['PATH'] ?? '')
++			.split(':')
++			.filter((p) => p !== rtkBinDir)
++			.join(':');
++		const { exitCode, stdout } = await run({ tool_input: { command: 'git status' } }, { PATH: pathWithoutRtk });
++		expect(exitCode).toBe(0);
++		expect(stdout.trim()).toBe('');
++	});
++
++	it('passes through when tool_input.command is absent', async () => {
++		const { exitCode, stdout } = await run({ tool_input: {} }, { PATH: pathWithRtk });
++		expect(exitCode).toBe(0);
++		expect(stdout.trim()).toBe('');
++	});
++
++	it('passes through for non-whitelisted commands', async () => {
++		const { exitCode, stdout } = await run({ tool_input: { command: 'echo hello' } }, { PATH: pathWithRtk });
++		expect(exitCode).toBe(0);
++		expect(stdout.trim()).toBe('');
++	});
++
++	it('does not double-wrap a command already prefixed with rtk', async () => {
++		const { exitCode, stdout } = await run({ tool_input: { command: 'rtk git status' } }, { PATH: pathWithRtk });
++		expect(exitCode).toBe(0);
++		expect(stdout.trim()).toBe('');
++	});
++
++	it.each(['git', 'cargo', 'npm', 'docker', 'kubectl', 'make', 'python', 'pip', 'yarn', 'bun', 'pnpm'])(
++		'rewrites %s commands',
++		async (tool) => {
++			const { stdout } = await run({ tool_input: { command: `${tool} build` } }, { PATH: pathWithRtk });
++			const output = JSON.parse(stdout) as HookOutput;
++			expect(output.hookSpecificOutput.hookEventName).toBe('PreToolUse');
++			expect(output.hookSpecificOutput.updatedInput.command).toBe(`rtk ${tool} build`);
++		}
++	);
++
++	it('passes through sudo-prefixed commands unchanged', async () => {
++		// rtk's handling of sudo as a first argument is undefined — pass through rather than risk breakage.
++		const { exitCode, stdout } = await run({ tool_input: { command: 'sudo git push' } }, { PATH: pathWithRtk });
++		expect(exitCode).toBe(0);
++		expect(stdout.trim()).toBe('');
++	});
++
++	it('passes through malformed JSON without erroring', async () => {
++		const { exitCode } = await run('not-valid-json' as unknown as Record<string, unknown>, { PATH: pathWithRtk });
++		expect(exitCode).toBe(0);
++	});
++});
+diff --git a/packages/valora-plugin-rtk/tsconfig.json b/packages/valora-plugin-rtk/tsconfig.json
+new file mode 100644
+index 0000000..000c609
+--- /dev/null
++++ b/packages/valora-plugin-rtk/tsconfig.json
+@@ -0,0 +1,15 @@
++{
++	"extends": "../../tsconfig.json",
++	"compilerOptions": {
++		"declaration": false,
++		"declarationMap": false,
++		"module": "ESNext",
++		"moduleResolution": "bundler",
++		"noEmit": true,
++		"paths": {},
++		"rootDir": "src",
++		"sourceMap": false
++	},
++	"include": ["src/**/*.test.ts", "vitest.config.ts"],
++	"exclude": ["node_modules"]
++}
+diff --git a/packages/valora-plugin-rtk/valora-plugin.json b/packages/valora-plugin-rtk/valora-plugin.json
+new file mode 100644
+index 0000000..3cefe26
+--- /dev/null
++++ b/packages/valora-plugin-rtk/valora-plugin.json
+@@ -0,0 +1,19 @@
++{
++	"name": "valora-plugin-rtk",
++	"version": "1.0.0",
++	"description": "RTK (Rust Token Killer) integration for Valora — transparently prepends rtk to known-noisy CLI tools, reducing LLM token consumption by 60–90%.",
++	"engines": { "valora": ">=0.1.0" },
++	"contributes": ["hooks"],
++	"permissions": ["shell-hooks"],
++	"requiresBinary": [
++		{
++			"name": "rtk",
++			"version": ">=0.5",
++			"install": "cargo install rtk"
++		},
++		{
++			"name": "jq",
++			"version": ">=1.6"
++		}
++	]
++}
+diff --git a/packages/valora-plugin-rtk/vitest.config.ts b/packages/valora-plugin-rtk/vitest.config.ts
+new file mode 100644
+index 0000000..f86bd2c
+--- /dev/null
++++ b/packages/valora-plugin-rtk/vitest.config.ts
+@@ -0,0 +1,8 @@
++import { defineConfig } from 'vitest/config';
++
++export default defineConfig({
++	test: {
++		environment: 'node',
++		testTimeout: 30000
++	}
++});
+diff --git a/src/plugins/plugin-loader.service.ts b/src/plugins/plugin-loader.service.ts
+index 2434596..5975c02 100644
+--- a/src/plugins/plugin-loader.service.ts
++++ b/src/plugins/plugin-loader.service.ts
+@@ -132,9 +132,29 @@ export class PluginLoaderService {
+ 		};
+ 	}
+ 
++	private resolveHookCommandPaths(hooks: HooksConfig, pluginDir: string): HooksConfig {
++		// Single-quote the path so the shell never interprets $ ` \ or ! inside it,
++		// regardless of where npm installs the package.
++		const safe = `'${pluginDir.replace(/'/g, "'\\''")}'`;
++		const result: HooksConfig = {};
++
++		for (const key of Object.keys(hooks) as Array<keyof HooksConfig>) {
++			const matchers = hooks[key];
++			if (matchers) {
++				result[key] = matchers.map((m) => ({
++					...m,
++					hooks: m.hooks.map((h) => ({ ...h, command: h.command.replaceAll('{pluginDir}', safe) }))
++				}));
++			}
++		}
++
++		return result;
++	}
++
+ 	private resolveHooks(pluginDir: string, manifest: PluginManifest): HooksConfig | undefined {
+ 		if (!manifest.permissions?.includes('shell-hooks')) return undefined;
+-		return this.loadHooksFile(pluginDir);
++		const hooks = this.loadHooksFile(pluginDir);
++		return hooks ? this.resolveHookCommandPaths(hooks, pluginDir) : undefined;
+ 	}
+ 
+ 	private resolveMcpsFile(pluginDir: string, manifest: PluginManifest): string | undefined {

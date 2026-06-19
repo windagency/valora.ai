@@ -10,10 +10,9 @@ import type { AgentAnalyticsData } from 'ui/dashboard/hooks/use-metrics-data';
 import { getTUIAdapter } from 'ui/tui-adapter.interface';
 
 const tui = getTUIAdapter();
-// eslint-disable-next-line @typescript-eslint/naming-convention -- Box and Text are React components which require PascalCase
+
 const { Box, Text } = tui;
 
-// eslint-disable-next-line @typescript-eslint/naming-convention -- React components must use PascalCase
 export function AgentAnalyticsView({ data }: { data: AgentAnalyticsData }): React.JSX.Element {
 	if (!data.metrics || data.metrics.totalSelections === 0) {
 		return (
@@ -140,7 +139,6 @@ function renderDistribution(
 	});
 }
 
-// eslint-disable-next-line @typescript-eslint/naming-convention -- React components must use PascalCase
 function SummaryHeader({ metrics }: { metrics: AgentSelectionMetrics }): React.JSX.Element {
 	return (
 		<Box borderColor="cyan" borderStyle="round" flexDirection="column" paddingX={1}>

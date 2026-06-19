@@ -9,7 +9,7 @@ import type { DashboardTab } from 'ui/dashboard/types';
 import { getTUIAdapter } from 'ui/tui-adapter.interface';
 
 const tui = getTUIAdapter();
-// eslint-disable-next-line @typescript-eslint/naming-convention -- Box and Text are React components which require PascalCase
+
 const { Box, Text } = tui;
 
 const TAB_CONFIG: Array<{ key: string; label: string; tab: DashboardTab }> = [
@@ -21,7 +21,6 @@ const TAB_CONFIG: Array<{ key: string; label: string; tab: DashboardTab }> = [
 	{ key: '6', label: 'Usage', tab: 'usage' }
 ];
 
-// eslint-disable-next-line @typescript-eslint/naming-convention -- React components must use PascalCase
 export function TabBar({ activeTab }: { activeTab: DashboardTab }): React.JSX.Element {
 	return (
 		<Box marginBottom={1}>

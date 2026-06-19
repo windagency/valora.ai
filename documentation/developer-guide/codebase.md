@@ -1,3 +1,7 @@
+---
+updated: 2026-05-07
+---
+
 # Codebase Overview
 
 > Walkthrough of the VALORA source structure.
@@ -38,12 +42,13 @@ data/                     # Built-in resources (shipped with the package)
 │   ├── agents/           # Agent definition files (Markdown + frontmatter)
 │   ├── commands/         # Command specification files
 │   ├── prompts/          # Prompt templates
+│   │   └── _shared/      # Shared reusable fragments included across prompts
 │   ├── templates/        # Document templates
 │   ├── hooks/            # Hook scripts
 │   ├── config.default.json
 │   ├── hooks.default.json
 │   └── external-mcp.default.json
-tests/
+__tests__/
 │   ├── integration/
 │   ├── e2e/
 │   ├── security/
@@ -96,15 +101,16 @@ Handles user input, flag parsing, and command dispatch.
 
 Owns pipeline orchestration and stage execution.
 
-| Component                        | Responsibility                                    |
-| -------------------------------- | ------------------------------------------------- |
-| `pipeline.ts`                    | Iterates stages, manages dependencies and results |
-| `stage-executor.ts`              | Sends a single stage prompt to the LLM provider   |
-| `stage-scheduler.ts`             | Determines execution order for parallel stages    |
-| `variable-resolution.service.ts` | Resolves `$VAR` and `$ENV_*` template variables   |
-| `agent-loader.ts`                | Loads and validates agent definition files        |
-| `command-loader.ts`              | Loads command specification files                 |
-| `execution-context.ts`           | Immutable container for execution state           |
+| Component                        | Responsibility                                                                               |
+| -------------------------------- | -------------------------------------------------------------------------------------------- |
+| `pipeline.ts`                    | Iterates stages, manages dependencies and results                                            |
+| `stage-executor.ts`              | Sends a single stage prompt to the LLM provider                                              |
+| `output-compression.service.ts`  | Compresses terminal output before LLM context assembly (ANSI stripping, per-command filters) |
+| `stage-scheduler.ts`             | Determines execution order for parallel stages                                               |
+| `variable-resolution.service.ts` | Resolves `$VAR` and `$ENV_*` template variables                                              |
+| `agent-loader.ts`                | Loads and validates agent definition files                                                   |
+| `command-loader.ts`              | Loads command specification files                                                            |
+| `execution-context.ts`           | Immutable container for execution state                                                      |
 
 <details>
 <summary><strong>Pipeline flow detail</strong></summary>

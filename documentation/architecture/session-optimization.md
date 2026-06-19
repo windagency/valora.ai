@@ -1,21 +1,30 @@
+---
+updated: 2026-05-07
+---
+
 # Session Optimisation
 
 > How VALORA uses sessions to reduce token consumption, avoid redundant LLM calls, and speed up execution.
+>
+> _updated: 2026-05-07_
 
 ## What Session Optimisation Does
 
 Sessions persist state across command executions, enabling several optimisation strategies that activate automatically:
 
-| Optimisation                 | Impact                                | When Active                              |
-| ---------------------------- | ------------------------------------- | ---------------------------------------- |
-| **Persistent stage caching** | **2–3 min saved per context load**    | **Unchanged source documents**           |
-| **Prompt caching**           | **Up to 90% input token savings**     | **Tool-loop iterations (all providers)** |
-| Loader cache reuse           | 90%+ faster agent loading             | Session resume with fresh cache          |
-| Stage output reference       | Eliminates redundant execution        | Multi-command workflows                  |
-| Context filtering            | ~40% token reduction                  | Pipelines with `$CONTEXT_*` refs         |
-| Snapshot resume              | 2–5× faster startup                   | Session resume with `--session-id`       |
-| Debounced persistence        | 80% fewer disk writes                 | Rapid command sequences                  |
-| Token tracking               | Full visibility (incl. cache metrics) | All sessions                             |
+| Optimisation                  | Impact                                 | When Active                              |
+| ----------------------------- | -------------------------------------- | ---------------------------------------- |
+| **Persistent stage caching**  | **2–3 min saved per context load**     | **Unchanged source documents**           |
+| **Prompt caching**            | **Up to 90% input token savings**      | **Tool-loop iterations (all providers)** |
+| **Output compression**        | **Reduces tool-result size by 40–80%** | **Shell commands ≥ 500 chars output**    |
+| **Proactive history pruning** | **Prevents context growth mid-loop**   | **Stages reaching iteration 8 of 20**    |
+| **Tool-result deduplication** | **Eliminates repeated results**        | **Repeated tool calls within a stage**   |
+| Loader cache reuse            | 90%+ faster agent loading              | Session resume with fresh cache          |
+| Stage output reference        | Eliminates redundant execution         | Multi-command workflows                  |
+| Context filtering             | ~40% token reduction                   | Pipelines with `$CONTEXT_*` refs         |
+| Snapshot resume               | 2–5× faster startup                    | Session resume with `--session-id`       |
+| Debounced persistence         | 80% fewer disk writes                  | Rapid command sequences                  |
+| Token tracking                | Full visibility (incl. cache metrics)  | All sessions                             |
 
 ---
 
@@ -71,6 +80,156 @@ Prompt caching is a provider-side optimisation that avoids re-processing identic
 | **Google**    | Automatic — reads `usageMetadata.cachedContentTokenCount`            | None needed            | 75% off  |
 
 Cache metrics (`cache_creation_input_tokens`, `cache_read_input_tokens`) are extracted from all provider responses and displayed in the CLI token usage summary.
+
+---
+
+## Output Compression
+
+Three complementary strategies reduce the token cost of tool results within every tool loop, automatically and without configuration.
+
+### Command-filter compression
+
+Every shell command result passes through a content-aware filter before being appended to the conversation. Outputs below 500 characters are returned unchanged (after ANSI stripping). Above that threshold, per-command filters remove structural noise while preserving meaningful content:
+
+| Command family                  | What is removed                                                                       |
+| ------------------------------- | ------------------------------------------------------------------------------------- |
+| `git diff` / `show`             | Metadata lines; added and removed lines capped at 15 per hunk with a count summary    |
+| `git log`                       | Verbose commit headers collapsed to one `<hash> <subject>` line each; capped at 20    |
+| `git status`                    | Instruction lines; only branch line and file status lines are kept                    |
+| `pnpm` / `npm` / `yarn` / `npx` | Progress spinners, peer-dep warnings, funding notices; added packages folded to count |
+| `vitest` / `jest`               | Passing test lines (collapsed to a count summary); coverage tables collapsed          |
+| `tsc`                           | Duplicate diagnostics (≤3 examples per error code); code-frame source excerpts        |
+| `eslint`                        | Duplicate rule violations (≤3 examples per rule)                                      |
+| `rg` / `grep`                   | Identical duplicate lines; per-file match cap of 5 with a count summary               |
+| `docker`                        | Layer-pull progress, BuildKit boilerplate, pip download/progress lines                |
+| `make`                          | Directory entry/exit banners                                                          |
+| `python` / `pytest`             | Passing test lines (collapsed to a count summary)                                     |
+
+Savings are tracked by the `compression.terminal.saved_chars` counter and the `compression.terminal.ratio` gauge, visible in the dashboard Optimisation panel. The dashboard also displays approximate token and cost savings derived from the character count — see below.
+
+### Proactive history pruning
+
+At iteration 8 of a tool loop (40% of the 20-iteration ceiling), old tool-result messages are replaced with:
+
+```
+[Tool result omitted to reduce context length]
+```
+
+The four most recent messages are always preserved. This prevents context growth from compounding across long-running stages, without waiting for a provider "prompt too long" error.
+
+### Tool-result deduplication
+
+Repeated identical results within a single stage are detected via a fast hash (`toolName:djb2(content)`). The second and subsequent occurrences are replaced with a back-reference:
+
+```
+[Same result as message #7 — omitted]
+```
+
+This is most effective when the LLM reads the same file or runs the same diagnostic command multiple times in a loop.
+
+---
+
+<details>
+<summary><strong>Implementation Details: Command-Filter Compression</strong></summary>
+
+**Files:** `src/executor/output-compression.service.ts`, `src/executor/tool-execution.service.ts`
+
+Strategies are registered by plugins at startup via `registerStrategy(tool, fn)`. The core pipeline in `output-compression.service.ts` resolves the right strategy using `resolveStrategyKey`, which handles wrapper commands transparently: `pnpm tsc --noEmit` dispatches to the `tsc` strategy, not the `pnpm` strategy, because `pnpm` is a wrapper and `tsc` is a registered tool.
+
+Three standalone packages under `packages/` register all built-in strategies:
+
+### Strategies by plugin
+
+<!-- Table generated by scripts/generate-strategy-table.ts on 2026-05-07. Re-run to update. -->
+
+| Package                                          | Count | Strategies (sorted)                                                                                                                |
+| ------------------------------------------------ | ----: | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/valora-plugin-compression-python/`     |     6 | `cargo`, `pip`, `pip3`, `pytest`, `python`, `ruff`                                                                                 |
+| `packages/valora-plugin-compression-typescript/` |    12 | `biome`, `bun`, `bunx`, `eslint`, `jest`, `npm`, `npx`, `pnpm`, `prettier`, `tsc`, `vitest`, `yarn`                                |
+| `packages/valora-plugin-compression-universal/`  |    17 | `cat`, `curl`, `diff`, `docker`, `find`, `gh`, `git`, `grep`, `journalctl`, `jq`, `ls`, `make`, `rg`, `tail`, `tree`, `wget`, `yq` |
+
+**Total: 35 strategies across 3 plugins.**
+
+Unknown commands fall back to an identity function (no-op). The call site uses a stats delta to measure only filter savings, not ANSI-stripping savings:
+
+```typescript
+const statsBefore = getCompressionStats();
+const compressed = compressTerminalOutput(command, output);
+const statsAfter = getCompressionStats();
+const filterSavedChars =
+	statsAfter.inputChars - statsBefore.inputChars - (statsAfter.outputChars - statsBefore.outputChars);
+if (filterSavedChars > 0) {
+	getMetricsCollector().incrementCounter('compression.terminal.saved_chars', filterSavedChars);
+}
+```
+
+Threshold constant: `OUTPUT_COMPRESSION_THRESHOLD = 500` (characters, post ANSI-strip).
+
+</details>
+
+<details>
+<summary><strong>Implementation Details: Token and Cost Estimation</strong></summary>
+
+**File:** `src/executor/stage-executor.ts` — `emitCompressionMetrics`
+
+Exact token counts are only available from the provider after a request completes; they cannot be measured for text that was removed before the call. Instead, saved characters are converted to approximate tokens using `⌈savedChars / 4⌉` (4 chars/token is the standard heuristic for English prose and code, as used throughout Valora). Cost is derived from the model's input price via `getModelPricing(model)`, falling back to $3.00/M tokens when the model is unknown.
+
+```typescript
+const savedChars = compressionStats.inputChars - compressionStats.outputChars;
+const savedTokens = Math.ceil(savedChars / 4); // 4 chars/token heuristic
+const pricing = getModelPricing(modelOverride ?? '');
+const costPerToken = (pricing?.input ?? 3.0) / 1_000_000; // per-token rate
+```
+
+The `~` prefix in the dashboard signals that these values are approximations. For exact per-request costs, see the **Spending** tab, which records actual billed token counts from provider responses.
+
+</details>
+
+<details>
+<summary><strong>Implementation Details: Proactive History Pruning</strong></summary>
+
+**File:** `src/executor/stage-executor.ts`
+
+```typescript
+const PROACTIVE_COMPRESS_AFTER_ITERATIONS = 8;
+
+// Inside callLLMWithToolLoop:
+if (iterations === PROACTIVE_COMPRESS_AFTER_ITERATIONS) {
+	prunedCount += this.compressToolResults(messages);
+}
+```
+
+`compressMessageHistory(messages, keepRecent = 4)` iterates from index 0 to `messages.length - keepRecent - 1`, replacing tool-role messages that have not already been replaced, and returns the count of actual replacements. It is idempotent — already-replaced messages are not double-counted.
+
+The reactive fallback (provider "prompt too long" error) also calls `compressToolResults`, so both proactive and reactive paths share the same implementation. The accumulated `prunedCount` is emitted as `compression.history.pruned_messages` at the end of each tool loop.
+
+</details>
+
+<details>
+<summary><strong>Implementation Details: Tool-Result Deduplication</strong></summary>
+
+**File:** `src/executor/stage-executor.ts`
+
+A hash map is initialised once per tool loop and passed into each `processToolCallsInLoop` call:
+
+```typescript
+const toolResultHashes = new Map<string, number>(); // toolName:hash → 1-based message index
+
+// For each tool result:
+const hashKey = `${toolName}:${djb2(sanitised)}`;
+const existingIndex = toolResultHashes.get(hashKey);
+if (existingIndex !== undefined) {
+    messages.push({ content: `[Same result as message #${existingIndex} — omitted]`, ... });
+    batchDedupHits++;
+} else {
+    toolResultHashes.set(hashKey, messages.length + 1);
+    messages.push({ content: sanitised, ... });
+}
+```
+
+The hash map is scoped to a single stage invocation and is not shared across stages. Accumulated `dedupHits` is emitted as `compression.dedup.hits` at the end of each tool loop.
+
+</details>
 
 ---
 
@@ -433,6 +592,27 @@ Persistence modes:
 **Impact:** 80%+ reduction in disk writes during intensive batches.
 
 </details>
+
+---
+
+## Verification Summary
+
+The strategy table in [Strategies by plugin](#strategies-by-plugin) was regenerated on **2026-05-07** using `scripts/generate-strategy-table.ts`.
+
+| Plugin                                 |  Count |
+| -------------------------------------- | -----: |
+| `valora-plugin-compression-python`     |      6 |
+| `valora-plugin-compression-typescript` |     12 |
+| `valora-plugin-compression-universal`  |     17 |
+| **Total**                              | **35** |
+
+To regenerate the table at any time:
+
+```sh
+pnpm exec tsx scripts/generate-strategy-table.ts
+```
+
+The script reads each plugin's `src/index.ts`, extracts all `registerStrategy('NAME', ...)` calls via regex, sorts names alphabetically within each plugin, and writes the table to stdout. It is fully deterministic (no external I/O beyond the three source files).
 
 ---
 

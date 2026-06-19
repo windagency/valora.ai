@@ -12,6 +12,7 @@ import { resolve } from 'path';
 
 import { getLogger } from 'output/logger';
 
+import { getAuditSink } from './audit-sink';
 import { createSecurityEvent, type SecurityEvent } from './security-event.types';
 
 /**
@@ -33,7 +34,18 @@ const SENSITIVE_ENV_PATTERNS: RegExp[] = [
 	/^REDIS_URL$/i,
 	/^MONGO_URI$/i,
 	/^PRIVATE_KEY$/i,
-	/^ENCRYPTION_KEY$/i
+	/^ENCRYPTION_KEY$/i,
+	// Explicit CI/CD and infrastructure credential variable names
+	/^GITHUB_TOKEN$/i,
+	/^GH_TOKEN$/i,
+	/^NPM_TOKEN$/i,
+	/^DOCKER_PASSWORD$/i,
+	/^DOCKER_AUTH$/i,
+	/^SLACK_TOKEN$/i,
+	/^CIRCLE_TOKEN$/i,
+	/^BUILDKITE_AGENT_TOKEN$/i,
+	/^VAULT_TOKEN$/i,
+	/^KUBECONFIG$/i
 ];
 
 /**
@@ -66,6 +78,7 @@ const SENSITIVE_DIRECTORIES = ['/.ssh/', '/.aws/', '/.gnupg/', '/.config/gcloud/
 
 /**
  * Patterns for detecting credentials in tool output text.
+ * High-entropy fallback must come last so explicit patterns take precedence.
  */
 const OUTPUT_CREDENTIAL_PATTERNS: RegExp[] = [
 	// API keys with common prefixes (sk-ant-api03-..., sk-proj-..., etc.)
@@ -74,6 +87,10 @@ const OUTPUT_CREDENTIAL_PATTERNS: RegExp[] = [
 	/api[_-]?key[=:]\s*["']?[a-zA-Z0-9_-]{16,}/gi,
 	// AWS access keys
 	/AKIA[0-9A-Z]{16}/g,
+	// GitHub tokens (PAT, Actions, runner, App installation)
+	/gh[psru]_[A-Za-z0-9_]{36}/g,
+	// JWT — three base64url segments starting with eyJ (header), eyJ (payload), signature
+	/eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g,
 	// Bearer tokens
 	/Bearer\s+[a-zA-Z0-9_\-.]{20,}/g,
 	// Generic long secrets (base64-ish with prefix)
@@ -93,19 +110,19 @@ export class CredentialGuard {
 	 * Sanitise environment variables for subprocess execution.
 	 * Returns a copy with sensitive values replaced by [REDACTED].
 	 */
-	sanitiseEnvironment(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
-		const sanitised: NodeJS.ProcessEnv = {};
+	sanitizeEnvironment(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+		const sanitized: NodeJS.ProcessEnv = {};
 
 		for (const [key, value] of Object.entries(env)) {
 			if (this.isSensitiveEnvVar(key)) {
-				sanitised[key] = REDACTED;
+				sanitized[key] = REDACTED;
 				this.logEvent('credential_redacted', 'medium', { source: 'environment', variable: key });
 			} else {
-				sanitised[key] = value;
+				sanitized[key] = value;
 			}
 		}
 
-		return sanitised;
+		return sanitized;
 	}
 
 	/**
@@ -191,6 +208,7 @@ export class CredentialGuard {
 	): void {
 		const event = createSecurityEvent(type, severity, details);
 		this.events.push(event);
+		getAuditSink().append(event);
 
 		const logger = getLogger();
 		logger.warn(`[Security] ${type}`, details);

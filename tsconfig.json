@@ -3,10 +3,8 @@
 		"allowImportingTsExtensions": false,
 		"allowSyntheticDefaultImports": true,
 		"alwaysStrict": true,
-		"baseUrl": ".",
 		"declaration": true,
 		"declarationMap": true,
-		"downlevelIteration": true,
 		"esModuleInterop": true,
 		"forceConsistentCasingInFileNames": true,
 		"importHelpers": true,
@@ -26,6 +24,7 @@
 		"noUnusedParameters": true,
 		"outDir": "./dist",
 		"paths": {
+			"analysis/*": ["./src/analysis/*"],
 			"ast/*": ["./src/ast/*"],
 			"batch/*": ["./src/batch/*"],
 			"security/*": ["./src/security/*"],
@@ -38,14 +37,32 @@
 			"llm/*": ["./src/llm/*"],
 			"lsp/*": ["./src/lsp/*"],
 			"mcp/*": ["./src/mcp/*"],
+			"memory": ["./src/memory/index.ts"],
 			"memory/*": ["./src/memory/*"],
 			"output/*": ["./src/output/*"],
+			"plugins/*": ["./src/plugins/*"],
 			"services/*": ["./src/services/*"],
 			"session/*": ["./src/session/*"],
 			"src/*": ["./src/*"],
+			"__tests__/*": ["./__tests__/*"],
 			"types/*": ["./src/types/*"],
 			"ui/*": ["./src/ui/*"],
-			"utils/*": ["./src/utils/*"]
+			"updater/*": ["./src/updater/*"],
+			"utils/*": ["./src/utils/*"],
+			"lint/*": ["./src/lint/*"],
+			"observability/*": ["./src/observability/*"],
+			"maintenance/*": ["./src/maintenance/*"],
+			"registry/*": ["./src/registry/*"],
+			"regression/*": ["./src/regression/*"],
+			"@windagency/valora-plugin-compression-python/src/index": [
+				"./packages/valora-plugin-compression-python/src/index"
+			],
+			"@windagency/valora-plugin-compression-typescript/src/index": [
+				"./packages/valora-plugin-compression-typescript/src/index"
+			],
+			"@windagency/valora-plugin-compression-universal/src/index": [
+				"./packages/valora-plugin-compression-universal/src/index"
+			]
 		},
 		"removeComments": false,
 		"resolveJsonModule": true,
@@ -60,6 +77,11 @@
 		"target": "ES2022",
 		"types": ["node"]
 	},
+	"references": [
+		{ "path": "./packages/valora-plugin-api" },
+		{ "path": "./packages/valora-runtime" },
+		{ "path": "./packages/valora-plugin-memory-vault" }
+	],
 	"exclude": ["node_modules", "dist", "**/*.spec.ts", "**/*.test.ts"],
 	"include": ["src/**/*"],
 	"tsc-alias": {

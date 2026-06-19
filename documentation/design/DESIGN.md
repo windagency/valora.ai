@@ -1,18 +1,33 @@
-# Claude CLI–Inspired UI/UX Design Specification
+---
+updated: 2026-05-07
+---
 
-> **Summary**: Valora's UI/UX is inspired by the Claude CLI — calm, minimal, text-first, and cognitively efficient. The design prioritises readability and conversational flow over decoration.
+# UI/UX Design Specification
+
+Valora's UI/UX is inspired by the Claude CLI — calm, minimal, text-first, and cognitively efficient. The design prioritises readability and conversational flow over decoration.
+
+## Quick Reference
+
+| Principle   | Rule                                                         |
+| ----------- | ------------------------------------------------------------ |
+| Layout      | Single-column, max 720–800 px, centred                       |
+| Typography  | Generous line height (1.5–1.7), no excessive font weights    |
+| Colour      | Predominantly neutral; accents only for interactive elements |
+| Motion      | Minimal and purposeful                                       |
+| Interaction | Keyboard-first; progressive disclosure; streaming output     |
 
 ---
 
 ## Overview
 
-This design is inspired by the **Claude CLI** experience: calm, minimal, text-first, and cognitively efficient. The interface emphasizes clarity, low visual noise, and a sense of conversational flow, prioritizing productivity and trust over decoration.
+This design is inspired by the **Claude CLI** experience: calm, minimal, text-first, and cognitively efficient. The interface emphasises clarity, low visual noise, and a sense of conversational flow, prioritising productivity and trust over decoration.
 
 The goal is to make users feel like they are **thinking alongside the system**, not navigating a traditional app.
 
 ---
 
-## Design Philosophy
+<details>
+<summary><strong>Design philosophy</strong></summary>
 
 - **Text is the primary UI**
 - **Whitespace is intentional**
@@ -21,6 +36,8 @@ The goal is to make users feel like they are **thinking alongside the system**, 
 - **Nothing distracts from reading or writing**
 
 This design favours _quiet confidence_ over visual flair.
+
+</details>
 
 ---
 

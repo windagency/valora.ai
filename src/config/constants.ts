@@ -153,6 +153,8 @@ export const MAX_GREP_OUTPUT_LINES = 200;
 export const MAX_TERMINAL_OUTPUT_CHARS = 15_000;
 export const MAX_MCP_OUTPUT_CHARS = 15_000;
 export const MAX_LIST_DIR_ENTRIES = 200;
+/** Minimum output length before per-command compression is attempted. */
+export const OUTPUT_COMPRESSION_THRESHOLD = 500;
 
 /**
  * Display Truncation Constants
@@ -221,7 +223,7 @@ export const MAX_SEQUENCE_ATTEMPTS = 1000;
 export const IDEMPOTENCY_CLEANUP_INTERVAL_MS = MS_PER_HOUR;
 
 /**
- * Hooks Configuration File
+ * Hooks Configuration File — resolved by HookExecutionService; returns null gracefully if absent (default hooks contributed by valora-defaults plugin instead).
  */
 export const HOOKS_CONFIG_FILE = 'hooks.default.json';
 
@@ -257,9 +259,23 @@ export const DEFAULT_MEMORY_RETRIEVAL_BOOST_DAYS = 2;
 export const DEFAULT_MEMORY_PRUNE_THRESHOLD = 0.05;
 export const DEFAULT_MEMORY_MAX_ENTRIES_PER_STORE = 500;
 export const DEFAULT_MEMORY_ERROR_HALF_LIFE_MULTIPLIER = 2;
+/**
+ * Cap on how far retrieval-strengthening can extend a memory's half-life,
+ * expressed as a multiple of the category default. Without a cap, frequently
+ * queried entries grow their half-life unboundedly (audit finding H5).
+ */
+export const MEMORY_HALF_LIFE_CAP_MULTIPLIER = 10;
 export const DEFAULT_MEMORY_INJECTION_TOKEN_BUDGET = 2000;
 export const DEFAULT_MEMORY_INJECTION_STRENGTH_THRESHOLD = 0.2;
 export const MEMORY_PERSIST_DEBOUNCE_MS = 2000;
+export const DEFAULT_MEMORY_BACKEND = 'vault' as const;
+export const DEFAULT_MEMORY_EMBED_MODEL = 'nomic-embed-text';
+export const DEFAULT_MEMORY_EMBED_DIM = 768;
+export const DEFAULT_MEMORY_EMBED_BATCH_SIZE = 32;
+export const DEFAULT_MEMORY_RECALL_SEED_K = 12;
+export const DEFAULT_MEMORY_RECALL_WALK_DEPTH = 2;
+export const DEFAULT_MEMORY_RECALL_WALK_DECAY = 0.6;
+export const DEFAULT_MEMORY_RECALL_CO_ACCESS_INCREMENT = 1;
 
 /**
  * Documentation URL

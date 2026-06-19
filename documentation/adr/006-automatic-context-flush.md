@@ -1,3 +1,7 @@
+---
+updated: 2026-05-07
+---
+
 # ADR-006: Automatic Context Flush and Resume
 
 > **Decision**: When LLM context usage reaches 80% of the window, Valora automatically summarises the conversation history and reconstructs a fresh context, allowing long-running operations to complete without manual intervention.
@@ -6,7 +10,31 @@
 
 Accepted
 
-## Context
+## Consequences
+
+### Positive
+
+- **Unattended execution** - Long-running tasks complete without manual intervention
+- **Graceful degradation** - Context limits handled smoothly, not catastrophically
+- **State preservation** - Execution progress is not lost during flush
+- **Observability** - Events emitted for monitoring and debugging
+- **Configurability** - Thresholds and behaviour configurable per environment
+- **Cost efficiency** - Uses fast, cheap model for summarisation
+
+### Negative
+
+- **Information loss** - Summarisation necessarily loses some detail
+- **Additional latency** - Flush operation adds time during execution
+- **Complexity** - More moving parts in the execution flow
+- **LLM dependency** - Summarisation quality depends on model capability
+
+### Neutral
+
+- **Token estimation** - Estimation may differ from actual counts; safety buffer mitigates this
+- **Checkpoint storage** - In-memory by default; persistence optional
+
+<details>
+<summary><strong>Context</strong></summary>
 
 LLM conversations have finite context windows (e.g., 200,000 tokens for Claude). When executing complex, multi-stage development workflows with numerous tool calls, the context can fill rapidly. Without automatic management, this leads to:
 
@@ -16,6 +44,8 @@ LLM conversations have finite context windows (e.g., 200,000 tokens for Claude).
 4. **Lost execution state** - No mechanism to preserve and restore progress
 
 VALORA needs automatic context management to handle long-running operations without user intervention.
+
+</details>
 
 ## Decision
 
@@ -91,30 +121,8 @@ Uses character-based estimation with safety buffer:
 - 15% safety buffer for estimation inaccuracies
 - Uses actual token counts from API when available
 
-## Consequences
-
-### Positive
-
-- **Unattended execution** - Long-running tasks complete without manual intervention
-- **Graceful degradation** - Context limits handled smoothly, not catastrophically
-- **State preservation** - Execution progress is not lost during flush
-- **Observability** - Events emitted for monitoring and debugging
-- **Configurability** - Thresholds and behaviour configurable per environment
-- **Cost efficiency** - Uses fast, cheap model for summarisation
-
-### Negative
-
-- **Information loss** - Summarisation necessarily loses some detail
-- **Additional latency** - Flush operation adds time during execution
-- **Complexity** - More moving parts in the execution flow
-- **LLM dependency** - Summarisation quality depends on model capability
-
-### Neutral
-
-- **Token estimation** - Estimation may differ from actual counts; safety buffer mitigates this
-- **Checkpoint storage** - In-memory by default; persistence optional
-
-## Alternatives Considered
+<details>
+<summary><strong>Alternatives considered</strong></summary>
 
 ### Alternative 1: Simple Truncation
 
@@ -156,8 +164,10 @@ Summarise at fixed intervals regardless of context usage.
 - May not summarise when actually needed
 - Less adaptive to actual usage patterns
 
+</details>
+
 ## References
 
-- [Context Management Module](../../src/context-management/)
+- [Context Management Module](../../src/session/)
 - [Configuration Constants](../../src/config/constants.ts)
 - [Pipeline Execution Model](./004-pipeline-execution-model.md)

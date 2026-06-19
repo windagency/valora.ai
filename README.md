@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-2.4.0-blue?style=flat-square" alt="Version" />
+  <img src="https://img.shields.io/badge/version-2.5.0-blue?style=flat-square" alt="Version" />
   <img src="https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen?style=flat-square&logo=node.js" alt="Node" />
   <img src="https://img.shields.io/badge/typescript-5.x-3178c6?style=flat-square&logo=typescript" alt="TypeScript" />
   <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="License" />
@@ -37,7 +37,8 @@
 
 **VALORA (Versatile Agent Logic for Orchestrated Response Architecture)** is a next-generation TypeScript-based platform designed to orchestrate a sophisticated network of AI agents to automate the complete software development lifecycle. By moving beyond simple "code generation", VALORA manages the delicate interplay between requirements, architecture, and deployment. VALORA provides intelligent automation while maintaining human oversight.
 
-### Why VALORA?
+<details>
+<summary><strong>Why VALORA?</strong> — design rationale</summary>
 
 **Intelligent Orchestration**: VALORA coordinates **11 specialised AI agents**, from **@lead** technical oversight to **@secops-engineer** compliance, ensuring the right expert is assigned to every task.
 
@@ -48,6 +49,8 @@
 **Strategic Optimisation**: To balance depth and speed, VALORA assigns specific LLMs (like **GPT-5** for planning or **Claude Haiku** for validation) based on the task's complexity.
 
 > VALORA is not a replacement for the developer; it is the high-fidelity instrument through which the developer conducts a full symphony of AI agents.
+
+</details>
 
 ## ✨ Features
 
@@ -122,24 +125,25 @@ Enterprise-grade security controls:
 <tr valign="top">
 <td width="50%">
 
-### 🌳 Worktree Dashboard & Statistics
+### 🧩 Plugin System
 
-Live visibility into parallel explorations:
+Extend Valora with **self-contained plugin directories**:
 
-- **Worktree Diagram Panel** — Real-time tree view of git worktrees in the `valora dash` dashboard
-- **Exploration Status** — Color-coded branches with status icons (▶ running, ✓ completed, ✗ failed)
-- **Session-Exploration Linking** — Explorations create linked sessions; the dashboard shows exploration details (task, worktrees, status) in the session details view
-- **Worktree Usage Stats** — Per-session tracking of worktree creation, concurrency, and duration
+| Contribution    | What it adds                                        |
+| --------------- | --------------------------------------------------- |
+| `agents`        | New AI personas                                     |
+| `commands`      | New CLI verbs (auto-exposed as MCP tools)           |
+| `hooks`         | PreToolUse / PostToolUse shell scripts              |
+| `prompts`       | Reusable pipeline stages                            |
+| `templates`     | PR, PRD, and plan scaffolds                         |
+| `agent-context` | Markdown injected into agent system prompts         |
+| `code`          | TypeScript modules registered via `PluginAPI` hooks |
 
-```plaintext
-┌─ Git Worktrees (3) ──────────┐
-│ ● main  abc1234              │
-│ ├── exploration/exp-abc-jwt  │
-│ │   def5678  ▶ RUNNING       │
-│ └── feature/new-api          │
-│     ghi9012                  │
-└──────────────────────────────┘
-```
+Plugins are discovered from four locations (later takes precedence): `data/plugins/` (built-in), `~/.valora/plugins/` (user), `.valora/plugins/` (project), `node_modules/@windagency/valora-plugin-*` (npm). Install an official plugin with `valora plugin add <name>` and add its short name to `plugins.enabled` in `.valora/config.json`. No restart required. See [Plugins guide](./documentation/user-guide/plugins.md).
+
+To **create** a plugin — from a minimal data plugin to a full code plugin with LLM providers, memory backends, and CLI subcommands — see the [Plugin Authoring Guide](./docs/plugin-authoring.md).
+
+35 built-in compression strategies ship as three **code plugins** and are the canonical example of the `code` contribution type. See [Strategies by plugin](./documentation/architecture/session-optimization.md#strategies-by-plugin) for the full list.
 
 </td>
 <td width="50%">
@@ -156,6 +160,30 @@ Connect to **15 external MCP servers** with user approval:
 | Infrastructure | Terraform, Firebase, Google Cloud         |
 | Data           | MongoDB, Elastic                          |
 | Observability  | Grafana, DeepResearch                     |
+
+</td>
+</tr>
+<tr valign="top">
+<td width="50%">
+
+### 🌳 Worktree Dashboard & Statistics
+
+Live visibility into parallel explorations:
+
+- **Worktree Diagram Panel** — Real-time tree view of git worktrees in the `valora dash` dashboard
+- **Exploration Status** — Colour-coded branches with status icons (▶ running, ✓ completed, ✗ failed)
+- **Session-Exploration Linking** — Explorations create linked sessions; the dashboard shows exploration details (task, worktrees, status) in the session details view
+- **Worktree Usage Stats** — Per-session tracking of worktree creation, concurrency, and duration
+
+```plaintext
+┌─ Git Worktrees (3) ──────────┐
+│ ● main  abc1234              │
+│ ├── exploration/exp-abc-jwt  │
+│ │   def5678  ▶ RUNNING       │
+│ └── feature/new-api          │
+│     ghi9012                  │
+└──────────────────────────────┘
+```
 
 </td>
 </tr>
@@ -179,7 +207,7 @@ npm install -g @windagency/valora       # npm
 
 # Verify installation
 valora --version
-# Should output: 2.4.0
+# Should output: 2.5.0
 ```
 
 ### Project Setup
@@ -309,6 +337,7 @@ export LOCAL_DEFAULT_MODEL=llama3.1
 | `create-pr`         | @lead            | Generate pull request                                |
 | `feedback`          | @product-manager | Capture outcomes                                     |
 | `consolidate`       | @lead            | Consolidate and prune memory stores _(experimental)_ |
+| `update`            | —                | Install the latest version of Valora                 |
 
 ### Command Categories
 
@@ -426,7 +455,7 @@ valora/                          # npm package root
 │   ├── executor/                # Pipeline execution
 │   ├── llm/                     # LLM provider integrations
 │   ├── lsp/                     # LSP integration (language server protocol client)
-│   ├── memory/                  # Biologically-inspired memory (exponential-decay stores)
+│   ├── memory/                  # MemoryProvider registry + bootstrap glue (the bundled vault lives in packages/valora-plugin-memory-vault/; ADR-016 — replaceable via plugin)
 │   ├── mcp/                     # MCP server implementation
 │   ├── security/                # Agentic AI security (credential, command, injection guards)
 │   ├── session/                 # Session management
@@ -444,7 +473,7 @@ valora/                          # npm package root
 │   ├── hooks.default.json       # Default hooks config
 │   └── external-mcp.default.json # External MCP server registry
 ├── dist/                        # Compiled output (gitignored)
-├── tests/                       # Test suites
+├── __tests__/                   # Test suites
 ├── documentation/               # Comprehensive docs
 └── package.json
 ```
@@ -463,10 +492,15 @@ When installed in a project, VALORA supports a `.valora/` directory for local ov
 ├── sessions/                    # Session state (gitignored)
 ├── logs/                        # Execution logs (gitignored)
 ├── index/                       # Codebase symbol index (gitignored)
-├── memory/                      # Agent memory stores (gitignored)
-│   ├── episodic.json            #   7-day half-life events and observations
-│   ├── semantic.json            #   30-day half-life patterns and insights
-│   └── decisions.json           #   21-day half-life architectural decisions
+├── memory/                      # Agent memory vault (gitignored — ADR-013; layout owned by the active memory plugin per ADR-016)
+│   ├── version                  #   Vault schema version stamp
+│   ├── meta.json                #   Last-written / last-consolidated timestamps
+│   ├── episodic/<id>.md         #   7-day half-life events and observations
+│   ├── semantic/<id>.md         #   30-day half-life patterns and insights
+│   ├── decisions/<id>.md        #   21-day half-life architectural decisions
+│   ├── embeddings.bin           #   Packed Float32Array of all embedding vectors
+│   ├── embeddings.index.json    #   id → byte-offset index pinned to model + dim
+│   └── _legacy/                 #   Archived JSON files from auto-migration
 └── cache/                       # Cache data (gitignored)
 ```
 
@@ -505,13 +539,14 @@ Resources in `.valora/` take precedence over built-in `data/` resources.
 
 ### Innovation Highlights
 
-| Innovation                    | Impact                                         |
-| ----------------------------- | ---------------------------------------------- |
-| **Multi-Agent Orchestration** | Specialised agents produce expert-level output |
-| **Three-Tier Execution**      | Flexibility from free to fully automated       |
-| **Session Persistence**       | Context flows naturally between commands       |
-| **Dynamic Agent Selection**   | Right expert for every task                    |
-| **Quality Gates**             | Multiple checkpoints prevent technical debt    |
+| Innovation                    | Impact                                                                                                                                                                       |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Multi-Agent Orchestration** | Specialised agents produce expert-level output                                                                                                                               |
+| **Three-Tier Execution**      | Flexibility from free to fully automated                                                                                                                                     |
+| **Session Persistence**       | Context flows naturally between commands                                                                                                                                     |
+| **Dynamic Agent Selection**   | Right expert for every task                                                                                                                                                  |
+| **Quality Gates**             | Multiple checkpoints prevent technical debt                                                                                                                                  |
+| **Token Efficiency**          | Content-aware command filters, proactive history pruning, and tool-result deduplication reduce per-call token costs; savings surface in the `valora dash` Optimisation panel |
 
 ---
 
@@ -528,6 +563,22 @@ Resources in `.valora/` take precedence over built-in `data/` resources.
 | **Validation**        | Zod                                              |
 | **Code Intelligence** | web-tree-sitter                                  |
 | **MCP**               | @modelcontextprotocol/sdk                        |
+
+---
+
+## 🛡️ Compliance
+
+Valora operates at the **Limited Risk** tier of the EU AI Act (Regulation (EU) 2024/1689).
+
+| Document                                                                        | Description                                                               |
+| ------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| [System Card](./documentation/architecture/system-card.md)                      | Technical documentation for auditors (Annex IV)                           |
+| [Instructions for Use](./documentation/user-guide/eu-ai-act-compliance.md)      | Intended purpose, out-of-scope domains, deployer obligations (Article 13) |
+| [GPAI Upstream Policy](./documentation/developer-guide/gpai-upstream-policy.md) | Upstream provider obligations (Article 25)                                |
+| [Memory Data Governance](./documentation/user-guide/memory-data-governance.md)  | What is stored, retention, and how to purge (Article 10)                  |
+| [SECURITY.md](./SECURITY.md)                                                    | Responsible disclosure and incident reporting                             |
+
+**Audit export:** `valora security audit-export --out audit.json`
 
 ---
 

@@ -6,6 +6,23 @@
  */
 
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { CodePluginModule } from 'plugins/plugin-api.types';
+
+import { readFileSync } from 'fs';
+import { MemoryProviderConflictError } from 'memory/registry';
+import { preloadConflictResolutions, resolveProviderConflict } from 'plugins/conflict-resolver';
+import { createPluginAPI, type PluginLifecycleRegistry } from 'plugins/plugin-api.factory';
+import { PluginLoaderService } from 'plugins/plugin-loader.service';
+import { getCommandGuard } from 'security/command-guard';
+import { getCredentialGuard } from 'security/credential-guard';
+import { getPromptInjectionDetector } from 'security/prompt-injection-detector';
+import { getToolDefinitionValidator } from 'security/tool-definition-validator';
+import { getToolIntegrityMonitor } from 'security/tool-integrity-monitor';
+
+import type { DeterministicValidator } from 'executor/validators/types';
+import type { ExternalMCPServerConfig } from 'types/mcp-client.types';
+import type { ToolCallArgs } from 'types/mcp.types';
+import type { LoadedPlugin, PluginsConfig } from 'types/plugin.types';
 
 import { CommandExecutor } from 'cli/command-executor';
 import { DocumentApprovalWorkflow } from 'cli/document-approval';
@@ -16,26 +33,18 @@ import { getConfigLoader } from 'config/loader';
 import { AgentLoader } from 'executor/agent-loader';
 import { CommandIsolationExecutor } from 'executor/command-isolation.executor';
 import { CommandLoader } from 'executor/command-loader';
+import { getHookExecutionService } from 'executor/hook-execution.service';
 import { PipelineExecutor } from 'executor/pipeline';
 import { PromptLoader } from 'executor/prompt-loader';
 import { StageExecutor } from 'executor/stage-executor';
-import { ExternalMCPIntegrator } from 'mcp/external-mcp-integrator';
-import { MCPApprovalWorkflow } from 'mcp/mcp-approval-workflow';
-// Initialize providers before importing registry (triggers self-registration)
-import 'llm/providers';
-import { getCommandGuard } from 'security/command-guard';
-import { getCredentialGuard } from 'security/credential-guard';
-import { getPromptInjectionDetector } from 'security/prompt-injection-detector';
-import { getToolDefinitionValidator } from 'security/tool-definition-validator';
-import { getToolIntegrityMonitor } from 'security/tool-integrity-monitor';
-
-import type { ToolCallArgs } from 'types/mcp.types';
-
-import { getProviderRegistry } from 'llm/registry';
+import { registerValidator } from 'executor/validators/registry';
+import { getProviderRegistry, ProviderConflictError } from 'llm/registry';
 import { ExternalMCPToolProxy } from 'mcp/external-client/tool-proxy';
+import { ExternalMCPIntegrator } from 'mcp/external-mcp-integrator';
 import { MCPApprovalCacheService } from 'mcp/mcp-approval-cache.service';
+import { MCPApprovalWorkflow } from 'mcp/mcp-approval-workflow';
 import { MCPAuditLoggerService } from 'mcp/mcp-audit-logger.service';
-import { MCPClientManagerService } from 'mcp/mcp-client-manager.service';
+import { MCPClientManagerService, registerGlobalPluginMcpServers } from 'mcp/mcp-client-manager.service';
 import { MCPRequestHandler } from 'mcp/request-handler';
 import { MCPSamplingServiceImpl } from 'mcp/sampling-service';
 import { MCPToolRegistry } from 'mcp/tool-registry';
@@ -43,6 +52,7 @@ import { type ConsoleOutput, getConsoleOutput } from 'output/console-output';
 import { getHeaderFormatter } from 'output/header-formatter';
 import { getLogger } from 'output/logger';
 import { getRenderer, type MarkdownRenderer } from 'output/markdown';
+import { getProcessingFeedback } from 'output/processing-feedback';
 import { getProgress } from 'output/progress';
 import {
 	AgentCapabilityMatcherService,
@@ -123,7 +133,11 @@ export const SERVICE_IDENTIFIERS = {
 	// Dynamic Agent Selection Services
 	TASK_CLASSIFIER: Symbol('TaskClassifierService'),
 	// MCP services
-	TOOL_REGISTRY: Symbol('MCPToolRegistry')
+	TOOL_REGISTRY: Symbol('MCPToolRegistry'),
+
+	// Plugin system
+	PLUGIN_LIFECYCLE_REGISTRIES: Symbol('PluginLifecycleRegistries'),
+	PLUGIN_LOADER: Symbol('PluginLoaderService')
 } as const;
 
 /**
@@ -203,6 +217,180 @@ export function createContainer(): DIContainer {
 }
 
 /**
+ * Discover and load plugins, registering their contributions with the active loaders.
+ * Must be called after createContainer() and before any commands are executed.
+ */
+let loadedPlugins: LoadedPlugin[] = [];
+
+export async function dispatchDeactivateHooks(container: DIContainer): Promise<void> {
+	try {
+		const registries = container.resolve<Map<string, PluginLifecycleRegistry>>(
+			SERVICE_IDENTIFIERS.PLUGIN_LIFECYCLE_REGISTRIES
+		);
+		for (const [pluginName, registry] of registries) {
+			for (const hook of registry.deactivateHooks) {
+				try {
+					await hook();
+				} catch (err) {
+					getLogger().warn(`Plugin "${pluginName}" deactivate hook failed`, {
+						error: (err as Error).message
+					});
+				}
+			}
+		}
+	} catch {
+		// Registry not initialized — initializePlugins was never called
+	}
+}
+
+export function getLoadedPlugins(): LoadedPlugin[] {
+	return loadedPlugins;
+}
+
+export async function initializePlugins(container: DIContainer): Promise<void> {
+	// Load LLM provider SDKs and vault lazily — keeps CLI startup fast for
+	// commands that don't need them (--help, config, session, etc.).
+	await Promise.all([import('llm/providers'), bootstrapMemoryFromConfig()]);
+
+	const pluginLoader = container.resolve<PluginLoaderService>(SERVICE_IDENTIFIERS.PLUGIN_LOADER);
+
+	let pluginsConfig: PluginsConfig | undefined;
+	try {
+		pluginsConfig = getConfigLoader().get().plugins;
+	} catch {
+		// Config not yet loaded — proceed with defaults (all discovered plugins enabled)
+	}
+
+	const plugins = pluginLoader.loadAll(pluginsConfig);
+	loadedPlugins = plugins;
+
+	getProcessingFeedback().showPluginsStatus(plugins);
+
+	const lifecycleRegistries = new Map<string, PluginLifecycleRegistry>();
+	container.register(SERVICE_IDENTIFIERS.PLUGIN_LIFECYCLE_REGISTRIES, lifecycleRegistries);
+
+	if (plugins.length === 0) return;
+
+	await preloadConflictResolutions();
+
+	const agentLoader = container.resolve<AgentLoader>(SERVICE_IDENTIFIERS.AGENT_LOADER);
+	const commandLoader = container.resolve<CommandLoader>(SERVICE_IDENTIFIERS.COMMAND_LOADER);
+	const promptLoader = container.resolve<PromptLoader>(SERVICE_IDENTIFIERS.PROMPT_LOADER);
+	const hookService = getHookExecutionService();
+
+	const activatePlugin = async (plugin: LoadedPlugin): Promise<void> => {
+		if (plugin.agentsDir) agentLoader.registerPluginDir(plugin.agentsDir);
+		if (plugin.commandsDir) commandLoader.registerPluginDir(plugin.commandsDir, plugin.manifest.name);
+		if (plugin.promptsDir) promptLoader.registerPluginPromptsDir(plugin.promptsDir);
+		if (plugin.hooks) hookService.registerPluginHooks(plugin.hooks);
+		if (plugin.mcpsFile) registerPluginMcpsFile(plugin.mcpsFile);
+		if (plugin.codeEntrypoint) await loadCodePlugin(container, plugin, lifecycleRegistries);
+		if (plugin.validatorModules) await loadPluginValidators(plugin);
+	};
+
+	for (const plugin of plugins) {
+		await activatePlugin(plugin);
+	}
+
+	await dispatchActivateHooks(lifecycleRegistries);
+}
+
+async function dispatchActivateHooks(registries: Map<string, PluginLifecycleRegistry>): Promise<void> {
+	for (const [pluginName, registry] of registries) {
+		for (const hook of registry.activateHooks) {
+			try {
+				await hook();
+			} catch (err) {
+				getLogger().warn(`Plugin "${pluginName}" activate hook failed`, {
+					error: (err as Error).message
+				});
+			}
+		}
+	}
+}
+
+async function loadCodePlugin(
+	container: DIContainer,
+	plugin: LoadedPlugin,
+	lifecycleRegistries: Map<string, PluginLifecycleRegistry>
+): Promise<void> {
+	const registry: PluginLifecycleRegistry = { activateHooks: [], deactivateHooks: [] };
+	lifecycleRegistries.set(plugin.manifest.name, registry);
+	try {
+		const mod = (await import(plugin.codeEntrypoint!)) as CodePluginModule;
+		const resolvedOverrides = new Set<string>();
+		const api = createPluginAPI(container, plugin, registry, resolvedOverrides);
+		const MAX_CONFLICT_RETRIES = 50;
+		for (let attempt = 0; attempt <= MAX_CONFLICT_RETRIES; attempt++) {
+			if (attempt === MAX_CONFLICT_RETRIES) {
+				throw new Error(
+					`Plugin "${plugin.manifest.name}" exceeded conflict resolution limit (${MAX_CONFLICT_RETRIES} conflicts). ` +
+						`Declare conflicting keys in the plugin's overrides list in valora-plugin.json.`
+				);
+			}
+			try {
+				await mod.register(api);
+				break;
+			} catch (err) {
+				const isProviderConflict = err instanceof ProviderConflictError;
+				const isMemoryConflict = err instanceof MemoryProviderConflictError;
+				if (!isProviderConflict && !isMemoryConflict) throw err;
+				const conflict = err as MemoryProviderConflictError | ProviderConflictError;
+				const winner = await resolveProviderConflict({
+					existingOwner: conflict.existingOwner,
+					incomingOwner: conflict.incomingOwner,
+					key: conflict.providerKey
+				});
+				if (winner === conflict.incomingOwner) {
+					resolvedOverrides.add(conflict.providerKey);
+				}
+			}
+		}
+	} catch (error) {
+		getLogger().warn('Failed to load code plugin', {
+			error: (error as Error).message,
+			plugin: plugin.manifest.name
+		});
+	}
+}
+
+async function loadPluginValidators(plugin: LoadedPlugin): Promise<void> {
+	const logger = getLogger();
+	for (const { modulePath, stage } of plugin.validatorModules ?? []) {
+		try {
+			const mod = (await import(modulePath)) as { default?: DeterministicValidator };
+			if (!mod.default || typeof mod.default.validate !== 'function') {
+				logger.warn(`Plugin "${plugin.manifest.name}" validator module has no default DeterministicValidator export`, {
+					modulePath
+				});
+				continue;
+			}
+			registerValidator(stage, mod.default);
+			logger.info(`Plugin validator registered: stage="${stage}" from ${plugin.manifest.name}`);
+		} catch (error) {
+			logger.warn(`Failed to load plugin validator: ${modulePath}`, {
+				error: (error as Error).message,
+				plugin: plugin.manifest.name
+			});
+		}
+	}
+}
+
+function registerPluginMcpsFile(mcpsFile: string): void {
+	try {
+		const raw = readFileSync(mcpsFile, 'utf-8');
+		const data = JSON.parse(raw) as { servers?: unknown[] };
+		const validServers = (data.servers ?? []).filter(
+			(s): s is ExternalMCPServerConfig =>
+				typeof s === 'object' && s !== null && typeof (s as Record<string, unknown>)['id'] === 'string'
+		);
+		registerGlobalPluginMcpServers(validServers);
+	} catch (error) {
+		getLogger().warn('Failed to load mcps.json from plugin', { error: (error as Error).message, path: mcpsFile });
+	}
+}
+
+/**
  * Setup default services in the container
  */
 function setupDefaultServices(container: DIContainer): void {
@@ -210,6 +398,9 @@ function setupDefaultServices(container: DIContainer): void {
 	container.registerFactory(SERVICE_IDENTIFIERS.COMMAND_LOADER, () => new CommandLoader());
 	container.registerFactory(SERVICE_IDENTIFIERS.PROMPT_LOADER, () => new PromptLoader());
 	container.registerFactory(SERVICE_IDENTIFIERS.AGENT_LOADER, () => new AgentLoader());
+
+	// Plugin system
+	container.registerFactory(SERVICE_IDENTIFIERS.PLUGIN_LOADER, () => new PluginLoaderService());
 
 	// Executors depend on loaders
 	container.registerFactory(SERVICE_IDENTIFIERS.PIPELINE_EXECUTOR, () => {
@@ -284,10 +475,7 @@ function setupDefaultServices(container: DIContainer): void {
 	// Command executor depends on multiple services
 	container.registerFactory(SERVICE_IDENTIFIERS.COMMAND_EXECUTOR, () => {
 		const commandLoader = container.resolve(SERVICE_IDENTIFIERS.COMMAND_LOADER) as CommandLoader;
-		const promptLoader = container.resolve(SERVICE_IDENTIFIERS.PROMPT_LOADER) as PromptLoader;
 		const agentLoader = container.resolve(SERVICE_IDENTIFIERS.AGENT_LOADER) as AgentLoader;
-		const pipelineExecutor = container.resolve(SERVICE_IDENTIFIERS.PIPELINE_EXECUTOR) as PipelineExecutor;
-		const isolationExecutor = container.resolve(SERVICE_IDENTIFIERS.ISOLATION_EXECUTOR) as CommandIsolationExecutor;
 		const sessionLifecycle = container.resolve(SERVICE_IDENTIFIERS.SESSION_LIFECYCLE) as SessionLifecycle;
 		const sessionManager = container.resolve(SERVICE_IDENTIFIERS.SESSION_MANAGER) as CLISessionManager;
 		const providerResolver = container.resolve(SERVICE_IDENTIFIERS.PROVIDER_RESOLVER) as CLIProviderResolver;
@@ -338,11 +526,8 @@ function setupDefaultServices(container: DIContainer): void {
 			commandLoader,
 			documentOutputProcessor,
 			dynamicAgentResolver,
-			isolationExecutor,
 			logger: container.resolve(SERVICE_IDENTIFIERS.LOGGER),
 			mcpSampling,
-			pipelineExecutor,
-			promptLoader,
 			providerResolver,
 			sessionLifecycle,
 			sessionManager
@@ -411,6 +596,27 @@ function setupDefaultServices(container: DIContainer): void {
 		const approvalWorkflow = container.resolve(SERVICE_IDENTIFIERS.MCP_APPROVAL_WORKFLOW) as MCPApprovalWorkflow;
 		return new ExternalMCPIntegrator(clientManager, approvalCache, auditLogger, approvalWorkflow);
 	});
+}
+
+/**
+ * Resolve the bundled vault's plugin-namespaced config and bootstrap the
+ * provider. The heavy vault package is loaded lazily so it does not inflate
+ * CLI startup time for commands that don't need memory (e.g. --help).
+ * Falls back to all-defaults when the loader has not yet run.
+ */
+export async function bootstrapMemoryFromConfig(): Promise<void> {
+	const [{ parseVaultPluginConfig }, { bootstrapBundledMemoryProvider }] = await Promise.all([
+		import('@windagency/valora-plugin-memory-vault'),
+		import('memory/bootstrap')
+	]);
+	let memoryConfig;
+	try {
+		const rawPlugins = getConfigLoader().getRaw()['plugins'] as Record<string, unknown> | undefined;
+		memoryConfig = parseVaultPluginConfig(rawPlugins?.['memory-vault']);
+	} catch {
+		memoryConfig = undefined;
+	}
+	bootstrapBundledMemoryProvider({ memoryConfig });
 }
 
 /**

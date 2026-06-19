@@ -10,10 +10,9 @@ import { formatDurationMs } from 'ui/dashboard/utils/format-helpers';
 import { getTUIAdapter } from 'ui/tui-adapter.interface';
 
 const tui = getTUIAdapter();
-// eslint-disable-next-line @typescript-eslint/naming-convention -- Box and Text are React components which require PascalCase
+
 const { Box, Text } = tui;
 
-// eslint-disable-next-line @typescript-eslint/naming-convention -- React components must use PascalCase
 export function SystemHealthPanel({ health }: { health: SystemHealth }): React.JSX.Element {
 	const statusColor = health.apiStatus === 'healthy' ? 'green' : 'red';
 	const statusIcon = health.apiStatus === 'healthy' ? '✓' : '✗';

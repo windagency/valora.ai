@@ -2,15 +2,21 @@
  * Tool Integrity Monitor
  *
  * Detects tool-set drift (rug pull attacks) by fingerprinting MCP server
- * tool definitions and comparing them across connections.
+ * tool definitions and comparing them across connections. Baselines are
+ * persisted to disk so drift can be detected even when the originating
+ * process is restarted between connections.
  */
 
 import { createHash } from 'crypto';
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 
 import type { ExternalMCPTool } from 'types/mcp-client.types';
 
 import { getLogger } from 'output/logger';
+import { getRuntimeDataDir } from 'utils/paths';
 
+import { getAuditSink } from './audit-sink';
 import { createSecurityEvent, type SecurityEvent } from './security-event.types';
 
 export interface IntegrityCheckResult {
@@ -20,16 +26,35 @@ export interface IntegrityCheckResult {
 	previousFingerprint?: string;
 }
 
+export interface ToolIntegrityMonitorOptions {
+	baselineFilePath?: string;
+}
+
 export interface ToolSetDiff {
 	added: string[];
 	changed: string[];
 	removed: string[];
 }
 
+interface PersistedBaseline {
+	fingerprint: string;
+	snapshot: Record<string, string>;
+}
+
+type PersistedBaselines = Record<string, PersistedBaseline>;
+
+const DEFAULT_BASELINE_FILENAME = 'mcp-baselines.json';
+
 export class ToolIntegrityMonitor {
+	private baselineFilePath: string;
 	private events: SecurityEvent[] = [];
 	private fingerprints = new Map<string, string>();
 	private toolSnapshots = new Map<string, Map<string, string>>();
+
+	constructor(options: ToolIntegrityMonitorOptions = {}) {
+		this.baselineFilePath = options.baselineFilePath ?? join(getRuntimeDataDir(), DEFAULT_BASELINE_FILENAME);
+		this.loadFromDisk();
+	}
 
 	/**
 	 * Compute a SHA-256 fingerprint of a tool set.
@@ -55,9 +80,9 @@ export class ToolIntegrityMonitor {
 		const previousFingerprint = this.fingerprints.get(serverId);
 
 		if (previousFingerprint === undefined) {
-			// First connection — store baseline
 			this.fingerprints.set(serverId, currentFingerprint);
 			this.storeToolSnapshot(serverId, currentTools);
+			this.persistToDisk();
 			return { changed: false, currentFingerprint };
 		}
 
@@ -65,14 +90,13 @@ export class ToolIntegrityMonitor {
 			return { changed: false, currentFingerprint, previousFingerprint };
 		}
 
-		// Tools changed — compute diff
 		const diff = this.computeDiff(serverId, currentTools);
 
 		this.logEvent(serverId, previousFingerprint, currentFingerprint, diff);
 
-		// Update stored state
 		this.fingerprints.set(serverId, currentFingerprint);
 		this.storeToolSnapshot(serverId, currentTools);
+		this.persistToDisk();
 
 		return { changed: true, currentFingerprint, diff, previousFingerprint };
 	}
@@ -111,6 +135,48 @@ export class ToolIntegrityMonitor {
 	 */
 	clearEvents(): void {
 		this.events = [];
+	}
+
+	private loadFromDisk(): void {
+		if (!existsSync(this.baselineFilePath)) return;
+		try {
+			const raw = readFileSync(this.baselineFilePath, 'utf8');
+			const parsed = JSON.parse(raw) as PersistedBaselines;
+			for (const [serverId, baseline] of Object.entries(parsed)) {
+				if (typeof baseline?.fingerprint !== 'string' || typeof baseline.snapshot !== 'object') continue;
+				this.fingerprints.set(serverId, baseline.fingerprint);
+				this.toolSnapshots.set(serverId, new Map(Object.entries(baseline.snapshot)));
+			}
+		} catch {
+			// Treat any read or parse failure as a missing baseline; the next
+			// successful checkIntegrity will rewrite the file.
+		}
+	}
+
+	private persistToDisk(): void {
+		const payload: PersistedBaselines = {};
+		for (const [serverId, fingerprint] of this.fingerprints) {
+			const snapshotMap = this.toolSnapshots.get(serverId) ?? new Map<string, string>();
+			payload[serverId] = {
+				fingerprint,
+				snapshot: Object.fromEntries(snapshotMap)
+			};
+		}
+
+		try {
+			const dir = dirname(this.baselineFilePath);
+			if (!existsSync(dir)) {
+				mkdirSync(dir, { recursive: true });
+			}
+			// Atomic write: write to temp file in same dir, then rename.
+			const tmpPath = `${this.baselineFilePath}.tmp-${process.pid}`;
+			writeFileSync(tmpPath, JSON.stringify(payload, null, 2), 'utf8');
+			renameSync(tmpPath, this.baselineFilePath);
+		} catch {
+			// Persistence is best-effort — a write failure must not break the
+			// in-process integrity tracking. The next process is responsible
+			// for reseeding from a clean state.
+		}
 	}
 
 	/**
@@ -172,6 +238,7 @@ export class ToolIntegrityMonitor {
 			serverId
 		});
 		this.events.push(event);
+		getAuditSink().append(event);
 
 		const logger = getLogger();
 		logger.warn(`[Security] MCP tool set changed for ${serverId}`, {

@@ -1,16 +1,46 @@
+---
+updated: 2026-05-11
+---
+
 # ADR-011: Biologically-Inspired Agent Memory System
 
 > **Decision**: Implement a native exponential-decay memory system for Valora agents rather than adopting an external library dependency.
+
+> **Note (2026-05):** This ADR describes the decay model and tag-based recall semantics of the **bundled vault plugin**. Since [ADR-016](./016-memory-as-plugin.md), the host owns only the `MemoryProvider` contract and a registry; the decay/recall behaviour documented below belongs to `@windagency/valora-plugin-memory-vault`. A user who installs an alternative memory plugin will get whatever recall and retention semantics that plugin chooses to implement.
 
 ## Status
 
 Accepted
 
-## Context
+## Consequences
+
+### Positive
+
+- Agents accumulate verified patterns, error signatures, and architectural decisions across sessions without repeating work
+- Zero new runtime dependencies — pure TypeScript with file I/O only
+- Decay is tunable per category; the system self-prunes without manual intervention
+- Git invalidation keeps memory consistent with code evolution (reverted decisions become stale automatically)
+- Graceful degradation — all memory operations are non-fatal; if loading or saving fails, the pipeline continues unaffected
+
+### Negative
+
+- JSON stores are not encrypted (unlike session data); memory entries should contain only non-sensitive observations about code patterns
+- Jaccard tag similarity is a coarse proxy for semantic similarity — fine-grained deduplication requires embeddings
+- Consolidation must be triggered explicitly (or via post-feedback hook); there is no background scheduler
+
+### Neutral
+
+- Memory is stored per-project (`.valora/memory/`), not globally; teams sharing a repository share memory stores if `.valora/memory/` is committed (it is gitignored by default)
+- The `injection_token_budget` (default: 2000 tokens) caps injected context; high-volume use may require tuning
+
+<details>
+<summary><strong>Context</strong></summary>
 
 Valora orchestrates 11 AI agents through multi-stage pipelines, but all learned knowledge is ephemeral — context exists only within a session run. Agents repeat the same mistakes, rediscover the same patterns, and lose architectural decisions between sessions. The `feedback` command analyses workflow outcomes but does not persist findings. The `knowledge-base/` directory exists but is empty.
 
 The Hippo Memory library (github.com/kitfunso/hippo-memory) implements a biologically-inspired model with decay, retrieval strengthening, and consolidation — precisely the characteristics Valora needs. However, a direct dependency was evaluated and rejected (see Alternatives Considered).
+
+</details>
 
 ## Decision
 
@@ -37,28 +67,8 @@ Build a native biologically-inspired memory system within Valora, comprising:
 
 9. **CLI command**: `valora consolidate` triggers a manual consolidation cycle; consolidation also runs automatically after a successful `feedback` pipeline
 
-## Consequences
-
-### Positive
-
-- Agents accumulate verified patterns, error signatures, and architectural decisions across sessions without repeating work
-- Zero new runtime dependencies — pure TypeScript with file I/O only
-- Decay is tunable per category; the system self-prunes without manual intervention
-- Git invalidation keeps memory consistent with code evolution (reverted decisions become stale automatically)
-- Graceful degradation — all memory operations are non-fatal; if loading or saving fails, the pipeline continues unaffected
-
-### Negative
-
-- JSON stores are not encrypted (unlike session data); memory entries should contain only non-sensitive observations about code patterns
-- Jaccard tag similarity is a coarse proxy for semantic similarity — fine-grained deduplication requires embeddings
-- Consolidation must be triggered explicitly (or via post-feedback hook); there is no background scheduler
-
-### Neutral
-
-- Memory is stored per-project (`.valora/memory/`), not globally; teams sharing a repository share memory stores if `.valora/memory/` is committed (it is gitignored by default)
-- The `injection_token_budget` (default: 2000 tokens) caps injected context; high-volume use may require tuning
-
-## Alternatives Considered
+<details>
+<summary><strong>Alternatives considered</strong></summary>
 
 ### Hippo Memory (external dependency)
 
@@ -75,6 +85,8 @@ Build a native biologically-inspired memory system within Valora, comprising:
 ### Redis or external key-value store
 
 **Rejected.** Introduces infrastructure dependency; contradicts Valora's "zero infrastructure" design principle (see ADR-001 and ADR-003).
+
+</details>
 
 ## References
 

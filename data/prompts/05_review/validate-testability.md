@@ -14,7 +14,6 @@ model_requirements:
   recommended:
     - claude-haiku-4.5
 agents:
-  - product-manager
   - lead
 dependencies:
   requires:

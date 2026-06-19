@@ -38,7 +38,7 @@ export type {
 export { formatDurationMs } from './dashboard/utils/format-helpers';
 
 const tui = getTUIAdapter();
-// eslint-disable-next-line @typescript-eslint/naming-convention -- Box and Text are React components which require PascalCase
+
 const { Box } = tui;
 
 const TAB_KEYS: Record<string, DashboardTab> = {
@@ -53,7 +53,7 @@ const TAB_KEYS: Record<string, DashboardTab> = {
 /**
  * Main Dashboard Component
  */
-// eslint-disable-next-line @typescript-eslint/naming-convention -- React components must use PascalCase
+
 function Dashboard(): React.JSX.Element {
 	const { exit } = tui.useApp();
 	const nav = useNavigation();

@@ -1,0 +1,50 @@
+### macOS ###
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+*.iCloud
+
+### Windows ###
+Thumbs.db
+ehthumbs.db
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+### Linux ###
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+### IDE ###
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/tasks.json
+!.vscode/launch.json
+.history/
+
+### Node ###
+node_modules/
+*.log
+npm-debug.log*
+yarn-debug.log*
+*.tsbuildinfo
+.npm
+.eslintcache
+*.tgz
+.env*
+!.env.sample
+!.env.example
+.pnp.*
+.yarn-integrity

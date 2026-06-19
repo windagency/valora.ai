@@ -231,8 +231,23 @@ describe('CircuitBreaker', () => {
 	let breaker: CircuitBreaker;
 
 	beforeEach(() => {
+		vi.useFakeTimers();
 		breaker = new CircuitBreaker(3, 1000); // 3 failures, 1 second timeout
 	});
+
+	afterEach(() => {
+		vi.useRealTimers();
+	});
+
+	async function triggerFailures(cb: CircuitBreaker, count: number) {
+		for (let i = 0; i < count; i++) {
+			await expect(
+				cb.execute(async () => {
+					throw new Error('Test failure');
+				})
+			).rejects.toThrow('Test failure');
+		}
+	}
 
 	it('should start in closed state', () => {
 		expect(breaker.getState()).toBe('closed');
@@ -247,77 +262,36 @@ describe('CircuitBreaker', () => {
 	});
 
 	it('should transition to open after threshold failures', async () => {
-		// Fail 3 times (threshold)
-		for (let i = 0; i < 3; i++) {
-			try {
-				await breaker.execute(async () => {
-					throw new Error('Test failure');
-				});
-			} catch (error) {
-				// Expected
-			}
-		}
+		await triggerFailures(breaker, 3);
 
 		expect(breaker.getState()).toBe('open');
 		expect(breaker.getFailureCount()).toBe(3);
 	});
 
 	it('should throw ResourceError when open', async () => {
-		// Force open state
-		for (let i = 0; i < 3; i++) {
-			try {
-				await breaker.execute(async () => {
-					throw new Error('Test failure');
-				});
-			} catch (error) {
-				// Expected
-			}
-		}
+		await triggerFailures(breaker, 3);
 
 		await expect(breaker.execute(async () => 'success')).rejects.toThrow(ResourceError);
 	});
 
 	it('should transition to half-open after timeout', async () => {
-		// Force open state
-		for (let i = 0; i < 3; i++) {
-			try {
-				await breaker.execute(async () => {
-					throw new Error('Test failure');
-				});
-			} catch (error) {
-				// Expected
-			}
-		}
+		await triggerFailures(breaker, 3);
 
-		// Wait for recovery timeout
-		await new Promise((resolve) => setTimeout(resolve, 1100));
+		await vi.advanceTimersByTimeAsync(1100);
 
-		// Next call should transition to half-open
-		try {
-			await breaker.execute(async () => {
+		await expect(
+			breaker.execute(async () => {
 				throw new Error('Still failing');
-			});
-		} catch (error) {
-			// Expected
-		}
+			})
+		).rejects.toThrow();
 
-		expect(breaker.getState()).toBe('open'); // Failed in half-open, back to open
+		expect(breaker.getState()).toBe('open');
 	});
 
 	it('should reset on success after half-open', async () => {
-		// Force open state
-		for (let i = 0; i < 3; i++) {
-			try {
-				await breaker.execute(async () => {
-					throw new Error('Test failure');
-				});
-			} catch (error) {
-				// Expected
-			}
-		}
+		await triggerFailures(breaker, 3);
 
-		// Wait for recovery and succeed
-		await new Promise((resolve) => setTimeout(resolve, 1100));
+		await vi.advanceTimersByTimeAsync(1100);
 		await breaker.execute(async () => 'success');
 
 		expect(breaker.getState()).toBe('closed');

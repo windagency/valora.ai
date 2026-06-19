@@ -80,8 +80,11 @@ export function getProjectConfigDir(): null | string {
 /**
  * Get the global user configuration directory.
  * Returns ~/.valora/ on Unix or %APPDATA%/valora/ on Windows.
+ * Override with VALORA_GLOBAL_CONFIG_DIR for testing or custom deployments.
  */
 export function getGlobalConfigDir(): string {
+	const envOverride = process.env['VALORA_GLOBAL_CONFIG_DIR'];
+	if (envOverride) return envOverride;
 	if (process.platform === 'win32') {
 		const appData = process.env['APPDATA'] ?? path.join(os.homedir(), 'AppData', 'Roaming');
 		return path.join(appData, 'valora');
@@ -96,4 +99,73 @@ export function getGlobalConfigDir(): string {
 export function getRuntimeDataDir(): string {
 	const projectDir = getProjectConfigDir();
 	return projectDir ?? getGlobalConfigDir();
+}
+
+/**
+ * Get the package's built-in plugins directory.
+ */
+export function getPackagePluginsDir(): string {
+	return path.join(getPackageRoot(), 'data', 'plugins');
+}
+
+/**
+ * Get the path to the shipped plugin registry JSON file.
+ */
+export function getPluginRegistryPath(): string {
+	return path.join(getPackagePluginsDir(), 'registry.json');
+}
+
+/**
+ * Get the global user plugins directory (~/.valora/plugins/).
+ */
+export function getGlobalPluginsDir(): string {
+	return path.join(getGlobalConfigDir(), 'plugins');
+}
+
+/**
+ * Get the system-wide plugins directory, accessible to all users on the machine.
+ * Override with VALORA_SYSTEM_PLUGINS_DIR for testing or custom deployments.
+ * Defaults: /usr/local/share/valora/plugins (Unix/macOS), %PROGRAMDATA%\valora\plugins (Windows).
+ */
+export function getSystemPluginsDir(): string {
+	const envOverride = process.env['VALORA_SYSTEM_PLUGINS_DIR'];
+	if (envOverride) return envOverride;
+	if (process.platform === 'win32') {
+		const programData = process.env['PROGRAMDATA'] ?? path.join('C:', 'ProgramData');
+		return path.join(programData, 'valora', 'plugins');
+	}
+	return '/usr/local/share/valora/plugins';
+}
+
+/**
+ * Get the project-level plugins directory (.valora/plugins/).
+ * Returns null if not in a project context.
+ */
+export function getProjectPluginsDir(): null | string {
+	const projectDir = getProjectConfigDir();
+	return projectDir ? path.join(projectDir, 'plugins') : null;
+}
+
+/**
+ * Get the current package version from package.json at the package root.
+ */
+export function getValoraVersion(): string {
+	const pkgPath = path.join(getPackageRoot(), 'package.json');
+	try {
+		const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8')) as { version?: string };
+		return pkg.version ?? '0.0.0';
+	} catch {
+		return '0.0.0';
+	}
+}
+
+/**
+ * Returns true if a Valora configuration directory exists in any scope
+ * (project, user, or system). Used to detect a first-time install.
+ */
+export function hasAnyValoraConfig(): boolean {
+	if (getProjectConfigDir() !== null) return true;
+	if (fs.existsSync(getGlobalConfigDir())) return true;
+	if (fs.existsSync(getSystemPluginsDir())) return true;
+	return false;
 }
