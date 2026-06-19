@@ -12,7 +12,7 @@ valora plugin add docs
 
 - **2 commands**: `generate-docs`, `generate-all-documentation`.
 
-Both target the `lead` agent contributed by `valora-core-engineering`, declared via `requires` in the manifest.
+Both target the `lead` agent contributed by `valora-plugin-engineering`, declared via `requires` in the manifest.
 
 ## See also
 

@@ -256,7 +256,7 @@ describe('resolvePackageName', () => {
 	});
 
 	it('scopes a valora- prefixed name directly without adding valora-plugin-', () => {
-		expect(resolvePackageName('valora-core-product')).toBe('@windagency/valora-core-product');
+		expect(resolvePackageName('valora-plugin-product')).toBe('@windagency/valora-plugin-product');
 	});
 
 	it('scopes a valora-plugin- prefixed name directly', () => {

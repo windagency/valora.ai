@@ -727,6 +727,10 @@ export function configureConsolidateCommand(program: CommandAdapter): void {
 		.option('--since <date>', 'Override git log start date (ISO format, e.g. 2026-01-01)')
 		.action(async (options: { dryRun?: boolean; pruneOnly?: boolean; since?: string }) => {
 			try {
+				const container = createContainer();
+				await initializePlugins(container);
+				getConfigLoader().warnUnknownProviders();
+
 				const { getMemoryRegistry } = await import('memory/registry');
 				const provider = getMemoryRegistry().getActive();
 				if (provider.consolidate === undefined) {
@@ -751,8 +755,15 @@ export function configureConsolidateCommand(program: CommandAdapter): void {
 				if (options.dryRun) {
 					console.log('  (dry-run mode — no changes written)\n');
 				}
+
+				const { stopAllCleanupSchedulers } = await import('cleanup/coordinator');
+				stopAllCleanupSchedulers();
+				process.exit(0);
 			} catch (error) {
 				console.error('Memory consolidation failed:', error instanceof Error ? error.message : String(error));
+
+				const { stopAllCleanupSchedulers } = await import('cleanup/coordinator');
+				stopAllCleanupSchedulers();
 				process.exit(1);
 			}
 		});

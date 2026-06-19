@@ -496,8 +496,8 @@ describe('plugin update (install)', () => {
 			catalogAll: makeCatalogAll([
 				makePlugin({ manifest: { name: 'valora-plugin-rtk', version: '1.0.0' }, location: 'user', status: 'enabled' }),
 				makePlugin({
-					dir: '/plugins/valora-core-product',
-					manifest: { name: 'valora-core-product', version: '2.0.0' },
+					dir: '/plugins/valora-plugin-product',
+					manifest: { name: 'valora-plugin-product', version: '2.0.0' },
 					location: 'user',
 					status: 'enabled'
 				})
@@ -512,8 +512,8 @@ describe('plugin update (install)', () => {
 				description: ''
 			},
 			{
-				name: 'valora-core-product',
-				package: '@windagency/valora-core-product',
+				name: 'valora-plugin-product',
+				package: '@windagency/valora-plugin-product',
 				version: '2.1.0',
 				contributes: [],
 				description: ''
@@ -521,10 +521,10 @@ describe('plugin update (install)', () => {
 		]);
 
 		const program = makeProgram();
-		await runCommand(program, ['plugin', 'update', 'valora-core-product']);
+		await runCommand(program, ['plugin', 'update', 'valora-plugin-product']);
 
 		expect(mockInstall).toHaveBeenCalledTimes(1);
-		expect(mockInstall).toHaveBeenCalledWith('valora-core-product', 'user', undefined);
+		expect(mockInstall).toHaveBeenCalledWith('valora-plugin-product', 'user', undefined);
 	});
 
 	it('warns and skips npm-scope plugins without installing', async () => {

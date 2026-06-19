@@ -1,5 +1,5 @@
 {
-	"name": "valora-core-engineering",
+	"name": "valora-plugin-engineering",
 	"version": "1.0.0",
 	"description": "Lead engineer agent and core engineering workflow commands (commit, create-pr, gather-knowledge, plan, plan-architecture, plan-implementation, review-code, review-functional, review-plan, validate-parallel, validate-plan).",
 	"engines": { "valora": ">=0.1.0" },

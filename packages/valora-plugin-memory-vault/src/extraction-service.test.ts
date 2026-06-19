@@ -315,6 +315,47 @@ describe('MemoryExtractionService', () => {
 				expect(paths).not.toContain('');
 			}
 		});
+
+		it('flattens files_changed when the LLM returns an object with created/modified/deleted/renamed sub-arrays', async () => {
+			const service = new MemoryExtractionService();
+			await service.extractFromFeedbackOutputs(
+				[
+					{
+						outputs: {
+							files_changed: {
+								created: ['knowledge-base/backend/API.md', 'knowledge-base/backend/ARCHITECTURE.md'],
+								modified: ['knowledge-base/FUNCTIONAL.md', 'knowledge-base/PRD.md'],
+								deleted: [],
+								renamed: []
+							},
+							errors_encountered: ['some error']
+						},
+						success: true
+					}
+				],
+				'sess-001',
+				'product-manager'
+			);
+
+			const createCalls = mockManagerInstance.create.mock.calls;
+			expect(createCalls.length).toBeGreaterThan(0);
+			for (const [, opts] of createCalls as Array<[string, Record<string, unknown>]>) {
+				const paths = opts['relatedPaths'] as string[];
+				expect(paths).toContain('knowledge-base/backend/API.md');
+				expect(paths).toContain('knowledge-base/FUNCTIONAL.md');
+			}
+		});
+
+		it('does not throw when files_changed is an unexpected shape', async () => {
+			const service = new MemoryExtractionService();
+			await expect(
+				service.extractFromFeedbackOutputs(
+					[{ outputs: { files_changed: 42, errors_encountered: ['err'] }, success: true }],
+					'sess-001',
+					'product-manager'
+				)
+			).resolves.not.toThrow();
+		});
 	});
 
 	// ------------------------------------------------------------------ 9

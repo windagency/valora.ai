@@ -24,7 +24,7 @@ Accepted
   - **Obsidian** — `valora-plugin-obsidian` exercises three namespaces simultaneously (`api.config.extend` + `api.lifecycle.onActivate` + `api.cli.addSubcommand`).
   - **OpenRouter** — `valora-plugin-openrouter` is the reference for the `providers` namespace.
   - **Memory vault** — `valora-plugin-memory-vault` is the reference for the `memory` namespace, registered as the default `'vault'` backend at host boot (see [ADR-016](./016-memory-as-plugin.md)). A user plugin can replace it by registering its own `MemoryProvider` and setting `memory.provider` in config.
-- **Horizon 1 migration complete** — As of April 2026, all embedded built-in resources have been packaged into 10 named plugins under `packages/` and `data/plugins/`: `valora-core-secops`, `valora-core-design`, `valora-core-platform`, `valora-core-generators`, `valora-core-product`, `valora-core-qa`, `valora-core-quality-gate`, `valora-core-docs`, `valora-core-engineering`, `valora-core-implement`. The directory `data/commands/` is now docs-only. `data/agents/` retains `registry.json` for dynamic agent selection at runtime.
+- **Horizon 1 migration complete** — As of April 2026, all embedded built-in resources have been packaged into 10 named plugins under `packages/` and `data/plugins/`: `valora-plugin-secops`, `valora-plugin-design`, `valora-plugin-platform`, `valora-core-generators`, `valora-plugin-product`, `valora-plugin-qa`, `valora-plugin-quality-gate`, `valora-plugin-docs`, `valora-plugin-engineering`, `valora-plugin-implement`. The directory `data/commands/` is now docs-only. `data/agents/` retains `registry.json` for dynamic agent selection at runtime.
 
 ### Negative
 

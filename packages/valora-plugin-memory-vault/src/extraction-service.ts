@@ -22,7 +22,7 @@ interface FeedbackOutputs {
 	// From context-analyze stage
 	agents_used?: string[];
 	errors_encountered?: unknown[];
-	files_changed?: string[];
+	files_changed?: string[] | { created?: string[]; deleted?: string[]; modified?: string[]; renamed?: string[] };
 	retries?: number;
 	// From review-feedback stage
 	feedback_comments?: string;
@@ -57,8 +57,9 @@ export class MemoryExtractionService {
 			.filter((s) => s.success)
 			.reduce<FeedbackOutputs>((acc, s) => ({ ...acc, ...s.outputs }), {});
 
-		// Extract relatedPaths from files_changed (normalise: trim, filter empty)
-		const relatedPaths: string[] = (merged.files_changed ?? []).map((f) => f.trim()).filter((f) => f.length > 0);
+		// Extract relatedPaths from files_changed — normalise both the flat string[]
+		// and the object shape { created, modified, deleted, renamed } that the LLM produces.
+		const relatedPaths: string[] = normalisedFilesChanged(merged.files_changed);
 
 		// Call the four private extraction methods and collect all entries
 		const [errorEntries, feedbackEntries, bottleneckEntries, patternEntries] = await Promise.all([
@@ -221,6 +222,17 @@ function buildDefaultVaultStore(): VaultStore {
 	const vaultDir = getDefaultVaultDir();
 	runAutoMigrationIfNeeded(getLegacyJsonDir(), vaultDir);
 	return new VaultStore(vaultDir);
+}
+
+function normalisedFilesChanged(raw: FeedbackOutputs['files_changed']): string[] {
+	if (!raw) return [];
+	if (Array.isArray(raw)) return raw.map((f) => f.trim()).filter((f) => f.length > 0);
+	if (typeof raw === 'object') {
+		return [...(raw.created ?? []), ...(raw.modified ?? []), ...(raw.deleted ?? []), ...(raw.renamed ?? [])]
+			.map((f) => f.trim())
+			.filter((f) => f.length > 0);
+	}
+	return [];
 }
 
 let extractionInstance: MemoryExtractionService | null = null;

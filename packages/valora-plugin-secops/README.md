@@ -12,7 +12,7 @@ valora plugin add secops
 
 - **1 agent**: `secops-engineer`.
 
-Requires `valora-core-platform` (declared via `requires`).
+Requires `valora-plugin-platform` (declared via `requires`).
 
 ## See also
 

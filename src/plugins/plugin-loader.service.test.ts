@@ -49,7 +49,7 @@ describe('PluginLoaderService — agent-only bundles', () => {
 
 	it('loads an agent-only plugin and exposes agentsDir', () => {
 		writeJson(path.join(tmpDir, 'valora-plugin.json'), {
-			name: 'valora-core-secops',
+			name: 'valora-plugin-secops',
 			version: '1.0.0',
 			description: 'SecOps agent bundle',
 			contributes: ['agents']
@@ -60,7 +60,7 @@ describe('PluginLoaderService — agent-only bundles', () => {
 		const plugins = loader.loadAll();
 
 		expect(plugins).toHaveLength(1);
-		expect(plugins[0].manifest.name).toBe('valora-core-secops');
+		expect(plugins[0].manifest.name).toBe('valora-plugin-secops');
 		expect(plugins[0].agentsDir).toBe(path.join(tmpDir, 'agents'));
 		expect(plugins[0].commandsDir).toBeUndefined();
 		expect(plugins[0].hooks).toBeUndefined();
@@ -68,7 +68,7 @@ describe('PluginLoaderService — agent-only bundles', () => {
 
 	it('preserves the discovery location on the loaded plugin', () => {
 		writeJson(path.join(tmpDir, 'valora-plugin.json'), {
-			name: 'valora-core-secops',
+			name: 'valora-plugin-secops',
 			version: '1.0.0',
 			contributes: ['agents']
 		});
@@ -80,7 +80,7 @@ describe('PluginLoaderService — agent-only bundles', () => {
 
 	it('returns status enabled for a valid agent plugin', () => {
 		writeJson(path.join(tmpDir, 'valora-plugin.json'), {
-			name: 'valora-core-design',
+			name: 'valora-plugin-design',
 			version: '1.0.0',
 			contributes: ['agents']
 		});
@@ -93,7 +93,7 @@ describe('PluginLoaderService — agent-only bundles', () => {
 
 	it('respects plugins.enabled allowlist — skips plugin not in list', () => {
 		writeJson(path.join(tmpDir, 'valora-plugin.json'), {
-			name: 'valora-core-platform',
+			name: 'valora-plugin-platform',
 			version: '1.0.0',
 			contributes: ['agents']
 		});
@@ -157,7 +157,7 @@ describe('PluginLoaderService — command + agent bundles', () => {
 
 	it('exposes both commandsDir and agentsDir for a command+agent bundle', () => {
 		writeJson(path.join(tmpDir, 'valora-plugin.json'), {
-			name: 'valora-core-product',
+			name: 'valora-plugin-product',
 			version: '1.0.0',
 			description: 'Product Manager agent and product workflow commands.',
 			contributes: ['agents', 'commands']
@@ -171,7 +171,7 @@ describe('PluginLoaderService — command + agent bundles', () => {
 		const plugins = loader.loadAll();
 
 		expect(plugins).toHaveLength(1);
-		expect(plugins[0].manifest.name).toBe('valora-core-product');
+		expect(plugins[0].manifest.name).toBe('valora-plugin-product');
 		expect(plugins[0].agentsDir).toBe(path.join(tmpDir, 'agents'));
 		expect(plugins[0].commandsDir).toBe(path.join(tmpDir, 'commands'));
 		expect(plugins[0].promptsDir).toBeUndefined();
@@ -180,7 +180,7 @@ describe('PluginLoaderService — command + agent bundles', () => {
 
 	it('exposes only commandsDir for a commands-only bundle (no agent in manifest)', () => {
 		writeJson(path.join(tmpDir, 'valora-plugin.json'), {
-			name: 'valora-core-docs',
+			name: 'valora-plugin-docs',
 			version: '1.0.0',
 			description: 'Documentation generation commands (lead agent is core).',
 			contributes: ['commands']

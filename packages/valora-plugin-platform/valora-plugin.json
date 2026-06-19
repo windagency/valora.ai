@@ -1,5 +1,5 @@
 {
-	"name": "valora-core-platform",
+	"name": "valora-plugin-platform",
 	"version": "1.0.0",
 	"description": "Platform Engineer agent for cloud-native architecture, Kubernetes, CI/CD, and infrastructure reliability.",
 	"engines": { "valora": ">=0.1.0" },

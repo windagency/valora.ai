@@ -56,8 +56,8 @@ describe('SpendingTracker enrichment fields', () => {
 	});
 
 	it('persists and round-trips plugin when provided', () => {
-		tracker.record(minimalRecord({ plugin: 'valora-core-engineering' }));
-		expect(tracker.getRecords()[0]!.plugin).toBe('valora-core-engineering');
+		tracker.record(minimalRecord({ plugin: 'valora-plugin-engineering' }));
+		expect(tracker.getRecords()[0]!.plugin).toBe('valora-plugin-engineering');
 	});
 
 	it('persists and round-trips activity when provided', () => {

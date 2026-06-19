@@ -44,7 +44,7 @@ describe('PluginDiscoveryService — npm plugin discovery', () => {
 	it('discovers a valid plugin from node_modules/@windagency/valora-plugin-*', () => {
 		const pluginDir = path.join(tmpDir, 'node_modules', '@windagency', 'valora-plugin-engineering');
 		writeJson(path.join(pluginDir, 'valora-plugin.json'), {
-			name: 'valora-core-engineering',
+			name: 'valora-plugin-engineering',
 			version: '1.0.0'
 		});
 
@@ -76,9 +76,9 @@ describe('PluginDiscoveryService — npm plugin discovery', () => {
 	});
 
 	it('discovers a valid plugin from node_modules/@windagency/valora-core-*', () => {
-		const pluginDir = path.join(tmpDir, 'node_modules', '@windagency', 'valora-core-engineering');
+		const pluginDir = path.join(tmpDir, 'node_modules', '@windagency', 'valora-plugin-engineering');
 		writeJson(path.join(pluginDir, 'valora-plugin.json'), {
-			name: 'valora-core-engineering',
+			name: 'valora-plugin-engineering',
 			version: '1.0.0'
 		});
 
@@ -96,8 +96,8 @@ describe('PluginDiscoveryService — npm plugin discovery', () => {
 	it('discovers multiple plugins from the same scope directory', () => {
 		const pluginDirA = path.join(tmpDir, 'node_modules', '@windagency', 'valora-plugin-engineering');
 		const pluginDirB = path.join(tmpDir, 'node_modules', '@windagency', 'valora-plugin-qa');
-		writeJson(path.join(pluginDirA, 'valora-plugin.json'), { name: 'valora-core-engineering', version: '1.0.0' });
-		writeJson(path.join(pluginDirB, 'valora-plugin.json'), { name: 'valora-core-qa', version: '1.0.0' });
+		writeJson(path.join(pluginDirA, 'valora-plugin.json'), { name: 'valora-plugin-engineering', version: '1.0.0' });
+		writeJson(path.join(pluginDirB, 'valora-plugin.json'), { name: 'valora-plugin-qa', version: '1.0.0' });
 
 		const dirs = discovery.discoverPluginDirs();
 
@@ -176,7 +176,7 @@ describe('PluginDiscoveryService — discoverWithSource()', () => {
 
 	it('labels a plugin found in node_modules/@windagency as npm', () => {
 		const pluginDir = path.join(tmpDir, 'node_modules', '@windagency', 'valora-plugin-engineering');
-		writeJson(path.join(pluginDir, 'valora-plugin.json'), { name: 'valora-core-engineering', version: '1.0.0' });
+		writeJson(path.join(pluginDir, 'valora-plugin.json'), { name: 'valora-plugin-engineering', version: '1.0.0' });
 
 		const discovery = new PluginDiscoveryService(tmpDir);
 		const results = discovery.discoverWithSource();

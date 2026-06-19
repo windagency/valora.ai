@@ -16,40 +16,40 @@ function allPluginNames(): string[] {
 }
 
 describe('activity taxonomy', () => {
-	it('maps valora-core-engineering to Coding', () => {
-		expect(pluginToActivity('valora-core-engineering')).toBe(Activity.Coding);
+	it('maps valora-plugin-engineering to Coding', () => {
+		expect(pluginToActivity('valora-plugin-engineering')).toBe(Activity.Coding);
 	});
 
-	it('maps valora-core-implement to Coding', () => {
-		expect(pluginToActivity('valora-core-implement')).toBe(Activity.Coding);
+	it('maps valora-plugin-implement to Coding', () => {
+		expect(pluginToActivity('valora-plugin-implement')).toBe(Activity.Coding);
 	});
 
-	it('maps valora-core-qa to Testing', () => {
-		expect(pluginToActivity('valora-core-qa')).toBe(Activity.Testing);
+	it('maps valora-plugin-qa to Testing', () => {
+		expect(pluginToActivity('valora-plugin-qa')).toBe(Activity.Testing);
 	});
 
-	it('maps valora-core-docs to Documentation', () => {
-		expect(pluginToActivity('valora-core-docs')).toBe(Activity.Documentation);
+	it('maps valora-plugin-docs to Documentation', () => {
+		expect(pluginToActivity('valora-plugin-docs')).toBe(Activity.Documentation);
 	});
 
-	it('maps valora-core-secops to Security', () => {
-		expect(pluginToActivity('valora-core-secops')).toBe(Activity.Security);
+	it('maps valora-plugin-secops to Security', () => {
+		expect(pluginToActivity('valora-plugin-secops')).toBe(Activity.Security);
 	});
 
-	it('maps valora-core-quality-gate to Review', () => {
-		expect(pluginToActivity('valora-core-quality-gate')).toBe(Activity.Review);
+	it('maps valora-plugin-quality-gate to Review', () => {
+		expect(pluginToActivity('valora-plugin-quality-gate')).toBe(Activity.Review);
 	});
 
-	it('maps valora-core-platform to Infrastructure', () => {
-		expect(pluginToActivity('valora-core-platform')).toBe(Activity.Infrastructure);
+	it('maps valora-plugin-platform to Infrastructure', () => {
+		expect(pluginToActivity('valora-plugin-platform')).toBe(Activity.Infrastructure);
 	});
 
-	it('maps valora-core-design to Design', () => {
-		expect(pluginToActivity('valora-core-design')).toBe(Activity.Design);
+	it('maps valora-plugin-design to Design', () => {
+		expect(pluginToActivity('valora-plugin-design')).toBe(Activity.Design);
 	});
 
-	it('maps valora-core-product to Planning', () => {
-		expect(pluginToActivity('valora-core-product')).toBe(Activity.Planning);
+	it('maps valora-plugin-product to Planning', () => {
+		expect(pluginToActivity('valora-plugin-product')).toBe(Activity.Planning);
 	});
 
 	it('maps compression plugins to Optimisation', () => {

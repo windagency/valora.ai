@@ -39,6 +39,21 @@ vi.mock('cleanup/coordinator', () => ({
 	stopAllCleanupSchedulers: vi.fn()
 }));
 
+vi.mock('memory/registry', () => ({
+	getMemoryRegistry: vi.fn(() => ({
+		getActive: vi.fn(() => ({
+			consolidate: vi.fn(async () => ({
+				durationMs: 10,
+				gitInvalidated: 0,
+				merged: 0,
+				promoted: 0,
+				pruned: 0,
+				staleMarked: 0
+			}))
+		}))
+	}))
+}));
+
 vi.mock('config/loader', () => ({
 	getConfigLoader: vi.fn(() => ({ get: vi.fn(() => ({})), warnUnknownProviders: vi.fn() }))
 }));
@@ -69,11 +84,11 @@ vi.mock('cli/document-output-processor', () => ({
 	DocumentOutputProcessor: { buildOptionsFromCli: vi.fn(() => ({})) }
 }));
 
-import { getLoadedPlugins } from 'di/container';
+import { createContainer, getLoadedPlugins, initializePlugins } from 'di/container';
 import { listAvailableCommands } from 'executor/command-discovery';
 import { fetchPluginRegistry } from 'plugins/plugin-registry.service';
 
-import { configureListCommand } from './dynamic';
+import { configureConsolidateCommand, configureListCommand } from './dynamic';
 
 function makePlugin(partial: Partial<LoadedPlugin>): LoadedPlugin {
 	return {
@@ -226,5 +241,55 @@ describe('configureListCommand', () => {
 		const engineeringInAvailable = lines.slice(availIdx + 1).some((l) => l.includes('valora-plugin-engineering'));
 		expect(rtkInAvailable).toBe(false);
 		expect(engineeringInAvailable).toBe(true);
+	});
+});
+
+describe('configureConsolidateCommand', () => {
+	let consoleSpy: ReturnType<typeof vi.spyOn>;
+	let exitSpy: ReturnType<typeof vi.spyOn>;
+
+	function makeProgram(): Command {
+		const program = new Command();
+		program.exitOverride();
+		configureConsolidateCommand(program as never);
+		return program;
+	}
+
+	async function runConsolidate(program: Command, args: string[] = []): Promise<void> {
+		await program.parseAsync(['node', 'valora', 'consolidate', ...args]);
+	}
+
+	beforeEach(() => {
+		consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+		exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never);
+		vi.mocked(createContainer).mockReturnValue({} as never);
+		vi.mocked(initializePlugins).mockResolvedValue(undefined as never);
+	});
+
+	afterEach(() => {
+		consoleSpy.mockRestore();
+		exitSpy.mockRestore();
+		vi.clearAllMocks();
+	});
+
+	it('initialises plugins before accessing the memory provider', async () => {
+		await runConsolidate(makeProgram());
+
+		expect(vi.mocked(createContainer)).toHaveBeenCalledOnce();
+		expect(vi.mocked(initializePlugins)).toHaveBeenCalledOnce();
+	});
+
+	it('prints a consolidation summary on success', async () => {
+		await runConsolidate(makeProgram());
+
+		const output = consoleSpy.mock.calls.map((c) => c.join(' ')).join('\n');
+		expect(output).toContain('Memory consolidation complete');
+		expect(output).toContain('Pruned:');
+	});
+
+	it('exits with code 0 on success', async () => {
+		await runConsolidate(makeProgram());
+
+		expect(exitSpy).toHaveBeenCalledWith(0);
 	});
 });

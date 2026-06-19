@@ -25,7 +25,7 @@ function record(overrides: Partial<SpendingRecord> = {}): SpendingRecord {
 		iterations: 1,
 		model: 'claude-sonnet',
 		outputCostUsd: 0.001,
-		plugin: 'valora-core-engineering',
+		plugin: 'valora-plugin-engineering',
 		projectPath: '/projects/my-app',
 		promptTokens: 500,
 		sessionId: 'sess-A',

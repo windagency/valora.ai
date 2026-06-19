@@ -43,6 +43,7 @@ const ALLOWED_BASE_COMMANDS = new Set<string>([
 	'git',
 	// Search and inspection
 	'cat',
+	'eza',
 	'fd',
 	'find',
 	'grep',
@@ -50,6 +51,7 @@ const ALLOWED_BASE_COMMANDS = new Set<string>([
 	'jq',
 	'ls',
 	'rg',
+	'stat',
 	'tail',
 	'tree',
 	'wc',
@@ -116,7 +118,7 @@ const REMOTE_ACCESS_COMMANDS = ['ssh', 'scp', 'rsync', 'ftp', 'sftp'];
 
 const EVAL_PATTERNS: RegExp[] = [
 	/\beval\s+/,
-	/\bexec\s+/,
+	/(?<!-)\bexec\s+/,
 	/\bbash\s+-c\b/,
 	/\bsh\s+-c\b/,
 	/\bzsh\s+-c\b/,

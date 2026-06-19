@@ -18,7 +18,7 @@ import {
 	createProtocolConnection,
 	StreamMessageReader,
 	StreamMessageWriter
-} from 'vscode-languageserver-protocol/node.js';
+} from 'vscode-languageserver-protocol/node';
 
 import type { LSPProtocolAdapter, LSPProtocolConnection } from './lsp-protocol-adapter.interface';
 

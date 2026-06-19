@@ -236,7 +236,7 @@ Built-in commands (shipped with Valora) must live inside a plugin bundle under `
 
 ### 1. Choose or create the plugin bundle
 
-If your command belongs to an existing bundle (e.g., `valora-core-engineering`), add your file there. Otherwise, create a new bundle:
+If your command belongs to an existing bundle (e.g., `valora-plugin-engineering`), add your file there. Otherwise, create a new bundle:
 
 ```bash
 mkdir -p data/plugins/my-bundle/commands
@@ -254,7 +254,7 @@ Create `data/plugins/my-bundle/valora-plugin.json`:
 }
 ```
 
-If your plugin's agents or commands depend on resources contributed by another plugin (for example, using an agent defined in `valora-core-engineering`), add a `"requires": ["valora-core-engineering"]` field to declare the dependency.
+If your plugin's agents or commands depend on resources contributed by another plugin (for example, using an agent defined in `valora-plugin-engineering`), add a `"requires": ["valora-plugin-engineering"]` field to declare the dependency.
 
 Valid `contributes` values are: `"agents"`, `"commands"`, `"hooks"`, `"mcps"`, `"prompts"`, `"templates"`, `"agent-context"`.
 

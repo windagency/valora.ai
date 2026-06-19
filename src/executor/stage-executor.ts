@@ -63,6 +63,31 @@ import { getToolExecutionService, type ToolExecutionService } from './tool-execu
 
 export { compressMessageHistory, djb2 } from './message-compression';
 
+/** Returns true when every tool result in an iteration was a dedup hit, indicating the LLM is spinning with no new information. */
+export function isToolLoopSpinning(batchDedupHits: number, toolCallCount: number): boolean {
+	return toolCallCount > 0 && batchDedupHits === toolCallCount;
+}
+
+const TOOL_BLOCKED_PREFIX = 'Tool call blocked by hook:';
+
+/** Returns true when a tool result was produced by a PreToolUse hook block rather than actual execution. */
+export function isToolBlockedResult(output: string): boolean {
+	return output.startsWith(TOOL_BLOCKED_PREFIX);
+}
+
+/**
+ * Build the dedup key for a tool result.
+ *
+ * Keys include BOTH the input arguments AND the output so that two different
+ * commands that happen to produce the same result (e.g. multiple `git log`
+ * variants on an empty repo all returning "") are never treated as duplicates.
+ * Only an identical call — same tool, same arguments, same output — is a true
+ * duplicate.
+ */
+export function buildDedupKey(toolName: string, args: Record<string, unknown>, result: string): string {
+	return `${toolName}:${djb2(JSON.stringify(args, Object.keys(args).sort()))}:${djb2(result)}`;
+}
+
 /**
  * If this many tool calls fail within a single stage, the stage is hard-stopped
  * (success: false) rather than allowing the LLM to produce degraded output.
@@ -875,21 +900,30 @@ export class StageExecutor {
 		const toolResultHashes = new Map<string, number>();
 		let dedupHits = 0;
 		let prunedCount = 0;
+		// Counts only iterations where at least one tool was actually executed (not just blocked by a hook).
+		// Hook blocks are behavioural guidance — they do not constitute meaningful loop progress.
+		let effectiveIterations = 0;
+		let totalIterations = 0;
 
-		for (let iterations = 1; iterations <= maxToolIterations; iterations++) {
+		while (effectiveIterations < maxToolIterations) {
+			totalIterations++;
 			const completion = await this.executeLLMIteration(
 				executionContext,
 				messages,
 				tools,
 				modelOverride,
 				modeOverride,
-				iterations,
+				totalIterations,
 				logger
 			);
 
 			// No tool calls means we're done
 			if (!completion.tool_calls || completion.tool_calls.length === 0) {
-				logger.debug('LLM completed without tool calls', { iterations, stage: `${stage.stage}.${stage.prompt}` });
+				logger.debug('LLM completed without tool calls', {
+					effectiveIterations,
+					stage: `${stage.stage}.${stage.prompt}`,
+					totalIterations
+				});
 				this.emitCompressionMetrics(prunedCount, dedupHits, modelOverride);
 				return {
 					completion,
@@ -904,10 +938,35 @@ export class StageExecutor {
 			}
 
 			// Process tool calls and add to conversation
-			dedupHits += await this.processToolCallsInLoop(completion, messages, stage, iterations, logger, toolResultHashes);
+			const { batchDedupHits, blockedCount } = await this.processToolCallsInLoop(
+				completion,
+				messages,
+				stage,
+				totalIterations,
+				logger,
+				toolResultHashes
+			);
+			dedupHits += batchDedupHits;
+
+			// Only count this as a productive iteration if at least one tool was actually executed.
+			// Blocked-only rounds are hook guidance, not real work, so they don't count toward the budget.
+			if (blockedCount < completion.tool_calls.length) {
+				effectiveIterations++;
+			}
+
+			// Early exit: every result this iteration was a duplicate — LLM is spinning with no new information
+			if (isToolLoopSpinning(batchDedupHits, completion.tool_calls.length)) {
+				logger.warn('Tool loop spinning: all results were duplicates, exiting early', {
+					effectiveIterations,
+					stage: stageId,
+					totalIterations
+				});
+				this.emitCompressionMetrics(prunedCount, dedupHits, modelOverride);
+				return this.handleMaxIterationsExceeded(executionContext, messages, stage, modelOverride, modeOverride, logger);
+			}
 
 			// Proactive history compression at iteration threshold
-			if (iterations === PROACTIVE_COMPRESS_AFTER_ITERATIONS) {
+			if (effectiveIterations === PROACTIVE_COMPRESS_AFTER_ITERATIONS) {
 				prunedCount += this.compressToolResults(messages);
 			}
 		}
@@ -1090,6 +1149,29 @@ export class StageExecutor {
 	/**
 	 * Process tool calls and add results to conversation
 	 */
+	private appendToolResultMessage(
+		messages: LLMMessage[],
+		toolResultHashes: Map<string, number>,
+		result: { tool_call_id: string },
+		toolName: string,
+		args: Record<string, unknown>,
+		sanitized: string
+	): boolean {
+		const hashKey = buildDedupKey(toolName, args, sanitized);
+		const existingIndex = toolResultHashes.get(hashKey);
+		if (existingIndex !== undefined) {
+			messages.push({
+				content: `[Same result as message #${existingIndex} — omitted]`,
+				name: result.tool_call_id,
+				role: 'tool'
+			});
+			return true;
+		}
+		toolResultHashes.set(hashKey, messages.length + 1);
+		messages.push({ content: sanitized, name: result.tool_call_id, role: 'tool' });
+		return false;
+	}
+
 	private async processToolCallsInLoop(
 		completion: LLMCompletionResult,
 		messages: LLMMessage[],
@@ -1097,7 +1179,7 @@ export class StageExecutor {
 		iterations: number,
 		logger: ReturnType<typeof getLogger>,
 		toolResultHashes: Map<string, number>
-	): Promise<number> {
+	): Promise<{ batchDedupHits: number; blockedCount: number }> {
 		const toolCalls = completion.tool_calls!;
 
 		logger.info('Processing tool calls from LLM', {
@@ -1114,19 +1196,13 @@ export class StageExecutor {
 			tool_calls: toolCalls
 		});
 
-		// Record planned tool calls before execution
-		for (const tc of toolCalls) {
-			this.currentTracer?.record('tool_call', {
-				arguments: tc.arguments,
-				toolCallId: tc.id,
-				toolName: tc.name
-			});
-		}
+		this.traceToolCalls(toolCalls);
 
 		// Execute tools and add results (with prompt injection scanning)
 		const toolResults = await this.toolExecutionService.executeTools(toolCalls);
 		const injectionDetector = getPromptInjectionDetector();
 		let batchDedupHits = 0;
+		let blockedCount = 0;
 
 		for (let i = 0; i < toolResults.length; i++) {
 			const result = toolResults[i]!;
@@ -1139,33 +1215,33 @@ export class StageExecutor {
 				toolName
 			});
 			const sanitized = injectionDetector.sanitizeToolResult(result.tool_call_id, formatted);
-
-			const hashKey = `${toolName}:${djb2(sanitized)}`;
-			const existingIndex = toolResultHashes.get(hashKey);
-
-			if (existingIndex !== undefined) {
-				messages.push({
-					content: `[Same result as message #${existingIndex} — omitted]`,
-					name: result.tool_call_id,
-					role: 'tool'
-				});
-				batchDedupHits++;
-			} else {
-				toolResultHashes.set(hashKey, messages.length + 1);
-				messages.push({
-					content: sanitized,
-					name: result.tool_call_id,
-					role: 'tool'
-				});
+			if (isToolBlockedResult(sanitized)) {
+				blockedCount++;
 			}
+			const isDup = this.appendToolResultMessage(
+				messages,
+				toolResultHashes,
+				result,
+				toolName,
+				toolCalls[i]?.arguments ?? {},
+				sanitized
+			);
+			if (isDup) batchDedupHits++;
 		}
 
 		logger.debug('Tool results added to conversation', {
+			blockedCount,
 			dedupHits: batchDedupHits,
 			iterations,
 			resultCount: toolResults.length
 		});
-		return batchDedupHits;
+		return { batchDedupHits, blockedCount };
+	}
+
+	private traceToolCalls(toolCalls: LLMToolCall[]): void {
+		for (const tc of toolCalls) {
+			this.currentTracer?.record('tool_call', { arguments: tc.arguments, toolCallId: tc.id, toolName: tc.name });
+		}
 	}
 
 	/**
