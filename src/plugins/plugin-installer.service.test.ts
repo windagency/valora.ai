@@ -276,14 +276,22 @@ describe('shortNameFromPackage', () => {
 
 describe('PluginInstallerService', () => {
 	let tmpTarget: string;
+	let savedRegistry: string | undefined;
 
 	beforeEach(() => {
 		tmpTarget = fs.mkdtempSync(path.join(os.tmpdir(), 'valora-install-target-'));
+		savedRegistry = process.env['VALORA_PLUGIN_REGISTRY'];
+		delete process.env['VALORA_PLUGIN_REGISTRY'];
 	});
 
 	afterEach(() => {
 		fs.rmSync(tmpTarget, { recursive: true, force: true });
 		vi.resetAllMocks();
+		if (savedRegistry !== undefined) {
+			process.env['VALORA_PLUGIN_REGISTRY'] = savedRegistry;
+		} else {
+			delete process.env['VALORA_PLUGIN_REGISTRY'];
+		}
 	});
 
 	describe('user scope', () => {
