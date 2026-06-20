@@ -203,7 +203,7 @@ plugins:
     # …whatever your plugin documents
 ```
 
-The host's `memory.*` block now accepts only `{ enabled, provider }` — every backend-specific knob lives under `plugins.<your-name>.*`. The previous `memory.backend` and vault-only keys are rejected with a `LegacyMemoryConfigError` at startup (see the [2026-05 migration note](../migrations/2026-05-memory-plugin.md)).
+The host's `memory.*` block now accepts only `{ enabled, provider }` — every backend-specific knob lives under `plugins.<your-name>.*`. The previous `memory.backend` and vault-only keys are rejected with a `LegacyMemoryConfigError` at startup.
 
 ## Conflicts and overrides
 
@@ -263,5 +263,4 @@ it('routes through my provider', async () => {
 - `packages/valora-plugin-api/src/memory.types.ts` — full type definitions.
 - `packages/valora-plugin-memory-vault/` — the bundled reference implementation.
 - `documentation/adr/016-memory-as-plugin.md` — design rationale and contract.
-- `documentation/migrations/2026-05-memory-plugin.md` — the config hard-break users may encounter.
 - `documentation/developer-guide/writing-plugins.md` — general plugin authoring guide.

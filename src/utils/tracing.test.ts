@@ -2,7 +2,7 @@
  * Tracing Service Tests
  */
 
-import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { SpanKind, SpanStatusCode } from '../types/tracing.types';
 import {
@@ -254,13 +254,16 @@ describe('Tracing', () => {
 		});
 
 		it('should calculate duration', async () => {
-			const span = tracer.startSpan('test');
-			await new Promise((resolve) => setTimeout(resolve, 50));
-			span.end();
+			vi.useFakeTimers();
+			try {
+				const span = tracer.startSpan('test');
+				await vi.advanceTimersByTimeAsync(50);
+				span.end();
 
-			const duration = span.getDuration();
-			expect(duration).toBeGreaterThanOrEqual(50);
-			expect(duration).toBeLessThan(200);
+				expect(span.getDuration()).toBe(50);
+			} finally {
+				vi.useRealTimers();
+			}
 		});
 
 		it('should use correct span kind', () => {

@@ -1,6 +1,6 @@
 {
 	"name": "@windagency/valora",
-	"version": "2.5.0",
+	"version": "3.0.0",
 	"description": "VALORA - AI-assisted development workflow orchestration with agnostic multi-LLM support, session-based state, and Cursor MCP integration",
 	"keywords": [
 		"valora",
@@ -154,7 +154,7 @@
 		"tree-sitter-wasms": "0.1.11",
 		"undici": "^7.16.0",
 		"unzipper": "^0.12.0",
-		"vscode-languageserver-protocol": "^3.17.5",
+		"vscode-languageserver-protocol": "3.18.0",
 		"web-tree-sitter": "^0.24.7",
 		"yaml": "^2.4.0",
 		"zod": "^3.22.4"
