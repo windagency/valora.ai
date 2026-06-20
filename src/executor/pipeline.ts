@@ -18,6 +18,7 @@ import { ExecutionError } from 'utils/error-handler';
 import type { AgentLoader } from './agent-loader';
 import type { PromptLoader } from './prompt-loader';
 
+import { CheckpointManager, type StageCheckpoint } from './checkpoint-manager';
 import { type ExecutionContext } from './execution-context';
 import { getInputPreResolver, type InputPreResolver, type PreResolvedInputs } from './input-pre-resolver';
 import {
@@ -69,6 +70,9 @@ export class PipelineExecutor {
 		// Detect worktree info once at pipeline start
 		const worktreeInfo = detectWorktreeInfo();
 
+		// Checkpoint manager — hoisted so both try and catch paths can clear on success/stop
+		const { checkpointCommand, checkpointManager, checkpointSessionId } = this.initCheckpointManager(executionContext);
+
 		logger.info(`Executing pipeline: ${executionContext.commandName}`, {
 			agent: executionContext.agentRole,
 			hasArgs: !!executionContext.args?.length,
@@ -102,115 +106,30 @@ export class PipelineExecutor {
 			const variableResolver = executionContext.getVariableResolver();
 			this.preResolvedInputs = await this.inputPreResolver.preResolveStaticInputs(stages, variableResolver);
 
+			// Stage checkpointing — skip stages completed before a crash/kill
+			const existingCheckpoints = this.loadExistingCheckpoints(
+				executionContext,
+				checkpointManager,
+				checkpointSessionId,
+				checkpointCommand
+			);
+
 			// Group stages by parallel execution
 			const stageGroups = this.stageScheduler.groupStages(stages);
 
 			// Process stage groups sequentially using reduce
 			await stageGroups.reduce(async (previousPromise, group) => {
 				await previousPromise;
-
-				// Check if all required stages from previous groups have succeeded
-				const stageOutputs = executionContext.getStageOutputs();
-				const failedRequiredStages = stageOutputs.filter(
-					(output) => !output.success && stages.find((s) => s.stage === output.stage)?.required
+				await this.processStageGroup(
+					group,
+					stages,
+					context,
+					worktreeInfo,
+					existingCheckpoints,
+					checkpointSessionId,
+					checkpointCommand,
+					checkpointManager
 				);
-
-				if (failedRequiredStages.length > 0) {
-					const failedStageNames = failedRequiredStages.map((output) => output.stage).join(', ');
-					throw new Error(`Cannot execute stage group: Required prerequisite stages failed: ${failedStageNames}`);
-				}
-
-				if (group.parallel) {
-					// Execute stages in parallel (filtering out stages with false conditionals)
-					const stageIndexStart = executionContext.getStageOutputs().length;
-					const options: StageExecutionOptions = { isParallel: true, worktreeInfo };
-
-					// Filter stages based on conditional evaluation
-					const variableResolver = executionContext.getVariableResolver();
-					const feedback = getProcessingFeedback();
-					const eligibleStages = group.stages.filter((stage) => {
-						if (!stage.conditional) {
-							return true; // No conditional, always execute
-						}
-						const conditionalValue = variableResolver.resolve(stage.conditional);
-						const shouldExecute = evaluateConditional(conditionalValue);
-						if (!shouldExecute) {
-							feedback.showInfo(
-								`Skipping stage: ${stage.stage}.${stage.prompt} (conditional: ${stage.conditional} = ${conditionalValue})`
-							);
-						}
-						return shouldExecute;
-					});
-
-					const results = await Promise.all(
-						eligibleStages.map((stage, index) => {
-							const stageOptions: StageExecutionOptions = {
-								...options,
-								preResolvedInputs: this.getPreResolvedInputsForStage(stage)
-							};
-							return this.stageExecutor.executeStage(stage, context, stageIndexStart + index, stageOptions);
-						})
-					);
-
-					// Record completed stages in execution context
-					results.forEach((result) => {
-						executionContext.recordStageCompletion(result);
-					});
-
-					// Check if we should stop (guided completion)
-					if (results.some((r) => r.metadata?.['stopPipeline'])) {
-						logger.info('Pipeline execution stopped by stage signal');
-						throw new Error('STOP_PIPELINE'); // Use exception for control flow
-					}
-				} else {
-					// Execute stages sequentially
-					const stageIndexStart = executionContext.getStageOutputs().length;
-					const options: StageExecutionOptions = { isParallel: false, worktreeInfo };
-					const variableResolver = executionContext.getVariableResolver();
-
-					await group.stages.reduce(async (prevStagePromise, stage, index) => {
-						await prevStagePromise;
-
-						// Check conditional before executing
-						if (stage.conditional) {
-							const conditionalValue = variableResolver.resolve(stage.conditional);
-							const shouldExecute = evaluateConditional(conditionalValue);
-							if (!shouldExecute) {
-								const feedback = getProcessingFeedback();
-								feedback.showInfo(
-									`Skipping stage: ${stage.stage}.${stage.prompt} (conditional: ${stage.conditional} = ${conditionalValue})`
-								);
-								return; // Skip this stage
-							}
-						}
-
-						const stageOptions: StageExecutionOptions = {
-							...options,
-							preResolvedInputs: this.getPreResolvedInputsForStage(stage)
-						};
-						const result = await this.executeStageWithRetry(stage, context, stageIndexStart + index, stageOptions);
-
-						// Record completed stage in execution context
-						executionContext.recordStageCompletion(result);
-
-						// Handle interactive questions if present and interactive mode is enabled
-						// This prompts the user for answers before proceeding to the next stage
-						await this.handleInteractiveQuestions(result, context, stage);
-
-						if (result.metadata?.['stopPipeline']) {
-							logger.info('Pipeline execution stopped by stage signal');
-							throw new Error('STOP_PIPELINE'); // Use exception for control flow
-						}
-
-						if (!result.success && stage.required) {
-							throw new ExecutionError(`Required stage failed: ${stage.stage}.${stage.prompt}`, {
-								error: result.error,
-								prompt: stage.prompt,
-								stage: stage.stage
-							});
-						}
-					}, Promise.resolve());
-				}
 			}, Promise.resolve());
 
 			const duration = Date.now() - startTime;
@@ -239,6 +158,9 @@ export class PipelineExecutor {
 
 			// Emit pipeline complete event
 			this.eventEmitter.emitPipelineComplete(executionContext.commandName, duration, requiredStagesSuccessful);
+
+			// Clear checkpoints on successful completion — they are no longer needed
+			checkpointManager.clear(checkpointSessionId, checkpointCommand);
 
 			// Trigger memory extraction after successful feedback pipeline
 			await this.maybeTriggerMemoryExtraction(executionContext, requiredStagesSuccessful, stageOutputs);
@@ -281,6 +203,9 @@ export class PipelineExecutor {
 				});
 
 				this.eventEmitter.emitPipelineComplete(executionContext.commandName, duration, requiredStagesSuccessful);
+
+				// Clear checkpoints on controlled stop — not a crash
+				checkpointManager.clear(checkpointSessionId, checkpointCommand);
 
 				// Trigger memory extraction after successful feedback pipeline
 				await this.maybeTriggerMemoryExtraction(executionContext, requiredStagesSuccessful, stageOutputs);
@@ -437,6 +362,110 @@ export class PipelineExecutor {
 	 * @param stage - The pipeline stage that was executed
 	 * @returns true if questions were handled, false otherwise
 	 */
+	private async executeParallelGroup(
+		group: { parallel: boolean; stages: PipelineStage[] },
+		context: PipelineExecutionContext,
+		worktreeInfo: undefined | WorktreeInfoContext,
+		existingCheckpoints: StageCheckpoint[],
+		checkpointSessionId: string,
+		checkpointCommand: string,
+		checkpointManager: CheckpointManager
+	): Promise<void> {
+		const { executionContext } = context;
+		const stageIndexStart = executionContext.getStageOutputs().length;
+		const options: StageExecutionOptions = { isParallel: true, worktreeInfo };
+
+		const variableResolver = executionContext.getVariableResolver();
+		const feedback = getProcessingFeedback();
+		const eligibleStages = group.stages.filter((stage) => {
+			if (!stage.conditional) return true;
+			const conditionalValue = variableResolver.resolve(stage.conditional);
+			const shouldExecute = evaluateConditional(conditionalValue);
+			if (!shouldExecute) {
+				feedback.showInfo(
+					`Skipping stage: ${stage.stage}.${stage.prompt} (conditional: ${stage.conditional} = ${conditionalValue})`
+				);
+			}
+			return shouldExecute;
+		});
+
+		const stagePlan: Array<{ checkpoint?: StageOutput; index: number; stage: PipelineStage }> = [];
+		const stagesToExecute: Array<{ index: number; stage: PipelineStage }> = [];
+		for (const [index, stage] of eligibleStages.entries()) {
+			const stageIndex = stageIndexStart + index;
+			const checkpoint = existingCheckpoints.find((c) => c.stageIndex === stageIndex);
+			if (checkpoint) {
+				stagePlan.push({ checkpoint: checkpoint.output, index, stage });
+			} else {
+				stagePlan.push({ index, stage });
+				stagesToExecute.push({ index, stage });
+			}
+		}
+
+		const freshResults = await Promise.all(
+			stagesToExecute.map(({ index, stage }) => {
+				const stageOptions: StageExecutionOptions = {
+					...options,
+					preResolvedInputs: this.getPreResolvedInputsForStage(stage)
+				};
+				return this.stageExecutor.executeStage(stage, context, stageIndexStart + index, stageOptions);
+			})
+		);
+
+		for (const [freshIdx, { index, stage }] of stagesToExecute.entries()) {
+			const result = freshResults[freshIdx];
+			if (result?.success) {
+				checkpointManager.write(checkpointSessionId, checkpointCommand, {
+					completedAt: new Date().toISOString(),
+					output: result,
+					stageIndex: stageIndexStart + index,
+					stageName: `${stage.stage}.${stage.prompt}`
+				});
+			}
+		}
+
+		let freshIdx = 0;
+		const results = stagePlan.map((plan) => plan.checkpoint ?? (freshResults[freshIdx++] as StageOutput));
+
+		results.forEach((result) => {
+			executionContext.recordStageCompletion(result);
+		});
+
+		if (results.some((r) => r.metadata?.['stopPipeline'])) {
+			getLogger().info('Pipeline execution stopped by stage signal');
+			throw new Error('STOP_PIPELINE');
+		}
+	}
+
+	private async executeSequentialGroup(
+		group: { parallel: boolean; stages: PipelineStage[] },
+		context: PipelineExecutionContext,
+		worktreeInfo: undefined | WorktreeInfoContext,
+		existingCheckpoints: StageCheckpoint[],
+		checkpointSessionId: string,
+		checkpointCommand: string,
+		checkpointManager: CheckpointManager
+	): Promise<void> {
+		const { executionContext } = context;
+		const stageIndexStart = executionContext.getStageOutputs().length;
+		const options: StageExecutionOptions = { isParallel: false, worktreeInfo };
+
+		await group.stages.reduce(async (prevStagePromise, stage, index) => {
+			await prevStagePromise;
+			await this.processSequentialStage(
+				stage,
+				index,
+				stageIndexStart,
+				context,
+				options,
+				existingCheckpoints,
+				checkpointSessionId,
+				checkpointCommand,
+				checkpointManager
+			);
+		}, Promise.resolve());
+	}
+
 	private async handleInteractiveQuestions(
 		result: StageOutput,
 		context: PipelineExecutionContext,
@@ -487,6 +516,144 @@ export class PipelineExecutor {
 		logger.info(`User answered ${questionResult.answeredCount} clarifying question(s)`);
 
 		return true;
+	}
+
+	private initCheckpointManager(executionContext: ExecutionContext): {
+		checkpointCommand: string;
+		checkpointManager: CheckpointManager;
+		checkpointSessionId: string;
+	} {
+		return {
+			checkpointCommand: executionContext.commandName,
+			checkpointManager: new CheckpointManager(),
+			checkpointSessionId: executionContext.sessionInfo?.sessionId ?? 'default'
+		};
+	}
+
+	private loadExistingCheckpoints(
+		executionContext: ExecutionContext,
+		checkpointManager: CheckpointManager,
+		checkpointSessionId: string,
+		checkpointCommand: string
+	): StageCheckpoint[] {
+		if (executionContext.flags['fresh'] === true) return [];
+		const checkpoints = checkpointManager.read(checkpointSessionId, checkpointCommand);
+		if (checkpoints.length > 0) {
+			getLogger().info(`Resuming from checkpoint: ${checkpoints.length} stage(s) already completed`, {
+				command: checkpointCommand,
+				sessionId: checkpointSessionId
+			});
+		}
+		return checkpoints;
+	}
+
+	private async processSequentialStage(
+		stage: PipelineStage,
+		index: number,
+		stageIndexStart: number,
+		context: PipelineExecutionContext,
+		options: StageExecutionOptions,
+		existingCheckpoints: StageCheckpoint[],
+		checkpointSessionId: string,
+		checkpointCommand: string,
+		checkpointManager: CheckpointManager
+	): Promise<void> {
+		const { executionContext } = context;
+		const logger = getLogger();
+		const variableResolver = executionContext.getVariableResolver();
+
+		if (stage.conditional) {
+			const conditionalValue = variableResolver.resolve(stage.conditional);
+			const shouldExecute = evaluateConditional(conditionalValue);
+			if (!shouldExecute) {
+				const feedback = getProcessingFeedback();
+				feedback.showInfo(
+					`Skipping stage: ${stage.stage}.${stage.prompt} (conditional: ${stage.conditional} = ${conditionalValue})`
+				);
+				return;
+			}
+		}
+
+		const stageIndex = stageIndexStart + index;
+		const checkpoint = existingCheckpoints.find((c) => c.stageIndex === stageIndex);
+		let result: StageOutput;
+		if (checkpoint) {
+			logger.info(`Skipping stage (checkpoint exists): ${stage.stage}.${stage.prompt}`);
+			result = checkpoint.output;
+		} else {
+			const stageOptions: StageExecutionOptions = {
+				...options,
+				preResolvedInputs: this.getPreResolvedInputsForStage(stage)
+			};
+			result = await this.executeStageWithRetry(stage, context, stageIndex, stageOptions);
+			if (result.success) {
+				checkpointManager.write(checkpointSessionId, checkpointCommand, {
+					completedAt: new Date().toISOString(),
+					output: result,
+					stageIndex,
+					stageName: `${stage.stage}.${stage.prompt}`
+				});
+			}
+		}
+
+		executionContext.recordStageCompletion(result);
+		await this.handleInteractiveQuestions(result, context, stage);
+
+		if (result.metadata?.['stopPipeline']) {
+			logger.info('Pipeline execution stopped by stage signal');
+			throw new Error('STOP_PIPELINE');
+		}
+
+		if (!result.success && stage.required) {
+			throw new ExecutionError(`Required stage failed: ${stage.stage}.${stage.prompt}`, {
+				error: result.error,
+				prompt: stage.prompt,
+				stage: stage.stage
+			});
+		}
+	}
+
+	private async processStageGroup(
+		group: { parallel: boolean; stages: PipelineStage[] },
+		stages: PipelineStage[],
+		context: PipelineExecutionContext,
+		worktreeInfo: undefined | WorktreeInfoContext,
+		existingCheckpoints: StageCheckpoint[],
+		checkpointSessionId: string,
+		checkpointCommand: string,
+		checkpointManager: CheckpointManager
+	): Promise<void> {
+		const { executionContext } = context;
+		const stageOutputs = executionContext.getStageOutputs();
+		const failedRequiredStages = stageOutputs.filter(
+			(output) => !output.success && stages.find((s) => s.stage === output.stage)?.required
+		);
+		if (failedRequiredStages.length > 0) {
+			const failedStageNames = failedRequiredStages.map((output) => output.stage).join(', ');
+			throw new Error(`Cannot execute stage group: Required prerequisite stages failed: ${failedStageNames}`);
+		}
+
+		if (group.parallel) {
+			await this.executeParallelGroup(
+				group,
+				context,
+				worktreeInfo,
+				existingCheckpoints,
+				checkpointSessionId,
+				checkpointCommand,
+				checkpointManager
+			);
+		} else {
+			await this.executeSequentialGroup(
+				group,
+				context,
+				worktreeInfo,
+				existingCheckpoints,
+				checkpointSessionId,
+				checkpointCommand,
+				checkpointManager
+			);
+		}
 	}
 }
 

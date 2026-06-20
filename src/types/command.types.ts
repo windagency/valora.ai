@@ -208,6 +208,13 @@ export interface PipelineStage {
 	 * Overrides the default of 20.
 	 */
 	max_tool_iterations?: number;
+	/**
+	 * Override the session-level model for this stage only.
+	 * Enables model tiering across pipeline stages — use cheaper models for
+	 * read-only or summarisation stages and reserve flagship models for code
+	 * generation or reasoning-heavy stages.
+	 */
+	model?: string;
 	outputs?: string[];
 	parallel?: boolean;
 	prompt: string;

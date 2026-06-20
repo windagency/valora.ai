@@ -20,7 +20,8 @@ import type {
 	LLMMessage,
 	LLMToolCall,
 	LLMToolDefinition,
-	LLMToolResult
+	LLMToolResult,
+	LLMUsage
 } from 'types/llm.types';
 import type { PromptDefinition } from 'types/prompt.types';
 
@@ -62,6 +63,35 @@ import { getStageValidationService, type StageValidationService } from './stage-
 import { getToolExecutionService, type ToolExecutionService } from './tool-execution.service';
 
 export { compressMessageHistory, djb2 } from './message-compression';
+
+/**
+ * Merges two LLMUsage objects by summing token counts across all fields.
+ * `batch_discount_applied` is carried from `next` (it's a pricing flag, not cumulative).
+ * Cache token fields resolve to `undefined` only when both sides are absent.
+ */
+export function accumulateLLMUsage(acc: LLMUsage, next: LLMUsage): LLMUsage {
+	const cacheCreation = (acc.cache_creation_input_tokens ?? 0) + (next.cache_creation_input_tokens ?? 0) || undefined;
+	const cacheRead = (acc.cache_read_input_tokens ?? 0) + (next.cache_read_input_tokens ?? 0) || undefined;
+	return {
+		batch_discount_applied: next.batch_discount_applied,
+		cache_creation_input_tokens: cacheCreation,
+		cache_read_input_tokens: cacheRead,
+		completion_tokens: acc.completion_tokens + next.completion_tokens,
+		prompt_tokens: acc.prompt_tokens + next.prompt_tokens,
+		total_tokens: acc.total_tokens + next.total_tokens
+	};
+}
+
+/**
+ * Resolves the model to use for a stage execution.
+ * Stage-level model takes precedence over the session-level --model flag.
+ */
+export function resolveModelOverride(
+	stageModel: string | undefined,
+	flagModel: string | undefined
+): string | undefined {
+	return stageModel ?? flagModel;
+}
 
 /** Returns true when every tool result in an iteration was a dedup hit, indicating the LLM is spinning with no new information. */
 export function isToolLoopSpinning(batchDedupHits: number, toolCallCount: number): boolean {
@@ -178,6 +208,8 @@ interface ExecutionSummary {
 	fatalFailureCount: number;
 	/** Number of failures from read-only/exploratory tools */
 	recoverableFailureCount: number;
+	/** Total number of LLM calls made across all tool loop iterations */
+	totalToolIterations: number;
 	/** Files that were successfully written, modified, or deleted by tool calls */
 	verifiedModifiedFiles: string[];
 	/** Whether the stage hit the iteration ceiling and required a forced output */
@@ -502,7 +534,7 @@ export class StageExecutor {
 		const { systemMessage, userMessage } = this.buildStageMessages(stage, resources, enrichedInputs);
 
 		// Get execution configuration
-		const config = this.getExecutionConfig(executionContext);
+		const config = this.getExecutionConfig(executionContext, stage);
 
 		// Log tool configuration
 		this.logToolConfiguration(stage, config, logger);
@@ -605,7 +637,7 @@ export class StageExecutor {
 		const resources = await this.loadStageResources(stage, executionContext);
 		const enrichedInputs = await this.resolveStageInputs(stage, executionContext, options, logger);
 		const { systemMessage, userMessage } = this.buildStageMessages(stage, resources, enrichedInputs);
-		const config = this.getExecutionConfig(executionContext);
+		const config = this.getExecutionConfig(executionContext, stage);
 
 		const messages: LLMMessage[] = [
 			{ content: systemMessage, role: 'system' },
@@ -789,13 +821,17 @@ export class StageExecutor {
 	/**
 	 * Get execution configuration (model, mode, tools, dry-run)
 	 */
-	private getExecutionConfig(executionContext: ExecutionContext): {
+	private getExecutionConfig(
+		executionContext: ExecutionContext,
+		stage?: PipelineStage
+	): {
 		isDryRun: boolean;
 		modelOverride: string | undefined;
 		modeOverride: string | undefined;
 		tools: LLMToolDefinition[] | undefined;
 	} {
-		const modelOverride = executionContext.flags['model'] as string | undefined;
+		const flagModel = executionContext.flags['model'] as string | undefined;
+		const modelOverride = resolveModelOverride(stage?.model, flagModel);
 		const modeOverride = executionContext.flags['mode'] as string | undefined;
 		const allowedTools = executionContext.allowedTools;
 		const tools =
@@ -904,6 +940,7 @@ export class StageExecutor {
 		// Hook blocks are behavioural guidance — they do not constitute meaningful loop progress.
 		let effectiveIterations = 0;
 		let totalIterations = 0;
+		let accumulatedUsage: LLMUsage = { completion_tokens: 0, prompt_tokens: 0, total_tokens: 0 };
 
 		while (effectiveIterations < maxToolIterations) {
 			totalIterations++;
@@ -917,6 +954,10 @@ export class StageExecutor {
 				logger
 			);
 
+			if (completion.usage) {
+				accumulatedUsage = accumulateLLMUsage(accumulatedUsage, completion.usage);
+			}
+
 			// No tool calls means we're done
 			if (!completion.tool_calls || completion.tool_calls.length === 0) {
 				logger.debug('LLM completed without tool calls', {
@@ -925,12 +966,14 @@ export class StageExecutor {
 					totalIterations
 				});
 				this.emitCompressionMetrics(prunedCount, dedupHits, modelOverride);
+				const patchedCompletion = completion.usage ? { ...completion, usage: accumulatedUsage } : completion;
 				return {
-					completion,
+					completion: patchedCompletion,
 					summary: {
 						fatalFailureCount: 0,
 						recoverableFailureCount: 0,
 						toolFailureCount: 0,
+						totalToolIterations: totalIterations,
 						verifiedModifiedFiles: [],
 						wasLoopExhausted: false
 					}
@@ -948,12 +991,6 @@ export class StageExecutor {
 			);
 			dedupHits += batchDedupHits;
 
-			// Only count this as a productive iteration if at least one tool was actually executed.
-			// Blocked-only rounds are hook guidance, not real work, so they don't count toward the budget.
-			if (blockedCount < completion.tool_calls.length) {
-				effectiveIterations++;
-			}
-
 			// Early exit: every result this iteration was a duplicate — LLM is spinning with no new information
 			if (isToolLoopSpinning(batchDedupHits, completion.tool_calls.length)) {
 				logger.warn('Tool loop spinning: all results were duplicates, exiting early', {
@@ -962,18 +999,40 @@ export class StageExecutor {
 					totalIterations
 				});
 				this.emitCompressionMetrics(prunedCount, dedupHits, modelOverride);
-				return this.handleMaxIterationsExceeded(executionContext, messages, stage, modelOverride, modeOverride, logger);
+				return this.handleMaxIterationsExceeded(
+					executionContext,
+					messages,
+					stage,
+					modelOverride,
+					modeOverride,
+					logger,
+					accumulatedUsage,
+					totalIterations
+				);
 			}
 
-			// Proactive history compression at iteration threshold
-			if (effectiveIterations === PROACTIVE_COMPRESS_AFTER_ITERATIONS) {
-				prunedCount += this.compressToolResults(messages);
-			}
+			// Advance productive-iteration counter and prune history when threshold is reached
+			({ effectiveIterations, prunedCount } = this.advanceIterationCounters(
+				blockedCount,
+				completion.tool_calls.length,
+				effectiveIterations,
+				messages,
+				prunedCount
+			));
 		}
 
 		// Exceeded max iterations
 		this.emitCompressionMetrics(prunedCount, dedupHits, modelOverride);
-		return this.handleMaxIterationsExceeded(executionContext, messages, stage, modelOverride, modeOverride, logger);
+		return this.handleMaxIterationsExceeded(
+			executionContext,
+			messages,
+			stage,
+			modelOverride,
+			modeOverride,
+			logger,
+			accumulatedUsage,
+			totalIterations
+		);
 	}
 
 	/**
@@ -1035,6 +1094,21 @@ export class StageExecutor {
 	 * Compress message history by replacing old tool results with a placeholder.
 	 * Keeps the system message, first user message, and the most recent 4 messages intact.
 	 */
+	private advanceIterationCounters(
+		blockedCount: number,
+		toolCallCount: number,
+		effectiveIterations: number,
+		messages: LLMMessage[],
+		prunedCount: number
+	): { effectiveIterations: number; prunedCount: number } {
+		const nextEffective = blockedCount < toolCallCount ? effectiveIterations + 1 : effectiveIterations;
+		const nextPruned =
+			nextEffective === PROACTIVE_COMPRESS_AFTER_ITERATIONS
+				? prunedCount + this.compressToolResults(messages)
+				: prunedCount;
+		return { effectiveIterations: nextEffective, prunedCount: nextPruned };
+	}
+
 	private compressToolResults(messages: LLMMessage[]): number {
 		return compressMessageHistory(messages);
 	}
@@ -1270,7 +1344,9 @@ export class StageExecutor {
 	 *   delete_file) so they can be injected into the forced final prompt, grounding
 	 *   the LLM's summary in verified state rather than memory.
 	 */
-	private extractExecutionSummary(messages: LLMMessage[]): Omit<ExecutionSummary, 'wasLoopExhausted'> {
+	private extractExecutionSummary(
+		messages: LLMMessage[]
+	): Omit<ExecutionSummary, 'totalToolIterations' | 'wasLoopExhausted'> {
 		const mutatingTools = new Set(['delete_file', 'search_replace', 'write']);
 		const pendingFiles = new Map<string, string>(); // tool_call_id → path
 		const toolCallNames = new Map<string, string>(); // tool_call_id → tool_name
@@ -1354,7 +1430,9 @@ export class StageExecutor {
 		stage: PipelineStage,
 		modelOverride: string | undefined,
 		modeOverride: string | undefined,
-		logger: ReturnType<typeof getLogger>
+		logger: ReturnType<typeof getLogger>,
+		accumulatedUsage?: LLMUsage,
+		totalIterations?: number
 	): Promise<{ completion: LLMCompletionResult; summary: ExecutionSummary }> {
 		const stageId = `${stage.stage}.${stage.prompt}`;
 		const { fatalFailureCount, recoverableFailureCount, toolFailureCount, verifiedModifiedFiles } =
@@ -1388,10 +1466,11 @@ export class StageExecutor {
 			fatalFailureCount,
 			recoverableFailureCount,
 			toolFailureCount,
+			totalToolIterations: totalIterations ?? maxIterations,
 			verifiedModifiedFiles,
 			wasLoopExhausted: true
 		};
-		const completion = await this.requestFinalOutput(
+		const rawCompletion = await this.requestFinalOutput(
 			executionContext,
 			messages,
 			stage,
@@ -1400,6 +1479,14 @@ export class StageExecutor {
 			summary,
 			logger
 		);
+		// Merge the final requestFinalOutput call's usage into the running total.
+		// Patch condition is `finalAccumulated` only — not `finalAccumulated && rawCompletion.usage`.
+		// If the final call returned no usage, we still surface the loop-iteration total.
+		const finalAccumulated =
+			accumulatedUsage && rawCompletion.usage
+				? accumulateLLMUsage(accumulatedUsage, rawCompletion.usage)
+				: (accumulatedUsage ?? rawCompletion.usage);
+		const completion = finalAccumulated ? { ...rawCompletion, usage: finalAccumulated } : rawCompletion;
 		return { completion, summary };
 	}
 
@@ -1633,6 +1720,7 @@ Summarize ALL changes you made during tool execution. Output ONLY the JSON code 
 						hardStopped: true,
 						recoverableFailureCount: executionSummary.recoverableFailureCount,
 						toolFailureCount: executionSummary.toolFailureCount,
+						toolIterations: executionSummary.totalToolIterations,
 						verifiedModifiedFiles: executionSummary.verifiedModifiedFiles,
 						wasLoopExhausted: executionSummary.wasLoopExhausted
 					},
@@ -1677,6 +1765,7 @@ Summarize ALL changes you made during tool execution. Output ONLY the JSON code 
 					executionQuality: {
 						degraded: isDegraded,
 						toolFailureCount: executionSummary.toolFailureCount,
+						toolIterations: executionSummary.totalToolIterations,
 						verifiedModifiedFiles: executionSummary.verifiedModifiedFiles,
 						wasLoopExhausted: executionSummary.wasLoopExhausted
 					}

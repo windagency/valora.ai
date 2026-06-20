@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import type { LLMMessage } from 'types/llm.types';
+import type { LLMMessage, LLMUsage } from 'types/llm.types';
 import {
+	accumulateLLMUsage,
 	buildDedupKey,
 	compressMessageHistory,
 	DEFAULT_FAILURE_POLICY,
 	djb2,
 	isToolBlockedResult,
-	isToolLoopSpinning
+	isToolLoopSpinning,
+	resolveModelOverride
 } from './stage-executor';
 
 describe('DEFAULT_FAILURE_POLICY', () => {
@@ -228,6 +230,69 @@ describe('isToolLoopSpinning', () => {
 
 	it('returns false when there were no tool calls at all', () => {
 		expect(isToolLoopSpinning(0, 0)).toBe(false);
+	});
+});
+
+// ── resolveModelOverride ──────────────────────────────────────────────────────
+
+describe('resolveModelOverride', () => {
+	it('returns the stage model when set, ignoring the flag model', () => {
+		expect(resolveModelOverride('claude-haiku-4-5-20251001', 'claude-sonnet-4-6')).toBe('claude-haiku-4-5-20251001');
+	});
+
+	it('falls back to the flag model when stage model is absent', () => {
+		expect(resolveModelOverride(undefined, 'claude-sonnet-4-6')).toBe('claude-sonnet-4-6');
+	});
+
+	it('returns undefined when both stage model and flag model are absent', () => {
+		expect(resolveModelOverride(undefined, undefined)).toBeUndefined();
+	});
+});
+
+// ── accumulateLLMUsage ────────────────────────────────────────────────────────
+
+describe('accumulateLLMUsage', () => {
+	function usage(overrides: Partial<LLMUsage> = {}): LLMUsage {
+		return { completion_tokens: 0, prompt_tokens: 0, total_tokens: 0, ...overrides };
+	}
+
+	it('sums all three token counts', () => {
+		const a = usage({ completion_tokens: 10, prompt_tokens: 100, total_tokens: 110 });
+		const b = usage({ completion_tokens: 20, prompt_tokens: 200, total_tokens: 220 });
+		const result = accumulateLLMUsage(a, b);
+		expect(result.completion_tokens).toBe(30);
+		expect(result.prompt_tokens).toBe(300);
+		expect(result.total_tokens).toBe(330);
+	});
+
+	it('sums cache_creation_input_tokens when both sides are present', () => {
+		const a = usage({ cache_creation_input_tokens: 50 });
+		const b = usage({ cache_creation_input_tokens: 75 });
+		expect(accumulateLLMUsage(a, b).cache_creation_input_tokens).toBe(125);
+	});
+
+	it('sums cache_read_input_tokens when both sides are present', () => {
+		const a = usage({ cache_read_input_tokens: 30 });
+		const b = usage({ cache_read_input_tokens: 40 });
+		expect(accumulateLLMUsage(a, b).cache_read_input_tokens).toBe(70);
+	});
+
+	it('returns undefined for cache tokens when both sides are absent', () => {
+		const result = accumulateLLMUsage(usage(), usage());
+		expect(result.cache_creation_input_tokens).toBeUndefined();
+		expect(result.cache_read_input_tokens).toBeUndefined();
+	});
+
+	it('carries batch_discount_applied from the second argument', () => {
+		const a = usage({ batch_discount_applied: false });
+		const b = usage({ batch_discount_applied: true });
+		expect(accumulateLLMUsage(a, b).batch_discount_applied).toBe(true);
+	});
+
+	it('handles one side missing cache tokens by treating the absent side as zero', () => {
+		const a = usage({ cache_creation_input_tokens: 100 });
+		const b = usage(); // no cache_creation_input_tokens
+		expect(accumulateLLMUsage(a, b).cache_creation_input_tokens).toBe(100);
 	});
 });
 
