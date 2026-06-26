@@ -90,7 +90,7 @@
 		"prebuild": "pnpm clean:build",
 		"build": "tsc -b && tsc-alias",
 		"postbuild": "cp package.json dist/ && cp tsconfig.runtime.json dist/tsconfig.json",
-		"build:plugins": "pnpm --filter './packages/**' --filter '!@windagency/valora-plugin-api' --filter '!@windagency/valora-plugin-memory-vault' build",
+		"build:plugins": "pnpm --filter './packages/**' build",
 		"postbuild:plugins": "pnpm build:registry",
 		"build:watch": "tsc -b --watch",
 		"start": "node dist/cli/index.js",
