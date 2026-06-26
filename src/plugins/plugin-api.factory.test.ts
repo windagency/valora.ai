@@ -23,7 +23,8 @@ vi.mock('llm/registry', () => ({
 
 vi.mock('memory/registry', () => ({
 	getMemoryRegistry: vi.fn(() => ({
-		registerProvider: vi.fn()
+		registerProvider: vi.fn(),
+		setActive: vi.fn()
 	}))
 }));
 
@@ -146,6 +147,36 @@ describe('createPluginAPI', () => {
 			expect(mockRegister).toHaveBeenCalledWith('test-mem', FakeMemory, expect.any(Object));
 			// 3 args (no descriptor) when descriptor is undefined
 			expect(mockRegister.mock.calls[0]).toHaveLength(3);
+		});
+	});
+
+	describe('api.memory.activate()', () => {
+		it('routes to the memory registry setActive with the given name and config', async () => {
+			const { getMemoryRegistry } = await import('memory/registry');
+			const mockSetActive = vi.fn();
+			vi.mocked(getMemoryRegistry).mockReturnValue({
+				registerProvider: vi.fn(),
+				setActive: mockSetActive
+			} as unknown as ReturnType<typeof getMemoryRegistry>);
+
+			const api = createPluginAPI({} as never, makePlugin(), makeRegistry());
+			api.memory.activate('ephemeral', { maxItems: 100 });
+
+			expect(mockSetActive).toHaveBeenCalledWith('ephemeral', { maxItems: 100 });
+		});
+
+		it('passes an empty config object when no config argument is supplied', async () => {
+			const { getMemoryRegistry } = await import('memory/registry');
+			const mockSetActive = vi.fn();
+			vi.mocked(getMemoryRegistry).mockReturnValue({
+				registerProvider: vi.fn(),
+				setActive: mockSetActive
+			} as unknown as ReturnType<typeof getMemoryRegistry>);
+
+			const api = createPluginAPI({} as never, makePlugin(), makeRegistry());
+			api.memory.activate('ephemeral');
+
+			expect(mockSetActive).toHaveBeenCalledWith('ephemeral', {});
 		});
 	});
 

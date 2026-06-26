@@ -68,6 +68,9 @@ export function createPluginAPI(
 		},
 		logger,
 		memory: {
+			activate(name, config) {
+				getMemoryRegistry().setActive(name, config ?? {});
+			},
 			register(name, provider, descriptor) {
 				const override = resolvedOverrides.has(name) || (plugin.manifest.overrides?.includes(name) ?? false);
 				const options = { override, owner: plugin.manifest.name };

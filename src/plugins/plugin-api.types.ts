@@ -24,6 +24,7 @@ export interface PluginAPI {
 	lifecycle: PluginLifecycleHooks;
 	logger: Pick<Logger, 'debug' | 'error' | 'info' | 'warn'>;
 	memory: {
+		activate(name: string, config?: Record<string, unknown>): void;
 		register(name: string, provider: PluginMemoryProvider, descriptor?: MemoryProviderDescriptor): void;
 	};
 	providers: {
