@@ -25,6 +25,8 @@ import { getLogger } from 'output/logger';
 import { generateMemoryId } from 'utils/id-generator';
 
 const CATEGORIES: MemoryCategory[] = ['decisions', 'episodic', 'semantic'];
+
+let warnedOnce = false;
 const CAPABILITIES: MemoryCapability[] = [];
 
 type CategoryStore = Map<string, MemoryEntry>;
@@ -34,9 +36,12 @@ export class EphemeralMemoryProvider implements MemoryProvider {
 
 	constructor() {
 		this.store = new Map<MemoryCategory, CategoryStore>(CATEGORIES.map((c) => [c, new Map<string, MemoryEntry>()]));
-		getLogger().warn(
-			'Using ephemeral memory — entries will not persist across sessions. Install valora-plugin-memory-vault for persistence.'
-		);
+		if (!warnedOnce) {
+			warnedOnce = true;
+			getLogger().warn(
+				'Using ephemeral memory — entries will not persist across sessions. Install valora-plugin-memory-vault for persistence.'
+			);
+		}
 	}
 
 	create(category: MemoryCategory, options: MemoryCreateOptions): Promise<MemoryEntry> {
@@ -56,7 +61,7 @@ export class EphemeralMemoryProvider implements MemoryProvider {
 			sessionId: options.sessionId,
 			source: options.source,
 			supersedes: options.supersedes,
-			tags: options.tags,
+			tags: options.tags ?? [],
 			updatedAt: now
 		};
 		this.store.get(category)!.set(entry.id, entry);

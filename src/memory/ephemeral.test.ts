@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { EphemeralMemoryProvider } from './ephemeral';
 
@@ -28,14 +28,22 @@ describe('EphemeralMemoryProvider', () => {
 	});
 
 	describe('instantiation', () => {
-		it('logs a one-time warning on construction', () => {
+		it('logs a one-time warning on construction', async () => {
+			vi.resetModules();
+			const { EphemeralMemoryProvider: Fresh } = await import('./ephemeral');
+			vi.clearAllMocks();
+			new Fresh();
 			expect(warnSpy).toHaveBeenCalledOnce();
-			expect(warnSpy.mock.calls[0][0]).toContain('ephemeral');
+			expect(warnSpy.mock.calls[0]![0]).toContain('ephemeral');
 		});
 
-		it('does not log again on subsequent instantiations within the same process', () => {
-			new EphemeralMemoryProvider();
-			expect(warnSpy).toHaveBeenCalledTimes(2); // once per instance
+		it('does not log again on subsequent instantiations within the same process', async () => {
+			vi.resetModules();
+			const { EphemeralMemoryProvider: Fresh } = await import('./ephemeral');
+			vi.clearAllMocks();
+			new Fresh();
+			new Fresh();
+			expect(warnSpy).toHaveBeenCalledTimes(1);
 		});
 	});
 
