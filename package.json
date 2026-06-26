@@ -1,6 +1,6 @@
 {
 	"name": "@windagency/valora",
-	"version": "3.0.0",
+	"version": "3.0.1",
 	"description": "VALORA - AI-assisted development workflow orchestration with agnostic multi-LLM support, session-based state, and Cursor MCP integration",
 	"keywords": [
 		"valora",
@@ -131,8 +131,6 @@
 	},
 	"dependencies": {
 		"@anthropic-ai/sdk": "^0.69.0",
-		"@windagency/valora-plugin-api": "workspace:*",
-		"@windagency/valora-plugin-memory-vault": "workspace:*",
 		"@windagency/valora-runtime": "workspace:*",
 		"@anthropic-ai/vertex-sdk": "^0.14.0",
 		"@fastify/cors": "^11.1.0",
@@ -173,6 +171,8 @@
 		"@typescript-eslint/eslint-plugin": "^8.0.0",
 		"@typescript-eslint/parser": "^8.0.0",
 		"@vitest/coverage-v8": "^1.0.0",
+		"@windagency/valora-plugin-api": "workspace:*",
+		"@windagency/valora-plugin-memory-vault": "workspace:*",
 		"arch-unit-ts": "^1.0.9",
 		"eslint": "^9.39.1",
 		"eslint-config-prettier": "^10.1.8",
