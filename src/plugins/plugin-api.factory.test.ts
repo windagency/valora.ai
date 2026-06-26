@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { LoadedPlugin } from 'types/plugin.types';
 
@@ -151,32 +151,34 @@ describe('createPluginAPI', () => {
 	});
 
 	describe('api.memory.activate()', () => {
-		it('routes to the memory registry setActive with the given name and config', async () => {
+		let realRegistry: Awaited<ReturnType<typeof import('memory/registry').getMemoryRegistry>>;
+
+		beforeEach(async () => {
+			const actual = await vi.importActual<typeof import('memory/registry')>('memory/registry');
+			realRegistry = new actual.MemoryProviderRegistry();
 			const { getMemoryRegistry } = await import('memory/registry');
-			const mockSetActive = vi.fn();
-			vi.mocked(getMemoryRegistry).mockReturnValue({
-				registerProvider: vi.fn(),
-				setActive: mockSetActive
-			} as unknown as ReturnType<typeof getMemoryRegistry>);
-
-			const api = createPluginAPI({} as never, makePlugin(), makeRegistry());
-			api.memory.activate('ephemeral', { maxItems: 100 });
-
-			expect(mockSetActive).toHaveBeenCalledWith('ephemeral', { maxItems: 100 });
+			vi.mocked(getMemoryRegistry).mockReturnValue(realRegistry);
 		});
 
-		it('passes an empty config object when no config argument is supplied', async () => {
-			const { getMemoryRegistry } = await import('memory/registry');
-			const mockSetActive = vi.fn();
-			vi.mocked(getMemoryRegistry).mockReturnValue({
-				registerProvider: vi.fn(),
-				setActive: mockSetActive
-			} as unknown as ReturnType<typeof getMemoryRegistry>);
+		it('activates a registered provider so the registry reports an active provider', async () => {
+			const { EphemeralMemoryProvider } = await vi.importActual<typeof import('memory/ephemeral')>('memory/ephemeral');
 
 			const api = createPluginAPI({} as never, makePlugin(), makeRegistry());
-			api.memory.activate('ephemeral');
+			api.memory.register(
+				'ephemeral',
+				EphemeralMemoryProvider as never,
+				{ capabilities: [], label: 'Ephemeral' } as never
+			);
+			api.memory.activate('ephemeral', {});
 
-			expect(mockSetActive).toHaveBeenCalledWith('ephemeral', {});
+			expect(realRegistry.hasActive()).toBe(true);
+			expect(realRegistry.getActiveName()).toBe('ephemeral');
+		});
+
+		it('throws when activating a provider that has not been registered', () => {
+			const api = createPluginAPI({} as never, makePlugin(), makeRegistry());
+
+			expect(() => api.memory.activate('unknown-provider')).toThrow();
 		});
 	});
 
