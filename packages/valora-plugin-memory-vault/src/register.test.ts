@@ -1,26 +1,32 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import type { PluginAPI } from '@windagency/valora-plugin-api';
+import { MemoryProviderRegistry } from '../../../src/memory/registry';
 
 import { register } from './index';
 
 describe('vault plugin register()', () => {
-	it('calls api.memory.register and api.memory.activate', () => {
-		const register_ = vi.fn();
-		const activate = vi.fn();
-		const extend = vi.fn().mockReturnValue(() => ({}));
+	it('registers and activates the vault provider in the memory registry', () => {
+		const registry = new MemoryProviderRegistry();
 
 		register({
-			memory: { register: register_, activate },
-			config: { extend },
-			cli: { addSubcommand: vi.fn() },
-			compression: { registerStrategy: vi.fn() },
-			lifecycle: { onActivate: vi.fn(), onDeactivate: vi.fn() },
-			logger: { debug: vi.fn(), error: vi.fn(), info: vi.fn(), warn: vi.fn() },
-			providers: { register: vi.fn() }
+			memory: {
+				register(name, provider, descriptor) {
+					registry.registerProvider(name, provider, { owner: 'vault' }, descriptor);
+				},
+				activate(name, config) {
+					registry.setActive(name, config ?? {});
+				}
+			},
+			config: { extend: () => () => ({}) },
+			cli: { addSubcommand: () => {} },
+			compression: { registerStrategy: () => {} },
+			lifecycle: { onActivate: () => {}, onDeactivate: () => {} },
+			logger: { debug: () => {}, error: () => {}, info: () => {}, warn: () => {} },
+			providers: { register: () => {} }
 		} as unknown as PluginAPI);
 
-		expect(register_).toHaveBeenCalledWith('vault', expect.any(Function), expect.any(Object));
-		expect(activate).toHaveBeenCalledWith('vault', expect.any(Object));
+		expect(registry.hasActive()).toBe(true);
+		expect(registry.getActiveName()).toBe('vault');
 	});
 });
