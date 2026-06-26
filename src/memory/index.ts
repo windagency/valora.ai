@@ -1,18 +1,18 @@
 /**
  * Memory module — host-side surface for the registry-routed memory subsystem.
  *
- * The bundled vault implementation lives in
- * `@windagency/valora-plugin-memory-vault`. Production callers reach the
- * active provider via `getMemoryRegistry().getActive()`; the legacy named
- * exports below are forwarded from the bundled package so that
- * `from 'memory'` keeps resolving for code that has not yet migrated.
+ * The bundled default is `EphemeralMemoryProvider` (in-memory, no persistence).
+ * Install `@windagency/valora-plugin-memory-vault` to gain a persistent store.
+ * Production callers reach the active provider via `getMemoryRegistry().getActive()`;
+ * the vault-plugin named exports below are forwarded so that `from 'memory'`
+ * keeps resolving for code that has not yet migrated.
  *
  * New code should consume `getMemoryRegistry()` (this module) and the
  * `MemoryProvider` contract from `@windagency/valora-plugin-api` (mirrored
  * via `types/memory.types`).
  */
 
-export { bootstrapBundledMemoryProvider, type BootstrapBundledMemoryProviderOptions } from './bootstrap';
+export { bootstrapBundledMemoryProvider } from './bootstrap';
 export {
 	getMemoryRegistry,
 	MemoryProviderConflictError,
