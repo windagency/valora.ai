@@ -36,27 +36,30 @@ const BUNDLED_VAULT_PACKAGE = '@windagency/valora-plugin-memory-vault';
  * Host files allowed to reach into the bundled vault package directly.
  * Each entry is a path relative to the repo root.
  *
- *   - `src/memory/bootstrap.ts` — registers the bundled provider as
- *     `'vault'` at boot.
- *   - `src/memory/index.ts` — legacy back-compat barrel that forwards
- *     vault exports for code still importing `from 'memory'`.
- *   - `src/services/index.ts` — legacy back-compat barrel that forwards
- *     the consolidation + extraction service singletons.
- *   - `src/di/container.ts` — reads `parseVaultPluginConfig` to parse the
- *     `plugins['memory-vault']` config block before bootstrap.
  *   - `src/executor/pipeline.ts` — pulls `getMemoryExtraction()` for the
  *     post-session extraction hook. (Candidate for future cleanup: route
  *     through `MemoryProvider.extractFromAgentOutput()`.)
  *   - `src/executor/stage-executor.ts` — reads `parseVaultPluginConfig`
  *     to source the memory-injection thresholds for prompt assembly.
+ *   - `src/cli/commands/memory.command.ts` — loads vault symbols lazily
+ *     via `requireVault()` for the `migrate` and `reembed` subcommands,
+ *     which manipulate vault internals directly and degrade gracefully when
+ *     the vault plugin is not installed.
+ *
+ * Previously allowed sites that have been removed after the decoupling:
+ *   - `src/memory/bootstrap.ts` — now registers the ephemeral provider; no vault import.
+ *   - `src/memory/index.ts` — barrel no longer re-exports vault symbols.
+ *   - `src/services/index.ts` — barrel no longer re-exports vault symbols.
+ *   - `src/di/container.ts` — `bootstrapMemoryFromConfig` no longer imports vault.
  */
 const ALLOWED_VAULT_IMPORT_SITES = new Set<string>([
-	'src/memory/bootstrap.ts',
-	'src/memory/index.ts',
-	'src/services/index.ts',
-	'src/di/container.ts',
-	'src/executor/pipeline.ts',
-	'src/executor/stage-executor.ts'
+	// src/memory/bootstrap.ts — removed (now registers ephemeral, no vault import)
+	// src/memory/index.ts — removed (barrel no longer re-exports vault)
+	// src/services/index.ts — removed (barrel no longer re-exports vault)
+	// src/di/container.ts — removed (bootstrapMemoryFromConfig no longer imports vault)
+	'src/executor/pipeline.ts', // non-fatal dynamic import: triggerMemoryExtraction
+	'src/executor/stage-executor.ts', // non-fatal dynamic import: loadAgentMemory
+	'src/cli/commands/memory.command.ts' // lazy requireVault() for migrate + reembed subcommands
 ]);
 
 /**

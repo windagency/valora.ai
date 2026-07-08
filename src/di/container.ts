@@ -599,24 +599,12 @@ function setupDefaultServices(container: DIContainer): void {
 }
 
 /**
- * Resolve the bundled vault's plugin-namespaced config and bootstrap the
- * provider. The heavy vault package is loaded lazily so it does not inflate
- * CLI startup time for commands that don't need memory (e.g. --help).
- * Falls back to all-defaults when the loader has not yet run.
+ * Bootstrap the bundled memory provider. Loaded lazily so it does not inflate
+ * CLI startup time for commands that do not need memory (e.g. --help).
  */
 export async function bootstrapMemoryFromConfig(): Promise<void> {
-	const [{ parseVaultPluginConfig }, { bootstrapBundledMemoryProvider }] = await Promise.all([
-		import('@windagency/valora-plugin-memory-vault'),
-		import('memory/bootstrap')
-	]);
-	let memoryConfig;
-	try {
-		const rawPlugins = getConfigLoader().getRaw()['plugins'] as Record<string, unknown> | undefined;
-		memoryConfig = parseVaultPluginConfig(rawPlugins?.['memory-vault']);
-	} catch {
-		memoryConfig = undefined;
-	}
-	bootstrapBundledMemoryProvider({ memoryConfig });
+	const { bootstrapBundledMemoryProvider } = await import('memory/bootstrap');
+	bootstrapBundledMemoryProvider();
 }
 
 /**

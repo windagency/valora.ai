@@ -35,12 +35,6 @@ importers:
       '@types/react':
         specifier: ^19
         version: 19.2.10
-      '@windagency/valora-plugin-api':
-        specifier: workspace:*
-        version: link:packages/valora-plugin-api
-      '@windagency/valora-plugin-memory-vault':
-        specifier: workspace:*
-        version: link:packages/valora-plugin-memory-vault
       '@windagency/valora-runtime':
         specifier: workspace:*
         version: link:packages/valora-runtime
@@ -138,6 +132,12 @@ importers:
       '@vitest/coverage-v8':
         specifier: ^1.0.0
         version: 1.6.1(vitest@1.6.1(@types/node@20.19.30))
+      '@windagency/valora-plugin-api':
+        specifier: workspace:*
+        version: link:packages/valora-plugin-api
+      '@windagency/valora-plugin-memory-vault':
+        specifier: workspace:*
+        version: link:packages/valora-plugin-memory-vault
       arch-unit-ts:
         specifier: ^1.0.9
         version: 1.0.9

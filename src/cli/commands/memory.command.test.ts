@@ -57,8 +57,10 @@ vi.mock('memory/registry', () => ({
 	resetMemoryRegistry: vi.fn()
 }));
 
-vi.mock('memory', async () => {
-	const actual = await vi.importActual<typeof import('memory')>('memory');
+vi.mock('@windagency/valora-plugin-memory-vault', async () => {
+	const actual = await vi.importActual<typeof import('@windagency/valora-plugin-memory-vault')>(
+		'@windagency/valora-plugin-memory-vault'
+	);
 	return {
 		...actual,
 		migrateJsonToVault: vi.fn().mockReturnValue({ migrated: 3, skipped: 0 })
@@ -77,7 +79,7 @@ vi.mock('output/color-adapter.interface', () => ({
 	}))
 }));
 
-import { migrateJsonToVault } from 'memory';
+import { migrateJsonToVault } from '@windagency/valora-plugin-memory-vault';
 import { configureMemoryCommand } from './memory.command';
 
 describe('configureMemoryCommand', () => {

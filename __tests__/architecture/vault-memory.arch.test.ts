@@ -360,17 +360,17 @@ describe('Memory Vault Architecture', () => {
 			}
 		});
 
-		it('the bundled vault provider is registered exactly once at bootstrap', () => {
+		it('a memory provider is registered and activated in bootstrap.ts', () => {
 			const bootstrapPath = path.join(MEMORY_DIR, 'bootstrap.ts');
 			if (!fs.existsSync(bootstrapPath)) {
 				throw new Error(
-					`memory/bootstrap.ts must exist as the single registration site for the bundled vault provider.`
+					`memory/bootstrap.ts must exist as the single registration site for the default memory provider.`
 				);
 			}
 			const content = fs.readFileSync(bootstrapPath, 'utf-8');
 			if (!/registerProvider/.test(content) || !/setActive/.test(content)) {
 				throw new Error(
-					`memory/bootstrap.ts must call both registerProvider() and setActive() to register and activate the bundled vault provider.`
+					`memory/bootstrap.ts must call both registerProvider() and setActive() to register and activate the default memory provider.`
 				);
 			}
 		});

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { LoadedPlugin } from 'types/plugin.types';
 
@@ -23,7 +23,8 @@ vi.mock('llm/registry', () => ({
 
 vi.mock('memory/registry', () => ({
 	getMemoryRegistry: vi.fn(() => ({
-		registerProvider: vi.fn()
+		registerProvider: vi.fn(),
+		setActive: vi.fn()
 	}))
 }));
 
@@ -146,6 +147,38 @@ describe('createPluginAPI', () => {
 			expect(mockRegister).toHaveBeenCalledWith('test-mem', FakeMemory, expect.any(Object));
 			// 3 args (no descriptor) when descriptor is undefined
 			expect(mockRegister.mock.calls[0]).toHaveLength(3);
+		});
+	});
+
+	describe('api.memory.activate()', () => {
+		let realRegistry: Awaited<ReturnType<typeof import('memory/registry').getMemoryRegistry>>;
+
+		beforeEach(async () => {
+			const actual = await vi.importActual<typeof import('memory/registry')>('memory/registry');
+			realRegistry = new actual.MemoryProviderRegistry();
+			const { getMemoryRegistry } = await import('memory/registry');
+			vi.mocked(getMemoryRegistry).mockReturnValue(realRegistry);
+		});
+
+		it('activates a registered provider so the registry reports an active provider', async () => {
+			const { EphemeralMemoryProvider } = await vi.importActual<typeof import('memory/ephemeral')>('memory/ephemeral');
+
+			const api = createPluginAPI({} as never, makePlugin(), makeRegistry());
+			api.memory.register(
+				'ephemeral',
+				EphemeralMemoryProvider as never,
+				{ capabilities: [], label: 'Ephemeral' } as never
+			);
+			api.memory.activate('ephemeral', {});
+
+			expect(realRegistry.hasActive()).toBe(true);
+			expect(realRegistry.getActiveName()).toBe('ephemeral');
+		});
+
+		it('throws when activating a provider that has not been registered', () => {
+			const api = createPluginAPI({} as never, makePlugin(), makeRegistry());
+
+			expect(() => api.memory.activate('unknown-provider')).toThrow();
 		});
 	});
 

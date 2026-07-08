@@ -1,75 +1,33 @@
 /**
  * Bootstrap the bundled memory provider.
  *
- * Registers `VaultMemoryProvider` under the key `'vault'` (owner `'core'`)
- * and activates it. The bundled vault is wired at boot rather than via
- * plugin discovery so it is always the default `memory.provider` unless a
- * user plugin overrides it via `manifest.overrides: ['vault']`.
+ * Registers `EphemeralMemoryProvider` under the key `'ephemeral'` (owner `'core'`)
+ * and activates it as the default in-process memory store. The ephemeral provider
+ * holds all entries in a plain `Map` and does not require any plugin installation.
  *
  * Idempotent: callable multiple times across CLI / MCP / test entry points
  * without side effects on subsequent invocations.
  */
 
-import {
-	type ConsolidationCompleteListener,
-	type ProviderLookup,
-	VAULT_DESCRIPTOR,
-	VaultMemoryProvider,
-	type VaultPluginConfig
-} from '@windagency/valora-plugin-memory-vault';
-
-import { getProviderRegistry } from 'llm/registry';
-import { getPipelineEmitter } from 'output/pipeline-emitter';
-
+import { EphemeralMemoryProvider } from './ephemeral';
 import { getMemoryRegistry } from './registry';
 
-const VAULT_PROVIDER_NAME = 'vault';
+const EPHEMERAL_PROVIDER_NAME = 'ephemeral';
 
-export interface BootstrapBundledMemoryProviderOptions {
-	/** Override the runtime-resolved vault directory. */
-	vaultDir?: string;
-	/** Override the bundled vault's tuning config parsed from `plugins['memory-vault']`. */
-	memoryConfig?: VaultPluginConfig;
-	/**
-	 * Override the consolidation-complete listener. Defaults to the host's
-	 * pipeline emitter so MCP/CLI surfaces continue to receive events. Tests
-	 * can supply a no-op or spy.
-	 */
-	onConsolidationComplete?: ConsolidationCompleteListener;
-	/**
-	 * Override the provider lookup used by the bundled vault to resolve an
-	 * embedder. Defaults to the host's `llm/registry`.
-	 */
-	providerLookup?: ProviderLookup;
-}
-
-export function bootstrapBundledMemoryProvider(options: BootstrapBundledMemoryProviderOptions = {}): void {
+export function bootstrapBundledMemoryProvider(): void {
 	const registry = getMemoryRegistry();
-
-	if (!registry.hasProvider(VAULT_PROVIDER_NAME)) {
-		registry.registerProvider(VAULT_PROVIDER_NAME, VaultMemoryProvider, { owner: 'core' }, VAULT_DESCRIPTOR);
+	if (!registry.hasProvider(EPHEMERAL_PROVIDER_NAME)) {
+		registry.registerProvider(
+			EPHEMERAL_PROVIDER_NAME,
+			EphemeralMemoryProvider,
+			{ owner: 'core' },
+			{
+				capabilities: [],
+				label: 'Ephemeral (in-memory)'
+			}
+		);
 	}
-
 	if (!registry.hasActive()) {
-		registry.setActive(VAULT_PROVIDER_NAME, {
-			memoryConfig: options.memoryConfig,
-			onConsolidationComplete: options.onConsolidationComplete ?? defaultOnConsolidationComplete(),
-			providerLookup: options.providerLookup ?? defaultProviderLookup(),
-			vaultDir: options.vaultDir
-		});
+		registry.setActive(EPHEMERAL_PROVIDER_NAME, {});
 	}
-}
-
-function defaultOnConsolidationComplete(): ConsolidationCompleteListener {
-	return (result) => {
-		getPipelineEmitter().emitConsolidationComplete(result);
-	};
-}
-
-function defaultProviderLookup(): ProviderLookup {
-	const registry = getProviderRegistry();
-	return {
-		createProvider: (name, config) => registry.createProvider(name, config),
-		getAvailableProviders: () => registry.getAvailableProviders()
-	};
 }

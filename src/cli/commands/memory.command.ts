@@ -1,4 +1,5 @@
-import { migrateJsonToVault, openVectorStore, parseVaultPluginConfig, resolveEmbedder, VaultStore } from 'memory';
+import type { openVectorStore, resolveEmbedder, VaultStore } from '@windagency/valora-plugin-memory-vault';
+
 import { getMemoryRegistry } from 'memory/registry';
 import { createSecurityEvent } from 'security/security-event.types';
 
@@ -83,8 +84,8 @@ export function configureMemoryCommand(program: CommandAdapter, dirs: MemoryComm
 	memory
 		.command('migrate')
 		.description('Migrate legacy JSON stores into the Markdown vault')
-		.action(() => {
-			// Vault-specific tooling: bypasses the registry by design
+		.action(async () => {
+			const { migrateJsonToVault } = await requireVault();
 			console.log(color.cyan('Migrating JSON memory stores to vault…'));
 			const result = migrateJsonToVault({ jsonDir, vaultDir });
 			console.log(color.green(`Migration complete: ${result.migrated} migrated, ${result.skipped} skipped`));
@@ -253,6 +254,7 @@ async function executeReembed(options: ReembedOptions, color: ColorAdapter, vaul
 
 	// Reembed manipulates the vault's binary embedding store directly. It is
 	// vault-specific tooling that bypasses the MemoryProvider port.
+	const { openVectorStore, VaultStore } = await requireVault();
 	const store = new VaultStore(vaultDir);
 	const allEntries = await collectAllVaultEntries(store);
 	await deleteExistingEmbeddings(vaultDir);
@@ -286,7 +288,7 @@ async function readConfirmation(): Promise<boolean> {
 	});
 }
 
-function readMemoryConfigOrDefaults(): ReembedConfig {
+async function readMemoryConfigOrDefaults(): Promise<ReembedConfig> {
 	const fallback: ReembedConfig = {
 		batchSize: DEFAULT_MEMORY_EMBED_BATCH_SIZE,
 		dim: DEFAULT_MEMORY_EMBED_DIM,
@@ -294,6 +296,7 @@ function readMemoryConfigOrDefaults(): ReembedConfig {
 		model: DEFAULT_MEMORY_EMBED_MODEL
 	};
 	try {
+		const { parseVaultPluginConfig } = await requireVault();
 		const rawPlugins = getConfigLoader().getRaw()['plugins'] as Record<string, unknown> | undefined;
 		const memoryConfig = parseVaultPluginConfig(rawPlugins?.['memory-vault']);
 		const embedding = memoryConfig.embedding;
@@ -340,6 +343,14 @@ async function reembedAll(
 	return processed;
 }
 
+async function requireVault() {
+	try {
+		return await import('@windagency/valora-plugin-memory-vault');
+	} catch {
+		throw new Error('Vault plugin not installed. Run: valora plugin add valora-plugin-memory-vault');
+	}
+}
+
 function resolvePurgeDuration(olderThan: string | undefined, color: ColorAdapter): number | undefined {
 	if (!olderThan) return undefined;
 	const ms = parseDuration(olderThan);
@@ -354,10 +365,11 @@ async function resolveReembedConfig(
 	options: ReembedOptions,
 	color: ColorAdapter
 ): Promise<null | ResolvedReembedConfig> {
-	const config = readMemoryConfigOrDefaults();
+	const config = await readMemoryConfigOrDefaults();
 	const model = options.model ?? config.model;
 	const dim = options.dim ? parseInt(options.dim, 10) : config.dim;
 	const batchSize = config.batchSize;
+	const { resolveEmbedder } = await requireVault();
 	const embedder = await resolveEmbedder({
 		...(config.memoryConfig ?? {}),
 		embedding: { batch_size: batchSize, dim, model, provider: 'auto' }

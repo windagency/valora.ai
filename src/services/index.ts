@@ -24,16 +24,6 @@ export {
 export { getIdempotencyStore, IdempotencyStoreService, resetIdempotencyStore } from './idempotency-store.service';
 export { TaskClassifierService } from './task-classifier.service';
 export {
-	getMemoryConsolidation,
-	MemoryConsolidationService,
-	resetMemoryConsolidation
-} from '@windagency/valora-plugin-memory-vault';
-export {
-	getMemoryExtraction,
-	MemoryExtractionService,
-	resetMemoryExtraction
-} from '@windagency/valora-plugin-memory-vault';
-export {
 	DomainKeywordRegistry,
 	getDomainKeywordRegistry,
 	resetDomainKeywordRegistry
