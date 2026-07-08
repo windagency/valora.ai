@@ -26,7 +26,13 @@ vi.mock('output/color-adapter.interface', () => ({
 }));
 
 vi.mock('ui/prompt-adapter.interface', () => ({
-	getPromptAdapter: () => ({ prompt: mockPromptFn })
+	getPromptAdapter: () => ({
+		prompt: mockPromptFn,
+		promptCancellable: (questions: unknown, initialAnswers?: unknown) => ({
+			cancel: () => {},
+			promise: mockPromptFn(questions, initialAnswers)
+		})
+	})
 }));
 
 import { BuiltinProviders } from './providers.config';
