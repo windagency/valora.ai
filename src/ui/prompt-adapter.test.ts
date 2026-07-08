@@ -68,4 +68,49 @@ describe('InquirerAdapter.promptCancellable', () => {
 
 		await expect(promise).rejects.toBe(exitError);
 	});
+
+	it.each(['checkbox', 'list', 'rawlist', 'expand'] as const)(
+		'disables wrap-around navigation by default for %s questions',
+		(type) => {
+			const { promptResult } = makeCancellableInquirerPrompt<{ choice: string }>();
+			mockInquirerPrompt.mockReturnValueOnce(promptResult);
+
+			const adapter = new InquirerAdapter();
+			adapter.promptCancellable([{ choices: ['a', 'b'], message: 'Pick one', name: 'choice', type }]);
+
+			expect(mockInquirerPrompt).toHaveBeenCalledWith([expect.objectContaining({ loop: false })], undefined);
+		}
+	);
+});
+
+describe('InquirerAdapter.prompt', () => {
+	beforeEach(() => {
+		mockInquirerPrompt.mockReset();
+		mockInquirerPrompt.mockResolvedValue({});
+	});
+
+	it.each(['checkbox', 'list', 'rawlist', 'expand'] as const)(
+		'disables wrap-around navigation by default for %s questions',
+		async (type) => {
+			const adapter = new InquirerAdapter();
+			await adapter.prompt([{ choices: ['a', 'b'], message: 'Pick one', name: 'choice', type }]);
+
+			expect(mockInquirerPrompt).toHaveBeenCalledWith([expect.objectContaining({ loop: false })], undefined);
+		}
+	);
+
+	it('leaves an explicitly configured loop value untouched', async () => {
+		const adapter = new InquirerAdapter();
+		await adapter.prompt([{ choices: ['a'], loop: true, message: 'Pick one', name: 'choice', type: 'checkbox' }]);
+
+		expect(mockInquirerPrompt).toHaveBeenCalledWith([expect.objectContaining({ loop: true })], undefined);
+	});
+
+	it('does not add a loop option to question types that do not support it', async () => {
+		const adapter = new InquirerAdapter();
+		await adapter.prompt([{ message: 'Name?', name: 'name', type: 'input' }]);
+
+		const [questions] = mockInquirerPrompt.mock.calls[0] as [Array<Record<string, unknown>>];
+		expect(questions[0]).not.toHaveProperty('loop');
+	});
 });

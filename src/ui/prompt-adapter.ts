@@ -17,8 +17,30 @@ import {
 	type PromptAnswers,
 	PromptCancelledError,
 	type PromptQuestion,
-	type PromptSeparator
+	type PromptSeparator,
+	type QuestionType
 } from './prompt-adapter.interface';
+
+/**
+ * Question types that render as a scrollable choice list. Inquirer wraps
+ * navigation from the last choice back to the first by default, which reads
+ * as an endless list to users; these types default to `loop: false` unless
+ * a caller sets `loop` explicitly.
+ */
+const LOOPABLE_QUESTION_TYPES: ReadonlySet<QuestionType> = new Set(['checkbox', 'expand', 'list', 'rawlist']);
+
+function withLoopDefault<T>(question: PromptQuestion<T>): PromptQuestion<T> {
+	if (question.loop !== undefined || typeof question.type !== 'string' || !LOOPABLE_QUESTION_TYPES.has(question.type)) {
+		return question;
+	}
+	return { ...question, loop: false };
+}
+
+function withLoopDefaults<T>(
+	questions: Array<PromptQuestion<T>> | PromptQuestion<T>
+): Array<PromptQuestion<T>> | PromptQuestion<T> {
+	return Array.isArray(questions) ? questions.map(withLoopDefault) : withLoopDefault(questions);
+}
 
 /**
  * Inquirer Adapter Implementation
@@ -43,7 +65,7 @@ export class InquirerAdapter implements PromptAdapter {
 		// Inquirer's prompt accepts both single question and array
 		// Type assertion needed due to incompatible generic constraints between our interface and Inquirer's
 		return inquirer.prompt(
-			questions as Parameters<typeof inquirer.prompt>[0],
+			withLoopDefaults(questions) as Parameters<typeof inquirer.prompt>[0],
 			initialAnswers as Record<string, unknown>
 		) as Promise<T>;
 	}
@@ -57,7 +79,7 @@ export class InquirerAdapter implements PromptAdapter {
 		initialAnswers?: Partial<T>
 	): { cancel: () => void; promise: Promise<T> } {
 		const runningPrompt = inquirer.prompt(
-			questions as Parameters<typeof inquirer.prompt>[0],
+			withLoopDefaults(questions) as Parameters<typeof inquirer.prompt>[0],
 			initialAnswers as Record<string, unknown>
 		);
 
