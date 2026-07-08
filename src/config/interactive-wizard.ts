@@ -19,6 +19,7 @@ import {
 	getProviderChoices,
 	getQuickSetupChoices
 } from './validation-helpers';
+import { promptWithEscToQuit } from './wizard-esc-quit';
 
 const prompt = getPromptAdapter();
 
@@ -55,7 +56,7 @@ ${color.gray('   API keys are optional - only needed for CLI or specific provide
 
 		try {
 			// Ask which providers to configure
-			const { providers } = await prompt.prompt([
+			const { providers } = await promptWithEscToQuit(prompt, [
 				{
 					choices: getProviderChoices(),
 					message: 'Which LLM providers would you like to configure?',
@@ -148,7 +149,7 @@ ${color.gray(`Config file: ${this.configLoader.getConfigPath()}`)}`);
 		}
 
 		// Multiple providers - prompt user to choose
-		const { defaultProvider } = await prompt.prompt([
+		const { defaultProvider } = await promptWithEscToQuit(prompt, [
 			{
 				choices: validProviders.map((provider) => ({
 					name: getProviderCatalog().getProviderMetadata(provider)?.label ?? provider,
@@ -276,7 +277,7 @@ ${color.gray(`You can run 'valora config setup' for more options.`)}`);
 	private async promptForProvider(
 		color: ReturnType<typeof getColorAdapter>
 	): Promise<{ apiKey: string; providerChoice: string }> {
-		const providerAnswer = await prompt.prompt([
+		const providerAnswer = await promptWithEscToQuit(prompt, [
 			{
 				choices: getQuickSetupChoices(),
 				default: BuiltinProviders.CURSOR,
@@ -295,7 +296,7 @@ ${color.gray('   Available when running in Cursor IDE.')}`);
 		}
 
 		// Prompt for API key
-		const apiKeyAnswer = await prompt.prompt([
+		const apiKeyAnswer = await promptWithEscToQuit(prompt, [
 			{
 				message: 'Enter your API key:',
 				name: 'apiKey',

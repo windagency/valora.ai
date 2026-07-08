@@ -14,7 +14,7 @@ model_requirements:
   min_context: 64000
   recommended:
     - claude-haiku-4.5
-    - claude-sonnet-4
+    - claude-sonnet-5
 agents:
   - asserter
 dependencies:

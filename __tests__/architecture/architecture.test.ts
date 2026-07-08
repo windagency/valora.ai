@@ -152,6 +152,7 @@ describe('Architecture Tests', () => {
 						pkgPath.includes('llm/providers') &&
 						!simpleName.includes('.test') &&
 						!simpleName.includes('.spec') &&
+						!simpleName.includes('.models') &&
 						!simpleName.includes('index') &&
 						!simpleName.toLowerCase().includes('base')
 					);
@@ -270,7 +271,9 @@ describe('Architecture Tests', () => {
 	describe('Provider Interface Compliance', () => {
 		it('LLM providers should extend BaseLLMProvider from llm/provider.interface', () => {
 			const providersDir = path.join(__dirname, '../../src/llm/providers');
-			const providerFiles = getTypeScriptFiles(providersDir);
+			// Only provider implementations (*.provider.ts) must extend BaseLLMProvider.
+			// Data modules (*.models.ts) hold the descriptor SSOT and have no class.
+			const providerFiles = getTypeScriptFiles(providersDir).filter((file) => file.endsWith('.provider.ts'));
 
 			const violations = providerFiles.filter((file) => {
 				const content = fs.readFileSync(file, 'utf-8');

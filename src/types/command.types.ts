@@ -13,10 +13,10 @@ import type { ModelNameValue } from './provider-names.types';
 export type AgentRole = string;
 
 /**
- * AI Model names - uses centralized model registry
- * Note: This includes legacy models that may still be in command definitions
+ * AI Model names — sourced from the centralized model registry (ModelNameValue).
+ * The provider descriptors are the single source of truth for valid model ids.
  */
-export type AIModel = 'gpt-5-codex' | 'gpt-5-thinking-high' | ModelNameValue;
+export type AIModel = ModelNameValue;
 
 /**
  * Built-in tools available to commands

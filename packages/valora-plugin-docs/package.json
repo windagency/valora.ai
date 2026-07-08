@@ -1,6 +1,6 @@
 {
 	"name": "@windagency/valora-plugin-docs",
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"description": "Documentation generation commands for Valora (generate-docs, generate-all-documentation). Requires valora-plugin-engineering for the lead agent.",
 	"keywords": [
 		"valora",

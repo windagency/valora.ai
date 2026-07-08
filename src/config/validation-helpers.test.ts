@@ -26,7 +26,13 @@ vi.mock('output/color-adapter.interface', () => ({
 }));
 
 vi.mock('ui/prompt-adapter.interface', () => ({
-	getPromptAdapter: () => ({ prompt: mockPromptFn })
+	getPromptAdapter: () => ({
+		prompt: mockPromptFn,
+		promptCancellable: (questions: unknown, initialAnswers?: unknown) => ({
+			cancel: () => {},
+			promise: mockPromptFn(questions, initialAnswers)
+		})
+	})
 }));
 
 import { BuiltinProviders } from './providers.config';
@@ -34,9 +40,8 @@ import {
 	configureDefaults,
 	configureProvider,
 	DEFAULT_MODELS,
-	PROVIDER_CHOICES,
 	PROVIDER_LABELS,
-	QUICK_SETUP_CHOICES
+	sortProviderKeysForDisplay
 } from './validation-helpers';
 
 function makePluginDescriptor(overrides: Partial<{ requiresApiKey: boolean; helpText: string }> = {}) {
@@ -69,64 +74,49 @@ describe('validation-helpers', () => {
 	describe('DEFAULT_MODELS', () => {
 		it('should include Cursor with correct default model', () => {
 			expect(DEFAULT_MODELS).toHaveProperty(BuiltinProviders.CURSOR);
-			expect(DEFAULT_MODELS[BuiltinProviders.CURSOR]).toBe('cursor-sonnet-4.5');
+			expect(DEFAULT_MODELS[BuiltinProviders.CURSOR]).toBe('cursor-sonnet-4.6');
 		});
 
-		it('should include xAI with grok-code', () => {
+		it('should include xAI with its frontier default model', () => {
 			expect(DEFAULT_MODELS).toHaveProperty(BuiltinProviders.XAI);
-			expect(DEFAULT_MODELS[BuiltinProviders.XAI]).toBe('grok-code');
+			expect(DEFAULT_MODELS[BuiltinProviders.XAI]).toBe('grok-4.3');
 		});
 
 		it('should have default models for all providers', () => {
-			expect(DEFAULT_MODELS[BuiltinProviders.ANTHROPIC]).toBe('claude-opus-4.6');
-			expect(DEFAULT_MODELS[BuiltinProviders.GOOGLE]).toBe('gemini-2.5-pro');
-			expect(DEFAULT_MODELS[BuiltinProviders.MOONSHOT]).toBe('kimi-k2');
-			expect(DEFAULT_MODELS[BuiltinProviders.OPENAI]).toBe('gpt-5');
+			expect(DEFAULT_MODELS[BuiltinProviders.ANTHROPIC]).toBe('claude-fable-5');
+			expect(DEFAULT_MODELS[BuiltinProviders.GOOGLE]).toBe('gemini-3.5-flash');
+			expect(DEFAULT_MODELS[BuiltinProviders.MOONSHOT]).toBe('kimi-k2.6');
+			expect(DEFAULT_MODELS[BuiltinProviders.OPENAI]).toBe('gpt-5.5');
 		});
 	});
 
-	describe('PROVIDER_CHOICES', () => {
-		it('should include Cursor provider option', () => {
-			const cursorChoice = PROVIDER_CHOICES.find((choice) => choice.value === BuiltinProviders.CURSOR);
-			expect(cursorChoice).toBeDefined();
-			expect(cursorChoice?.name).toContain('Cursor');
-			expect(cursorChoice?.name).toContain('Zero config');
+	describe('sortProviderKeysForDisplay', () => {
+		const labels: Record<string, string> = {
+			anthropic: 'Anthropic',
+			google: 'Google',
+			local: 'Local',
+			'my-plugin': 'My Plugin',
+			openai: 'OpenAI',
+			xai: 'xAI'
+		};
+		const labelOf = (key: string) => labels[key] ?? key;
+
+		it('sorts providers alphabetically by label (case-insensitive)', () => {
+			expect(sortProviderKeysForDisplay(['openai', 'anthropic', 'google'], labelOf)).toEqual([
+				'anthropic',
+				'google',
+				'openai'
+			]);
 		});
 
-		it('should have skip option with updated text', () => {
-			const skipChoice = PROVIDER_CHOICES.find((choice) => choice.value === '__skip__');
-			expect(skipChoice).toBeDefined();
-			expect(skipChoice?.name).toContain('Skip');
-			expect(skipChoice?.name).toContain('No provider configuration');
+		it('always places Local last, even when alphabetically earlier', () => {
+			const sorted = sortProviderKeysForDisplay(['local', 'anthropic', 'xai'], labelOf);
+			expect(sorted).toEqual(['anthropic', 'xai', 'local']);
 		});
 
-		it('should have all standard providers', () => {
-			const providers = PROVIDER_CHOICES.map((c) => c.value);
-			expect(providers).toContain(BuiltinProviders.ANTHROPIC);
-			expect(providers).toContain(BuiltinProviders.CURSOR);
-			expect(providers).toContain(BuiltinProviders.OPENAI);
-			expect(providers).toContain(BuiltinProviders.GOOGLE);
-			expect(providers).toContain(BuiltinProviders.XAI);
-			expect(providers).toContain(BuiltinProviders.MOONSHOT);
-		});
-	});
-
-	describe('QUICK_SETUP_CHOICES', () => {
-		it('should have Cursor as first option', () => {
-			expect(QUICK_SETUP_CHOICES[0].value).toBe(BuiltinProviders.CURSOR);
-			expect(QUICK_SETUP_CHOICES[0].name).toContain('No API key needed');
-		});
-
-		it('should include key providers for quick setup', () => {
-			const providers = QUICK_SETUP_CHOICES.map((c) => c.value);
-			expect(providers).toContain(BuiltinProviders.CURSOR);
-			expect(providers).toContain(BuiltinProviders.ANTHROPIC);
-			expect(providers).toContain(BuiltinProviders.OPENAI);
-			expect(providers).toContain(BuiltinProviders.GOOGLE);
-		});
-
-		it('should have at least 4 quick setup options', () => {
-			expect(QUICK_SETUP_CHOICES.length).toBeGreaterThanOrEqual(4);
+		it('sorts plugin-contributed providers alongside built-ins, Local still last', () => {
+			const sorted = sortProviderKeysForDisplay(['openai', 'my-plugin', 'local', 'anthropic'], labelOf);
+			expect(sorted).toEqual(['anthropic', 'my-plugin', 'openai', 'local']);
 		});
 	});
 });

@@ -1,6 +1,6 @@
 {
 	"name": "@windagency/valora-plugin-product",
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"description": "Product manager agent and discovery workflow commands for Valora (create-prd, refine-specs, refine-task, create-backlog, fetch-task, feedback).",
 	"keywords": [
 		"valora",

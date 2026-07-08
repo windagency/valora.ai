@@ -9,7 +9,7 @@ allowed-tools:
   - glob_file_search
   - run_terminal_cmd # Required for modern CLI tools (jq, yq, rg, fd)
   - web_search
-model: gpt-5-thinking-high
+model: gpt-5.5
 agent: product-manager
 prompts:
   pipeline:

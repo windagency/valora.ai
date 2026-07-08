@@ -4,7 +4,9 @@
 
 ## Purpose
 
-Generates the `data/commands/registry.json` file from command definition files in the `data/commands/` directory. This registry catalogs available commands with their agents, models, and allowed tools.
+Generates the `data/commands/registry.json` file from command definition files in `packages/*/commands/`. This registry catalogs available commands with their agents, models, and allowed tools.
+
+Frontmatter is parsed with a real YAML parser (the repo's `yaml` package, via Node) and serialised with `JSON.stringify`, so the output is always valid JSON regardless of characters in field values. Invalid frontmatter is reported per-file and fails the run.
 
 ## Usage
 
@@ -18,7 +20,7 @@ scripts/generate-commands-registry.sh --dry-run
 
 ## What it does
 
-1. **Parses YAML frontmatter** from all `.md` files in `data/commands/` (excluding `_template.md`)
+1. **Parses YAML frontmatter** from all `.md` files in `packages/*/commands/` (excluding `_template.md`)
 2. **Extracts command metadata**: name, description, experimental status, argument hints, allowed tools, model, agent
 3. **Generates JSON registry** mapping command names to their configurations
 

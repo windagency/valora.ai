@@ -166,22 +166,37 @@ export class ContainerManager {
 	async removeContainer(containerName: string, force: boolean = false): Promise<void> {
 		const forceFlag = force ? '-f' : '';
 		const command = `docker rm ${forceFlag} ${containerName}`.trim();
+		const maxAttempts = 3;
 
-		try {
-			logger.debug(`Removing container: ${containerName}`);
-			await execAsync(command);
+		for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+			try {
+				logger.debug(`Removing container: ${containerName}`);
+				await execAsync(command);
 
-			// Remove from tracking
-			this.containers.delete(containerName);
+				// Remove from tracking
+				this.containers.delete(containerName);
 
-			logger.info(`Container ${containerName} removed`);
-		} catch (error: unknown) {
-			// If container doesn't exist, that's okay
-			const errorMessage = formatErrorMessage(error);
-			if (!errorMessage.includes('No such container')) {
+				logger.info(`Container ${containerName} removed`);
+				return;
+			} catch (error: unknown) {
+				const errorMessage = formatErrorMessage(error);
+
+				// If container doesn't exist, that's okay
+				if (errorMessage.includes('No such container')) {
+					logger.warn(`Container ${containerName} not found`);
+					return;
+				}
+
+				// Docker can report this transiently right after `docker stop`
+				// returns, while the daemon finishes tearing the container down
+				// internally; retry briefly rather than failing immediately.
+				if (errorMessage.includes('is already in progress') && attempt < maxAttempts) {
+					await new Promise((resolve) => setTimeout(resolve, 500 * attempt));
+					continue;
+				}
+
 				throw new Error(`Failed to remove container ${containerName}: ${errorMessage}`);
 			}
-			logger.warn(`Container ${containerName} not found`);
 		}
 	}
 

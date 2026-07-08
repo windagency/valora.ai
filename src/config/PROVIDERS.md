@@ -25,11 +25,11 @@ enum ProviderName {
 
 // Model names - commonly used models as constants
 const ModelName = {
-	CLAUDE_SONNET_4_5: 'claude-sonnet-4.6',
+	CLAUDE_FABLE_5: 'claude-fable-5',
 	CURSOR_SONNET_4_5: 'cursor-sonnet-4.5',
-	GPT_5: 'gpt-5',
-	GEMINI_2_5_PRO: 'gemini-2.5-pro',
-	GROK_CODE: 'grok-code'
+	GPT_5_5: 'gpt-5.5',
+	GEMINI_3_5_PRO: 'gemini-3.5-pro',
+	GROK_4_3: 'grok-4.3'
 	// ... all other models
 } as const;
 ```
@@ -98,7 +98,11 @@ Each provider in the registry contains:
 
 ## Adding a New Provider
 
-To add a new provider, simply update `PROVIDER_REGISTRY` in `providers.config.ts`:
+Adding a provider has **two required parts**. Declaring static metadata alone is **not** enough to make a provider usable — the setup wizard and provider catalog read from the _runtime_ registry (`getProviderRegistry().getAvailableProviders()`), not from `PROVIDER_REGISTRY`. A provider that is only declared statically will never appear in the wizard and cannot be instantiated.
+
+### 1. Declare the static metadata
+
+Add the model name constants to `ModelName` in `provider-names.types.ts`, then add the provider entry to `PROVIDER_REGISTRY` in `providers.config.ts`:
 
 ```typescript
 newprovider: {
@@ -114,13 +118,40 @@ newprovider: {
 }
 ```
 
-**That's it!** The following are automatically updated:
+Also add each model's context window to `MODEL_CONTEXT_WINDOWS`.
 
-- Setup wizard choices (`PROVIDER_CHOICES`, `QUICK_SETUP_CHOICES`)
+This automatically updates the derived helpers:
+
 - Default models mapping (`DEFAULT_MODELS`)
 - Provider labels (`PROVIDER_LABELS`)
-- Model to provider suggestions (`MODEL_PROVIDER_SUGGESTIONS`)
-- Config type definitions (add to `ProvidersConfig` in `config.types.ts`)
+- Model-to-provider suggestions (`MODEL_PROVIDER_SUGGESTIONS`)
+- The setup-wizard _quick_ choices for no-API-key providers
+
+### 2. Implement and self-register the provider at runtime
+
+Create `src/llm/providers/newprovider.provider.ts` extending `BaseLLMProvider`,
+and self-register it at module load (mirroring the existing providers). Most
+third-party APIs are OpenAI-compatible — see `xai.provider.ts` / `moonshot.provider.ts`
+for a template that points the OpenAI SDK at a custom `baseURL`:
+
+```typescript
+getProviderRegistry().registerProvider(
+	BuiltinProviders.NEWPROVIDER,
+	NewProvider,
+	{ owner: 'core' },
+	{
+		/* descriptor: keep in sync with the PROVIDER_REGISTRY entry above */
+	}
+);
+```
+
+Then import the file in `src/llm/providers/index.ts` so the self-registration runs.
+The `src/llm/providers/index.test.ts` boundary test asserts that every
+`BuiltinProviders` key has a registered runtime provider — it will fail if you
+skip this step.
+
+Finally, add the provider key to `ProvidersConfig` handling in `config.types.ts`
+if it needs bespoke config fields.
 
 ## Utility Functions
 
@@ -167,7 +198,7 @@ The Cursor provider demonstrates a provider that doesn't require an API key:
 cursor: {
   key: 'cursor',
   label: 'Cursor',
-  defaultModel: 'cursor-sonnet-4.5',
+  defaultModel: 'cursor-sonnet-4.6',
   requiresApiKey: false, // <-- No API key needed
   helpText: 'The Cursor provider uses your Cursor subscription via MCP.',
   // ...

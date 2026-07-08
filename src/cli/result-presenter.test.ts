@@ -122,7 +122,7 @@ describe('ResultPresenter', () => {
 
 		it('should display agent and model information when provided', () => {
 			const agent = 'software-engineer-typescript';
-			const model = 'gpt-5-thinking-high';
+			const model = 'gpt-5.5';
 
 			presenter.displaySuccess(
 				baseParams.commandName,
@@ -146,7 +146,7 @@ describe('ResultPresenter', () => {
 		});
 
 		it('should handle missing agent gracefully', () => {
-			const model = 'gpt-5-thinking-high';
+			const model = 'gpt-5.5';
 
 			presenter.displaySuccess(
 				baseParams.commandName,
@@ -366,7 +366,7 @@ describe('ResultPresenter', () => {
 	describe('integration scenarios', () => {
 		it('should handle complete successful command flow', () => {
 			const agent = 'software-engineer-typescript';
-			const model = 'gpt-5-thinking-high';
+			const model = 'gpt-5.5';
 
 			// Start command
 			presenter.displayCommandStart('plan', 'Planning implementation');

@@ -14,7 +14,7 @@ allowed-tools:
   - mcp_playwright
   # MCP: Cross-browser testing (optional)
   - mcp_browserstack
-model: claude-sonnet-4.5
+model: claude-sonnet-5
 agent: qa
 prompts:
   pipeline:

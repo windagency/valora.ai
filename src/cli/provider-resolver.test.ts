@@ -36,12 +36,12 @@ describe('provider-resolver', () => {
 			});
 		});
 
-		it('should include grok-code for xAI provider', () => {
+		it('should include the grok-build code model for xAI provider', () => {
 			const xaiProvider = MODEL_PROVIDER_SUGGESTIONS[BuiltinProviders.XAI];
 			expect(xaiProvider).toBeDefined();
 
-			const hasGrokCode = xaiProvider.modelModes.some((mm) => mm.model === ModelName.GROK_CODE);
-			expect(hasGrokCode).toBe(true);
+			const hasGrokBuild = xaiProvider.modelModes.some((mm) => mm.model === ModelName.GROK_BUILD_0_1);
+			expect(hasGrokBuild).toBe(true);
 		});
 
 		it('should include cursor-sonnet-4.5 for Cursor provider', () => {
@@ -65,9 +65,9 @@ describe('provider-resolver', () => {
 			});
 		});
 
-		it('should have xAI with grok-code as first model', () => {
+		it('should have xAI with grok-4.3 as first (frontier) model', () => {
 			const xaiProvider = MODEL_PROVIDER_SUGGESTIONS[BuiltinProviders.XAI];
-			expect(xaiProvider.modelModes[0].model).toBe(ModelName.GROK_CODE);
+			expect(xaiProvider.modelModes[0].model).toBe(ModelName.GROK_4_3);
 			expect(xaiProvider.modelModes[0].mode).toBe('default');
 		});
 

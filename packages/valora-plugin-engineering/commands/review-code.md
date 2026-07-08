@@ -15,7 +15,7 @@ allowed-tools:
   - mcp_github
   # MCP: AI-powered code analysis
   - mcp_serena
-model: claude-opus-4.6
+model: claude-opus-4.8
 agent: lead
 prompts:
   pipeline:

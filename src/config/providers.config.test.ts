@@ -6,16 +6,20 @@ import { describe, expect, it } from 'vitest';
 
 import {
 	BuiltinProviders,
+	DEFAULT_CONTEXT_WINDOW,
 	getAllModels,
 	getAllProviderKeys,
 	getDefaultModel,
+	getModelContextWindow,
+	getModelPricing,
 	getProviderMetadata,
 	getProviderModels,
 	getProvidersRequiringApiKey,
 	getProvidersWithoutApiKey,
 	hasModel,
 	isValidProvider,
-	PROVIDER_REGISTRY
+	PROVIDER_REGISTRY,
+	resolveApiModelId
 } from './providers.config';
 describe('providers.config', () => {
 	describe('PROVIDER_REGISTRY', () => {
@@ -112,7 +116,7 @@ describe('providers.config', () => {
 			const metadata = getProviderMetadata(BuiltinProviders.CURSOR);
 			expect(metadata).toBeDefined();
 			expect(metadata?.requiresApiKey).toBe(false);
-			expect(metadata?.defaultModel).toBe('cursor-sonnet-4.5');
+			expect(metadata?.defaultModel).toBe('cursor-sonnet-4.6');
 		});
 	});
 
@@ -156,7 +160,50 @@ describe('providers.config', () => {
 			expect(hasModel(BuiltinProviders.ANTHROPIC, 'claude-opus-4.5')).toBe(true);
 			expect(hasModel(BuiltinProviders.OPENAI, 'gpt-5')).toBe(true);
 			expect(hasModel(BuiltinProviders.CURSOR, 'cursor-sonnet-4.5')).toBe(true);
-			expect(hasModel(BuiltinProviders.XAI, 'grok-code')).toBe(true);
+			expect(hasModel(BuiltinProviders.XAI, 'grok-4.3')).toBe(true);
+		});
+
+		it('should include the newly added frontier models', () => {
+			expect(hasModel(BuiltinProviders.ANTHROPIC, 'claude-opus-4.8')).toBe(true);
+			expect(hasModel(BuiltinProviders.ANTHROPIC, 'claude-fable-5')).toBe(true);
+			expect(hasModel(BuiltinProviders.ANTHROPIC, 'claude-sonnet-5')).toBe(true);
+			expect(hasModel(BuiltinProviders.OPENAI, 'gpt-5.5')).toBe(true);
+			expect(hasModel(BuiltinProviders.OPENAI, 'gpt-5.6-sol')).toBe(true);
+			expect(hasModel(BuiltinProviders.GOOGLE, 'gemini-3.5-flash')).toBe(true);
+			expect(hasModel(BuiltinProviders.GOOGLE, 'gemini-3.5-pro')).toBe(true);
+			expect(hasModel(BuiltinProviders.XAI, 'grok-4.3')).toBe(true);
+			expect(hasModel(BuiltinProviders.MOONSHOT, 'kimi-k2.6')).toBe(true);
+			expect(hasModel(BuiltinProviders.MOONSHOT, 'kimi-k2.7-code')).toBe(true);
+		});
+
+		it('should include the model variations', () => {
+			// GPT-5.6 sibling tiers
+			expect(hasModel(BuiltinProviders.OPENAI, 'gpt-5.6-terra')).toBe(true);
+			expect(hasModel(BuiltinProviders.OPENAI, 'gpt-5.6-luna')).toBe(true);
+			// Google cheapest tier
+			expect(hasModel(BuiltinProviders.GOOGLE, 'gemini-3.1-flash-lite')).toBe(true);
+			// xAI multi-agent variant
+			expect(hasModel(BuiltinProviders.XAI, 'grok-4.20-multi-agent-0309')).toBe(true);
+			// Moonshot prior flagship
+			expect(hasModel(BuiltinProviders.MOONSHOT, 'kimi-k2.5')).toBe(true);
+			// Anthropic fast speed variants
+			expect(hasModel(BuiltinProviders.ANTHROPIC, 'claude-opus-4.8-fast')).toBe(true);
+			expect(hasModel(BuiltinProviders.ANTHROPIC, 'claude-opus-4.7-fast')).toBe(true);
+			expect(hasModel(BuiltinProviders.ANTHROPIC, 'claude-opus-4.6-fast')).toBe(true);
+			// Cursor in-house + frontier passthroughs
+			expect(hasModel(BuiltinProviders.CURSOR, 'cursor-fusion')).toBe(true);
+			expect(hasModel(BuiltinProviders.CURSOR, 'cursor-opus-4.8')).toBe(true);
+			expect(hasModel(BuiltinProviders.CURSOR, 'cursor-grok-4.3')).toBe(true);
+		});
+
+		it('should expose Anthropic effort modes', () => {
+			const modes = PROVIDER_REGISTRY[BuiltinProviders.ANTHROPIC].modelModes
+				.filter((mm) => mm.model === 'claude-opus-4.8')
+				.map((mm) => mm.mode);
+			expect(modes).toContain('low effort');
+			expect(modes).toContain('high effort');
+			expect(modes).toContain('xhigh effort');
+			expect(modes).toContain('max effort');
 		});
 
 		it('should return false for non-existing model', () => {
@@ -193,7 +240,7 @@ describe('providers.config', () => {
 			expect(models).toContain('claude-opus-4.5');
 			expect(models).toContain('gpt-5');
 			expect(models).toContain('cursor-sonnet-4.5');
-			expect(models).toContain('grok-code');
+			expect(models).toContain('grok-4.3');
 		});
 
 		it('should return unique models only', () => {
@@ -211,14 +258,32 @@ describe('providers.config', () => {
 
 	describe('getDefaultModel', () => {
 		it('should return default model for valid provider', () => {
-			expect(getDefaultModel(BuiltinProviders.ANTHROPIC)).toBe('claude-opus-4.6');
-			expect(getDefaultModel(BuiltinProviders.OPENAI)).toBe('gpt-5');
-			expect(getDefaultModel(BuiltinProviders.CURSOR)).toBe('cursor-sonnet-4.5');
-			expect(getDefaultModel(BuiltinProviders.XAI)).toBe('grok-code');
+			expect(getDefaultModel(BuiltinProviders.ANTHROPIC)).toBe('claude-fable-5');
+			expect(getDefaultModel(BuiltinProviders.OPENAI)).toBe('gpt-5.5');
+			expect(getDefaultModel(BuiltinProviders.CURSOR)).toBe('cursor-sonnet-4.6');
+			expect(getDefaultModel(BuiltinProviders.XAI)).toBe('grok-4.3');
+			expect(getDefaultModel(BuiltinProviders.GOOGLE)).toBe('gemini-3.5-flash');
+			expect(getDefaultModel(BuiltinProviders.MOONSHOT)).toBe('kimi-k2.6');
 		});
 
 		it('should return undefined for invalid provider', () => {
 			expect(getDefaultModel('invalid-provider')).toBeUndefined();
+		});
+	});
+
+	describe('getModelContextWindow', () => {
+		it('should report context windows for the new frontier models', () => {
+			expect(getModelContextWindow('claude-opus-4.8')).toBe(1_000_000);
+			expect(getModelContextWindow('claude-fable-5')).toBe(1_000_000);
+			expect(getModelContextWindow('claude-sonnet-5')).toBe(1_000_000);
+			expect(getModelContextWindow('gpt-5.5')).toBe(1_000_000);
+			expect(getModelContextWindow('gemini-3.5-pro')).toBe(2_000_000);
+			expect(getModelContextWindow('grok-4.3')).toBe(1_000_000);
+			expect(getModelContextWindow('kimi-k2.6')).toBe(256_000);
+		});
+
+		it('should fall back to the default window for unknown models', () => {
+			expect(getModelContextWindow('totally-unknown-model')).toBe(DEFAULT_CONTEXT_WINDOW);
 		});
 	});
 
@@ -241,6 +306,55 @@ describe('providers.config', () => {
 				const hasDefaultModel = metadata.modelModes.some((mm) => mm.model === metadata.defaultModel);
 				expect(hasDefaultModel, `Default model ${metadata.defaultModel} should exist in ${key} modelModes`).toBe(true);
 			});
+		});
+	});
+
+	describe('single source of truth', () => {
+		it('every offered model is owned by exactly one provider descriptor', () => {
+			const owners = new Map<string, string[]>();
+			for (const [key, metadata] of Object.entries(PROVIDER_REGISTRY)) {
+				for (const { model } of metadata.modelModes) {
+					owners.set(model, [...(owners.get(model) ?? []), key]);
+				}
+			}
+			for (const [model, providers] of owners) {
+				expect(new Set(providers).size, `${model} is offered by more than one provider: ${providers.join(', ')}`).toBe(
+					1
+				);
+			}
+		});
+
+		it('sources pricing from the owning provider descriptor', () => {
+			// Anthropic Opus 4.8 pricing lives in anthropic.models.ts and is surfaced via the aggregator.
+			expect(getModelPricing('claude-opus-4.8')).toEqual({
+				cache_read: 0.5,
+				cache_write: 6.25,
+				input: 5.0,
+				output: 25.0
+			});
+			expect(getModelPricing('gpt-5.6-terra')).toEqual({ cache_read: 0.25, input: 2.5, output: 15.0 });
+			// A model without declared pricing returns undefined (no hidden fallback table).
+			expect(getModelPricing('gemini-3.5-pro')).toBeUndefined();
+		});
+
+		it('resolves both alias and resolved API id to the same context window and pricing', () => {
+			// The aggregator expands each alias to its standard/vertex API ids.
+			expect(getModelContextWindow('claude-opus-4-8')).toBe(getModelContextWindow('claude-opus-4.8'));
+			expect(getModelPricing('claude-haiku-4-5-20251001')).toEqual(getModelPricing('claude-haiku-4.5'));
+		});
+	});
+
+	describe('resolveApiModelId', () => {
+		it('maps Anthropic dotted aliases to real API ids (standard and Vertex)', () => {
+			expect(resolveApiModelId('claude-opus-4.8')).toBe('claude-opus-4-8');
+			expect(resolveApiModelId('claude-opus-4.8', true)).toBe('claude-opus-4-8');
+			expect(resolveApiModelId('claude-haiku-4.5')).toBe('claude-haiku-4-5-20251001');
+			expect(resolveApiModelId('claude-haiku-4.5', true)).toBe('claude-haiku-4-5@20251001');
+		});
+
+		it('returns the model unchanged when the provider declares no mapping', () => {
+			expect(resolveApiModelId('gpt-5.5')).toBe('gpt-5.5');
+			expect(resolveApiModelId('grok-4.3')).toBe('grok-4.3');
 		});
 	});
 });

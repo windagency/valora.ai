@@ -11,7 +11,7 @@ allowed-tools:
   - codebase_search
   - grep
   - run_terminal_cmd
-model: claude-opus-4.6
+model: claude-opus-4.8
 agent: lead
 prompts:
   pipeline:

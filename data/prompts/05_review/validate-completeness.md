@@ -12,8 +12,7 @@ tags:
 model_requirements:
   min_context: 128000
   recommended:
-    - gpt-5-thinking-high
-    - gpt-o1-high
+    - gpt-5.5
 dependencies:
   requires:
     - context.use-modern-cli-tools

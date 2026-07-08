@@ -1,4 +1,4 @@
-import type { openVectorStore, resolveEmbedder, VaultStore } from '@windagency/valora-plugin-memory-vault';
+import type * as ValoraMemoryVaultModule from '@windagency/valora-plugin-memory-vault';
 
 import { getMemoryRegistry } from 'memory/registry';
 import { createSecurityEvent } from 'security/security-event.types';
@@ -40,7 +40,7 @@ interface PurgeOptions {
 interface ReembedConfig {
 	batchSize: number;
 	dim: number;
-	memoryConfig: Parameters<typeof resolveEmbedder>[0];
+	memoryConfig: Parameters<typeof ValoraMemoryVaultModule.resolveEmbedder>[0];
 	model: string;
 }
 
@@ -53,7 +53,7 @@ interface ReembedOptions {
 interface ResolvedReembedConfig {
 	batchSize: number;
 	dim: number;
-	embedder: Awaited<ReturnType<typeof resolveEmbedder>>;
+	embedder: Awaited<ReturnType<typeof ValoraMemoryVaultModule.resolveEmbedder>>;
 	model: string;
 }
 
@@ -150,7 +150,7 @@ function assertPurgeTarget(
 	}
 }
 
-async function collectAllVaultEntries(store: VaultStore): Promise<MemoryEntry[]> {
+async function collectAllVaultEntries(store: ValoraMemoryVaultModule.VaultStore): Promise<MemoryEntry[]> {
 	const [episodic, semantic, decisions] = await Promise.all([
 		store.getEntries('episodic'),
 		store.getEntries('semantic'),
@@ -314,8 +314,8 @@ async function readMemoryConfigOrDefaults(): Promise<ReembedConfig> {
 async function reembedAll(
 	config: ResolvedReembedConfig,
 	allEntries: MemoryEntry[],
-	store: VaultStore,
-	vs: ReturnType<typeof openVectorStore>,
+	store: ValoraMemoryVaultModule.VaultStore,
+	vs: ReturnType<typeof ValoraMemoryVaultModule.openVectorStore>,
 	color: ColorAdapter
 ): Promise<number> {
 	const total = allEntries.length;
@@ -343,7 +343,7 @@ async function reembedAll(
 	return processed;
 }
 
-async function requireVault() {
+async function requireVault(): Promise<typeof ValoraMemoryVaultModule> {
 	try {
 		return await import('@windagency/valora-plugin-memory-vault');
 	} catch {

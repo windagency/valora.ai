@@ -13,7 +13,7 @@ model_requirements:
   min_context: 200000
   recommended:
     - claude-sonnet-4.6
-    - claude-sonnet-4.5
+    - claude-sonnet-5
 agents:
   - software-engineer-typescript-backend
   - software-engineer-typescript-frontend

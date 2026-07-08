@@ -11,7 +11,7 @@ allowed-tools:
   - list_dir
   - glob_file_search
   - run_terminal_cmd # Required for modern CLI tools (jq, yq, rg, fd)
-model: claude-opus-4.6
+model: claude-opus-4.8
 agent: product-manager
 prompts:
   pipeline:

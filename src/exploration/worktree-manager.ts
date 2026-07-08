@@ -7,6 +7,7 @@
  * metacharacters. createMultipleWorktrees rolls back partial failures.
  */
 
+import { promises as fs } from 'fs';
 import * as path from 'path';
 
 import { DEFAULT_TIMEOUT_MS } from 'config/constants';
@@ -100,7 +101,9 @@ export class WorktreeManager {
 		const validatedPath = InputValidator.validatePath(worktreePath, this.repoRoot);
 
 		const worktrees = await this.listWorktrees();
-		const absolutePath = path.resolve(validatedPath);
+		// `git worktree list` reports paths with symlinks resolved (e.g. macOS
+		// /var -> /private/var), so the comparison side must resolve them too.
+		const absolutePath = await this.resolveRealPath(validatedPath);
 
 		const worktree = worktrees.find((wt) => path.resolve(wt.path) === absolutePath);
 
@@ -242,6 +245,14 @@ export class WorktreeManager {
 		}
 
 		return worktrees;
+	}
+
+	private async resolveRealPath(candidatePath: string): Promise<string> {
+		try {
+			return await fs.realpath(candidatePath);
+		} catch {
+			return path.resolve(candidatePath);
+		}
 	}
 
 	/**

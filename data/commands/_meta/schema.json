@@ -59,12 +59,12 @@
 			"type": "string",
 			"description": "AI model to use for this command",
 			"enum": [
-				"claude-opus-4.6",
+				"claude-opus-4.8",
 				"claude-sonnet-4.6",
-				"claude-sonnet-4.5",
+				"claude-sonnet-5",
 				"claude-opus-4.1",
 				"claude-haiku-4.5",
-				"gpt-5-codex",
+				"gpt-5.5",
 				"gpt-5",
 				"gemini-2.5-flash",
 				"gemini-2.5-pro",
@@ -279,7 +279,7 @@
 			"description": "Analyze task and create detailed implementation plan",
 			"argument-hint": "<task-description> [--complexity-threshold=5]",
 			"allowed-tools": ["codebase_search", "read_file", "grep", "list_dir"],
-			"model": "claude-sonnet-4.5",
+			"model": "claude-sonnet-5",
 			"agent": "lead",
 			"prompts": {
 				"pipeline": [

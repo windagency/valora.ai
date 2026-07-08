@@ -15,7 +15,7 @@ model_requirements:
   min_context: 128000
   recommended:
     - claude-sonnet-4.6
-    - claude-sonnet-4.5
+    - claude-sonnet-5
 agents:
   - lead
 dependencies:

@@ -4,7 +4,9 @@
 
 ## Purpose
 
-Generates the `data/agents/registry.json` file from agent definition files in the `data/agents/` directory. This registry is used by the AI orchestration engine to understand agent capabilities, domains, and selection criteria.
+Generates the `data/agents/registry.json` file from agent definition files in `packages/*/agents/`. This registry is used by the AI orchestration engine to understand agent capabilities, domains, and selection criteria.
+
+Frontmatter is parsed with a real YAML parser (the repo's `yaml` package, via Node) and serialised with `JSON.stringify`, so the output is always valid JSON regardless of characters in field values. Invalid frontmatter is reported per-file and fails the run.
 
 ## Usage
 
@@ -18,7 +20,7 @@ scripts/generate-agents-registry.sh --dry-run
 
 ## What it does
 
-1. **Parses YAML frontmatter** from all `.md` files in `data/agents/` (excluding `_template.md`)
+1. **Parses YAML frontmatter** from all `.md` files in `packages/*/agents/` (excluding `_template.md`)
 2. **Handles inheritance** - agents with `inherits` field inherit expertise from parent agents
 3. **Maps agent data** to registry format:
    - `domains`: Categorizes agents by their areas of focus
