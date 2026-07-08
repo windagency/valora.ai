@@ -141,7 +141,7 @@ Extend Valora with **self-contained plugin directories**:
 
 Plugins are discovered from four locations (later takes precedence): `data/plugins/` (built-in), `~/.valora/plugins/` (user), `.valora/plugins/` (project), `node_modules/@windagency/valora-plugin-*` (npm). Install an official plugin with `valora plugin add <name>` and add its short name to `plugins.enabled` in `.valora/config.json`. No restart required. See [Plugins guide](./documentation/user-guide/plugins.md).
 
-To **create** a plugin — from a minimal data plugin to a full code plugin with LLM providers, memory backends, and CLI subcommands — see the [Plugin Authoring Guide](./docs/plugin-authoring.md).
+To **create** a plugin — from a minimal data plugin to a full code plugin with LLM providers, memory backends, and CLI subcommands — see the [Plugin Authoring Guide](./documentation/developer-guide/plugin-authoring.md).
 
 35 built-in compression strategies ship as three **code plugins** and are the canonical example of the `code` contribution type. See [Strategies by plugin](./documentation/architecture/session-optimization.md#strategies-by-plugin) for the full list.
 

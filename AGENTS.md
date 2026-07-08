@@ -4,7 +4,7 @@ updated: 2026-05-07
 
 # AGENTS.md
 
-> Agent entry point. Keep this file under 120 lines — rules and details belong in the docs/ files linked below.
+> Agent entry point. Keep this file under 120 lines — rules and details belong in the documentation/ files linked below.
 
 ## What this repository is
 
@@ -63,12 +63,3 @@ pnpm maintenance:gc        # prune stale memory and trace data
 3. Read `documentation/quality/grades.json` for known gaps and technical debt.
 4. Check `.claude/plans/` for active implementation plans.
 5. If a Slack discussion or design decision shaped current code, it belongs in a doc — add it so future agents can reason over it.
-
-## Verification Summary
-
-Verified 2026-05-07 against `package.json` scripts, `documentation/`, `data/`, `src/`, and `__tests__/architecture/`.
-
-- Claims checked: 4 (navigation table entries, dev-loop commands, rule statements, file/directory paths referenced)
-- Confirmed: 2 (existing entries and rules are accurate; all referenced paths exist)
-- Corrected: 2 — (a) Layer rule rewritten from the fictional `Types → Config → Repo → Service → Runtime → UI` (no `repo/` or `runtime/` directories existed) to the actually-enforced `Types → Config → LLM/Services → Executor + MCP → CLI` with cross-cutting leaves listed; ADR-015 cross-referenced for the executor↔MCP direction. (b) "When you are stuck" stale paths `docs/quality/grades.json` and `docs/superpowers/plans/` corrected to `documentation/quality/grades.json` and `.claude/plans/` — `docs/` does not exist at the repo root.
-- Unverifiable: 0
