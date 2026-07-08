@@ -634,6 +634,19 @@ describe('PluginInstallerService', () => {
 			const { getGlobalPluginsDir } = await import('utils/paths');
 			vi.mocked(getGlobalPluginsDir).mockReturnValue(tmpTarget);
 
+			// Build the tarball once, outside the per-install temp dirs (the service
+			// deletes those after each install), so every `npm pack` invocation copies
+			// the exact same bytes instead of re-running `tar -czf`. gzip embeds a
+			// compression timestamp in its header, so two independently-created
+			// tarballs of identical content still hash differently — re-packing on
+			// each call made this test's SHA256 comparison flaky.
+			const stableSrcDir = fs.mkdtempSync(path.join(tmpTarget, 'stable-src-'));
+			const pkgDir = path.join(stableSrcDir, 'package');
+			fs.mkdirSync(pkgDir);
+			fs.writeFileSync(path.join(pkgDir, 'valora-plugin.json'), '{}');
+			const stableTgz = path.join(stableSrcDir, 'valora-plugin-rtk-1.0.0.tgz');
+			child_process.spawnSync('tar', ['-czf', stableTgz, '-C', stableSrcDir, 'package']);
+
 			let capturedIntegrity = '';
 			const runner: ProcessRunner & { packCalls: string[] } = {
 				packCalls: [],
@@ -642,12 +655,7 @@ describe('PluginInstallerService', () => {
 						const destIdx = argv.indexOf('--pack-destination');
 						const destDir = argv[destIdx + 1];
 						const tgz = path.join(destDir, 'valora-plugin-rtk-1.0.0.tgz');
-						const srcDir = fs.mkdtempSync(path.join(destDir, 'src-'));
-						const pkgDir = path.join(srcDir, 'package');
-						fs.mkdirSync(pkgDir);
-						fs.writeFileSync(path.join(pkgDir, 'valora-plugin.json'), '{}');
-						child_process.spawnSync('tar', ['-czf', tgz, '-C', srcDir, 'package']);
-						fs.rmSync(srcDir, { force: true, recursive: true });
+						fs.copyFileSync(stableTgz, tgz);
 						capturedIntegrity = computeTarballIntegrity(tgz);
 					}
 					return 0;

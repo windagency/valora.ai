@@ -158,7 +158,9 @@ describe('Docker Integration Tests', () => {
 			expect(result).toBeDefined();
 			// branch returns full ref path like "refs/heads/branchname"
 			expect(result.branch).toContain(branchName);
-			expect(result.path).toBe(worktreePath);
+			// git reports the symlink-resolved path (e.g. macOS /var -> /private/var),
+			// so compare canonical forms rather than the raw requested string.
+			expect(result.path).toBe(await fs.realpath(worktreePath));
 
 			// Verify worktree exists
 			const stats = await fs.stat(worktreePath);
@@ -180,8 +182,10 @@ describe('Docker Integration Tests', () => {
 			expect(Array.isArray(worktrees)).toBe(true);
 			expect(worktrees.length).toBeGreaterThan(0);
 
-			// Should include main worktree
-			const mainWorktree = worktrees.find((w) => w.path === testRepoDir);
+			// Should include main worktree. git reports the symlink-resolved path
+			// (e.g. macOS /var -> /private/var), so compare canonical forms.
+			const canonicalTestRepoDir = await fs.realpath(testRepoDir);
+			const mainWorktree = worktrees.find((w) => w.path === canonicalTestRepoDir);
 			expect(mainWorktree).toBeDefined();
 
 			console.log(`Found ${worktrees.length} worktree(s)`);

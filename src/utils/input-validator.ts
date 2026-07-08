@@ -4,6 +4,7 @@
  * Validates and sanitizes user inputs to prevent injection attacks
  */
 
+import { existsSync, realpathSync } from 'fs';
 import * as path from 'path';
 
 import { isNonEmptyString } from './type-guards';
@@ -271,9 +272,11 @@ export class InputValidator {
 			throw new InputValidationError('Path contains null bytes', 'path', targetPath);
 		}
 
-		// Resolve to absolute path
-		const absolutePath = path.resolve(targetPath);
-		const absoluteRoot = path.resolve(allowedRoot);
+		// Resolve to absolute path, following symlinks on whatever prefix already
+		// exists (e.g. macOS /var -> /private/var) so containment checks compare
+		// like-for-like even when the leaf path doesn't exist yet.
+		const absolutePath = this.resolveExistingSymlinks(targetPath);
+		const absoluteRoot = this.resolveExistingSymlinks(allowedRoot);
 
 		// Check if path is within allowed root
 		if (!absolutePath.startsWith(absoluteRoot)) {
@@ -286,6 +289,33 @@ export class InputValidator {
 		}
 
 		return absolutePath;
+	}
+
+	/**
+	 * Resolve a path to its canonical (symlink-free) absolute form, following
+	 * symlinks on the longest ancestor that already exists on disk and
+	 * reattaching any remaining (not-yet-created) segments unresolved.
+	 */
+	private static resolveExistingSymlinks(inputPath: string): string {
+		const absolutePath = path.resolve(inputPath);
+
+		let existingAncestor = absolutePath;
+		const missingSegments: string[] = [];
+		while (!existsSync(existingAncestor)) {
+			const parent = path.dirname(existingAncestor);
+			if (parent === existingAncestor) {
+				return absolutePath;
+			}
+			missingSegments.unshift(path.basename(existingAncestor));
+			existingAncestor = parent;
+		}
+
+		try {
+			const realAncestor = realpathSync(existingAncestor);
+			return missingSegments.length > 0 ? path.join(realAncestor, ...missingSegments) : realAncestor;
+		} catch {
+			return absolutePath;
+		}
 	}
 
 	/**
