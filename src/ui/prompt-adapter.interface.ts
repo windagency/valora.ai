@@ -13,6 +13,17 @@
 import { createDefaultPromptAdapter } from './prompt-adapter';
 
 /**
+ * Thrown when a cancellable prompt (see `PromptAdapter.promptCancellable`) is
+ * cancelled via its `cancel()` handle, instead of being answered normally.
+ */
+export class PromptCancelledError extends Error {
+	constructor() {
+		super('Prompt was cancelled');
+		this.name = 'PromptCancelledError';
+	}
+}
+
+/**
  * Question types supported by the prompt adapter
  */
 export type QuestionType =
@@ -158,6 +169,27 @@ export interface PromptAdapter {
 		questions: Array<PromptQuestion<T>> | PromptQuestion<T>,
 		initialAnswers?: Partial<T>
 	): Promise<T>;
+
+	/**
+	 * Prompt user with questions, returning a handle that can cancel the
+	 * in-flight prompt from outside the caller awaiting it.
+	 *
+	 * @param questions - Question or array of questions
+	 * @param initialAnswers - Initial answers to pre-fill
+	 * @returns An object containing the prompt's `promise` (rejects with
+	 * `PromptCancelledError` if `cancel()` is invoked before the user
+	 * answers) and a `cancel` function that aborts the prompt.
+	 *
+	 * @example
+	 * const { promise, cancel } = adapter.promptCancellable([
+	 *   { type: 'confirm', name: 'proceed', message: 'Continue?' }
+	 * ]);
+	 * setTimeout(cancel, 5000); // abort if unanswered after 5s
+	 */
+	promptCancellable<T = PromptAnswers>(
+		questions: Array<PromptQuestion<T>> | PromptQuestion<T>,
+		initialAnswers?: Partial<T>
+	): { cancel: () => void; promise: Promise<T> };
 
 	/**
 	 * Create a separator for list/checkbox questions
