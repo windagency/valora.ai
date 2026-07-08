@@ -53,7 +53,8 @@ export async function promptWithEscToQuit<T = PromptAnswers>(
 			handlePromptCancellation();
 		}
 
-		return await promptWithEscToQuit(prompt, questions, initialAnswers, stdin);
+		// eslint-disable-next-line @typescript-eslint/return-await -- listener cleanup in `finally` must run per-call, not wait for the full recursive retry chain to settle
+		return promptWithEscToQuit(prompt, questions, initialAnswers, stdin);
 	} finally {
 		stdin.removeListener('keypress', onKeypress);
 	}

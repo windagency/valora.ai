@@ -92,6 +92,58 @@ describe('promptWithEscToQuit', () => {
 		expect(exitSpy).not.toHaveBeenCalled();
 	});
 
+	it('removes the previous call listener before the retried prompt settles, without leaking listeners', async () => {
+		let rejectFirst!: (reason: unknown) => void;
+		const firstPromise = new Promise((_resolve, reject) => {
+			rejectFirst = reject;
+		});
+		const firstCancel = vi.fn(() => rejectFirst(new PromptCancelledError()));
+
+		let resolveSecond!: (value: { name: string }) => void;
+		const secondPromise = new Promise<{ name: string }>((resolve) => {
+			resolveSecond = resolve;
+		});
+		const secondCancel = vi.fn();
+
+		const adapter = {
+			prompt: vi.fn().mockResolvedValueOnce({ confirmQuit: false }),
+			promptCancellable: vi
+				.fn()
+				.mockReturnValueOnce({ cancel: firstCancel, promise: firstPromise })
+				.mockReturnValueOnce({ cancel: secondCancel, promise: secondPromise })
+		} as unknown as PromptAdapter;
+
+		const stdin = new PassThrough();
+		const questions = [{ type: 'input' as const, name: 'name', message: 'Name?' }];
+		const resultPromise = promptWithEscToQuit(adapter, questions, undefined, stdin);
+
+		expect(stdin.listenerCount('keypress')).toBe(1);
+
+		stdin.emit('keypress', undefined, { name: 'escape' });
+
+		// Wait for the decline-and-retry chain (reject -> await prompt.prompt() -> recursive call)
+		// to reach its steady state, while the retried (second) prompt is still pending.
+		await vi.waitFor(() => {
+			expect(adapter.promptCancellable).toHaveBeenCalledTimes(2);
+		});
+
+		// Exactly one listener should remain registered: the retried call's own. If the first
+		// call's `finally` (listener cleanup) were delayed until the whole recursive retry chain
+		// settles, instead of running right after the retry is kicked off, this would be 2.
+		expect(stdin.listenerCount('keypress')).toBe(1);
+
+		// A fresh ESC press must reach the retried call's cancel — not a stale listener from the
+		// original (already-settled) call.
+		stdin.emit('keypress', undefined, { name: 'escape' });
+		expect(secondCancel).toHaveBeenCalledTimes(1);
+		expect(firstCancel).toHaveBeenCalledTimes(1);
+
+		resolveSecond({ name: 'Ada' });
+		const answer = await resultPromise;
+
+		expect(answer).toEqual({ name: 'Ada' });
+	});
+
 	it('ignores non-escape keys', async () => {
 		const adapter = {
 			prompt: vi.fn(),
