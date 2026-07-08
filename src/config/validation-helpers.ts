@@ -13,6 +13,7 @@ import type { Config } from './schema';
 
 import { getProviderCatalog } from './provider-catalog';
 import { BuiltinProviders, getAllProviderKeys, PROVIDER_REGISTRY } from './providers.config';
+import { promptWithEscToQuit } from './wizard-esc-quit';
 
 const prompt = getPromptAdapter();
 
@@ -95,7 +96,7 @@ async function configureLocalProvider(metadata: ProviderDescriptor, config: Conf
 		console.info(color.gray(`  ${metadata.helpText}`));
 	}
 
-	const { baseUrl, defaultModel } = await prompt.prompt([
+	const { baseUrl, defaultModel } = await promptWithEscToQuit(prompt, [
 		{
 			default: 'http://localhost:8080/v1',
 			message: 'Local server URL:',
@@ -125,7 +126,7 @@ async function configureAnthropicVertexOption(
 	providerName: string,
 	config: Config
 ): Promise<boolean> {
-	const { useVertex } = await prompt.prompt([
+	const { useVertex } = await promptWithEscToQuit(prompt, [
 		{
 			default: false,
 			message: 'Use Vertex AI for Claude? (Recommended for enterprise environments)',
@@ -138,7 +139,7 @@ async function configureAnthropicVertexOption(
 		return false;
 	}
 
-	const vertexAnswers = await prompt.prompt([
+	const vertexAnswers = await promptWithEscToQuit(prompt, [
 		{
 			message: 'Vertex AI Project ID:',
 			name: 'vertexProjectId',
@@ -200,7 +201,7 @@ export async function configureProvider(providerName: string, config: Config): P
 				console.info(color.gray(`  ${metadata.helpText}`));
 			}
 
-			const { defaultModel } = await prompt.prompt([
+			const { defaultModel } = await promptWithEscToQuit(prompt, [
 				{
 					default: metadata.defaultModel,
 					message: 'Default model (optional):',
@@ -228,7 +229,7 @@ export async function configureProvider(providerName: string, config: Config): P
 		}
 
 		// Standard API key-based provider configuration
-		const { apiKey, defaultModel } = await prompt.prompt([
+		const { apiKey, defaultModel } = await promptWithEscToQuit(prompt, [
 			{
 				message: `Enter your ${metadata.label} API key:`,
 				name: 'apiKey',
@@ -273,7 +274,7 @@ export async function configureDefaults(config: Config): Promise<void> {
 	console.group(color.cyan('\n⚙️  Configuring default preferences'));
 
 	try {
-		const answers = await prompt.prompt([
+		const answers = await promptWithEscToQuit(prompt, [
 			{
 				default: true,
 				message: 'Enable interactive mode by default?',

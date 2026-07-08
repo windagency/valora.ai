@@ -12,7 +12,13 @@
 
 import inquirer from 'inquirer';
 
-import type { PromptAdapter, PromptAnswers, PromptQuestion, PromptSeparator } from './prompt-adapter.interface';
+import {
+	type PromptAdapter,
+	type PromptAnswers,
+	PromptCancelledError,
+	type PromptQuestion,
+	type PromptSeparator
+} from './prompt-adapter.interface';
 
 /**
  * Inquirer Adapter Implementation
@@ -40,6 +46,35 @@ export class InquirerAdapter implements PromptAdapter {
 			questions as Parameters<typeof inquirer.prompt>[0],
 			initialAnswers as Record<string, unknown>
 		) as Promise<T>;
+	}
+
+	/**
+	 * Prompt user with questions, returning a handle that can cancel the
+	 * in-flight prompt from outside.
+	 */
+	promptCancellable<T = PromptAnswers>(
+		questions: Array<PromptQuestion<T>> | PromptQuestion<T>,
+		initialAnswers?: Partial<T>
+	): { cancel: () => void; promise: Promise<T> } {
+		const runningPrompt = inquirer.prompt(
+			questions as Parameters<typeof inquirer.prompt>[0],
+			initialAnswers as Record<string, unknown>
+		);
+
+		const promise = runningPrompt.then(
+			(answer) => answer as T,
+			(error: unknown) => {
+				if (error instanceof Error && error.name === 'AbortPromptError') {
+					throw new PromptCancelledError();
+				}
+				throw error;
+			}
+		);
+
+		return {
+			cancel: () => runningPrompt.ui.close(),
+			promise
+		};
 	}
 
 	/**
