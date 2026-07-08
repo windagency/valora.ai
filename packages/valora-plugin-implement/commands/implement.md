@@ -27,7 +27,7 @@ agent_selection_criteria:
   - analyze_task_description
   - analyze_affected_files
   - consider_dependencies
-model: claude-sonnet-4.5
+model: claude-sonnet-5
 prompts:
   pipeline:
     - stage: context

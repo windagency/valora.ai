@@ -63,9 +63,9 @@ describe('CursorProvider', () => {
 		});
 
 		it('should validate known cursor models', async () => {
-			expect(await provider.validateModel('cursor-sonnet-4.5')).toBe(true);
-			expect(await provider.validateModel('cursor-gpt-4')).toBe(true);
-			expect(await provider.validateModel('cursor-claude-3.5')).toBe(true);
+			expect(await provider.validateModel('cursor-sonnet-4.6')).toBe(true);
+			expect(await provider.validateModel('cursor-composer-2.5')).toBe(true);
+			expect(await provider.validateModel('cursor-gpt-5.5')).toBe(true);
 		});
 
 		it('should accept cursor-prefixed models', async () => {

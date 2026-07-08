@@ -1,10 +1,23 @@
 /**
- * Centralized Provider Configuration
+ * Centralized Provider Configuration (consumer facade)
  *
- * Single source of truth for all LLM provider metadata, models, and capabilities.
- * This eliminates duplication across validation-helpers.ts, provider-resolver.ts, and other files.
+ * The single source of truth for each provider's models is its own
+ * `src/llm/providers/<name>.models.ts` descriptor. This module aggregates the
+ * built-in descriptors into the shapes the rest of the codebase already consumes
+ * (PROVIDER_REGISTRY + model lookups) so that no component hand-maintains a
+ * second copy of model metadata.
  */
 
+import type { ProviderDescriptor } from 'plugins/plugin-api.types';
+import type { ApiModelId, ModelPricing } from 'types/model.types';
+
+import { ANTHROPIC_DESCRIPTOR } from 'llm/providers/anthropic.models';
+import { CURSOR_DESCRIPTOR } from 'llm/providers/cursor.models';
+import { GOOGLE_DESCRIPTOR } from 'llm/providers/google.models';
+import { LOCAL_DESCRIPTOR } from 'llm/providers/local.models';
+import { MOONSHOT_DESCRIPTOR } from 'llm/providers/moonshot.models';
+import { OPENAI_DESCRIPTOR } from 'llm/providers/openai.models';
+import { XAI_DESCRIPTOR } from 'llm/providers/xai.models';
 import { BuiltinProviders, ModelName, ModelNameValue, ProviderName } from 'types/provider-names.types';
 
 /**
@@ -18,56 +31,29 @@ export interface ModelMode {
 	model: string;
 }
 
+/** Provider metadata is the provider's descriptor plus its registry key. */
+export type ProviderMetadata = ProviderDescriptor & { key: ProviderName };
+
 /**
- * Context window sizes for models (in tokens)
- * These are approximate maximum context sizes for each model
+ * Built-in provider descriptors, keyed by provider name.
+ * The SSOT for each entry lives in the corresponding `llm/providers/*.models.ts`.
  */
-export const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
-	// Anthropic models - 1M context (4.6+)
-	[ModelName.CLAUDE_OPUS_4_6]: 1_000_000,
-	[ModelName.CLAUDE_SONNET_4_6]: 1_000_000,
-	// Anthropic models - 200K context
-	[ModelName.CLAUDE_HAIKU_3_5]: 200_000,
-	[ModelName.CLAUDE_HAIKU_4_5]: 200_000,
-	[ModelName.CLAUDE_OPUS_4]: 200_000,
-	[ModelName.CLAUDE_OPUS_4_1]: 200_000,
-	[ModelName.CLAUDE_OPUS_4_5]: 200_000,
-	[ModelName.CLAUDE_SONNET_4]: 200_000,
-	[ModelName.CLAUDE_SONNET_4_5]: 200_000,
-
-	// Cursor models (inherit from underlying models)
-	[ModelName.CURSOR_CLAUDE_3_5]: 200_000,
-	[ModelName.CURSOR_GPT_4]: 128_000,
-	[ModelName.CURSOR_SONNET_4_5]: 200_000,
-
-	// Google models
-	[ModelName.GEMINI_2_5_FLASH]: 1_000_000,
-	[ModelName.GEMINI_2_5_FLASH_LITE]: 1_000_000,
-	[ModelName.GEMINI_2_5_PRO]: 2_000_000,
-	[ModelName.GEMINI_3_PRO]: 2_000_000,
-	[ModelName.GEMMA_2]: 8_192,
-	[ModelName.GEMMA_3]: 128_000,
-	[ModelName.GEMMA_3N]: 128_000,
-
-	// Moonshot models
-	[ModelName.KIMI_K2]: 128_000,
-
-	// OpenAI models
-	[ModelName.GPT_5]: 256_000,
-	[ModelName.GPT_5_1]: 256_000,
-	[ModelName.GPT_5_MINI]: 256_000,
-	[ModelName.GPT_5_NANO]: 128_000,
-	[ModelName.O3]: 200_000,
-	[ModelName.O3_PRO]: 200_000,
-	[ModelName.O4_MINI]: 200_000,
-
-	// xAI models
-	[ModelName.GROK_4_1_FAST_NON_REASONING]: 256_000,
-	[ModelName.GROK_4_1_FAST_REASONING]: 256_000,
-	[ModelName.GROK_4_FAST_NON_REASONING]: 256_000,
-	[ModelName.GROK_4_FAST_REASONING]: 256_000,
-	[ModelName.GROK_CODE]: 256_000
+const BUILTIN_DESCRIPTORS: Record<string, ProviderDescriptor> = {
+	[BuiltinProviders.ANTHROPIC]: ANTHROPIC_DESCRIPTOR,
+	[BuiltinProviders.CURSOR]: CURSOR_DESCRIPTOR,
+	[BuiltinProviders.GOOGLE]: GOOGLE_DESCRIPTOR,
+	[BuiltinProviders.LOCAL]: LOCAL_DESCRIPTOR,
+	[BuiltinProviders.MOONSHOT]: MOONSHOT_DESCRIPTOR,
+	[BuiltinProviders.OPENAI]: OPENAI_DESCRIPTOR,
+	[BuiltinProviders.XAI]: XAI_DESCRIPTOR
 };
+
+/**
+ * Comprehensive provider registry, derived from the per-provider descriptors.
+ */
+export const PROVIDER_REGISTRY: Record<string, ProviderMetadata> = Object.fromEntries(
+	Object.entries(BUILTIN_DESCRIPTORS).map(([key, descriptor]) => [key, { ...descriptor, key: key as ProviderName }])
+);
 
 /**
  * Default context window size for unknown models
@@ -75,151 +61,63 @@ export const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
 export const DEFAULT_CONTEXT_WINDOW = 128_000;
 
 /**
- * Get context window size for a model
+ * Build a lookup keyed by every form a model may be referenced by: its registry
+ * alias plus, when the provider declares apiModelIds, the resolved standard and
+ * Vertex API ids. Consumers can therefore pass either the alias or the API id.
+ */
+function buildModelLookup<T>(
+	select: (descriptor: ProviderDescriptor) => Record<string, T> | undefined
+): Record<string, T> {
+	const out: Record<string, T> = {};
+	for (const descriptor of Object.values(BUILTIN_DESCRIPTORS)) {
+		const table = select(descriptor);
+		if (!table) continue;
+		for (const [alias, value] of Object.entries(table)) {
+			out[alias] = value;
+			const api = descriptor.apiModelIds?.[alias];
+			if (api) {
+				out[api.standard] = value;
+				if (api.vertex) out[api.vertex] = value;
+			}
+		}
+	}
+	return out;
+}
+
+const MODEL_CONTEXT_WINDOWS: Record<string, number> = buildModelLookup((descriptor) => descriptor.contextWindows);
+const MODEL_PRICING: Record<string, ModelPricing> = buildModelLookup((descriptor) => descriptor.pricing);
+const API_MODEL_IDS: Record<string, ApiModelId> = (() => {
+	const out: Record<string, ApiModelId> = {};
+	for (const descriptor of Object.values(BUILTIN_DESCRIPTORS)) {
+		Object.assign(out, descriptor.apiModelIds ?? {});
+	}
+	return out;
+})();
+
+/**
+ * Get context window size for a model (accepts the registry alias or a resolved API id).
  */
 export function getModelContextWindow(model: string): number {
 	return MODEL_CONTEXT_WINDOWS[model] ?? DEFAULT_CONTEXT_WINDOW;
 }
 
-export interface ProviderMetadata {
-	/** Internal provider key */
-	key: ProviderName;
-	/** Display name for UI */
-	label: string;
-	/** Default model for this provider */
-	defaultModel: string;
-	/** Available models with their modes */
-	modelModes: Array<ModelMode>;
-	/** Whether this provider requires an API key */
-	requiresApiKey: boolean;
-	/** Description for setup wizard */
-	description?: string;
-	/** Help text or notes */
-	helpText?: string;
+/**
+ * Get pricing for a model (accepts the registry alias or a resolved API id).
+ * Returns undefined when the model has no declared pricing.
+ */
+export function getModelPricing(model: string): ModelPricing | undefined {
+	return MODEL_PRICING[model];
 }
 
 /**
- * Comprehensive provider registry
+ * Resolve a registry alias to the vendor's real API id (standard or Vertex form).
+ * Returns the input unchanged when the provider declares no mapping (alias === API id).
  */
-export const PROVIDER_REGISTRY: Record<string, ProviderMetadata> = {
-	[BuiltinProviders.ANTHROPIC]: {
-		defaultModel: ModelName.CLAUDE_OPUS_4_6,
-		description: 'Claude models from Anthropic',
-		key: BuiltinProviders.ANTHROPIC,
-		label: 'Anthropic',
-		modelModes: [
-			{ mode: 'normal', model: ModelName.CLAUDE_OPUS_4_6 },
-			{ mode: 'extended thinking', model: ModelName.CLAUDE_OPUS_4_6 },
-			{ mode: 'normal', model: ModelName.CLAUDE_SONNET_4_6 },
-			{ mode: 'extended thinking', model: ModelName.CLAUDE_SONNET_4_6 },
-			{ mode: 'normal', model: ModelName.CLAUDE_OPUS_4_5 },
-			{ mode: 'extended thinking', model: ModelName.CLAUDE_OPUS_4_5 },
-			{ mode: 'normal', model: ModelName.CLAUDE_OPUS_4 },
-			{ mode: 'extended thinking', model: ModelName.CLAUDE_OPUS_4 },
-			{ mode: 'normal', model: ModelName.CLAUDE_SONNET_4_5 },
-			{ mode: 'extended thinking', model: ModelName.CLAUDE_SONNET_4_5 },
-			{ mode: 'normal', model: ModelName.CLAUDE_SONNET_4 },
-			{ mode: 'extended thinking', model: ModelName.CLAUDE_SONNET_4 },
-			{ mode: 'normal', model: ModelName.CLAUDE_HAIKU_4_5 },
-			{ mode: 'normal', model: ModelName.CLAUDE_HAIKU_3_5 }
-		],
-		requiresApiKey: true
-	},
-	[BuiltinProviders.CURSOR]: {
-		defaultModel: ModelName.CURSOR_SONNET_4_5,
-		description: 'Zero config - uses your Cursor subscription',
-		helpText: 'The Cursor provider uses your Cursor subscription via MCP. No API key needed!',
-		key: BuiltinProviders.CURSOR,
-		label: 'Cursor',
-		modelModes: [
-			{ mode: 'normal', model: ModelName.CURSOR_SONNET_4_5 },
-			{ mode: 'high reasoning', model: ModelName.CURSOR_GPT_4 },
-			{ mode: 'normal', model: ModelName.CURSOR_CLAUDE_3_5 }
-		],
-		requiresApiKey: false
-	},
-	[BuiltinProviders.GOOGLE]: {
-		defaultModel: ModelName.GEMINI_2_5_PRO,
-		description: 'Gemini models from Google',
-		key: BuiltinProviders.GOOGLE,
-		label: 'Google',
-		modelModes: [
-			{ mode: 'default', model: ModelName.GEMINI_3_PRO },
-			{ mode: 'deep-think', model: ModelName.GEMINI_3_PRO },
-			{ mode: 'default', model: ModelName.GEMINI_2_5_PRO },
-			{ mode: 'default', model: ModelName.GEMINI_2_5_FLASH },
-			{ mode: 'default', model: ModelName.GEMINI_2_5_FLASH_LITE },
-			{ mode: 'default', model: ModelName.GEMMA_3N },
-			{ mode: 'default', model: ModelName.GEMMA_3 },
-			{ mode: 'default', model: ModelName.GEMMA_2 }
-		],
-		requiresApiKey: true
-	},
-	[BuiltinProviders.LOCAL]: {
-		defaultModel: 'llama3.1',
-		description: 'Local OpenAI-compatible model server',
-		helpText: 'Connect to a local OpenAI-compatible server.',
-		key: BuiltinProviders.LOCAL,
-		label: 'Local',
-		modelModes: [{ mode: 'default', model: 'llama3.1' }],
-		requiresApiKey: false
-	},
-	[BuiltinProviders.MOONSHOT]: {
-		defaultModel: ModelName.KIMI_K2,
-		description: 'Kimi models from Moonshot',
-		key: BuiltinProviders.MOONSHOT,
-		label: 'Moonshot',
-		modelModes: [{ mode: 'default', model: ModelName.KIMI_K2 }],
-		requiresApiKey: true
-	},
-	[BuiltinProviders.OPENAI]: {
-		defaultModel: ModelName.GPT_5,
-		description: 'GPT models from OpenAI',
-		key: BuiltinProviders.OPENAI,
-		label: 'OpenAI',
-		modelModes: [
-			{ mode: 'minimal reasoning', model: ModelName.GPT_5 },
-			{ mode: 'low reasoning', model: ModelName.GPT_5 },
-			{ mode: 'medium reasoning', model: ModelName.GPT_5 },
-			{ mode: 'high reasoning', model: ModelName.GPT_5 },
-			{ mode: 'minimal reasoning', model: ModelName.GPT_5_MINI },
-			{ mode: 'low reasoning', model: ModelName.GPT_5_MINI },
-			{ mode: 'medium reasoning', model: ModelName.GPT_5_MINI },
-			{ mode: 'high reasoning', model: ModelName.GPT_5_MINI },
-			{ mode: 'minimal reasoning', model: ModelName.GPT_5_NANO },
-			{ mode: 'low reasoning', model: ModelName.GPT_5_NANO },
-			{ mode: 'medium reasoning', model: ModelName.GPT_5_NANO },
-			{ mode: 'high reasoning', model: ModelName.GPT_5_NANO },
-			{ mode: 'none reasoning', model: ModelName.GPT_5_1 },
-			{ mode: 'low reasoning', model: ModelName.GPT_5_1 },
-			{ mode: 'medium reasoning', model: ModelName.GPT_5_1 },
-			{ mode: 'high reasoning', model: ModelName.GPT_5_1 },
-			{ mode: 'low reasoning', model: ModelName.O3 },
-			{ mode: 'medium reasoning', model: ModelName.O3 },
-			{ mode: 'high reasoning', model: ModelName.O3 },
-			{ mode: 'high reasoning', model: ModelName.O3_PRO },
-			{ mode: 'low reasoning', model: ModelName.O4_MINI },
-			{ mode: 'medium reasoning', model: ModelName.O4_MINI },
-			{ mode: 'high reasoning', model: ModelName.O4_MINI }
-		],
-		requiresApiKey: true
-	},
-	[BuiltinProviders.XAI]: {
-		defaultModel: ModelName.GROK_CODE,
-		description: 'Grok models from xAI',
-		// TODO: Verify xAI's actual API model names when official documentation is available
-		key: BuiltinProviders.XAI,
-		label: 'xAI',
-		modelModes: [
-			{ mode: 'default', model: ModelName.GROK_CODE },
-			{ mode: 'reasoning', model: ModelName.GROK_4_1_FAST_REASONING },
-			{ mode: 'non-reasoning', model: ModelName.GROK_4_1_FAST_NON_REASONING },
-			{ mode: 'reasoning', model: ModelName.GROK_4_FAST_REASONING },
-			{ mode: 'non-reasoning', model: ModelName.GROK_4_FAST_NON_REASONING }
-		],
-		requiresApiKey: true
-	}
-} as const;
+export function resolveApiModelId(model: string, useVertex = false): string {
+	const api = API_MODEL_IDS[model];
+	if (!api) return model;
+	return useVertex ? (api.vertex ?? api.standard) : api.standard;
+}
 
 /**
  * Provider keys as a type-safe array

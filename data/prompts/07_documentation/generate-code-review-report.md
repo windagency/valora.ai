@@ -13,7 +13,7 @@ model_requirements:
   min_context: 128000
   recommended:
     - claude-sonnet-4.6
-    - claude-sonnet-4.5
+    - claude-sonnet-5
 agents:
   - lead
 dependencies:
@@ -161,7 +161,6 @@ For **LOW** severity issues (optional improvements):
 ```markdown
 ## Low Priority Issues (Optional Improvements)
 
-- **[File:line]**: [Brief description and suggestion]
 - **[File:line]**: [Brief description and suggestion]
 ```
 

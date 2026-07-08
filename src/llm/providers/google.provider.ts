@@ -9,16 +9,16 @@
  * Self-registers with the LLM Provider Registry using dependency inversion pattern
  */
 
-import type { ProviderDescriptor } from 'plugins/plugin-api.types';
-
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
 import type { LLMCompletionOptions, LLMCompletionResult, LLMUsage } from 'types/llm.types';
 
-import { BuiltinProviders, getProviderModels, ModelName } from 'config/providers.config';
+import { BuiltinProviders, getProviderModels } from 'config/providers.config';
 import { BaseLLMProvider } from 'llm/provider.interface';
 import { getProviderRegistry } from 'llm/registry';
 import { ProviderError } from 'utils/error-handler';
+
+import { GOOGLE_DESCRIPTOR } from './google.models';
 
 export class GoogleProvider extends BaseLLMProvider {
 	name = BuiltinProviders.GOOGLE;
@@ -259,19 +259,4 @@ export class GoogleProvider extends BaseLLMProvider {
 }
 
 // Self-register this provider with the registry when module is loaded
-getProviderRegistry().registerProvider(BuiltinProviders.GOOGLE, GoogleProvider, { owner: 'core' }, {
-	defaultModel: ModelName.GEMINI_2_5_PRO,
-	description: 'Gemini models from Google',
-	label: 'Google',
-	modelModes: [
-		{ mode: 'default', model: ModelName.GEMINI_3_PRO },
-		{ mode: 'deep-think', model: ModelName.GEMINI_3_PRO },
-		{ mode: 'default', model: ModelName.GEMINI_2_5_PRO },
-		{ mode: 'default', model: ModelName.GEMINI_2_5_FLASH },
-		{ mode: 'default', model: ModelName.GEMINI_2_5_FLASH_LITE },
-		{ mode: 'default', model: ModelName.GEMMA_3N },
-		{ mode: 'default', model: ModelName.GEMMA_3 },
-		{ mode: 'default', model: ModelName.GEMMA_2 }
-	],
-	requiresApiKey: true
-} satisfies ProviderDescriptor);
+getProviderRegistry().registerProvider(BuiltinProviders.GOOGLE, GoogleProvider, { owner: 'core' }, GOOGLE_DESCRIPTOR);

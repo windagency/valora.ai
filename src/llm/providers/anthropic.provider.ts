@@ -11,7 +11,6 @@
 
 import type { BatchableProvider } from 'batch/batch-provider.interface';
 import type { BatchRequest, BatchResult, BatchStatusInfo, BatchSubmission } from 'batch/batch.types';
-import type { ProviderDescriptor } from 'plugins/plugin-api.types';
 
 import Anthropic from '@anthropic-ai/sdk';
 import { AnthropicVertex } from '@anthropic-ai/vertex-sdk';
@@ -28,13 +27,14 @@ import { Agent as UndiciAgent, fetch as undiciFetch } from 'undici';
 import type { LLMCompletionOptions, LLMCompletionResult, LLMMessage, LLMUsage } from 'types/llm.types';
 
 import { DEFAULT_MAX_TOKENS } from 'config/constants';
-import { BuiltinProviders, getProviderModels, ModelName } from 'config/providers.config';
-import { getModelMappingRegistry, type ModelMappingRegistry } from 'llm/model-mapping-registry';
+import { BuiltinProviders, getProviderModels, resolveApiModelId } from 'config/providers.config';
 import { BaseLLMProvider } from 'llm/provider.interface';
 import { getProviderRegistry } from 'llm/registry';
 import { createErrorContext, ProviderError, withCircuitBreaker, withRetry } from 'utils/error-handler';
 import { checkRateLimit, getRateLimitStatus } from 'utils/rate-limiter';
 import { estimateTokensFromText } from 'utils/token-estimator';
+
+import { ANTHROPIC_DESCRIPTOR } from './anthropic.models';
 
 /** Minimum estimated tokens for a content block to be worth caching */
 const MIN_CACHEABLE_TOKENS = 1024;
@@ -42,15 +42,9 @@ const MIN_CACHEABLE_TOKENS = 1024;
 export class AnthropicProvider extends BaseLLMProvider implements BatchableProvider {
 	name = BuiltinProviders.ANTHROPIC;
 	private client: Anthropic | AnthropicVertex | null = null;
-	private readonly modelMappingRegistry: ModelMappingRegistry;
 
 	// Threshold above which streaming is required by Anthropic API
 	private static readonly STREAMING_THRESHOLD = 16000;
-
-	constructor(config: Record<string, unknown> = {}) {
-		super(config);
-		this.modelMappingRegistry = getModelMappingRegistry();
-	}
 
 	async complete(options: LLMCompletionOptions): Promise<LLMCompletionResult> {
 		const context = createErrorContext('anthropic-provider', 'complete', {
@@ -112,7 +106,7 @@ export class AnthropicProvider extends BaseLLMProvider implements BatchableProvi
 			const { messages, system } = this.formatMessages(options.messages);
 
 			// Resolve model name based on model + mode combination
-			const resolvedModel = this.resolveModelName(options.model, options.mode);
+			const resolvedModel = this.resolveModelName(options.model);
 
 			// Format tools for Anthropic API
 			const formattedTools = options.tools?.map((tool) => ({
@@ -255,7 +249,7 @@ export class AnthropicProvider extends BaseLLMProvider implements BatchableProvi
 		system: string | undefined
 	): Anthropic.MessageCreateParamsStreaming {
 		// Resolve model name for Vertex AI compatibility
-		const resolvedModel = this.resolveModelName(options.model, options.mode);
+		const resolvedModel = this.resolveModelName(options.model);
 
 		const params: Anthropic.MessageCreateParamsStreaming = {
 			max_tokens: options.max_tokens ?? DEFAULT_MAX_TOKENS,
@@ -696,12 +690,13 @@ export class AnthropicProvider extends BaseLLMProvider implements BatchableProvi
 		}
 	}
 
-	private resolveModelName(model?: string, mode?: string): string {
-		model ??= this.getDefaultModel() ?? 'claude-sonnet-4.6';
-		const useVertex = this.config['vertexAI'] as boolean;
+	private resolveModelName(model?: string): string {
+		const alias = model ?? this.getDefaultModel() ?? 'claude-sonnet-4.6';
+		const useVertex = Boolean(this.config['vertexAI']);
 
-		// Use the model mapping registry for resolution
-		return this.modelMappingRegistry.resolveWithMode(model, mode, useVertex);
+		// Resolve the registry alias to the vendor's real API id (standard or Vertex),
+		// sourced from the Anthropic descriptor's apiModelIds (the single source of truth).
+		return resolveApiModelId(alias, useVertex);
 	}
 
 	// ─── BatchableProvider implementation ────────────────────────────────────
@@ -738,7 +733,7 @@ export class AnthropicProvider extends BaseLLMProvider implements BatchableProvi
 
 		const formatted = requests.map((req) => {
 			const { messages, system } = this.formatMessages(req.options.messages);
-			const resolvedModel = this.resolveModelName(req.options.model, req.options.mode);
+			const resolvedModel = this.resolveModelName(req.options.model);
 			const formattedTools = req.options.tools?.map((tool) => ({
 				description: tool.description,
 				input_schema: tool.parameters as Anthropic.Tool.InputSchema,
@@ -768,25 +763,9 @@ export class AnthropicProvider extends BaseLLMProvider implements BatchableProvi
 }
 
 // Self-register this provider with the registry when module is loaded
-getProviderRegistry().registerProvider(BuiltinProviders.ANTHROPIC, AnthropicProvider, { owner: 'core' }, {
-	defaultModel: ModelName.CLAUDE_OPUS_4_6,
-	description: 'Claude models from Anthropic',
-	label: 'Anthropic',
-	modelModes: [
-		{ mode: 'normal', model: ModelName.CLAUDE_OPUS_4_6 },
-		{ mode: 'extended thinking', model: ModelName.CLAUDE_OPUS_4_6 },
-		{ mode: 'normal', model: ModelName.CLAUDE_SONNET_4_6 },
-		{ mode: 'extended thinking', model: ModelName.CLAUDE_SONNET_4_6 },
-		{ mode: 'normal', model: ModelName.CLAUDE_OPUS_4_5 },
-		{ mode: 'extended thinking', model: ModelName.CLAUDE_OPUS_4_5 },
-		{ mode: 'normal', model: ModelName.CLAUDE_OPUS_4 },
-		{ mode: 'extended thinking', model: ModelName.CLAUDE_OPUS_4 },
-		{ mode: 'normal', model: ModelName.CLAUDE_SONNET_4_5 },
-		{ mode: 'extended thinking', model: ModelName.CLAUDE_SONNET_4_5 },
-		{ mode: 'normal', model: ModelName.CLAUDE_SONNET_4 },
-		{ mode: 'extended thinking', model: ModelName.CLAUDE_SONNET_4 },
-		{ mode: 'normal', model: ModelName.CLAUDE_HAIKU_4_5 },
-		{ mode: 'normal', model: ModelName.CLAUDE_HAIKU_3_5 }
-	],
-	requiresApiKey: true
-} satisfies ProviderDescriptor);
+getProviderRegistry().registerProvider(
+	BuiltinProviders.ANTHROPIC,
+	AnthropicProvider,
+	{ owner: 'core' },
+	ANTHROPIC_DESCRIPTOR
+);

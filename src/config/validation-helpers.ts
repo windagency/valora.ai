@@ -28,11 +28,29 @@ export const DEFAULT_MODELS: Record<string, string> = Object.fromEntries(
 );
 
 /**
+ * Order provider keys for display: alphabetical by label (case-insensitive),
+ * with the built-in `local` provider always pinned last. Plugin-contributed
+ * providers are sorted alongside the built-ins.
+ */
+export function sortProviderKeysForDisplay(keys: string[], labelOf: (key: string) => string): string[] {
+	return [...keys].sort((a, b) => {
+		if (a === BuiltinProviders.LOCAL && b === BuiltinProviders.LOCAL) return 0;
+		if (a === BuiltinProviders.LOCAL) return 1;
+		if (b === BuiltinProviders.LOCAL) return -1;
+		return labelOf(a).toLowerCase().localeCompare(labelOf(b).toLowerCase());
+	});
+}
+
+/**
  * Available provider choices for setup wizard (queries the catalog at call time).
+ * Providers are listed alphabetically by label, with Local always last.
  */
 export function getProviderChoices(): Array<{ checked?: boolean; name: string; value: string }> {
 	const catalog = getProviderCatalog();
-	const keys = catalog.getAllProviderKeys();
+	const keys = sortProviderKeysForDisplay(
+		catalog.getAllProviderKeys(),
+		(key) => catalog.getProviderMetadata(key)?.label ?? key
+	);
 	const choices: Array<{ checked?: boolean; name: string; value: string }> = keys.map((key, index) => {
 		const metadata = catalog.getProviderMetadata(key);
 		if (!metadata) {
@@ -51,66 +69,22 @@ export function getProviderChoices(): Array<{ checked?: boolean; name: string; v
 
 /**
  * Quick setup provider choices (queries the catalog at call time).
- * No-API-key providers appear first, followed by the three core API-key providers.
+ * Providers are listed alphabetically by label, with Local always last.
+ * No-API-key providers are annotated so users can spot the zero-config options.
  */
 export function getQuickSetupChoices(): Array<{ name: string; value: string }> {
 	const catalog = getProviderCatalog();
-	const noKeyDescriptors = catalog.getProvidersWithoutApiKey();
-	const noKeyChoices = noKeyDescriptors.map((desc) => ({
-		name: `${desc.label} (No API key needed)`,
-		value:
-			// Resolve the key from the catalog by matching the descriptor
-			Array.from(catalog.descriptors()).find(([, d]) => d === desc)?.[0] ?? desc.label.toLowerCase()
-	}));
-	return [
-		...noKeyChoices,
-		{ name: 'Anthropic (Claude) - Recommended', value: BuiltinProviders.ANTHROPIC },
-		{ name: 'OpenAI (GPT)', value: BuiltinProviders.OPENAI },
-		{ name: 'Google (Gemini)', value: BuiltinProviders.GOOGLE }
-	];
+	const keys = sortProviderKeysForDisplay(
+		catalog.getAllProviderKeys(),
+		(key) => catalog.getProviderMetadata(key)?.label ?? key
+	);
+	return keys.map((key) => {
+		const metadata = catalog.getProviderMetadata(key);
+		const label = metadata?.label ?? key;
+		const suffix = metadata && !metadata.requiresApiKey ? ' (No API key needed)' : '';
+		return { name: `${label}${suffix}`, value: key };
+	});
 }
-
-/**
- * @deprecated Use getProviderChoices() instead.
- * Kept for backward compatibility until all callers are updated.
- */
-export const PROVIDER_CHOICES = [
-	...getAllProviderKeys().map((key, index) => {
-		const metadata = PROVIDER_REGISTRY[key];
-		if (!metadata) {
-			throw new Error(`Provider metadata not found for key: ${key}`);
-		}
-		const displayName = metadata.description ? `${metadata.label} (${metadata.description})` : metadata.label;
-		return {
-			checked: index === 0,
-			name: displayName,
-			value: key
-		};
-	}),
-	{ name: getColorAdapter().gray('Skip - No provider configuration'), value: '__skip__' }
-];
-
-/**
- * @deprecated Use getQuickSetupChoices() instead.
- * Kept for backward compatibility until all callers are updated.
- */
-export const QUICK_SETUP_CHOICES = [
-	...getAllProviderKeys()
-		.filter((key) => !PROVIDER_REGISTRY[key]?.requiresApiKey)
-		.map((key) => {
-			const metadata = PROVIDER_REGISTRY[key];
-			if (!metadata) {
-				throw new Error(`Provider metadata not found for key: ${key}`);
-			}
-			return {
-				name: `${metadata.label} (No API key needed)`,
-				value: key
-			};
-		}),
-	{ name: 'Anthropic (Claude) - Recommended', value: BuiltinProviders.ANTHROPIC },
-	{ name: 'OpenAI (GPT)', value: BuiltinProviders.OPENAI },
-	{ name: 'Google (Gemini)', value: BuiltinProviders.GOOGLE }
-];
 
 /**
  * Configure the local provider — prompts for base URL and default model

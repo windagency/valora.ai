@@ -15,8 +15,6 @@ export {
 	filterValidProviders,
 	getProviderChoices,
 	getQuickSetupChoices,
-	PROVIDER_CHOICES,
 	PROVIDER_LABELS,
-	QUICK_SETUP_CHOICES,
 	validateApiKey
 } from './validation-helpers';

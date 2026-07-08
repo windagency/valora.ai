@@ -186,7 +186,6 @@ Generate a human-readable summary of changes:
 ## Assumptions Validated
 
 - ✅ [Assumption confirmed by user answer]
-- ✅ [Assumption confirmed by user answer]
 
 ---
 

@@ -12,7 +12,7 @@ allowed-tools:
   - run_terminal_cmd
   - query_session
   - mcp_github
-model: gpt-5-thinking-high
+model: gpt-5.5
 agent: product-manager
 stash_protection: true
 prompts:

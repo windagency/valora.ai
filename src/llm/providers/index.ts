@@ -20,7 +20,9 @@ import './anthropic.provider';
 import './cursor.provider';
 import './google.provider';
 import './local.provider';
+import './moonshot.provider';
 import './openai.provider';
+import './xai.provider';
 
 // Re-export provider classes for testing and special use cases
 // (Most code should use the registry, not import providers directly)
@@ -28,4 +30,6 @@ export { AnthropicProvider } from './anthropic.provider';
 export { CursorProvider } from './cursor.provider';
 export { GoogleProvider } from './google.provider';
 export { LocalProvider } from './local.provider';
+export { MoonshotProvider } from './moonshot.provider';
 export { OpenAIProvider } from './openai.provider';
+export { XAIProvider } from './xai.provider';

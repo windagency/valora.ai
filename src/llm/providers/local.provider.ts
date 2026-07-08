@@ -8,8 +8,6 @@
  * Self-registers with the LLM Provider Registry using dependency inversion pattern
  */
 
-import type { ProviderDescriptor } from 'plugins/plugin-api.types';
-
 import OpenAI from 'openai';
 
 import type { LLMCompletionOptions, LLMCompletionResult, LLMUsage } from 'types/llm.types';
@@ -19,6 +17,8 @@ import { BaseLLMProvider } from 'llm/provider.interface';
 import { getProviderRegistry } from 'llm/registry';
 import { getLogger } from 'output/logger';
 import { createErrorContext, ProviderError, withRetry } from 'utils/error-handler';
+
+import { LOCAL_DESCRIPTOR } from './local.models';
 
 const DEFAULT_LOCAL_BASE_URL = 'http://localhost:8080/v1';
 
@@ -241,11 +241,4 @@ export class LocalProvider extends BaseLLMProvider {
 }
 
 // Self-register this provider with the registry when module is loaded
-getProviderRegistry().registerProvider(BuiltinProviders.LOCAL, LocalProvider, { owner: 'core' }, {
-	defaultModel: 'llama3.1',
-	description: 'Local OpenAI-compatible model server',
-	helpText: 'Connect to a local OpenAI-compatible server.',
-	label: 'Local',
-	modelModes: [{ mode: 'default', model: 'llama3.1' }],
-	requiresApiKey: false
-} satisfies ProviderDescriptor);
+getProviderRegistry().registerProvider(BuiltinProviders.LOCAL, LocalProvider, { owner: 'core' }, LOCAL_DESCRIPTOR);

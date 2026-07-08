@@ -13,7 +13,7 @@ model_requirements:
   min_context: 128000
   recommended:
     - claude-sonnet-4.6
-    - claude-sonnet-4.5
+    - claude-sonnet-5
 agents:
 dependencies:
   requires:
@@ -123,7 +123,6 @@ Synthesize all collected data, metrics, and recommendations into a comprehensive
 ### Error Rate: <percentage>% (<count> errors, <resolved> resolved)
 
 - <Error type>: <count>
-- <Error type>: <count>
 
 ---
 
@@ -148,16 +147,13 @@ Synthesize all collected data, metrics, and recommendations into a comprehensive
 **What Went Well:**
 
 - <highlight>
-- <highlight>
 
 **Pain Points:**
 
 - <pain point>
-- <pain point>
 
 **Improvement Suggestions:**
 
-- <suggestion>
 - <suggestion>
 
 ---
@@ -175,11 +171,9 @@ Synthesize all collected data, metrics, and recommendations into a comprehensive
 ### Agent Refinements
 
 - **@<agent-name>:** <specific recommendation>
-- **@<agent-name>:** <specific recommendation>
 
 ### Prompt Refinements
 
-- **<prompt-name>:** <specific refinement>
 - **<prompt-name>:** <specific refinement>
 
 ---

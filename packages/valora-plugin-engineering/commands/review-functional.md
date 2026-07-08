@@ -16,7 +16,7 @@ allowed-tools:
   - mcp_figma
   # MCP: Component documentation verification
   - mcp_storybook
-model: claude-opus-4.6
+model: claude-opus-4.8
 agent: lead
 prompts:
   pipeline:

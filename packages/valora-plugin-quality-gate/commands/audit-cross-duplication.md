@@ -6,7 +6,7 @@ argument-hint: '[<path>] [--depth=<N>] [--threshold=<N>] [--concerns=<csv>] [--e
 allowed-tools:
   - run_terminal_cmd
   - read_file
-model: claude-opus-4.6
+model: claude-opus-4.8
 agent: lead
 prompts:
   pipeline:

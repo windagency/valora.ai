@@ -11,7 +11,7 @@ allowed-tools:
   - glob_file_search
   - run_terminal_cmd # Required for modern CLI tools (jq, yq, rg, fd)
   - query_session
-model: gpt-5-thinking-high
+model: gpt-5.5
 agent: lead
 prompts:
   pipeline:

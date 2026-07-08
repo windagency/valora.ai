@@ -4,6 +4,7 @@ import type { CompressionStrategy } from 'executor/output-compression.service';
 import type { Logger } from 'output/logger';
 import type { LLMProvider } from 'types/llm.types';
 import type { MemoryProvider, MemoryProviderDescriptor } from 'types/memory.types';
+import type { ApiModelId, ModelPricing } from 'types/model.types';
 
 export type { CompressionStrategy };
 
@@ -50,8 +51,16 @@ export type PluginProviderClass = new (config: Record<string, unknown>) => LLMPr
 export type PluginProviderFactory = (config: Record<string, unknown>) => LLMProvider;
 
 export interface ProviderDescriptor {
+	/**
+	 * Real API model ids per registry alias (standard + optional Vertex form).
+	 * Only needed when the registry alias differs from the vendor's API id
+	 * (e.g. Anthropic `claude-opus-4.8` → `claude-opus-4-8`). Omit for providers
+	 * whose alias already equals the API id.
+	 */
+	apiModelIds?: Record<string, ApiModelId>;
 	configSchema?: ZodTypeAny;
 	configureInteractive?: (ctx: ProviderWizardContext) => Promise<Record<string, unknown>>;
+	/** Context window (tokens) per model alias. */
 	contextWindows?: Record<string, number>;
 	defaultModel: string;
 	description?: string;
@@ -60,6 +69,8 @@ export interface ProviderDescriptor {
 	label: string;
 	modelModes: Array<{ mode: string; model: string }>;
 	modelPrefix?: string;
+	/** Per-model pricing (USD per million tokens). */
+	pricing?: Record<string, ModelPricing>;
 	requiresApiKey: boolean;
 }
 

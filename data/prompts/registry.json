@@ -1,61 +1,43 @@
 {
 	"prompts": {
-		"00_generator.create_agent": {
-			"id": "00_generator.create_agent",
-			"version": " 1.0.0",
-			"category": " generator",
-			"experimental": false,
-			"name": " Agent Definition Generator Prompt",
-			"description": " Define a Specialized AI Agent",
-			"tags": ["generator", "agent"],
-			"model_requirements": {
-				"min_context": 8192,
-				"recommended": ["GPT-4.1", "GPT-4.1-turbo", "GPT-5 mini", "Claude 3", "Mistral 7B-Instruct", "GPT-3.5"],
-				"forbidden": ["GPT-3.5"]
-			},
-			"inputs": []
-		},
-		"00_generator.create_command": {
-			"id": "00_generator.create_command",
-			"version": "",
-			"category": "",
-			"experimental": false,
-			"name": " Command Definition Generator Prompt",
-			"description": " Define a Specialized AI Command",
-			"tags": ["generator", "command"],
-			"model_requirements": {
-				"min_context": 8192,
-				"recommended": ["GPT-4.1", "GPT-4.1-turbo", "GPT-5 mini", "Claude 3", "Mistral 7B-Instruct", "GPT-3.5"],
-				"forbidden": ["GPT-3.5"]
-			},
-			"inputs": []
-		},
 		"01_onboard.analyze-clarity": {
 			"id": "01_onboard.analyze-clarity",
-			"version": " 1.0.0",
-			"category": " onboard",
-			"experimental": false,
-			"name": " Analyze Task Clarity",
-			"description": " Assess task clarity and identify ambiguities requiring refinement",
+			"version": "1.0.0",
+			"category": "onboard",
+			"experimental": true,
+			"name": "Analyze Task Clarity",
+			"description": "Assess task clarity and identify ambiguities requiring refinement",
 			"tags": ["clarity-assessment", "ambiguity-detection", "requirement-analysis"],
-			"agents": ["product-manager"],
 			"outputs": ["clarity_gaps", "ambiguities", "clarity_score"],
 			"model_requirements": {
 				"min_context": 128000,
 				"recommended": ["claude-haiku-4.5"]
 			},
 			"dependencies": {
-				"requires": ["context.load-task"]
+				"requires": ["context.use-modern-cli-tools", "context.load-task"]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "task",
+					"description": "Task details from context.load-task",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "criteria",
+					"description": "Current acceptance criteria",
+					"type": "array",
+					"required": false
+				}
+			]
 		},
 		"01_onboard.analyze-documentation-requirements": {
 			"id": "01_onboard.analyze-documentation-requirements",
-			"version": " 1.0.0",
-			"category": " onboard",
-			"experimental": false,
-			"name": " Analyse Documentation Requirements",
-			"description": " Plan documentation structure, identify diagram requirements, and establish cross-references",
+			"version": "1.0.0",
+			"category": "onboard",
+			"experimental": true,
+			"name": "Analyse Documentation Requirements",
+			"description": "Plan documentation structure, identify diagram requirements, and establish cross-references",
 			"tags": ["documentation", "planning", "analysis"],
 			"agents": ["lead"],
 			"outputs": ["documentation_plan", "diagram_requirements", "cross_references", "domain_assignments"],
@@ -64,36 +46,101 @@
 				"recommended": ["claude-haiku-4.5"]
 			},
 			"dependencies": {
-				"requires": ["context.load-documentation-context"]
+				"requires": ["context.use-modern-cli-tools", "context.load-documentation-context"]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "prd",
+					"description": "Parsed PRD document from context stage",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "functional",
+					"description": "Parsed FUNCTIONAL document from context stage",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "backlog",
+					"description": "Parsed BACKLOG document from context stage",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "codebase",
+					"description": "Codebase context from context stage",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "metadata",
+					"description": "Project metadata from context stage",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "domain_filter",
+					"description": "Domain filter from --domain argument",
+					"type": "string",
+					"required": false
+				},
+				{
+					"name": "doc_type_filter",
+					"description": "Document type filter from --doc-type argument",
+					"type": "string",
+					"required": false
+				}
+			]
 		},
 		"01_onboard.analyze-patterns": {
 			"id": "01_onboard.analyze-patterns",
-			"version": " 1.0.0",
-			"category": " onboard",
-			"experimental": false,
-			"name": " Analyze Patterns",
-			"description": " Identify architectural patterns, design patterns, and coding conventions",
+			"version": "1.0.0",
+			"category": "onboard",
+			"experimental": true,
+			"name": "Analyze Patterns",
+			"description": "Identify architectural patterns, design patterns, and coding conventions",
 			"tags": ["architecture", "design-patterns", "conventions"],
 			"agents": ["lead"],
 			"outputs": ["coding_patterns", "architectural_style", "conventions"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5", "gpt-5-thinking-high"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-5", "gpt-5.5"]
 			},
 			"dependencies": {
-				"requires": ["context.scan-codebase"]
+				"requires": ["context.use-modern-cli-tools", "context.scan-codebase"]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "structure",
+					"description": "Codebase structure from scan-codebase",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "tech_stack",
+					"description": "Tech stack information from scan-codebase",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "domain",
+					"description": "Domain filter for focused analysis",
+					"type": "string",
+					"required": false,
+					"validation": {
+						"enum": ["backend", "frontend", "infrastructure", "data", "all"]
+					}
+				}
+			]
 		},
 		"01_onboard.analyze-requirements": {
 			"id": "01_onboard.analyze-requirements",
-			"version": " 2.0.0",
-			"category": " onboard",
-			"experimental": false,
-			"name": " Analyze Requirements",
-			"description": " Generic requirements analysis for PRD generation or backlog decomposition",
+			"version": "2.0.0",
+			"category": "onboard",
+			"experimental": true,
+			"name": "Analyze Requirements",
+			"description": "Generic requirements analysis for PRD generation or backlog decomposition",
 			"tags": ["requirements-analysis", "user-stories", "complexity-estimation"],
 			"agents": ["product-manager"],
 			"outputs": [
@@ -106,94 +153,226 @@
 			],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["gpt-5-thinking-high", "gpt-o1-high"]
+				"recommended": ["gpt-5.5"]
 			},
-			"dependencies": {},
-			"inputs": []
+			"dependencies": {
+				"requires": ["context.use-modern-cli-tools"]
+			},
+			"inputs": [
+				{
+					"name": "source_document",
+					"description": "Source document to analyze (specifications or PRD)",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "source_type",
+					"description": "Type of source being analyzed",
+					"type": "string",
+					"required": true,
+					"validation": {
+						"enum": ["specifications", "prd"]
+					}
+				},
+				{
+					"name": "project_type",
+					"description": "Project type (greenfield, brownfield, etc.)",
+					"type": "string",
+					"required": false
+				},
+				{
+					"name": "granularity",
+					"description": "Analysis granularity (for backlog context)",
+					"type": "string",
+					"required": false,
+					"validation": {
+						"enum": ["fine", "medium", "coarse"]
+					}
+				}
+			]
 		},
 		"01_onboard.collect-clarifications": {
 			"id": "01_onboard.collect-clarifications",
-			"version": " 1.0.0",
-			"category": " onboard",
-			"experimental": false,
-			"name": " Collect User Clarifications",
-			"description": " Present clarifying questions to the user and collect answers for specification refinement",
+			"version": "1.0.0",
+			"category": "onboard",
+			"experimental": true,
+			"name": "Collect User Clarifications",
+			"description": "Present clarifying questions to the user and collect answers for specification refinement",
 			"tags": ["interactive", "user-input", "clarification", "specification-refinement"],
-			"agents": ["product-manager"],
 			"outputs": ["answers", "summary", "questions_answered", "questions_skipped"],
 			"model_requirements": {
 				"min_context": 32000,
-				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5", "claude-haiku-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-5", "claude-haiku-4.5"]
 			},
 			"dependencies": {
-				"requires": ["onboard.refine-specifications"]
+				"requires": ["context.use-modern-cli-tools", "onboard.refine-specifications"]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "clarifying_questions",
+					"description": "Array of questions from onboard.refine-specifications",
+					"type": "array",
+					"required": true
+				},
+				{
+					"name": "refined_specifications",
+					"description": "Current specification document",
+					"type": "string",
+					"required": true
+				},
+				{
+					"name": "clarity_score",
+					"description": "Current clarity score (0-1)",
+					"type": "number",
+					"required": true
+				},
+				{
+					"name": "collected_user_answers",
+					"description": "Pre-collected user answers from the CLI interactive handler (Record<questionId, answer>)",
+					"type": "object",
+					"required": false
+				},
+				{
+					"name": "collected_summary",
+					"description": "Pre-generated summary of user answers",
+					"type": "string",
+					"required": false
+				}
+			]
 		},
 		"01_onboard.fetch-task": {
 			"id": "01_onboard.fetch-task",
-			"version": " 1.0.0",
-			"category": " onboard",
-			"experimental": false,
-			"name": " Fetch Task",
-			"description": " Select a task from backlog - either user-specified or auto-selected based on readiness scoring",
+			"version": "1.0.0",
+			"category": "onboard",
+			"experimental": true,
+			"name": "Fetch Task",
+			"description": "Select a task from backlog - either user-specified or auto-selected based on readiness scoring",
 			"tags": ["task-selection", "prioritization", "readiness-scoring"],
-			"agents": ["product-manager"],
 			"outputs": ["fetched_task", "task_metadata", "blocking_dependencies", "selection_rationale"],
 			"model_requirements": {
 				"min_context": 128000,
 				"recommended": ["claude-haiku-4.5"]
 			},
 			"dependencies": {
-				"requires": ["context.load-backlog"]
+				"requires": ["context.use-modern-cli-tools", "context.load-backlog"]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "backlog",
+					"description": "Loaded backlog document from context.load-backlog",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "available_tasks",
+					"description": "List of available tasks from context.load-backlog",
+					"type": "array",
+					"required": true
+				},
+				{
+					"name": "task_id",
+					"description": "Optional task ID for fetch mode",
+					"type": "string",
+					"required": false
+				},
+				{
+					"name": "priority_filter",
+					"description": "Optional priority filter (P0, P1, P2)",
+					"type": "string",
+					"required": false,
+					"validation": {
+						"enum": ["P0", "P1", "P2"]
+					}
+				},
+				{
+					"name": "domain_filter",
+					"description": "Optional domain filter",
+					"type": "string",
+					"required": false,
+					"validation": {
+						"enum": ["Frontend", "Backend", "Data", "Infrastructure", "Testing", "Documentation"]
+					}
+				}
+			]
 		},
 		"01_onboard.map-dependencies": {
 			"id": "01_onboard.map-dependencies",
-			"version": " 1.0.0",
-			"category": " onboard",
-			"experimental": false,
-			"name": " Map Dependencies",
-			"description": " Analyze internal and external dependencies and identify integration points",
+			"version": "1.0.0",
+			"category": "onboard",
+			"experimental": true,
+			"name": "Map Dependencies",
+			"description": "Analyze internal and external dependencies and identify integration points",
 			"tags": ["dependencies", "integrations", "third-party"],
 			"agents": ["lead"],
 			"outputs": ["internal_dependencies", "external_dependencies", "integration_points"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5", "gpt-5-thinking-high"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-5", "gpt-5.5"]
 			},
 			"dependencies": {
-				"requires": ["context.scan-codebase"]
+				"requires": ["context.use-modern-cli-tools", "context.scan-codebase"]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "structure",
+					"description": "Codebase structure from scan-codebase",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "tech_stack",
+					"description": "Tech stack from scan-codebase",
+					"type": "object",
+					"required": true
+				}
+			]
 		},
 		"01_onboard.refine-requirements": {
 			"id": "01_onboard.refine-requirements",
-			"version": " 1.0.0",
-			"category": " onboard",
-			"experimental": false,
-			"name": " Refine Requirements",
-			"description": " Clarify requirements through structured questioning or reasonable inference",
+			"version": "1.0.0",
+			"category": "onboard",
+			"experimental": true,
+			"name": "Refine Requirements",
+			"description": "Clarify requirements through structured questioning or reasonable inference",
 			"tags": ["requirement-clarification", "question-generation", "assumption-documentation"],
 			"agents": ["product-manager"],
 			"outputs": ["refined_requirements", "clarifying_questions", "assumptions_made"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-haiku-4.5", "claude-sonnet-4"]
+				"recommended": ["claude-haiku-4.5", "claude-sonnet-5"]
 			},
 			"dependencies": {
-				"requires": ["context.load-task", "onboard.analyze-clarity"]
+				"requires": ["context.use-modern-cli-tools", "context.load-task", "onboard.analyze-clarity"]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "task",
+					"description": "Task details from context.load-task",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "gaps",
+					"description": "Clarity gaps from onboard.analyze-clarity",
+					"type": "array",
+					"required": true
+				},
+				{
+					"name": "interactive",
+					"description": "Whether to ask questions interactively",
+					"type": "boolean",
+					"required": false,
+					"default": false
+				}
+			]
 		},
 		"01_onboard.refine-specifications": {
 			"id": "01_onboard.refine-specifications",
-			"version": " 1.0.0",
-			"category": " onboard",
-			"experimental": false,
-			"name": " Refine Specifications",
-			"description": " Transform initial understanding into comprehensive specifications through structured questioning and synthesis",
+			"version": "1.0.0",
+			"category": "onboard",
+			"experimental": true,
+			"name": "Refine Specifications",
+			"description": "Transform initial understanding into comprehensive specifications through structured questioning and synthesis",
 			"tags": ["requirements-refinement", "clarification", "specification-synthesis"],
 			"agents": ["product-manager"],
 			"outputs": [
@@ -205,77 +384,154 @@
 			],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["gpt-5-thinking-high", "gpt-o1-high"]
+				"recommended": ["gpt-5.5"]
 			},
 			"dependencies": {
-				"requires": ["context.understand-intent"]
+				"requires": ["context.use-modern-cli-tools", "context.understand-intent"]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "user_intent",
+					"description": "Output from context.understand-intent",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "initial_scope",
+					"description": "Initial scope boundaries from context phase",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "initial_concept",
+					"description": "Original user input",
+					"type": "string",
+					"required": true
+				},
+				{
+					"name": "domain",
+					"description": "Optional domain or industry context",
+					"type": "string",
+					"required": false
+				},
+				{
+					"name": "stakeholders",
+					"description": "List of key stakeholders",
+					"type": "string",
+					"required": false
+				}
+			]
 		},
 		"02_context.analyze-change-scope": {
 			"id": "02_context.analyze-change-scope",
-			"version": " 1.0.0",
-			"category": " context",
-			"experimental": false,
-			"name": " Analyze Change Scope",
-			"description": " Analyze changes to determine type, affected areas, and breaking changes",
+			"version": "1.0.0",
+			"category": "context",
+			"experimental": true,
+			"name": "Analyze Change Scope",
+			"description": "Analyze changes to determine type, affected areas, and breaking changes",
 			"tags": ["change-analysis", "semantic-analysis", "risk-assessment"],
 			"agents": ["lead", "software-engineer"],
 			"outputs": ["change_type", "affected_areas", "breaking_changes", "change_summary", "risk_level"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-5"]
 			},
 			"dependencies": {
-				"requires": ["context.analyze-git-status"]
+				"requires": ["context.use-modern-cli-tools", "context.analyze-git-status"]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "changed_files",
+					"description": "List of changed files from git status analysis",
+					"type": "array",
+					"required": true
+				}
+			]
 		},
 		"02_context.analyze-changes-for-review": {
 			"id": "02_context.analyze-changes-for-review",
-			"version": " 1.0.0",
-			"category": " context",
-			"experimental": false,
-			"name": " Analyze Changes for Review",
-			"description": " Identify changed files, scope, and focus areas for code quality review",
+			"version": "1.0.0",
+			"category": "context",
+			"experimental": true,
+			"name": "Analyze Changes for Review",
+			"description": "Identify changed files, scope, and focus areas for code quality review",
 			"tags": ["code-review", "change-analysis", "scope-detection"],
 			"agents": ["lead"],
 			"outputs": ["changed_files", "change_scope", "review_focus_areas", "risk_level"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-5"]
 			},
-			"dependencies": {},
-			"inputs": []
+			"dependencies": {
+				"requires": ["context.use-modern-cli-tools"]
+			},
+			"inputs": [
+				{
+					"name": "scope",
+					"description": "Review scope (file path, directory, or git diff)",
+					"type": "string",
+					"required": true
+				},
+				{
+					"name": "severity",
+					"description": "Minimum severity level to report",
+					"type": "string",
+					"required": false,
+					"validation": {
+						"enum": ["critical", "high", "medium", "low"]
+					}
+				},
+				{
+					"name": "focus",
+					"description": "Specific focus area for review",
+					"type": "string",
+					"required": false,
+					"validation": {
+						"enum": ["security", "performance", "maintainability", "all"]
+					}
+				}
+			]
 		},
 		"02_context.analyze-codebase-changes": {
 			"id": "02_context.analyze-codebase-changes",
-			"version": " 1.0.0",
-			"category": " context",
-			"experimental": false,
-			"name": " Analyze Codebase Changes",
-			"description": " Analyze the actual code changes to understand impact, test coverage, and complexity",
+			"version": "1.0.0",
+			"category": "context",
+			"experimental": true,
+			"name": "Analyze Codebase Changes",
+			"description": "Analyze the actual code changes to understand impact, test coverage, and complexity",
 			"tags": ["code-analysis", "impact-analysis", "test-coverage"],
 			"agents": ["lead"],
 			"outputs": ["impact_areas", "test_coverage_delta", "complexity_metrics", "dependencies_changed"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-5"]
 			},
 			"dependencies": {
-				"requires": ["context.analyze-commits-for-pr"]
+				"requires": ["context.use-modern-cli-tools", "context.analyze-commits-for-pr"]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "affected_files",
+					"description": "Files changed in this PR",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "change_types",
+					"description": "Types of changes (feat, fix, etc.)",
+					"type": "object",
+					"required": true
+				}
+			]
 		},
 		"02_context.analyze-command-execution": {
 			"id": "02_context.analyze-command-execution",
-			"version": " 1.0.0",
-			"category": " context",
-			"experimental": false,
-			"name": " Analyze Command Execution",
-			"description": " Extract detailed execution metadata from each command in the workflow chain",
+			"version": "1.0.0",
+			"category": "context",
+			"experimental": true,
+			"name": "Analyze Command Execution",
+			"description": "Extract detailed execution metadata from each command in the workflow chain",
 			"tags": ["workflow-analysis", "feedback", "execution-metrics"],
-			"agents": ["product-manager"],
 			"outputs": [
 				"agents_used",
 				"prompts_executed",
@@ -286,170 +542,269 @@
 			],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-5"]
 			},
 			"dependencies": {
-				"requires": ["context.identify-completed-workflow"]
+				"requires": ["context.identify-completed-workflow", "context.use-modern-cli-tools"]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "workflow_executed",
+					"description": "Workflow type from previous stage",
+					"type": "string",
+					"required": true
+				},
+				{
+					"name": "commands_chain",
+					"description": "Chain of commands from previous stage",
+					"type": "array",
+					"required": true
+				}
+			]
 		},
 		"02_context.analyze-commits-for-pr": {
 			"id": "02_context.analyze-commits-for-pr",
-			"version": " 1.0.0",
-			"category": " context",
-			"experimental": false,
-			"name": " Analyze Commits for PR",
-			"description": " Extract and analyze commit messages to understand changes for PR description",
+			"version": "1.0.0",
+			"category": "context",
+			"experimental": true,
+			"name": "Analyze Commits for PR",
+			"description": "Extract and analyze commit messages to understand changes for PR description",
 			"tags": ["commit-analysis", "conventional-commits", "pr-context"],
 			"agents": ["lead"],
 			"outputs": ["commit_messages", "change_summary", "affected_files", "change_types", "breaking_changes", "authors"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-5"]
 			},
 			"dependencies": {
-				"requires": ["context.analyze-git-branch"]
+				"requires": ["context.use-modern-cli-tools", "context.analyze-git-branch"]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "current_branch",
+					"description": "Current branch name",
+					"type": "string",
+					"required": true
+				},
+				{
+					"name": "base_branch",
+					"description": "Base branch for comparison",
+					"type": "string",
+					"required": true
+				},
+				{
+					"name": "commits_ahead",
+					"description": "Number of commits ahead",
+					"type": "number",
+					"required": true
+				}
+			]
 		},
 		"02_context.analyze-functional-scope": {
 			"id": "02_context.analyze-functional-scope",
-			"version": " 1.0.0",
-			"category": " context",
-			"experimental": false,
-			"name": " Analyze Functional Scope",
-			"description": " Identify feature scope, requirements, acceptance criteria, and user workflows for functional validation",
+			"version": "1.0.0",
+			"category": "context",
+			"experimental": true,
+			"name": "Analyze Functional Scope",
+			"description": "Identify feature scope, requirements, acceptance criteria, and user workflows for functional validation",
 			"tags": ["functional-review", "requirements-analysis", "scope-definition"],
 			"agents": ["lead"],
 			"outputs": ["feature_scope", "requirements_list", "acceptance_criteria", "user_workflows", "integration_points"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-5"]
 			},
 			"dependencies": {
-				"requires": ["context.load-prd", "context.load-task"],
+				"requires": ["context.use-modern-cli-tools"],
 				"optional": ["context.load-prd", "context.load-task"]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "scope",
+					"description": "The scope to review (file paths, feature name, or description)",
+					"type": "string",
+					"required": true
+				}
+			]
 		},
 		"02_context.analyze-git-branch": {
 			"id": "02_context.analyze-git-branch",
-			"version": " 1.0.0",
-			"category": " context",
-			"experimental": false,
-			"name": " Analyze Git Branch",
-			"description": " Analyze current Git branch state and determine base branch for PR",
+			"version": "1.0.0",
+			"category": "context",
+			"experimental": true,
+			"name": "Analyze Git Branch",
+			"description": "Analyze current Git branch state and determine base branch for PR",
 			"tags": ["git", "branch-analysis", "pr-context"],
 			"agents": ["lead", "software-engineer"],
 			"outputs": ["current_branch", "base_branch", "branch_name_convention", "commits_ahead", "commits_behind"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-5"]
 			},
-			"dependencies": {},
-			"inputs": []
+			"dependencies": {
+				"requires": ["context.use-modern-cli-tools"]
+			},
+			"inputs": [
+				{
+					"name": "base_branch_arg",
+					"description": "Optional user-specified base branch",
+					"type": "string",
+					"required": false
+				}
+			]
 		},
 		"02_context.analyze-git-status": {
 			"id": "02_context.analyze-git-status",
-			"version": " 1.0.0",
-			"category": " context",
-			"experimental": false,
-			"name": " Analyze Git Status",
-			"description": " Analyze current git repository status and identify all changes ready for commit",
+			"version": "1.0.0",
+			"category": "context",
+			"experimental": true,
+			"name": "Analyze Git Status",
+			"description": "Analyze current git repository status and identify all changes ready for commit",
 			"tags": ["git", "status-analysis", "change-detection"],
 			"agents": ["lead", "software-engineer"],
 			"outputs": ["changed_files", "staged_files", "untracked_files", "git_status_summary"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-5"]
 			},
-			"dependencies": {},
+			"dependencies": {
+				"requires": ["context.use-modern-cli-tools"]
+			},
 			"inputs": []
 		},
 		"02_context.analyze-task-context": {
 			"id": "02_context.analyze-task-context",
-			"version": " 1.0.0",
-			"category": " context",
-			"experimental": false,
-			"name": " Analyze Task Context",
-			"description": " Parse task requirements and identify affected components and scope",
+			"version": "1.0.0",
+			"category": "context",
+			"experimental": true,
+			"name": "Analyze Task Context",
+			"description": "Parse task requirements and identify affected components and scope",
 			"tags": ["task-analysis", "scope-definition", "component-mapping"],
 			"agents": ["lead"],
 			"outputs": ["task_scope", "affected_components", "relevant_files", "scope_boundaries"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5", "gpt-5-thinking-high"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-5", "gpt-5.5"]
 			},
 			"dependencies": {
-				"requires": ["context.scan-codebase", "context.understand-intent"],
+				"requires": ["context.scan-codebase", "context.use-modern-cli-tools"],
 				"optional": ["context.understand-intent"]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "task_description",
+					"description": "The task requirements and description",
+					"type": "string",
+					"required": true,
+					"validation": {
+						"min": 10
+					}
+				},
+				{
+					"name": "gathered_knowledge",
+					"description": "Optional gathered knowledge from knowledge base",
+					"type": "object",
+					"required": false
+				}
+			]
 		},
 		"02_context.check-dependencies": {
 			"id": "02_context.check-dependencies",
-			"version": " 1.0.0",
-			"category": " context",
-			"experimental": false,
-			"name": " Check Dependencies",
-			"description": " Validate task dependencies and identify blockers",
+			"version": "1.0.0",
+			"category": "context",
+			"experimental": true,
+			"name": "Check Dependencies",
+			"description": "Validate task dependencies and identify blockers",
 			"tags": ["dependency-validation", "blocker-detection", "task-readiness"],
-			"agents": ["product-manager"],
 			"outputs": ["dependency_status", "blockers_list", "satisfaction_score"],
 			"model_requirements": {
 				"min_context": 128000,
 				"recommended": ["claude-haiku-4.5"]
 			},
 			"dependencies": {
-				"requires": ["context.load-backlog", "onboard.fetch-task"]
+				"requires": ["context.use-modern-cli-tools", "context.load-backlog", "onboard.fetch-task"]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "task",
+					"description": "Selected task from onboard.fetch-task",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "completed",
+					"description": "List of completed tasks from context.load-backlog",
+					"type": "array",
+					"required": true
+				}
+			]
 		},
 		"02_context.extract-ticket-info": {
 			"id": "02_context.extract-ticket-info",
-			"version": " 1.0.0",
-			"category": " context",
-			"experimental": false,
-			"name": " Extract Ticket Info",
-			"description": " Extract ticket/issue information from branch name for commit linking",
+			"version": "1.0.0",
+			"category": "context",
+			"experimental": true,
+			"name": "Extract Ticket Info",
+			"description": "Extract ticket/issue information from branch name for commit linking",
 			"tags": ["ticket-extraction", "issue-linking", "branch-analysis"],
 			"agents": ["lead", "software-engineer"],
 			"outputs": ["ticket_number", "ticket_details"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-5"]
 			},
-			"dependencies": {},
-			"inputs": []
+			"dependencies": {
+				"requires": ["context.use-modern-cli-tools"]
+			},
+			"inputs": [
+				{
+					"name": "branch_name",
+					"description": "Current git branch name",
+					"type": "string",
+					"required": true
+				}
+			]
 		},
 		"02_context.extract-ticket-references": {
 			"id": "02_context.extract-ticket-references",
-			"version": " 1.0.0",
-			"category": " context",
-			"experimental": false,
-			"name": " Extract Ticket References",
-			"description": " Extract issue and ticket references from branch name and commit messages",
+			"version": "1.0.0",
+			"category": "context",
+			"experimental": true,
+			"name": "Extract Ticket References",
+			"description": "Extract issue and ticket references from branch name and commit messages",
 			"tags": ["issue-linking", "ticket-extraction", "pr-context"],
 			"agents": ["lead"],
 			"outputs": ["related_issues", "ticket_numbers", "issue_titles"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-5"]
 			},
 			"dependencies": {
-				"requires": ["context.analyze-git-branch"]
+				"requires": ["context.use-modern-cli-tools", "context.analyze-git-branch"]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "current_branch",
+					"description": "Current branch name",
+					"type": "string",
+					"required": true
+				},
+				{
+					"name": "commits_ahead",
+					"description": "Commit information from branch analysis",
+					"type": "array",
+					"required": true
+				}
+			]
 		},
 		"02_context.gather-git-metrics": {
 			"id": "02_context.gather-git-metrics",
-			"version": " 1.0.0",
-			"category": " context",
-			"experimental": false,
-			"name": " Gather Git Metrics",
-			"description": " Collect objective metrics from git, GitHub, and CI/CD for feedback analysis",
+			"version": "1.0.0",
+			"category": "context",
+			"experimental": true,
+			"name": "Gather Git Metrics",
+			"description": "Collect objective metrics from git, GitHub, and CI/CD for feedback analysis",
 			"tags": ["git-analysis", "metrics", "feedback", "ci-status"],
-			"agents": ["product-manager"],
 			"outputs": [
 				"commits_created",
 				"files_modified",
@@ -460,18 +815,27 @@
 			],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-5"]
 			},
-			"dependencies": {},
-			"inputs": []
+			"dependencies": {
+				"requires": ["context.use-modern-cli-tools"]
+			},
+			"inputs": [
+				{
+					"name": "pr_number",
+					"description": "Optional PR number for detailed metrics",
+					"type": "number",
+					"required": false
+				}
+			]
 		},
 		"02_context.gather-validation-context": {
 			"id": "02_context.gather-validation-context",
-			"version": " 1.0.0",
-			"category": " context",
-			"experimental": false,
-			"name": " Gather Validation Context",
-			"description": " Collect all necessary context for assertion validation including standards, requirements, and quality gates",
+			"version": "1.0.0",
+			"category": "context",
+			"experimental": true,
+			"name": "Gather Validation Context",
+			"description": "Collect all necessary context for assertion validation including standards, requirements, and quality gates",
 			"tags": ["context-gathering", "validation", "quality-assurance"],
 			"agents": ["asserter"],
 			"outputs": ["coding_standards", "architectural_guidelines", "quality_gates", "acceptance_criteria"],
@@ -479,33 +843,62 @@
 				"min_context": 128000,
 				"recommended": ["claude-haiku-4.5", "gpt-5-mini"]
 			},
-			"dependencies": {},
-			"inputs": []
+			"dependencies": {
+				"requires": ["context.use-modern-cli-tools"]
+			},
+			"inputs": [
+				{
+					"name": "implementation_details",
+					"description": "Recent changes, modified files, commit context",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "requirements",
+					"description": "User stories, acceptance criteria, technical specifications",
+					"type": "object",
+					"required": false
+				}
+			]
 		},
 		"02_context.identify-completed-workflow": {
 			"id": "02_context.identify-completed-workflow",
-			"version": " 1.0.0",
-			"category": " context",
-			"experimental": false,
-			"name": " Identify Completed Workflow",
-			"description": " Reconstruct workflow execution chain from command history, git commits, and PR metadata",
+			"version": "1.0.0",
+			"category": "context",
+			"experimental": true,
+			"name": "Identify Completed Workflow",
+			"description": "Reconstruct workflow execution chain from command history, git commits, and PR metadata",
 			"tags": ["workflow-analysis", "feedback", "execution-tracking"],
-			"agents": ["product-manager"],
 			"outputs": ["workflow_executed", "commands_chain", "start_time", "end_time", "execution_duration"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-5"]
 			},
-			"dependencies": {},
-			"inputs": []
+			"dependencies": {
+				"requires": ["context.use-modern-cli-tools"]
+			},
+			"inputs": [
+				{
+					"name": "command_name",
+					"description": "Optional command name to start from (e.g., create-pr, implement)",
+					"type": "string",
+					"required": false
+				},
+				{
+					"name": "pr_number",
+					"description": "Optional PR number to extract workflow from",
+					"type": "number",
+					"required": false
+				}
+			]
 		},
 		"02_context.load-and-analyze-parallel": {
 			"id": "02_context.load-and-analyze-parallel",
-			"version": " 1.0.0",
-			"category": " context",
-			"experimental": false,
-			"name": " Load and Analyze Context (Parallel)",
-			"description": " Merged context loading and analysis stage for parallel documentation generation - saves 15s per workflow",
+			"version": "1.0.0",
+			"category": "context",
+			"experimental": true,
+			"name": "Load and Analyze Context (Parallel)",
+			"description": "Merged context loading and analysis stage for parallel documentation generation - saves 15s per workflow",
 			"tags": ["documentation", "context-loading", "analysis", "parallel", "optimisation"],
 			"agents": ["lead"],
 			"outputs": [
@@ -522,52 +915,90 @@
 			],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-5"]
 			},
-			"dependencies": {},
-			"inputs": []
+			"dependencies": {
+				"requires": ["context.use-modern-cli-tools"]
+			},
+			"inputs": [
+				{
+					"name": "output_dir_arg",
+					"description": "Optional output directory from --output-dir argument",
+					"type": "string",
+					"required": false
+				},
+				{
+					"name": "cache_context",
+					"description": "Force use of cached context if available",
+					"type": "boolean",
+					"required": false
+				},
+				{
+					"name": "security_context_path",
+					"description": "Path to security requirements file",
+					"type": "string",
+					"required": false
+				}
+			]
 		},
 		"02_context.load-backlog": {
 			"id": "02_context.load-backlog",
-			"version": " 1.0.0",
-			"category": " context",
-			"experimental": false,
-			"name": " Load Backlog",
-			"description": " Load and parse project backlog for task retrieval and project state analysis",
+			"version": "1.0.0",
+			"category": "context",
+			"experimental": true,
+			"name": "Load Backlog",
+			"description": "Load and parse project backlog for task retrieval and project state analysis",
 			"tags": ["backlog", "task-management", "context-loading"],
-			"agents": ["product-manager"],
 			"outputs": ["backlog_document", "available_tasks", "completed_tasks", "project_state"],
 			"model_requirements": {
 				"min_context": 128000,
 				"recommended": ["claude-haiku-4.5"]
 			},
-			"dependencies": {},
-			"inputs": []
+			"dependencies": {
+				"requires": ["context.use-modern-cli-tools"]
+			},
+			"inputs": [
+				{
+					"name": "backlog_file_arg",
+					"description": "Optional path to backlog file from --backlog-file argument",
+					"type": "string",
+					"required": false
+				}
+			]
 		},
 		"02_context.load-commit-template": {
 			"id": "02_context.load-commit-template",
-			"version": " 1.0.0",
-			"category": " context",
-			"experimental": false,
-			"name": " Load Commit Template",
-			"description": " Load and parse project-specific commit template configuration",
+			"version": "1.0.0",
+			"category": "context",
+			"experimental": true,
+			"name": "Load Commit Template",
+			"description": "Load and parse project-specific commit template configuration",
 			"tags": ["commit-template", "configuration", "template-parsing"],
 			"agents": ["lead", "software-engineer"],
 			"outputs": ["template_config", "required_fields"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-5"]
 			},
-			"dependencies": {},
-			"inputs": []
+			"dependencies": {
+				"requires": ["context.use-modern-cli-tools"]
+			},
+			"inputs": [
+				{
+					"name": "template_name",
+					"description": "Template name specified by user (e.g., \"feature\", \"bugfix\")",
+					"type": "string",
+					"required": true
+				}
+			]
 		},
 		"02_context.load-documentation-context": {
 			"id": "02_context.load-documentation-context",
-			"version": " 1.0.0",
-			"category": " context",
-			"experimental": false,
-			"name": " Load Documentation Context",
-			"description": " Load PRD, FUNCTIONAL, BACKLOG, and codebase context for documentation generation",
+			"version": "1.0.0",
+			"category": "context",
+			"experimental": true,
+			"name": "Load Documentation Context",
+			"description": "Load PRD, FUNCTIONAL, BACKLOG, and codebase context for documentation generation",
 			"tags": ["documentation", "context-loading", "prerequisites"],
 			"agents": ["lead"],
 			"outputs": ["prd_document", "functional_document", "backlog_document", "codebase_context", "project_metadata"],
@@ -575,16 +1006,25 @@
 				"min_context": 128000,
 				"recommended": ["claude-haiku-4.5"]
 			},
-			"dependencies": {},
-			"inputs": []
+			"dependencies": {
+				"requires": ["context.use-modern-cli-tools"]
+			},
+			"inputs": [
+				{
+					"name": "output_dir_arg",
+					"description": "Optional output directory from --output-dir argument",
+					"type": "string",
+					"required": false
+				}
+			]
 		},
 		"02_context.load-implementation-context": {
 			"id": "02_context.load-implementation-context",
-			"version": " 1.0.0",
-			"category": " context",
-			"experimental": false,
-			"name": " Load Implementation Context",
-			"description": " Parse implementation plan and prepare context for execution",
+			"version": "1.0.0",
+			"category": "context",
+			"experimental": true,
+			"name": "Load Implementation Context",
+			"description": "Parse implementation plan and prepare context for execution",
 			"tags": ["implementation", "context-loading", "parsing"],
 			"agents": [
 				"software-engineer-typescript-backend",
@@ -602,217 +1042,504 @@
 			],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5", "gpt-5-thinking-high"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-5", "gpt-5.5"]
 			},
-			"dependencies": {},
-			"inputs": []
+			"dependencies": {
+				"requires": ["context.use-modern-cli-tools"]
+			},
+			"inputs": [
+				{
+					"name": "implementation_plan",
+					"description": "Path to implementation plan or plan content",
+					"type": "string",
+					"required": true
+				},
+				{
+					"name": "agent_type",
+					"description": "Type of engineer performing implementation",
+					"type": "string",
+					"required": false,
+					"validation": {
+						"enum": [
+							"software-engineer-typescript-backend",
+							"software-engineer-typescript-frontend",
+							"platform-engineer",
+							"secops-engineer"
+						]
+					}
+				},
+				{
+					"name": "mode",
+					"description": "Implementation mode",
+					"type": "string",
+					"required": false,
+					"default": "standard",
+					"validation": {
+						"enum": ["standard", "step-by-step"]
+					}
+				},
+				{
+					"name": "current_step",
+					"description": "Current step number for step-by-step mode",
+					"type": "number",
+					"required": false
+				}
+			]
 		},
 		"02_context.load-plan-context": {
 			"id": "02_context.load-plan-context",
-			"version": " 1.0.0",
-			"category": " context",
-			"experimental": false,
-			"name": " Load Plan Context",
-			"description": " Parse and understand implementation plan structure and content",
+			"version": "1.0.0",
+			"category": "context",
+			"experimental": true,
+			"name": "Load Plan Context",
+			"description": "Parse and understand implementation plan structure and content",
 			"tags": ["plan-review", "context-loading", "parsing"],
 			"agents": ["lead"],
 			"outputs": ["plan_structure", "task_requirements", "complexity_assessment"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["gpt-5-thinking-high", "claude-sonnet-4.6", "claude-sonnet-4.5"]
+				"recommended": ["gpt-5.5", "claude-sonnet-4.6", "claude-sonnet-5"]
 			},
-			"dependencies": {},
-			"inputs": []
+			"dependencies": {
+				"requires": ["context.use-modern-cli-tools"]
+			},
+			"inputs": [
+				{
+					"name": "plan_document",
+					"description": "Path to the implementation plan document",
+					"type": "string",
+					"required": true
+				},
+				{
+					"name": "previous_plan_version",
+					"description": "Optional previous version for comparison",
+					"type": "string",
+					"required": false
+				}
+			]
 		},
 		"02_context.load-pr-template": {
 			"id": "02_context.load-pr-template",
-			"version": " 1.0.0",
-			"category": " context",
-			"experimental": false,
-			"name": " Load PR Template",
-			"description": " Load and parse pull request template for structured description",
+			"version": "1.0.0",
+			"category": "context",
+			"experimental": true,
+			"name": "Load PR Template",
+			"description": "Load and parse pull request template for structured description",
 			"tags": ["pr-template", "github", "template-parsing"],
 			"agents": ["lead"],
 			"outputs": ["template_content", "required_sections", "checklist_items"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-5"]
 			},
-			"dependencies": {},
-			"inputs": []
+			"dependencies": {
+				"requires": ["context.use-modern-cli-tools"]
+			},
+			"inputs": [
+				{
+					"name": "template_name",
+					"description": "Optional custom template name",
+					"type": "string",
+					"required": false
+				}
+			]
 		},
 		"02_context.load-prd": {
 			"id": "02_context.load-prd",
-			"version": " 1.0.0",
-			"category": " context",
-			"experimental": false,
-			"name": " Load PRD",
-			"description": " Load and parse Product Requirements Document for backlog generation",
+			"version": "1.0.0",
+			"category": "context",
+			"experimental": true,
+			"name": "Load PRD",
+			"description": "Load and parse Product Requirements Document for backlog generation",
 			"tags": ["prd", "requirements", "context-loading"],
-			"agents": ["product-manager"],
 			"outputs": ["prd_document", "requirements_list"],
 			"model_requirements": {
 				"min_context": 128000,
 				"recommended": ["claude-haiku-4.5"]
 			},
-			"dependencies": {},
-			"inputs": []
+			"dependencies": {
+				"requires": ["context.use-modern-cli-tools"]
+			},
+			"inputs": [
+				{
+					"name": "prd_file_arg",
+					"description": "Optional path to PRD file from --prd-file argument",
+					"type": "string",
+					"required": false
+				}
+			]
 		},
 		"02_context.load-specifications": {
 			"id": "02_context.load-specifications",
-			"version": " 1.0.0",
-			"category": " context",
-			"experimental": false,
-			"name": " Load Specifications",
-			"description": " Load and parse refined specifications from various sources",
+			"version": "1.0.0",
+			"category": "context",
+			"experimental": true,
+			"name": "Load Specifications",
+			"description": "Load and parse refined specifications from various sources",
 			"tags": ["specifications", "requirements", "context-loading"],
-			"agents": ["product-manager"],
 			"outputs": ["specifications", "project_type", "existing_context"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["gpt-5-thinking-high", "gpt-o1-high"]
+				"recommended": ["gpt-5.5"]
 			},
-			"dependencies": {},
-			"inputs": []
+			"dependencies": {
+				"requires": ["context.use-modern-cli-tools"]
+			},
+			"inputs": [
+				{
+					"name": "specs_file_arg",
+					"description": "Optional path to specifications file",
+					"type": "string",
+					"required": false
+				}
+			]
 		},
 		"02_context.load-task": {
 			"id": "02_context.load-task",
-			"version": " 1.0.0",
-			"category": " context",
-			"experimental": false,
-			"name": " Load Task",
-			"description": " Load task details from TODO.md or BACKLOG.md for refinement",
+			"version": "1.0.0",
+			"category": "context",
+			"experimental": true,
+			"name": "Load Task",
+			"description": "Load task details from TODO.md or BACKLOG.md for refinement",
 			"tags": ["task-loading", "context", "task-details"],
-			"agents": ["product-manager"],
 			"outputs": ["task_details", "current_acceptance_criteria", "linked_requirements"],
 			"model_requirements": {
 				"min_context": 128000,
 				"recommended": ["claude-haiku-4.5"]
 			},
-			"dependencies": {},
-			"inputs": []
+			"dependencies": {
+				"requires": ["context.use-modern-cli-tools"]
+			},
+			"inputs": [
+				{
+					"name": "task_id",
+					"description": "Optional explicit task ID parameter",
+					"type": "string",
+					"required": false
+				},
+				{
+					"name": "backlog_file",
+					"description": "Path to BACKLOG.md file (defaults to knowledge-base/BACKLOG.md)",
+					"type": "string",
+					"required": false,
+					"default": "knowledge-base/BACKLOG.md"
+				}
+			]
 		},
 		"02_context.scan-codebase": {
 			"id": "02_context.scan-codebase",
-			"version": " 1.0.0",
-			"category": " context",
-			"experimental": false,
-			"name": " Scan Codebase",
-			"description": " Analyze codebase structure, tech stack, and entry points",
+			"version": "1.0.0",
+			"category": "context",
+			"experimental": true,
+			"name": "Scan Codebase",
+			"description": "Analyze codebase structure, tech stack, and entry points",
 			"tags": ["codebase-analysis", "structure-mapping", "tech-stack"],
 			"agents": ["lead"],
 			"outputs": ["codebase_structure", "tech_stack", "entry_points"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5", "gpt-5-thinking-high"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-5", "gpt-5.5"]
 			},
-			"dependencies": {},
-			"inputs": []
+			"dependencies": {
+				"requires": ["context.use-modern-cli-tools"]
+			},
+			"inputs": [
+				{
+					"name": "scope",
+					"description": "Analysis scope (project or task)",
+					"type": "string",
+					"required": false,
+					"default": "project",
+					"validation": {
+						"enum": ["project", "task"]
+					}
+				},
+				{
+					"name": "domain",
+					"description": "Domain filter for focused analysis",
+					"type": "string",
+					"required": false,
+					"default": "all",
+					"validation": {
+						"enum": ["backend", "frontend", "infrastructure", "data", "all"]
+					}
+				},
+				{
+					"name": "depth",
+					"description": "Analysis depth level",
+					"type": "string",
+					"required": false,
+					"default": "deep",
+					"validation": {
+						"enum": ["shallow", "deep"]
+					}
+				}
+			]
 		},
 		"02_context.understand-intent": {
 			"id": "02_context.understand-intent",
-			"version": " 1.0.0",
-			"category": " context",
-			"experimental": false,
-			"name": " Understand Intent",
-			"description": " Capture the essence of what the user wants to build and confirm initial understanding",
+			"version": "1.0.0",
+			"category": "context",
+			"experimental": true,
+			"name": "Understand Intent",
+			"description": "Capture the essence of what the user wants to build and confirm initial understanding",
 			"tags": ["context-gathering", "requirements", "initial-analysis"],
 			"agents": ["product-manager"],
 			"outputs": ["user_intent", "initial_scope", "problem_statement", "target_users", "constraints_identified"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["gpt-5-thinking-high"]
+				"recommended": ["gpt-5.5"]
+			},
+			"inputs": [
+				{
+					"name": "initial_concept",
+					"description": "The user's initial concept or project idea",
+					"type": "string",
+					"required": true,
+					"validation": {
+						"min": 10
+					}
+				},
+				{
+					"name": "domain",
+					"description": "Optional domain or industry context",
+					"type": "string",
+					"required": false
+				}
+			]
+		},
+		"02_context.use-modern-cli-tools": {
+			"id": "02_context.use-modern-cli-tools",
+			"version": "1.0.0",
+			"category": "context",
+			"experimental": true,
+			"name": "Use Modern CLI Tools",
+			"description": "Replace legacy CLI commands (grep, find, cat, ls, cd, git) with modern alternatives that cut agent token usage by up to 90%",
+			"tags": ["cli", "tooling", "token-efficiency", "search", "parsing"],
+			"agents": [
+				"lead",
+				"platform-engineer",
+				"software-engineer-typescript",
+				"software-engineer-typescript-backend",
+				"software-engineer-typescript-frontend",
+				"software-engineer-typescript-frontend-react"
+			],
+			"model_requirements": {
+				"min_context": 8192,
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-5", "claude-haiku-4.5"]
+			},
+			"dependencies": {
+				"requires": []
 			},
 			"inputs": []
 		},
 		"03_plan.assess-complexity": {
 			"id": "03_plan.assess-complexity",
-			"version": " 1.0.0",
-			"category": " plan",
-			"experimental": false,
-			"name": " Assess Complexity",
-			"description": " Evaluate task complexity and determine appropriate implementation mode",
+			"version": "1.0.0",
+			"category": "plan",
+			"experimental": true,
+			"name": "Assess Complexity",
+			"description": "Evaluate task complexity and determine appropriate implementation mode",
 			"tags": ["complexity-analysis", "risk-assessment", "planning"],
 			"agents": ["lead"],
-			"outputs": ["complexity_score", "complexity_factors", "implementation_mode", "confidence_level"],
+			"outputs": [
+				"complexity_score",
+				"complexity_factors",
+				"implementation_mode",
+				"confidence_level",
+				"clarifying_questions"
+			],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["gpt-5-thinking-high", "claude-sonnet-4.6", "claude-sonnet-4.5"]
+				"recommended": ["gpt-5.5", "claude-sonnet-4.6", "claude-sonnet-5"]
 			},
 			"dependencies": {
-				"requires": ["context.analyze-task-context"]
+				"requires": ["context.use-modern-cli-tools", "context.analyze-task-context"]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "task_scope",
+					"description": "Task scope from analyze-task-context",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "affected_components",
+					"description": "List of affected components",
+					"type": "array",
+					"required": true
+				},
+				{
+					"name": "complexity_threshold",
+					"description": "Threshold for incremental mode (1-10)",
+					"type": "number",
+					"required": false,
+					"default": 5,
+					"validation": {
+						"min": 1,
+						"max": 10
+					}
+				}
+			]
 		},
 		"03_plan.assess-risks": {
 			"id": "03_plan.assess-risks",
-			"version": " 1.0.0",
-			"category": " plan",
-			"experimental": false,
-			"name": " Assess Risks",
-			"description": " Identify technical, business, and operational risks with mitigation strategies",
+			"version": "1.0.0",
+			"category": "plan",
+			"experimental": true,
+			"name": "Assess Risks",
+			"description": "Identify technical, business, and operational risks with mitigation strategies",
 			"tags": ["risk-assessment", "mitigation", "planning"],
 			"agents": ["lead"],
-			"outputs": ["technical_risks", "business_risks", "operational_risks", "mitigation_strategies", "risk_score"],
+			"outputs": [
+				"technical_risks",
+				"business_risks",
+				"operational_risks",
+				"mitigation_strategies",
+				"risk_score",
+				"clarifying_questions"
+			],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["gpt-5-thinking-high", "claude-sonnet-4.6", "claude-sonnet-4.5"]
+				"recommended": ["gpt-5.5", "claude-sonnet-4.6", "claude-sonnet-5"]
 			},
 			"dependencies": {
-				"requires": ["context.analyze-task-context", "plan.assess-complexity"]
+				"requires": ["context.use-modern-cli-tools", "context.analyze-task-context", "plan.assess-complexity"]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "task_scope",
+					"description": "Task scope from analyze-task-context",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "complexity_score",
+					"description": "Complexity score from assess-complexity",
+					"type": "number",
+					"required": true
+				},
+				{
+					"name": "affected_components",
+					"description": "List of affected components",
+					"type": "array",
+					"required": false
+				}
+			]
 		},
 		"03_plan.breakdown-implementation": {
 			"id": "03_plan.breakdown-implementation",
-			"version": " 1.0.0",
-			"category": " plan",
-			"experimental": false,
-			"name": " Breakdown Implementation",
-			"description": " Create step-by-step implementation plan with validation criteria",
+			"version": "1.0.0",
+			"category": "plan",
+			"experimental": true,
+			"name": "Breakdown Implementation",
+			"description": "Create step-by-step implementation plan with validation criteria",
 			"tags": ["implementation-planning", "task-breakdown", "execution-planning"],
 			"agents": ["lead"],
 			"outputs": ["implementation_steps", "estimated_effort", "testing_strategy", "rollback_strategy"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5", "gpt-5-thinking-high"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-5", "gpt-5.5"]
 			},
 			"dependencies": {
 				"requires": [
+					"context.use-modern-cli-tools",
 					"context.analyze-task-context",
 					"plan.assess-complexity",
 					"plan.identify-dependencies",
 					"plan.assess-risks"
 				]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "task_scope",
+					"description": "Task scope from analyze-task-context",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "complexity_score",
+					"description": "Complexity score from assess-complexity",
+					"type": "number",
+					"required": true
+				},
+				{
+					"name": "dependencies",
+					"description": "Dependencies from identify-dependencies",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "risks",
+					"description": "Risks from assess-risks",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "mode",
+					"description": "Implementation mode (standard or incremental)",
+					"type": "string",
+					"required": true,
+					"validation": {
+						"enum": ["standard", "incremental"]
+					}
+				}
+			]
 		},
 		"03_plan.decompose-tasks": {
 			"id": "03_plan.decompose-tasks",
-			"version": " 1.0.0",
-			"category": " plan",
-			"experimental": false,
-			"name": " Decompose Tasks",
-			"description": " Break down analyzed requirements into actionable, prioritized tasks for backlog",
+			"version": "1.0.0",
+			"category": "plan",
+			"experimental": true,
+			"name": "Decompose Tasks",
+			"description": "Break down analyzed requirements into actionable, prioritized tasks for backlog",
 			"tags": ["task-decomposition", "backlog-planning", "work-breakdown"],
-			"agents": ["product-manager"],
 			"outputs": ["task_list", "task_dependencies", "priority_order"],
 			"model_requirements": {
 				"min_context": 128000,
 				"recommended": ["claude-haiku-4.5"]
 			},
 			"dependencies": {
-				"requires": ["onboard.analyze-requirements"]
+				"requires": ["onboard.analyze-requirements", "context.use-modern-cli-tools"]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "analysis",
+					"description": "Requirements analysis from onboard stage",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "dependencies",
+					"description": "Dependency graph from onboard stage",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "complexity",
+					"description": "Complexity map from onboard stage",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "granularity",
+					"description": "Task granularity level (fine/medium/coarse)",
+					"type": "string",
+					"required": false,
+					"default": "medium",
+					"validation": {
+						"enum": ["fine", "medium", "coarse"]
+					}
+				}
+			]
 		},
 		"03_plan.define-architecture": {
 			"id": "03_plan.define-architecture",
-			"version": " 1.0.0",
-			"category": " plan",
-			"experimental": false,
-			"name": " Define Architecture",
-			"description": " Establish high-level architectural decisions including technology choices, component boundaries, and integration strategy",
+			"version": "1.0.0",
+			"category": "plan",
+			"experimental": true,
+			"name": "Define Architecture",
+			"description": "Establish high-level architectural decisions including technology choices, component boundaries, and integration strategy",
 			"tags": ["architecture", "technology-selection", "planning"],
 			"agents": ["lead"],
 			"outputs": [
@@ -825,192 +1552,491 @@
 			],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5", "gpt-5-thinking-high"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-5", "gpt-5.5"]
 			},
 			"dependencies": {
-				"requires": ["context.analyze-task-context"]
+				"requires": ["context.use-modern-cli-tools", "context.analyze-task-context"]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "task_details",
+					"description": "Task description and requirements",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "context_analysis",
+					"description": "Context analysis from analyze-task-context",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "acceptance_criteria",
+					"description": "Acceptance criteria from task",
+					"type": "array",
+					"required": true
+				}
+			]
 		},
 		"03_plan.identify-dependencies": {
 			"id": "03_plan.identify-dependencies",
-			"version": " 1.0.0",
-			"category": " plan",
-			"experimental": false,
-			"name": " Identify Dependencies",
-			"description": " Map technical, data, and integration dependencies with execution order",
+			"version": "1.0.0",
+			"category": "plan",
+			"experimental": true,
+			"name": "Identify Dependencies",
+			"description": "Map technical, data, and integration dependencies with execution order",
 			"tags": ["dependency-mapping", "technical-analysis", "planning"],
 			"agents": ["lead"],
-			"outputs": ["technical_dependencies", "data_dependencies", "integration_dependencies", "execution_order"],
+			"outputs": [
+				"technical_dependencies",
+				"data_dependencies",
+				"integration_dependencies",
+				"execution_order",
+				"clarifying_questions"
+			],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5", "gpt-5-thinking-high"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-5", "gpt-5.5"]
 			},
 			"dependencies": {
-				"requires": ["context.analyze-task-context", "review.assess-constraints", "onboard.map-dependencies"],
+				"requires": ["context.use-modern-cli-tools", "context.analyze-task-context"],
 				"optional": ["review.assess-constraints", "onboard.map-dependencies"]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "task_scope",
+					"description": "Task scope from analyze-task-context",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "affected_components",
+					"description": "List of affected components",
+					"type": "array",
+					"required": true
+				}
+			]
 		},
 		"04_code.calculate-version-bump": {
 			"id": "04_code.calculate-version-bump",
-			"version": " 1.0.0",
-			"category": " code",
-			"experimental": false,
-			"name": " Calculate Version Bump",
-			"description": " Determine semantic version bump based on commit type and breaking changes",
+			"version": "1.0.0",
+			"category": "code",
+			"experimental": true,
+			"name": "Calculate Version Bump",
+			"description": "Determine semantic version bump based on commit type and breaking changes",
 			"tags": ["semver", "versioning", "release-management"],
 			"agents": ["lead", "software-engineer"],
 			"outputs": ["version_bump_type", "current_version", "next_version"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-5"]
 			},
 			"dependencies": {
-				"requires": ["context.analyze-change-scope"]
+				"requires": ["context.use-modern-cli-tools", "context.analyze-change-scope"]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "change_type",
+					"description": "Commit type (feat, fix, etc.)",
+					"type": "string",
+					"required": true
+				},
+				{
+					"name": "breaking_changes",
+					"description": "Whether breaking changes detected",
+					"type": "boolean",
+					"required": true
+				},
+				{
+					"name": "version_bump_arg",
+					"description": "User-specified version bump (auto, major, minor, patch)",
+					"type": "string",
+					"required": false
+				}
+			]
 		},
 		"04_code.create-version-tag": {
 			"id": "04_code.create-version-tag",
-			"version": " 1.0.0",
-			"category": " code",
-			"experimental": false,
-			"name": " Create Version Tag",
-			"description": " Create annotated git tag with version number after successful commit",
+			"version": "1.0.0",
+			"category": "code",
+			"experimental": true,
+			"name": "Create Version Tag",
+			"description": "Create annotated git tag with version number after successful commit",
 			"tags": ["git", "tagging", "versioning"],
 			"agents": ["lead", "software-engineer"],
 			"outputs": ["tag_created", "tag_name"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-5"]
 			},
 			"dependencies": {
-				"requires": ["code.calculate-version-bump", "code.stage-and-commit"]
+				"requires": ["context.use-modern-cli-tools", "code.calculate-version-bump", "code.stage-and-commit"]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "next_version",
+					"description": "Next version number from version bump calculation",
+					"type": "string",
+					"required": true
+				},
+				{
+					"name": "commit_hashes",
+					"description": "Commit hashes to tag",
+					"type": "array",
+					"required": true
+				}
+			]
 		},
 		"04_code.determine-commit-strategy": {
 			"id": "04_code.determine-commit-strategy",
-			"version": " 1.0.0",
-			"category": " code",
-			"experimental": false,
-			"name": " Determine Commit Strategy",
-			"description": " Decide whether to create single or multiple commits and group changes logically",
+			"version": "1.0.0",
+			"category": "code",
+			"experimental": true,
+			"name": "Determine Commit Strategy",
+			"description": "Decide whether to create single or multiple commits and group changes logically",
 			"tags": ["commit-strategy", "change-grouping", "atomic-commits"],
 			"agents": ["lead", "software-engineer"],
 			"outputs": ["should_split", "commit_groups", "commit_strategy"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-5"]
 			},
 			"dependencies": {
-				"requires": ["context.analyze-change-scope"]
+				"requires": ["context.use-modern-cli-tools", "context.analyze-change-scope"]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "change_summary",
+					"description": "Summary of changes",
+					"type": "string",
+					"required": true
+				},
+				{
+					"name": "affected_areas",
+					"description": "Affected functional areas",
+					"type": "array",
+					"required": true
+				},
+				{
+					"name": "breaking_changes",
+					"description": "Whether breaking changes detected",
+					"type": "boolean",
+					"required": true
+				}
+			]
 		},
 		"04_code.determine-labels": {
 			"id": "04_code.determine-labels",
-			"version": " 1.0.0",
-			"category": " code",
-			"experimental": false,
-			"name": " Determine Labels",
-			"description": " Automatically determine appropriate labels for pull request based on changes",
+			"version": "1.0.0",
+			"category": "code",
+			"experimental": true,
+			"name": "Determine Labels",
+			"description": "Automatically determine appropriate labels for pull request based on changes",
 			"tags": ["labels", "categorization", "automation"],
 			"agents": ["lead"],
 			"outputs": ["labels_list", "label_rationale"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-5"]
 			},
 			"dependencies": {
-				"requires": ["context.analyze-commits-for-pr", "context.analyze-codebase-changes"]
+				"requires": [
+					"context.use-modern-cli-tools",
+					"context.analyze-commits-for-pr",
+					"context.analyze-codebase-changes"
+				]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "labels_arg",
+					"description": "User-specified labels",
+					"type": "string",
+					"required": false
+				},
+				{
+					"name": "change_types",
+					"description": "Types of changes",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "impact_areas",
+					"description": "Functional areas impacted",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "breaking_changes",
+					"description": "Breaking changes detected",
+					"type": "array",
+					"required": true
+				},
+				{
+					"name": "complexity_metrics",
+					"description": "Change complexity",
+					"type": "object",
+					"required": true
+				}
+			]
 		},
 		"04_code.determine-reviewers": {
 			"id": "04_code.determine-reviewers",
-			"version": " 1.0.0",
-			"category": " code",
-			"experimental": false,
-			"name": " Determine Reviewers",
-			"description": " Intelligently determine appropriate code reviewers based on ownership and expertise",
+			"version": "1.0.0",
+			"category": "code",
+			"experimental": true,
+			"name": "Determine Reviewers",
+			"description": "Intelligently determine appropriate code reviewers based on ownership and expertise",
 			"tags": ["reviewers", "codeowners", "automation"],
 			"agents": ["lead"],
 			"outputs": ["reviewers_list", "reviewer_rationale"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-5"]
 			},
 			"dependencies": {
-				"requires": ["context.analyze-commits-for-pr", "context.analyze-codebase-changes"]
+				"requires": [
+					"context.use-modern-cli-tools",
+					"context.analyze-commits-for-pr",
+					"context.analyze-codebase-changes"
+				]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "reviewers_arg",
+					"description": "User-specified reviewers",
+					"type": "string",
+					"required": false
+				},
+				{
+					"name": "auto_assign",
+					"description": "Whether to auto-assign reviewers",
+					"type": "boolean",
+					"required": false,
+					"default": false
+				},
+				{
+					"name": "affected_files",
+					"description": "Files changed in PR",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "impact_areas",
+					"description": "Functional areas impacted",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "authors",
+					"description": "Commit authors",
+					"type": "array",
+					"required": true
+				}
+			]
 		},
 		"04_code.generate-commit-messages": {
 			"id": "04_code.generate-commit-messages",
-			"version": " 1.0.0",
-			"category": " code",
-			"experimental": false,
-			"name": " Generate Commit Messages",
-			"description": " Generate conventional commit messages for each commit group",
+			"version": "1.0.0",
+			"category": "code",
+			"experimental": true,
+			"name": "Generate Commit Messages",
+			"description": "Generate conventional commit messages for each commit group",
 			"tags": ["commit-messages", "conventional-commits", "message-generation"],
 			"agents": ["lead", "software-engineer"],
 			"outputs": ["commit_messages", "commit_descriptions", "commit_footers"],
 			"model_requirements": {
 				"min_context": 200000,
-				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-5"]
 			},
 			"dependencies": {
-				"requires": ["code.determine-commit-strategy"]
+				"requires": ["context.use-modern-cli-tools", "code.determine-commit-strategy"]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "commit_groups",
+					"description": "Commit groups from strategy determination",
+					"type": "array",
+					"required": true
+				},
+				{
+					"name": "change_type",
+					"description": "Primary change type",
+					"type": "string",
+					"required": true
+				},
+				{
+					"name": "scope",
+					"description": "User-specified scope (optional)",
+					"type": "string",
+					"required": false
+				},
+				{
+					"name": "breaking",
+					"description": "User-specified breaking flag",
+					"type": "boolean",
+					"required": false
+				},
+				{
+					"name": "custom_message",
+					"description": "User-specified custom message",
+					"type": "string",
+					"required": false
+				},
+				{
+					"name": "template_config",
+					"description": "Template configuration if using template",
+					"type": "object",
+					"required": false
+				},
+				{
+					"name": "ticket_number",
+					"description": "Extracted ticket number",
+					"type": "string",
+					"required": false
+				},
+				{
+					"name": "insights",
+					"description": "Recommendations from insights",
+					"type": "array",
+					"required": false
+				}
+			]
 		},
 		"04_code.generate-pr-description": {
 			"id": "04_code.generate-pr-description",
-			"version": " 1.0.0",
-			"category": " code",
-			"experimental": false,
-			"name": " Generate PR Description",
-			"description": " Generate comprehensive pull request description with all relevant sections",
+			"version": "1.0.0",
+			"category": "code",
+			"experimental": true,
+			"name": "Generate PR Description",
+			"description": "Generate comprehensive pull request description with all relevant sections",
 			"tags": ["pr-generation", "documentation", "description-generation"],
 			"agents": ["lead"],
 			"outputs": ["pr_description", "description_sections"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-5"]
 			},
 			"dependencies": {
-				"requires": ["context.analyze-commits-for-pr", "context.analyze-codebase-changes"]
+				"requires": [
+					"context.use-modern-cli-tools",
+					"context.analyze-commits-for-pr",
+					"context.analyze-codebase-changes"
+				]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "template_content",
+					"description": "PR template content if available",
+					"type": "string",
+					"required": false
+				},
+				{
+					"name": "change_summary",
+					"description": "Summary of changes",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "commit_messages",
+					"description": "All commit messages",
+					"type": "array",
+					"required": true
+				},
+				{
+					"name": "affected_files",
+					"description": "Files changed",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "breaking_changes",
+					"description": "Breaking changes detected",
+					"type": "array",
+					"required": true
+				},
+				{
+					"name": "related_issues",
+					"description": "Related issues/tickets",
+					"type": "array",
+					"required": false
+				},
+				{
+					"name": "impact_areas",
+					"description": "Functional areas impacted",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "test_coverage_delta",
+					"description": "Test coverage changes",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "complexity_metrics",
+					"description": "Change complexity",
+					"type": "object",
+					"required": true
+				}
+			]
 		},
 		"04_code.generate-pr-title": {
 			"id": "04_code.generate-pr-title",
-			"version": " 1.0.0",
-			"category": " code",
-			"experimental": false,
-			"name": " Generate PR Title",
-			"description": " Generate a clear, concise pull request title following conventions",
+			"version": "1.0.0",
+			"category": "code",
+			"experimental": true,
+			"name": "Generate PR Title",
+			"description": "Generate a clear, concise pull request title following conventions",
 			"tags": ["pr-generation", "conventional-commits", "title-generation"],
 			"agents": ["lead"],
 			"outputs": ["pr_title", "title_format"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-5"]
 			},
 			"dependencies": {
-				"requires": ["context.analyze-commits-for-pr"]
+				"requires": ["context.use-modern-cli-tools", "context.analyze-commits-for-pr"]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "custom_title",
+					"description": "User-provided custom title",
+					"type": "string",
+					"required": false
+				},
+				{
+					"name": "change_summary",
+					"description": "Summary of changes",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "change_types",
+					"description": "Types of changes",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "ticket_numbers",
+					"description": "Ticket/issue references",
+					"type": "array",
+					"required": false
+				},
+				{
+					"name": "branch_name_convention",
+					"description": "Branch naming convention",
+					"type": "string",
+					"required": false
+				}
+			]
 		},
 		"04_code.implement-changes": {
 			"id": "04_code.implement-changes",
-			"version": " 1.0.0",
-			"category": " code",
-			"experimental": false,
-			"name": " Implement Code Changes",
-			"description": " Execute code changes following implementation plan with quality standards",
+			"version": "1.0.0",
+			"category": "code",
+			"experimental": true,
+			"name": "Implement Code Changes",
+			"description": "Execute code changes following implementation plan with quality standards",
 			"tags": ["implementation", "code-generation", "refactoring"],
 			"agents": [
 				"software-engineer-typescript-backend",
@@ -1021,20 +2047,53 @@
 			"outputs": ["code_changes", "files_modified", "implementation_notes", "breaking_changes"],
 			"model_requirements": {
 				"min_context": 200000,
-				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-5"]
 			},
 			"dependencies": {
-				"requires": ["context.load-implementation-context", "code.validate-prerequisites"]
+				"requires": [
+					"context.load-implementation-context",
+					"code.validate-prerequisites",
+					"context.use-modern-cli-tools"
+				]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "implementation_scope",
+					"description": "Scope from load-implementation-context",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "target_files",
+					"description": "Files to modify/create from context",
+					"type": "array",
+					"required": true
+				},
+				{
+					"name": "mode",
+					"description": "Implementation mode",
+					"type": "string",
+					"required": false,
+					"default": "standard",
+					"validation": {
+						"enum": ["standard", "step-by-step", "dry-run"]
+					}
+				},
+				{
+					"name": "step",
+					"description": "Current step number for step-by-step mode",
+					"type": "number",
+					"required": false
+				}
+			]
 		},
 		"04_code.implement-tests": {
 			"id": "04_code.implement-tests",
-			"version": " 1.0.0",
-			"category": " code",
-			"experimental": false,
-			"name": " Implement Tests",
-			"description": " Write comprehensive tests for implemented code",
+			"version": "1.0.0",
+			"category": "code",
+			"experimental": true,
+			"name": "Implement Tests",
+			"description": "Write comprehensive tests for implemented code",
 			"tags": ["testing", "test-implementation", "quality-assurance"],
 			"agents": [
 				"software-engineer-typescript-backend",
@@ -1045,49 +2104,88 @@
 			"outputs": ["test_files", "test_coverage", "test_results"],
 			"model_requirements": {
 				"min_context": 200000,
-				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-5"]
 			},
 			"dependencies": {
-				"requires": ["code.implement-changes", "review.validate-test-strategy"],
+				"requires": ["context.use-modern-cli-tools", "code.implement-changes"],
 				"optional": ["review.validate-test-strategy"]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "code_changes",
+					"description": "Changes from implement-changes",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "testing_strategy",
+					"description": "Testing strategy from context",
+					"type": "object",
+					"required": true
+				}
+			]
 		},
 		"04_code.interactive-review": {
 			"id": "04_code.interactive-review",
-			"version": " 1.0.0",
-			"category": " code",
-			"experimental": false,
-			"name": " Interactive Review",
-			"description": " Present commit messages for user review and modification before execution",
+			"version": "1.0.0",
+			"category": "code",
+			"experimental": true,
+			"name": "Interactive Review",
+			"description": "Present commit messages for user review and modification before execution",
 			"tags": ["interactive", "user-review", "commit-approval"],
 			"agents": ["lead", "software-engineer"],
 			"outputs": ["approved_messages", "user_modifications"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-5"]
 			},
 			"dependencies": {
-				"requires": ["code.generate-commit-messages"]
+				"requires": ["context.use-modern-cli-tools", "code.generate-commit-messages"]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "commit_messages",
+					"description": "Generated commit messages",
+					"type": "array",
+					"required": true
+				},
+				{
+					"name": "commit_groups",
+					"description": "Commit groups with file lists",
+					"type": "array",
+					"required": true
+				},
+				{
+					"name": "quality_score",
+					"description": "Quality score from insights",
+					"type": "number",
+					"required": false
+				},
+				{
+					"name": "recommendations",
+					"description": "Recommendations from insights",
+					"type": "array",
+					"required": false
+				}
+			]
 		},
 		"04_code.push-and-create-pr": {
 			"id": "04_code.push-and-create-pr",
-			"version": " 1.0.0",
-			"category": " code",
-			"experimental": false,
-			"name": " Push and Create PR",
-			"description": " Push branch to remote and create pull request via GitHub API",
+			"version": "1.0.0",
+			"category": "code",
+			"experimental": true,
+			"name": "Push and Create PR",
+			"description": "Push branch to remote and create pull request via GitHub API",
 			"tags": ["git-push", "pr-creation", "github-api"],
 			"agents": ["lead"],
 			"outputs": ["pr_url", "pr_number", "push_status"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-5"]
 			},
 			"dependencies": {
 				"requires": [
+					"context.use-modern-cli-tools",
 					"context.analyze-git-branch",
 					"code.generate-pr-title",
 					"code.generate-pr-description",
@@ -1095,34 +2193,128 @@
 					"code.determine-labels"
 				]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "current_branch",
+					"description": "Current branch name",
+					"type": "string",
+					"required": true
+				},
+				{
+					"name": "base_branch",
+					"description": "Base branch for PR",
+					"type": "string",
+					"required": true
+				},
+				{
+					"name": "pr_title",
+					"description": "Generated PR title",
+					"type": "string",
+					"required": true
+				},
+				{
+					"name": "pr_description",
+					"description": "Generated PR description",
+					"type": "string",
+					"required": true
+				},
+				{
+					"name": "reviewers_list",
+					"description": "Reviewers to assign",
+					"type": "array",
+					"required": false
+				},
+				{
+					"name": "labels_list",
+					"description": "Labels to apply",
+					"type": "array",
+					"required": false
+				},
+				{
+					"name": "draft",
+					"description": "Create as draft PR",
+					"type": "boolean",
+					"required": false,
+					"default": false
+				},
+				{
+					"name": "no_push",
+					"description": "Skip pushing (testing mode)",
+					"type": "boolean",
+					"required": false,
+					"default": false
+				}
+			]
 		},
 		"04_code.stage-and-commit": {
 			"id": "04_code.stage-and-commit",
-			"version": " 1.0.0",
-			"category": " code",
-			"experimental": false,
-			"name": " Stage and Commit",
-			"description": " Execute git operations to stage files and create commits",
+			"version": "1.0.0",
+			"category": "code",
+			"experimental": true,
+			"name": "Stage and Commit",
+			"description": "Execute git operations to stage files and create commits",
 			"tags": ["git", "commit-execution", "staging"],
 			"agents": ["lead", "software-engineer"],
 			"outputs": ["commits_created", "commit_hashes", "commit_summary"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-5"]
 			},
 			"dependencies": {
-				"requires": ["code.generate-commit-messages"]
+				"requires": ["context.use-modern-cli-tools", "code.generate-commit-messages"]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "commit_groups",
+					"description": "Commit groups with files",
+					"type": "array",
+					"required": true
+				},
+				{
+					"name": "commit_messages",
+					"description": "Generated commit messages",
+					"type": "array",
+					"required": true
+				},
+				{
+					"name": "commit_descriptions",
+					"description": "Descriptions for each commit",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "commit_footers",
+					"description": "Footers for each commit",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "amend",
+					"description": "Whether to amend last commit",
+					"type": "boolean",
+					"required": false
+				},
+				{
+					"name": "no_verify",
+					"description": "Skip pre-commit hooks",
+					"type": "boolean",
+					"required": false
+				},
+				{
+					"name": "sign",
+					"description": "Sign commit with GPG/SSH",
+					"type": "boolean",
+					"required": false
+				}
+			]
 		},
 		"04_code.validate-prerequisites": {
 			"id": "04_code.validate-prerequisites",
-			"version": " 1.0.0",
-			"category": " code",
-			"experimental": false,
-			"name": " Validate Implementation Prerequisites",
-			"description": " Verify environment readiness before code execution",
+			"version": "1.0.0",
+			"category": "code",
+			"experimental": true,
+			"name": "Validate Implementation Prerequisites",
+			"description": "Verify environment readiness before code execution",
 			"tags": ["validation", "prerequisites", "environment-check"],
 			"agents": [
 				"software-engineer-typescript-backend",
@@ -1133,20 +2325,33 @@
 			"outputs": ["prerequisites_met", "missing_dependencies", "environment_ready", "blockers"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-5"]
 			},
 			"dependencies": {
-				"requires": ["context.load-implementation-context"]
+				"requires": ["context.use-modern-cli-tools", "context.load-implementation-context"]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "plan_summary",
+					"description": "Summary from load-implementation-context",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "dependencies",
+					"description": "Dependencies from load-implementation-context",
+					"type": "object",
+					"required": true
+				}
+			]
 		},
 		"04_code.verify-implementation": {
 			"id": "04_code.verify-implementation",
-			"version": " 1.0.0",
-			"category": " code",
-			"experimental": false,
-			"name": " Verify Implementation",
-			"description": " Validate implementation quality through linting, type checking, and testing",
+			"version": "1.0.0",
+			"category": "code",
+			"experimental": true,
+			"name": "Verify Implementation",
+			"description": "Validate implementation quality through linting, type checking, and testing",
 			"tags": ["verification", "quality-assurance", "validation"],
 			"agents": [
 				"software-engineer-typescript-backend",
@@ -1165,35 +2370,55 @@
 			],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-5"]
 			},
 			"dependencies": {
 				"requires": [
+					"context.use-modern-cli-tools",
 					"code.implement-changes",
 					"code.implement-tests",
-					"documentation.update-inline-docs",
-					"review.validate-completeness"
+					"documentation.update-inline-docs"
 				],
 				"optional": ["review.validate-completeness"]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "code_changes",
+					"description": "Changes from implement-changes",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "test_files",
+					"description": "Test files from implement-tests",
+					"type": "array",
+					"required": true
+				},
+				{
+					"name": "plan_summary",
+					"description": "Original plan summary",
+					"type": "object",
+					"required": true
+				}
+			]
 		},
 		"05_review.assess-code-quality": {
 			"id": "05_review.assess-code-quality",
-			"version": " 1.0.0",
-			"category": " review",
-			"experimental": false,
-			"name": " Assess Code Quality",
-			"description": " Orchestrate comprehensive code quality assessment across all dimensions",
+			"version": "1.0.0",
+			"category": "review",
+			"experimental": true,
+			"name": "Assess Code Quality",
+			"description": "Orchestrate comprehensive code quality assessment across all dimensions",
 			"tags": ["code-review", "quality-assessment", "orchestration"],
 			"agents": ["lead"],
 			"outputs": ["quality_score", "issues_found", "security_concerns", "blocking_issues", "review_decision"],
 			"model_requirements": {
 				"min_context": 200000,
-				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-5"]
 			},
 			"dependencies": {
 				"requires": [
+					"context.use-modern-cli-tools",
 					"context.analyze-changes-for-review",
 					"review.validate-security",
 					"review.validate-architecture",
@@ -1203,36 +2428,92 @@
 					"review.validate-type-safety"
 				]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "scope",
+					"description": "Review scope from arguments",
+					"type": "string",
+					"required": true
+				},
+				{
+					"name": "severity",
+					"description": "Minimum severity filter",
+					"type": "string",
+					"required": false,
+					"default": "low"
+				},
+				{
+					"name": "focus",
+					"description": "Review focus area",
+					"type": "string",
+					"required": false,
+					"default": "all"
+				},
+				{
+					"name": "changed_files",
+					"description": "Files changed from context stage",
+					"type": "array",
+					"required": true
+				},
+				{
+					"name": "review_focus_areas",
+					"description": "Prioritized focus areas from context",
+					"type": "array",
+					"required": true
+				}
+			]
 		},
 		"05_review.assess-constraints": {
 			"id": "05_review.assess-constraints",
-			"version": " 1.0.0",
-			"category": " review",
-			"experimental": false,
-			"name": " Assess Constraints",
-			"description": " Identify technical, performance, security, and infrastructure constraints",
+			"version": "1.0.0",
+			"category": "review",
+			"experimental": true,
+			"name": "Assess Constraints",
+			"description": "Identify technical, performance, security, and infrastructure constraints",
 			"tags": ["constraints", "limitations", "requirements"],
 			"agents": ["lead"],
 			"outputs": ["technical_constraints", "performance_considerations", "security_requirements"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5", "gpt-5-thinking-high"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-5", "gpt-5.5"]
 			},
 			"dependencies": {
-				"requires": ["context.scan-codebase", "onboard.analyze-patterns", "onboard.map-dependencies"]
+				"requires": [
+					"context.use-modern-cli-tools",
+					"context.scan-codebase",
+					"onboard.analyze-patterns",
+					"onboard.map-dependencies"
+				]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "tech_stack",
+					"description": "Tech stack from scan-codebase",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "patterns",
+					"description": "Coding patterns from analyze-patterns",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "dependencies",
+					"description": "External dependencies from map-dependencies",
+					"type": "object",
+					"required": true
+				}
+			]
 		},
 		"05_review.calculate-performance-metrics": {
 			"id": "05_review.calculate-performance-metrics",
-			"version": " 1.0.0",
-			"category": " review",
-			"experimental": false,
-			"name": " Calculate Performance Metrics",
-			"description": " Quantify workflow efficiency, error rates, and identify bottlenecks",
+			"version": "1.0.0",
+			"category": "review",
+			"experimental": true,
+			"name": "Calculate Performance Metrics",
+			"description": "Quantify workflow efficiency, error rates, and identify bottlenecks",
 			"tags": ["performance", "metrics", "efficiency", "bottleneck-analysis"],
-			"agents": ["product-manager"],
 			"outputs": [
 				"time_efficiency_score",
 				"error_rate",
@@ -1245,19 +2526,43 @@
 				"recommended": ["claude-haiku-4.5"]
 			},
 			"dependencies": {
-				"requires": ["context.analyze-command-execution"]
+				"requires": ["context.use-modern-cli-tools", "context.analyze-command-execution"]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "execution_duration",
+					"description": "Total workflow duration in seconds",
+					"type": "number",
+					"required": true
+				},
+				{
+					"name": "commands_chain",
+					"description": "Array of commands with durations",
+					"type": "array",
+					"required": true
+				},
+				{
+					"name": "errors_encountered",
+					"description": "List of errors from execution analysis",
+					"type": "array",
+					"required": true
+				},
+				{
+					"name": "retries_performed",
+					"description": "Number of retries",
+					"type": "number",
+					"required": true
+				}
+			]
 		},
 		"05_review.collect-user-feedback": {
 			"id": "05_review.collect-user-feedback",
-			"version": " 1.0.0",
-			"category": " review",
-			"experimental": false,
-			"name": " Collect User Feedback",
-			"description": " Interactive or non-interactive user satisfaction and feedback collection",
+			"version": "1.0.0",
+			"category": "review",
+			"experimental": true,
+			"name": "Collect User Feedback",
+			"description": "Interactive or non-interactive user satisfaction and feedback collection",
 			"tags": ["feedback", "user-satisfaction", "interactive"],
-			"agents": ["product-manager"],
 			"outputs": [
 				"satisfaction_score",
 				"feedback_comments",
@@ -1270,57 +2575,123 @@
 				"recommended": ["claude-haiku-4.5"]
 			},
 			"dependencies": {
-				"requires": ["context.identify-completed-workflow"]
+				"requires": ["context.use-modern-cli-tools", "context.identify-completed-workflow"]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "workflow_executed",
+					"description": "Workflow type from context stage",
+					"type": "string",
+					"required": true
+				},
+				{
+					"name": "satisfaction_arg",
+					"description": "Non-interactive satisfaction score (1-10)",
+					"type": "number",
+					"required": false,
+					"validation": {
+						"min": 1,
+						"max": 10
+					}
+				},
+				{
+					"name": "interactive_mode",
+					"description": "Whether to collect interactive feedback",
+					"type": "boolean",
+					"required": false,
+					"default": false
+				}
+			]
 		},
 		"05_review.evaluate-quality-outcomes": {
 			"id": "05_review.evaluate-quality-outcomes",
-			"version": " 1.0.0",
-			"category": " review",
-			"experimental": false,
-			"name": " Evaluate Quality Outcomes",
-			"description": " Assess code quality, test quality, and review quality with scoring",
+			"version": "1.0.0",
+			"category": "review",
+			"experimental": true,
+			"name": "Evaluate Quality Outcomes",
+			"description": "Assess code quality, test quality, and review quality with scoring",
 			"tags": ["quality-assessment", "metrics", "code-quality", "test-quality"],
-			"agents": ["product-manager"],
 			"outputs": ["code_quality_score", "test_quality_score", "review_quality_score", "overall_quality_score"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-5"]
 			},
 			"dependencies": {
-				"requires": ["context.gather-git-metrics"]
+				"requires": ["context.use-modern-cli-tools", "context.gather-git-metrics"]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "files_changed",
+					"description": "Files created/modified/deleted",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "test_coverage_delta",
+					"description": "Test coverage change",
+					"type": "object",
+					"required": false
+				},
+				{
+					"name": "ci_status",
+					"description": "CI check status",
+					"type": "string",
+					"required": true
+				},
+				{
+					"name": "review_comments_count",
+					"description": "Number of review comments",
+					"type": "number",
+					"required": false
+				}
+			]
 		},
 		"05_review.generate-commit-insights": {
 			"id": "05_review.generate-commit-insights",
-			"version": " 1.0.0",
-			"category": " review",
-			"experimental": false,
-			"name": " Generate Commit Insights",
-			"description": " AI-powered quality analysis and recommendations for commits",
+			"version": "1.0.0",
+			"category": "review",
+			"experimental": true,
+			"name": "Generate Commit Insights",
+			"description": "AI-powered quality analysis and recommendations for commits",
 			"tags": ["quality-analysis", "insights", "recommendations"],
 			"agents": ["lead"],
 			"outputs": ["quality_score", "impact_analysis", "security_issues", "recommendations"],
 			"model_requirements": {
 				"min_context": 200000,
-				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-5"]
 			},
 			"dependencies": {
-				"requires": ["context.analyze-change-scope"]
+				"requires": ["context.use-modern-cli-tools", "context.analyze-change-scope"]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "change_summary",
+					"description": "Summary of changes from scope analysis",
+					"type": "string",
+					"required": true
+				},
+				{
+					"name": "changed_files",
+					"description": "List of changed files with diffs",
+					"type": "array",
+					"required": true
+				},
+				{
+					"name": "breaking_changes",
+					"description": "Breaking changes detected",
+					"type": "boolean",
+					"required": true
+				}
+			]
 		},
 		"05_review.identify-improvement-areas": {
 			"id": "05_review.identify-improvement-areas",
-			"version": " 1.0.0",
-			"category": " review",
-			"experimental": false,
-			"name": " Identify Improvement Areas",
-			"description": " Generate actionable recommendations for agents, prompts, and workflow optimization",
+			"version": "1.0.0",
+			"category": "review",
+			"experimental": true,
+			"name": "Identify Improvement Areas",
+			"description": "Generate actionable recommendations for agents, prompts, and workflow optimization",
 			"tags": ["improvement", "recommendations", "optimization", "continuous-learning"],
-			"agents": ["product-manager"],
 			"outputs": [
 				"agent_improvements",
 				"prompt_refinements",
@@ -1330,33 +2701,66 @@
 			],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-5"]
 			},
 			"dependencies": {
 				"requires": [
+					"context.use-modern-cli-tools",
 					"context.analyze-command-execution",
 					"review.calculate-performance-metrics",
 					"review.collect-user-feedback"
 				]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "agents_used",
+					"description": "List of agents used in workflow",
+					"type": "array",
+					"required": true
+				},
+				{
+					"name": "prompts_executed",
+					"description": "List of prompts executed",
+					"type": "array",
+					"required": true
+				},
+				{
+					"name": "bottlenecks_identified",
+					"description": "Performance bottlenecks",
+					"type": "array",
+					"required": true
+				},
+				{
+					"name": "pain_points",
+					"description": "User-reported pain points",
+					"type": "array",
+					"required": false
+				},
+				{
+					"name": "errors_encountered",
+					"description": "Errors during execution",
+					"type": "array",
+					"required": true
+				}
+			]
 		},
 		"05_review.synthesize-plan-assessment": {
 			"id": "05_review.synthesize-plan-assessment",
-			"version": " 1.0.0",
-			"category": " review",
-			"experimental": false,
-			"name": " Synthesize Plan Assessment",
-			"description": " Combine all validation results into overall confidence score and go/no-go decision",
+			"version": "1.0.0",
+			"category": "review",
+			"experimental": true,
+			"name": "Synthesize Plan Assessment",
+			"description": "Combine all validation results into overall confidence score and go/no-go decision",
 			"tags": ["plan-review", "synthesis", "decision", "assessment"],
 			"agents": ["lead"],
 			"outputs": ["overall_confidence", "go_no_go_decision", "improvement_recommendations", "critical_issues"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["gpt-5-thinking-high", "claude-sonnet-4.6", "claude-sonnet-4.5"]
+				"recommended": ["gpt-5.5", "claude-sonnet-4.6", "claude-sonnet-5"]
 			},
 			"dependencies": {
 				"requires": [
+					"context.use-modern-cli-tools",
 					"context.load-plan-context",
 					"review.validate-completeness",
 					"review.validate-technical-feasibility",
@@ -1365,24 +2769,88 @@
 					"review.validate-test-strategy"
 				]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "completeness_score",
+					"description": "Score from validate-plan-completeness",
+					"type": "number",
+					"required": true,
+					"validation": {
+						"min": 0,
+						"max": 10
+					}
+				},
+				{
+					"name": "feasibility_score",
+					"description": "Score from validate-technical-feasibility",
+					"type": "number",
+					"required": true,
+					"validation": {
+						"min": 0,
+						"max": 10
+					}
+				},
+				{
+					"name": "risk_coverage_score",
+					"description": "Score from validate-risk-coverage",
+					"type": "number",
+					"required": true,
+					"validation": {
+						"min": 0,
+						"max": 10
+					}
+				},
+				{
+					"name": "step_quality_score",
+					"description": "Score from validate-step-quality",
+					"type": "number",
+					"required": true,
+					"validation": {
+						"min": 0,
+						"max": 10
+					}
+				},
+				{
+					"name": "test_coverage_score",
+					"description": "Score from validate-test-strategy",
+					"type": "number",
+					"required": true,
+					"validation": {
+						"min": 0,
+						"max": 10
+					}
+				},
+				{
+					"name": "all_gaps",
+					"description": "Combined gaps from all validation stages",
+					"type": "array",
+					"required": true
+				},
+				{
+					"name": "all_concerns",
+					"description": "Combined concerns from all validation stages",
+					"type": "array",
+					"required": true
+				}
+			]
 		},
 		"05_review.synthesize-validation-report": {
 			"id": "05_review.synthesize-validation-report",
-			"version": " 1.0.0",
-			"category": " review",
-			"experimental": false,
-			"name": " Synthesize Validation Report",
-			"description": " Aggregate all validation results into a comprehensive assertion report with pass/fail determination",
+			"version": "1.0.0",
+			"category": "review",
+			"experimental": true,
+			"name": "Synthesize Validation Report",
+			"description": "Aggregate all validation results into a comprehensive assertion report with pass/fail determination",
 			"tags": ["validation", "synthesis", "reporting"],
 			"agents": ["asserter"],
 			"outputs": ["validation_status", "blocker_count", "validation_report"],
 			"model_requirements": {
 				"min_context": 200000,
-				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5", "gpt-5-thinking-high"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-5", "gpt-5.5"]
 			},
 			"dependencies": {
 				"requires": [
+					"context.use-modern-cli-tools",
 					"review.validate-completeness",
 					"review.validate-standards-compliance",
 					"review.validate-type-safety",
@@ -1390,15 +2858,66 @@
 					"review.validate-architecture"
 				]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "completeness",
+					"description": "Completeness validation results",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "standards",
+					"description": "Standards compliance results",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "type_safety",
+					"description": "Type safety validation results",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "security",
+					"description": "Security validation results",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "architecture",
+					"description": "Architecture validation results",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "accessibility",
+					"description": "Accessibility validation results (may be null if no frontend changes)",
+					"type": "object",
+					"required": false
+				},
+				{
+					"name": "severity_filter",
+					"description": "Minimum severity to report (critical, high, all)",
+					"type": "string",
+					"required": false,
+					"default": "critical"
+				},
+				{
+					"name": "report_format",
+					"description": "Report format (structured, summary, detailed)",
+					"type": "string",
+					"required": false,
+					"default": "structured"
+				}
+			]
 		},
 		"05_review.validate-accessibility": {
 			"id": "05_review.validate-accessibility",
-			"version": " 1.0.0",
-			"category": " review",
-			"experimental": false,
-			"name": " Validate Accessibility",
-			"description": " Verify WCAG compliance, ARIA implementation, and semantic HTML usage for frontend changes",
+			"version": "1.0.0",
+			"category": "review",
+			"experimental": true,
+			"name": "Validate Accessibility",
+			"description": "Verify WCAG compliance, ARIA implementation, and semantic HTML usage for frontend changes",
 			"tags": ["validation", "accessibility", "wcag", "aria"],
 			"agents": ["asserter"],
 			"outputs": ["wcag_violations", "aria_issues", "semantic_html_issues"],
@@ -1407,17 +2926,17 @@
 				"recommended": ["claude-haiku-4.5"]
 			},
 			"dependencies": {
-				"requires": ["context.gather-validation-context"]
+				"requires": ["context.use-modern-cli-tools", "context.gather-validation-context"]
 			},
 			"inputs": []
 		},
 		"05_review.validate-architecture": {
 			"id": "05_review.validate-architecture",
-			"version": " 1.0.0",
-			"category": " review",
-			"experimental": false,
-			"name": " Validate Architecture",
-			"description": " Verify implementation follows architectural patterns, respects boundaries, and avoids anti-patterns",
+			"version": "1.0.0",
+			"category": "review",
+			"experimental": true,
+			"name": "Validate Architecture",
+			"description": "Verify implementation follows architectural patterns, respects boundaries, and avoids anti-patterns",
 			"tags": ["validation", "architecture", "design-patterns"],
 			"agents": ["asserter"],
 			"outputs": ["architectural_violations", "pattern_violations", "boundary_breaches"],
@@ -1426,17 +2945,24 @@
 				"recommended": ["claude-haiku-4.5"]
 			},
 			"dependencies": {
-				"requires": ["context.gather-validation-context"]
+				"requires": ["context.use-modern-cli-tools", "context.gather-validation-context"]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "architectural_guidelines",
+					"description": "Design patterns, layer rules, and module boundaries",
+					"type": "object",
+					"required": true
+				}
+			]
 		},
 		"05_review.validate-backlog": {
 			"id": "05_review.validate-backlog",
-			"version": " 1.0.0",
-			"category": " review",
-			"experimental": false,
-			"name": " Validate Backlog",
-			"description": " Validate backlog completeness, quality, and readiness for execution",
+			"version": "1.0.0",
+			"category": "review",
+			"experimental": true,
+			"name": "Validate Backlog",
+			"description": "Validate backlog completeness, quality, and readiness for execution",
 			"tags": ["validation", "quality-assurance", "backlog-review"],
 			"agents": ["product-manager"],
 			"outputs": ["validation_results", "coverage_score", "gaps_identified"],
@@ -1445,34 +2971,86 @@
 				"recommended": ["claude-haiku-4.5"]
 			},
 			"dependencies": {
-				"requires": ["plan.decompose-tasks"]
+				"requires": ["context.use-modern-cli-tools", "plan.decompose-tasks"]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "tasks",
+					"description": "Complete task list from decompose-tasks stage",
+					"type": "array",
+					"required": true
+				},
+				{
+					"name": "prd_requirements",
+					"description": "Original requirements list from PRD",
+					"type": "array",
+					"required": true
+				}
+			]
 		},
 		"05_review.validate-completeness": {
 			"id": "05_review.validate-completeness",
-			"version": " 3.0.0",
-			"category": " review",
-			"experimental": false,
-			"name": " Validate Completeness",
-			"description": " Generic validation for specifications, PRDs, and implementation plans",
+			"version": "3.0.0",
+			"category": "review",
+			"experimental": true,
+			"name": "Validate Completeness",
+			"description": "Generic validation for specifications, PRDs, and implementation plans",
 			"tags": ["validation", "quality-assurance", "completeness-check"],
-			"agents": ["product-manager", "lead"],
 			"outputs": ["validation_results", "missing_elements", "completeness_score", "ready_for_next_stage"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["gpt-5-thinking-high", "gpt-o1-high"]
+				"recommended": ["gpt-5.5"]
 			},
-			"dependencies": {},
-			"inputs": []
+			"dependencies": {
+				"requires": ["context.use-modern-cli-tools"]
+			},
+			"inputs": [
+				{
+					"name": "document",
+					"description": "The document to validate (specifications, PRD, or plan structure)",
+					"type": "string|object",
+					"required": true
+				},
+				{
+					"name": "document_type",
+					"description": "Type of document being validated",
+					"type": "string",
+					"required": true,
+					"validation": {
+						"enum": ["specifications", "prd", "plan"]
+					}
+				},
+				{
+					"name": "plan_structure",
+					"description": "Parsed plan structure (only for document_type=plan)",
+					"type": "object",
+					"required": false
+				},
+				{
+					"name": "task_requirements",
+					"description": "Task requirements (only for document_type=plan)",
+					"type": "object",
+					"required": false
+				},
+				{
+					"name": "clarity_score",
+					"description": "Optional initial clarity score from previous stage",
+					"type": "number",
+					"required": false,
+					"validation": {
+						"min": 0,
+						"max": 1
+					}
+				}
+			]
 		},
 		"05_review.validate-documentation": {
 			"id": "05_review.validate-documentation",
-			"version": " 1.0.0",
-			"category": " review",
-			"experimental": false,
-			"name": " Validate Documentation",
-			"description": " Validate completeness, quality, and cross-references of generated documentation",
+			"version": "1.0.0",
+			"category": "review",
+			"experimental": true,
+			"name": "Validate Documentation",
+			"description": "Validate completeness, quality, and cross-references of generated documentation",
 			"tags": ["documentation", "validation", "review"],
 			"agents": ["lead"],
 			"outputs": ["validation_results", "completeness_score", "quality_issues", "cross_reference_status"],
@@ -1482,172 +3060,361 @@
 			},
 			"dependencies": {
 				"requires": [
+					"context.use-modern-cli-tools",
 					"documentation.generate-infrastructure-docs",
 					"documentation.generate-backend-docs",
 					"documentation.generate-frontend-docs"
 				]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "infrastructure_docs",
+					"description": "Generated infrastructure documentation (may be null/empty if domain disabled)",
+					"type": "object",
+					"required": false
+				},
+				{
+					"name": "backend_docs",
+					"description": "Generated backend documentation (may be null/empty if domain disabled)",
+					"type": "object",
+					"required": false
+				},
+				{
+					"name": "frontend_docs",
+					"description": "Generated frontend documentation (may be null/empty if domain disabled)",
+					"type": "object",
+					"required": false
+				},
+				{
+					"name": "documentation_plan",
+					"description": "Original documentation plan",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "cross_references",
+					"description": "Cross-reference mappings",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "domain_assignments",
+					"description": "Which domains were enabled for generation",
+					"type": "object",
+					"required": true
+				}
+			]
 		},
 		"05_review.validate-functional-requirements": {
 			"id": "05_review.validate-functional-requirements",
-			"version": " 1.0.0",
-			"category": " review",
-			"experimental": false,
-			"name": " Validate Functional Requirements",
-			"description": " Comprehensive functional validation including requirements coverage, UX, workflows, edge cases, and integration",
+			"version": "1.0.0",
+			"category": "review",
+			"experimental": true,
+			"name": "Validate Functional Requirements",
+			"description": "Comprehensive functional validation including requirements coverage, UX, workflows, edge cases, and integration",
 			"tags": ["functional-review", "requirements-validation", "ux-validation", "workflow-validation"],
 			"agents": ["lead"],
 			"outputs": ["completeness_score", "requirements_coverage", "ux_issues", "functional_gaps", "workflow_validation"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-5"]
 			},
 			"dependencies": {
-				"requires": ["context.analyze-functional-scope", "review.validate-accessibility"],
+				"requires": ["context.use-modern-cli-tools", "context.analyze-functional-scope"],
 				"optional": ["review.validate-accessibility"]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "scope",
+					"description": "Feature scope to validate",
+					"type": "string",
+					"required": true
+				},
+				{
+					"name": "requirements",
+					"description": "Requirements list from scope analysis",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "severity",
+					"description": "Minimum severity to report",
+					"type": "string",
+					"required": false,
+					"validation": {
+						"enum": ["critical", "high", "medium", "low"]
+					}
+				},
+				{
+					"name": "check_a11y",
+					"description": "Whether to include accessibility validation",
+					"type": "boolean",
+					"required": false,
+					"default": false
+				}
+			]
 		},
 		"05_review.validate-implementation-completeness": {
 			"id": "05_review.validate-implementation-completeness",
-			"version": " 1.0.0",
-			"category": " review",
-			"experimental": false,
-			"name": " Validate Implementation Completeness",
-			"description": " Validate that implementation is complete against acceptance criteria before testing",
+			"version": "1.0.0",
+			"category": "review",
+			"experimental": true,
+			"name": "Validate Implementation Completeness",
+			"description": "Validate that implementation is complete against acceptance criteria before testing",
 			"tags": ["validation", "quality-assurance", "completeness-check", "implementation"],
 			"agents": ["asserter"],
 			"outputs": ["completeness_status", "missing_features", "incomplete_items", "coverage_percentage"],
 			"model_requirements": {
 				"min_context": 64000,
-				"recommended": ["claude-haiku-4.5", "claude-sonnet-4"]
+				"recommended": ["claude-haiku-4.5", "claude-sonnet-5"]
 			},
-			"dependencies": {},
-			"inputs": []
+			"dependencies": {
+				"requires": ["context.use-modern-cli-tools"]
+			},
+			"inputs": [
+				{
+					"name": "acceptance_criteria",
+					"description": "Acceptance criteria to validate against",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "implementation_details",
+					"description": "Details of the implementation including modified files and change metrics",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "modified_files",
+					"description": "List of modified files with their changes",
+					"type": "array",
+					"required": true
+				}
+			]
 		},
 		"05_review.validate-maintainability": {
 			"id": "05_review.validate-maintainability",
-			"version": " 1.0.0",
-			"category": " review",
-			"experimental": false,
-			"name": " Validate Maintainability",
-			"description": " Assess code complexity, technical debt, readability, and long-term maintainability",
+			"version": "1.0.0",
+			"category": "review",
+			"experimental": true,
+			"name": "Validate Maintainability",
+			"description": "Assess code complexity, technical debt, readability, and long-term maintainability",
 			"tags": ["validation", "maintainability", "code-quality", "technical-debt"],
 			"agents": ["lead"],
 			"outputs": ["complexity_issues", "code_smells", "technical_debt_items", "refactoring_recommendations"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-5"]
 			},
 			"dependencies": {
-				"requires": ["context.analyze-changes-for-review"]
+				"requires": ["context.use-modern-cli-tools", "context.analyze-changes-for-review"]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "changed_files",
+					"description": "Files to review for maintainability",
+					"type": "array",
+					"required": true
+				},
+				{
+					"name": "complexity_threshold",
+					"description": "Maximum acceptable cyclomatic complexity",
+					"type": "number",
+					"required": false,
+					"default": 10
+				}
+			]
 		},
 		"05_review.validate-performance": {
 			"id": "05_review.validate-performance",
-			"version": " 1.0.0",
-			"category": " review",
-			"experimental": false,
-			"name": " Validate Performance",
-			"description": " Identify performance bottlenecks, inefficient algorithms, and optimization opportunities",
+			"version": "1.0.0",
+			"category": "review",
+			"experimental": true,
+			"name": "Validate Performance",
+			"description": "Identify performance bottlenecks, inefficient algorithms, and optimization opportunities",
 			"tags": ["validation", "performance", "optimization", "bottlenecks"],
 			"agents": ["lead"],
 			"outputs": ["performance_issues", "bottlenecks_identified", "optimization_recommendations"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-5"]
 			},
 			"dependencies": {
-				"requires": ["context.analyze-changes-for-review"]
+				"requires": ["context.use-modern-cli-tools", "context.analyze-changes-for-review"]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "changed_files",
+					"description": "Files to review for performance",
+					"type": "array",
+					"required": true
+				},
+				{
+					"name": "review_focus",
+					"description": "Specific performance concerns",
+					"type": "object",
+					"required": false
+				}
+			]
 		},
 		"05_review.validate-pr-creation": {
 			"id": "05_review.validate-pr-creation",
-			"version": " 1.0.0",
-			"category": " review",
-			"experimental": false,
-			"name": " Validate PR Creation",
-			"description": " Validate that the PR was created successfully and all post-creation checks pass",
+			"version": "1.0.0",
+			"category": "review",
+			"experimental": true,
+			"name": "Validate PR Creation",
+			"description": "Validate that the PR was created successfully and all post-creation checks pass",
 			"tags": ["validation", "post-creation", "ci-checks"],
 			"agents": ["lead"],
 			"outputs": ["pr_status", "validation_result", "next_steps"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-5"]
 			},
 			"dependencies": {
-				"requires": ["code.push-and-create-pr"]
+				"requires": ["context.use-modern-cli-tools", "code.push-and-create-pr"]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "pr_url",
+					"description": "URL of created PR",
+					"type": "string",
+					"required": true
+				},
+				{
+					"name": "pr_number",
+					"description": "PR number",
+					"type": "number",
+					"required": true
+				},
+				{
+					"name": "require_checks",
+					"description": "Whether to require CI checks to start",
+					"type": "boolean",
+					"required": false,
+					"default": false
+				}
+			]
 		},
 		"05_review.validate-pr-readiness": {
 			"id": "05_review.validate-pr-readiness",
-			"version": " 1.0.0",
-			"category": " review",
-			"experimental": false,
-			"name": " Validate PR Readiness",
-			"description": " Validate that the PR is ready for creation based on quality checks",
+			"version": "1.0.0",
+			"category": "review",
+			"experimental": true,
+			"name": "Validate PR Readiness",
+			"description": "Validate that the PR is ready for creation based on quality checks",
 			"tags": ["validation", "quality-assurance", "pr-readiness"],
 			"agents": ["lead"],
 			"outputs": ["pr_ready", "readiness_issues", "quality_score", "recommendations"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-5"]
 			},
 			"dependencies": {
-				"requires": ["context.analyze-commits-for-pr", "context.analyze-codebase-changes"]
+				"requires": [
+					"context.use-modern-cli-tools",
+					"context.analyze-commits-for-pr",
+					"context.analyze-codebase-changes"
+				]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "change_summary",
+					"description": "Summary of changes",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "breaking_changes",
+					"description": "Breaking changes detected",
+					"type": "array",
+					"required": true
+				},
+				{
+					"name": "test_coverage_delta",
+					"description": "Test coverage analysis",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "complexity_metrics",
+					"description": "Change complexity metrics",
+					"type": "object",
+					"required": true
+				}
+			]
 		},
 		"05_review.validate-readiness": {
 			"id": "05_review.validate-readiness",
-			"version": " 1.0.0",
-			"category": " review",
-			"experimental": false,
-			"name": " Validate Readiness",
-			"description": " Validate that a fetched task is ready for implementation",
+			"version": "1.0.0",
+			"category": "review",
+			"experimental": true,
+			"name": "Validate Readiness",
+			"description": "Validate that a fetched task is ready for implementation",
 			"tags": ["validation", "task-readiness", "quality-assurance"],
-			"agents": ["product-manager"],
 			"outputs": ["readiness_score", "readiness_issues", "recommendation"],
 			"model_requirements": {
 				"min_context": 128000,
 				"recommended": ["claude-haiku-4.5"]
 			},
 			"dependencies": {
-				"requires": ["onboard.fetch-task", "context.check-dependencies"]
+				"requires": ["context.use-modern-cli-tools", "onboard.fetch-task", "context.check-dependencies"]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "task",
+					"description": "Selected task from onboard.fetch-task",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "dependencies",
+					"description": "Dependency status from context.check-dependencies",
+					"type": "object",
+					"required": true
+				}
+			]
 		},
 		"05_review.validate-risk-coverage": {
 			"id": "05_review.validate-risk-coverage",
-			"version": " 1.0.0",
-			"category": " review",
-			"experimental": false,
-			"name": " Validate Risk Coverage",
-			"description": " Ensure risks are properly identified, assessed, and mitigated in the plan",
+			"version": "1.0.0",
+			"category": "review",
+			"experimental": true,
+			"name": "Validate Risk Coverage",
+			"description": "Ensure risks are properly identified, assessed, and mitigated in the plan",
 			"tags": ["plan-review", "risk-assessment", "validation", "mitigation"],
 			"agents": ["lead"],
 			"outputs": ["risk_coverage_score", "unaddressed_risks", "mitigation_gaps"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["gpt-5-thinking-high", "claude-sonnet-4.6", "claude-sonnet-4.5"]
+				"recommended": ["gpt-5.5", "claude-sonnet-4.6", "claude-sonnet-5"]
 			},
 			"dependencies": {
-				"requires": ["review.load-plan-context", "plan.assess-risks"],
+				"requires": ["context.use-modern-cli-tools", "review.load-plan-context"],
 				"optional": ["plan.assess-risks"]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "plan_structure",
+					"description": "Parsed plan structure from load-plan-context",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "complexity_assessment",
+					"description": "Complexity assessment from load-plan-context",
+					"type": "object",
+					"required": true
+				}
+			]
 		},
 		"05_review.validate-security": {
 			"id": "05_review.validate-security",
-			"version": " 1.0.0",
-			"category": " review",
-			"experimental": false,
-			"name": " Validate Security",
-			"description": " Scan for security vulnerabilities, secrets, and OWASP compliance violations",
+			"version": "1.0.0",
+			"category": "review",
+			"experimental": true,
+			"name": "Validate Security",
+			"description": "Scan for security vulnerabilities, secrets, and OWASP compliance violations",
 			"tags": ["validation", "security", "owasp", "vulnerabilities"],
 			"agents": ["asserter"],
 			"outputs": ["security_vulnerabilities", "secrets_found", "owasp_violations"],
@@ -1656,17 +3423,24 @@
 				"recommended": ["claude-haiku-4.5"]
 			},
 			"dependencies": {
-				"requires": ["context.gather-validation-context"]
+				"requires": ["context.use-modern-cli-tools", "context.gather-validation-context"]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "quality_gates",
+					"description": "Security policies and compliance requirements",
+					"type": "object",
+					"required": true
+				}
+			]
 		},
 		"05_review.validate-standards-compliance": {
 			"id": "05_review.validate-standards-compliance",
-			"version": " 1.0.0",
-			"category": " review",
-			"experimental": false,
-			"name": " Validate Standards Compliance",
-			"description": " Verify code adheres to linting rules, formatting standards, and naming conventions",
+			"version": "1.0.0",
+			"category": "review",
+			"experimental": true,
+			"name": "Validate Standards Compliance",
+			"description": "Verify code adheres to linting rules, formatting standards, and naming conventions",
 			"tags": ["validation", "linting", "code-standards"],
 			"agents": ["asserter"],
 			"outputs": ["linting_results", "formatting_results", "convention_violations"],
@@ -1675,93 +3449,140 @@
 				"recommended": ["claude-haiku-4.5"]
 			},
 			"dependencies": {
-				"requires": ["context.gather-validation-context"]
+				"requires": ["context.use-modern-cli-tools", "context.gather-validation-context"]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "coding_standards",
+					"description": "Linting and formatting configuration from context stage",
+					"type": "object",
+					"required": true
+				}
+			]
 		},
 		"05_review.validate-step-quality": {
 			"id": "05_review.validate-step-quality",
-			"version": " 1.0.0",
-			"category": " review",
-			"experimental": false,
-			"name": " Validate Step Quality",
-			"description": " Ensure implementation steps are clear, specific, actionable, and properly sequenced",
+			"version": "1.0.0",
+			"category": "review",
+			"experimental": true,
+			"name": "Validate Step Quality",
+			"description": "Ensure implementation steps are clear, specific, actionable, and properly sequenced",
 			"tags": ["plan-review", "step-validation", "actionability", "clarity"],
 			"agents": ["lead"],
 			"outputs": ["step_quality_score", "vague_steps", "actionability_issues"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["gpt-5-thinking-high", "claude-sonnet-4.6", "claude-sonnet-4.5"]
+				"recommended": ["gpt-5.5", "claude-sonnet-4.6", "claude-sonnet-5"]
 			},
 			"dependencies": {
-				"requires": ["review.load-plan-context"]
+				"requires": ["context.use-modern-cli-tools", "review.load-plan-context"]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "plan_structure",
+					"description": "Parsed plan structure from load-plan-context",
+					"type": "object",
+					"required": true
+				}
+			]
 		},
 		"05_review.validate-technical-feasibility": {
 			"id": "05_review.validate-technical-feasibility",
-			"version": " 1.0.0",
-			"category": " review",
-			"experimental": false,
-			"name": " Validate Technical Feasibility",
-			"description": " Assess if proposed implementation approach is technically sound and achievable",
+			"version": "1.0.0",
+			"category": "review",
+			"experimental": true,
+			"name": "Validate Technical Feasibility",
+			"description": "Assess if proposed implementation approach is technically sound and achievable",
 			"tags": ["plan-review", "feasibility", "validation", "technical-assessment"],
 			"agents": ["lead"],
 			"outputs": ["feasibility_score", "technical_concerns", "blockers_identified"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["gpt-5-thinking-high", "claude-sonnet-4.6", "claude-sonnet-4.5"]
+				"recommended": ["gpt-5.5", "claude-sonnet-4.6", "claude-sonnet-5"]
 			},
 			"dependencies": {
-				"requires": ["review.load-plan-context"]
+				"requires": ["review.load-plan-context", "context.use-modern-cli-tools"]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "plan_structure",
+					"description": "Parsed plan structure from load-plan-context",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "complexity_assessment",
+					"description": "Complexity assessment from load-plan-context",
+					"type": "object",
+					"required": true
+				}
+			]
 		},
 		"05_review.validate-test-strategy": {
 			"id": "05_review.validate-test-strategy",
-			"version": " 1.0.0",
-			"category": " review",
-			"experimental": false,
-			"name": " Validate Test Strategy",
-			"description": " Ensure testing approach is comprehensive, realistic, and covers critical scenarios",
+			"version": "1.0.0",
+			"category": "review",
+			"experimental": true,
+			"name": "Validate Test Strategy",
+			"description": "Ensure testing approach is comprehensive, realistic, and covers critical scenarios",
 			"tags": ["plan-review", "testing", "validation", "coverage"],
 			"agents": ["lead"],
 			"outputs": ["test_coverage_score", "testing_gaps"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["gpt-5-thinking-high", "claude-sonnet-4.6", "claude-sonnet-4.5"]
+				"recommended": ["gpt-5.5", "claude-sonnet-4.6", "claude-sonnet-5"]
 			},
 			"dependencies": {
-				"requires": ["review.load-plan-context"]
+				"requires": ["context.use-modern-cli-tools", "review.load-plan-context"]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "plan_structure",
+					"description": "Parsed plan structure from load-plan-context",
+					"type": "object",
+					"required": true
+				}
+			]
 		},
 		"05_review.validate-testability": {
 			"id": "05_review.validate-testability",
-			"version": " 1.0.0",
-			"category": " review",
-			"experimental": false,
-			"name": " Validate Testability",
-			"description": " Validate that acceptance criteria are testable and complete before planning",
+			"version": "1.0.0",
+			"category": "review",
+			"experimental": true,
+			"name": "Validate Testability",
+			"description": "Validate that acceptance criteria are testable and complete before planning",
 			"tags": ["validation", "testability", "acceptance-criteria"],
-			"agents": ["product-manager", "lead"],
+			"agents": ["lead"],
 			"outputs": ["testability_score", "acceptance_criteria_complete", "test_strategy"],
 			"model_requirements": {
 				"min_context": 128000,
 				"recommended": ["claude-haiku-4.5"]
 			},
 			"dependencies": {
-				"requires": ["context.load-task", "onboard.refine-requirements"]
+				"requires": ["context.use-modern-cli-tools", "context.load-task", "onboard.refine-requirements"]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "task",
+					"description": "Task details from context.load-task",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "refined",
+					"description": "Refined requirements from onboard.refine-requirements",
+					"type": "object",
+					"required": true
+				}
+			]
 		},
 		"05_review.validate-type-safety": {
 			"id": "05_review.validate-type-safety",
-			"version": " 1.0.0",
-			"category": " review",
-			"experimental": false,
-			"name": " Validate Type Safety",
-			"description": " Execute type checkers to ensure type correctness and contract compliance",
+			"version": "1.0.0",
+			"category": "review",
+			"experimental": true,
+			"name": "Validate Type Safety",
+			"description": "Execute type checkers to ensure type correctness and contract compliance",
 			"tags": ["validation", "type-safety", "contracts"],
 			"agents": ["asserter"],
 			"outputs": ["type_errors", "contract_violations", "type_coverage"],
@@ -1770,95 +3591,266 @@
 				"recommended": ["claude-haiku-4.5"]
 			},
 			"dependencies": {
-				"requires": ["context.gather-validation-context"]
+				"requires": ["context.use-modern-cli-tools", "context.gather-validation-context"]
 			},
 			"inputs": []
 		},
 		"05_review.verify-commits": {
 			"id": "05_review.verify-commits",
-			"version": " 1.0.0",
-			"category": " review",
-			"experimental": false,
-			"name": " Verify Commits",
-			"description": " Post-commit verification and comprehensive summary",
+			"version": "1.0.0",
+			"category": "review",
+			"experimental": true,
+			"name": "Verify Commits",
+			"description": "Post-commit verification and comprehensive summary",
 			"tags": ["verification", "validation", "commit-summary"],
 			"agents": ["lead", "software-engineer"],
 			"outputs": ["verification_status", "commit_log", "final_summary"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-5"]
 			},
 			"dependencies": {
-				"requires": ["code.stage-and-commit"]
+				"requires": ["context.use-modern-cli-tools", "code.stage-and-commit"]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "commits_created",
+					"description": "Number of commits created",
+					"type": "number",
+					"required": true
+				},
+				{
+					"name": "commit_hashes",
+					"description": "Array of commit hashes",
+					"type": "array",
+					"required": true
+				},
+				{
+					"name": "tag_created",
+					"description": "Whether version tag was created",
+					"type": "boolean",
+					"required": false
+				}
+			]
 		},
 		"06_test.analyze-results": {
 			"id": "06_test.analyze-results",
-			"version": " 1.0.0",
-			"category": " test",
-			"experimental": false,
-			"name": " Analyze Test Results",
-			"description": " Evaluate test outcomes, assess coverage, identify patterns in failures, and provide actionable recommendations",
+			"version": "1.0.0",
+			"category": "test",
+			"experimental": true,
+			"name": "Analyze Test Results",
+			"description": "Evaluate test outcomes, assess coverage, identify patterns in failures, and provide actionable recommendations",
 			"tags": ["testing", "result-analysis", "quality-assessment"],
 			"agents": ["qa"],
 			"outputs": ["quality_assessment", "recommendations"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-haiku-4.5", "claude-sonnet-4.6", "claude-sonnet-4.5"]
+				"recommended": ["claude-haiku-4.5", "claude-sonnet-4.6", "claude-sonnet-5"]
 			},
 			"dependencies": {
-				"requires": ["test.execute-tests", "review.validate-completeness"],
+				"requires": ["context.use-modern-cli-tools", "test.execute-tests"],
 				"optional": ["review.validate-completeness"]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "test_results",
+					"description": "Test execution results from execute-tests",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "coverage_metrics",
+					"description": "Coverage metrics from execute-tests",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "coverage_threshold",
+					"description": "Minimum coverage threshold",
+					"type": "number",
+					"required": false,
+					"default": 80
+				}
+			]
 		},
 		"06_test.analyze-test-infrastructure": {
 			"id": "06_test.analyze-test-infrastructure",
-			"version": " 1.0.0",
-			"category": " test",
-			"experimental": false,
-			"name": " Analyze Test Infrastructure",
-			"description": " Detect test framework, configuration, and identify relevant test files by scope",
+			"version": "1.0.0",
+			"category": "test",
+			"experimental": true,
+			"name": "Analyze Test Infrastructure",
+			"description": "Detect test framework, configuration, and identify relevant test files by scope",
 			"tags": ["testing", "infrastructure-analysis", "test-discovery"],
 			"agents": ["qa"],
 			"outputs": ["test_framework", "test_structure", "existing_tests"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-haiku-4.5", "claude-sonnet-4.6", "claude-sonnet-4.5"]
+				"recommended": ["claude-haiku-4.5", "claude-sonnet-4.6", "claude-sonnet-5"]
 			},
 			"dependencies": {
-				"requires": ["context.scan-codebase"],
+				"requires": ["context.use-modern-cli-tools"],
 				"optional": ["context.scan-codebase"]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "test_scope",
+					"description": "Scope of tests to analyze (all, specific directory, or file pattern)",
+					"type": "string",
+					"required": false,
+					"default": "all"
+				}
+			]
+		},
+		"06_test.execute-pre-checks": {
+			"id": "06_test.execute-pre-checks",
+			"version": "1.0.0",
+			"category": "test",
+			"experimental": true,
+			"name": "Execute Pre-Checks",
+			"description": "Detect the project ecosystem then run language-appropriate quality checks (type checking, linting, formatting, security audit, quick tests) in parallel",
+			"tags": ["pre-check", "linting", "type-checking", "security-audit", "multi-language"],
+			"agents": ["qa"],
+			"outputs": ["check_results", "issues_found", "auto_fixes_applied", "overall_status"],
+			"model_requirements": {
+				"min_context": 32000,
+				"recommended": ["claude-haiku-4.5", "claude-sonnet-4.6"]
+			},
+			"dependencies": {
+				"requires": ["context.use-modern-cli-tools"]
+			},
+			"inputs": [
+				{
+					"name": "fix",
+					"description": "Automatically fix issues where possible (auto-formatters, auto-fixable linters)",
+					"type": "boolean",
+					"required": false,
+					"default": false
+				},
+				{
+					"name": "strict",
+					"description": "Enable strict mode — treat all warnings as errors",
+					"type": "boolean",
+					"required": false,
+					"default": false
+				},
+				{
+					"name": "ci",
+					"description": "CI/CD mode — non-interactive, fail fast, structured output",
+					"type": "boolean",
+					"required": false,
+					"default": false
+				}
+			]
 		},
 		"06_test.execute-tests": {
 			"id": "06_test.execute-tests",
-			"version": " 1.0.0",
-			"category": " test",
-			"experimental": false,
-			"name": " Execute Tests",
-			"description": " Run test suites based on scope and type, collect results and coverage metrics",
+			"version": "1.0.0",
+			"category": "test",
+			"experimental": true,
+			"name": "Execute Tests",
+			"description": "Run test suites based on scope and type, collect results and coverage metrics",
 			"tags": ["testing", "test-execution", "coverage-analysis"],
 			"agents": ["qa"],
 			"outputs": ["test_results", "coverage_metrics", "failed_tests"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-haiku-4.5", "claude-sonnet-4.6", "claude-sonnet-4.5"]
+				"recommended": ["claude-haiku-4.5", "claude-sonnet-4.6", "claude-sonnet-5"]
 			},
 			"dependencies": {
-				"requires": ["test.analyze-test-infrastructure"]
+				"requires": ["context.use-modern-cli-tools", "test.analyze-test-infrastructure"]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "test_scope",
+					"description": "Scope of tests to execute",
+					"type": "string",
+					"required": false,
+					"default": "all"
+				},
+				{
+					"name": "test_type",
+					"description": "Type of tests to run",
+					"type": "string",
+					"required": false,
+					"default": "all",
+					"validation": {
+						"enum": ["unit", "integration", "e2e", "all"]
+					}
+				},
+				{
+					"name": "coverage_threshold",
+					"description": "Minimum coverage percentage required",
+					"type": "number",
+					"required": false,
+					"default": 80,
+					"validation": {
+						"min": 0,
+						"max": 100
+					}
+				},
+				{
+					"name": "test_framework",
+					"description": "Test framework info from analyze-test-infrastructure",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "test_structure",
+					"description": "Test structure from analyze-test-infrastructure",
+					"type": "object",
+					"required": true
+				}
+			]
+		},
+		"06_test.generate-precheck-report": {
+			"id": "06_test.generate-precheck-report",
+			"version": "1.0.0",
+			"category": "test",
+			"experimental": true,
+			"name": "Generate Pre-Check Report",
+			"description": "Format pre-check results from any language ecosystem into a structured summary, detailed, or JSON report",
+			"tags": ["pre-check", "reporting", "quality-assessment", "multi-language"],
+			"agents": ["qa"],
+			"outputs": ["precheck_report", "recommendations"],
+			"model_requirements": {
+				"min_context": 16000,
+				"recommended": ["claude-haiku-4.5", "claude-sonnet-4.6"]
+			},
+			"dependencies": {
+				"requires": ["test.execute-pre-checks"]
+			},
+			"inputs": [
+				{
+					"name": "check_results",
+					"description": "Normalised check results from execute-pre-checks, keyed by ecosystem",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "issues_found",
+					"description": "List of issues with ecosystem, check, severity and detail",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "report_format",
+					"description": "Output format — summary (default), detailed, or json",
+					"type": "string",
+					"required": false,
+					"default": "summary",
+					"validation": {
+						"enum": ["summary", "detailed", "json"]
+					}
+				}
+			]
 		},
 		"07_documentation.apply-specification-refinement": {
 			"id": "07_documentation.apply-specification-refinement",
-			"version": " 1.0.0",
-			"category": " documentation",
-			"experimental": false,
-			"name": " Apply Specification Refinement",
-			"description": " Merge user clarifications into refined specifications and output final document",
+			"version": "1.0.0",
+			"category": "documentation",
+			"experimental": true,
+			"name": "Apply Specification Refinement",
+			"description": "Merge user clarifications into refined specifications and output final document",
 			"tags": ["specifications", "refinement", "documentation", "merge"],
 			"agents": ["product-manager"],
 			"outputs": ["final_specifications", "changes_summary", "clarifications_applied"],
@@ -1867,17 +3859,59 @@
 				"recommended": ["claude-haiku-4.5"]
 			},
 			"dependencies": {
-				"requires": ["context.understand-intent", "onboard.refine-specifications", "review.validate-completeness"]
+				"requires": [
+					"context.use-modern-cli-tools",
+					"context.understand-intent",
+					"onboard.refine-specifications",
+					"review.validate-completeness"
+				]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "refined_specifications",
+					"description": "Refined specifications from onboard.refine-specifications",
+					"type": "string",
+					"required": true
+				},
+				{
+					"name": "clarity_score",
+					"description": "Clarity score from onboard.refine-specifications",
+					"type": "number",
+					"required": true
+				},
+				{
+					"name": "validation_results",
+					"description": "Validation results from review.validate-completeness",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "user_answers",
+					"description": "User answers to clarifying questions (from interactive mode)",
+					"type": "object",
+					"required": false
+				},
+				{
+					"name": "user_answers_summary",
+					"description": "Summary of user answers for inclusion in the document",
+					"type": "string",
+					"required": false
+				},
+				{
+					"name": "output_file",
+					"description": "Path to output file (default knowledge-base/FUNCTIONAL.md)",
+					"type": "string",
+					"required": false
+				}
+			]
 		},
 		"07_documentation.apply-task-refinement": {
 			"id": "07_documentation.apply-task-refinement",
-			"version": " 1.1.0",
-			"category": " documentation",
-			"experimental": false,
-			"name": " Apply Task Refinement",
-			"description": " Merge refined task into BACKLOG.md and output for approval",
+			"version": "1.1.0",
+			"category": "documentation",
+			"experimental": true,
+			"name": "Apply Task Refinement",
+			"description": "Merge refined task into BACKLOG.md and output for approval",
 			"tags": ["backlog", "task-refinement", "documentation", "merge"],
 			"agents": ["product-manager"],
 			"outputs": ["changes_summary", "backlog_document", "updated_task"],
@@ -1886,55 +3920,161 @@
 				"recommended": ["claude-haiku-4.5"]
 			},
 			"dependencies": {
-				"requires": ["context.load-task", "onboard.refine-requirements", "review.validate-testability"]
+				"requires": [
+					"context.load-task",
+					"onboard.refine-requirements",
+					"review.validate-testability",
+					"context.use-modern-cli-tools"
+				]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "task_context",
+					"description": "Original task details from context.load-task",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "refinement",
+					"description": "Refined requirements from onboard.refine-requirements",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "validation",
+					"description": "Validation results from review.validate-testability",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "backlog_file",
+					"description": "Path to BACKLOG.md file",
+					"type": "string",
+					"required": true
+				},
+				{
+					"name": "user_answers",
+					"description": "User answers to clarifying questions (from interactive mode)",
+					"type": "object",
+					"required": false
+				},
+				{
+					"name": "user_answers_summary",
+					"description": "Summary of user answers for inclusion in changes summary",
+					"type": "string",
+					"required": false
+				}
+			]
 		},
 		"07_documentation.export-metrics": {
 			"id": "07_documentation.export-metrics",
-			"version": " 1.0.0",
-			"category": " documentation",
-			"experimental": false,
-			"name": " Export Metrics",
-			"description": " Export feedback metrics in machine-readable formats (JSON, CSV, HTML)",
+			"version": "1.0.0",
+			"category": "documentation",
+			"experimental": true,
+			"name": "Export Metrics",
+			"description": "Export feedback metrics in machine-readable formats (JSON, CSV, HTML)",
 			"tags": ["documentation", "export", "metrics", "reporting"],
-			"agents": ["product-manager"],
 			"outputs": ["exported_file_path", "export_status"],
 			"model_requirements": {
 				"min_context": 128000,
 				"recommended": ["claude-haiku-4.5"]
 			},
 			"dependencies": {
-				"requires": ["documentation.generate-feedback-report"]
+				"requires": ["context.use-modern-cli-tools", "documentation.generate-feedback-report"]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "summary_statistics",
+					"description": "Summary statistics from feedback report",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "export_format",
+					"description": "Export format (json, csv, html, markdown)",
+					"type": "string",
+					"required": true,
+					"validation": {
+						"enum": ["json", "csv", "html", "markdown"]
+					}
+				},
+				{
+					"name": "output_path",
+					"description": "Optional custom output path",
+					"type": "string",
+					"required": false
+				}
+			]
 		},
 		"07_documentation.generate-all-domains-parallel": {
 			"id": "07_documentation.generate-all-domains-parallel",
-			"version": " 1.0.0",
-			"category": " documentation",
-			"experimental": false,
-			"name": " Generate All Domains (Parallel Subprocesses)",
-			"description": " Generate infrastructure, backend, and frontend documentation simultaneously using parallel subprocesses - saves 5 minutes per workflow",
+			"version": "1.0.0",
+			"category": "documentation",
+			"experimental": true,
+			"name": "Generate All Domains (Parallel Subprocesses)",
+			"description": "Generate infrastructure, backend, and frontend documentation simultaneously using parallel subprocesses - saves 5 minutes per workflow",
 			"tags": ["documentation", "parallel", "subprocess", "optimisation"],
 			"agents": ["lead"],
 			"outputs": ["infrastructure_docs", "backend_docs", "frontend_docs", "generation_metrics"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-5"]
 			},
 			"dependencies": {
-				"requires": ["context.load-and-analyze-parallel"]
+				"requires": ["context.use-modern-cli-tools", "context.load-and-analyze-parallel"]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "documentation_plan",
+					"description": "Full documentation plan from context stage",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "diagram_requirements",
+					"description": "Diagram requirements from context stage",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "cross_refs",
+					"description": "Cross-reference mappings",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "prd",
+					"description": "PRD document context",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "codebase",
+					"description": "Codebase context",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "security_context",
+					"description": "Security requirements context",
+					"type": "object",
+					"required": false
+				},
+				{
+					"name": "domain_assignments",
+					"description": "Which domains to generate",
+					"type": "object",
+					"required": true
+				}
+			]
 		},
 		"07_documentation.generate-backend-docs": {
 			"id": "07_documentation.generate-backend-docs",
-			"version": " 1.0.0",
-			"category": " documentation",
-			"experimental": false,
-			"name": " Generate Backend Documentation",
-			"description": " Generate 5 backend documentation files (ARCHITECTURE, API, DATA, TESTING, CODING-ASSERTIONS)",
+			"version": "1.0.0",
+			"category": "documentation",
+			"experimental": true,
+			"name": "Generate Backend Documentation",
+			"description": "Generate 5 backend documentation files (ARCHITECTURE, API, DATA, TESTING, CODING-ASSERTIONS)",
 			"tags": ["documentation", "backend", "api"],
 			"agents": ["software-engineer-typescript-backend"],
 			"outputs": [
@@ -1949,103 +4089,339 @@
 				"recommended": ["claude-haiku-4.5"]
 			},
 			"dependencies": {
-				"requires": ["onboard.analyze-documentation-requirements"]
+				"requires": ["onboard.analyze-documentation-requirements", "context.use-modern-cli-tools"]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "documentation_plan",
+					"description": "Full documentation plan object (extract backend domain)",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "diagram_requirements",
+					"description": "Full diagram requirements object (extract backend domain)",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "cross_refs",
+					"description": "Cross-reference mappings",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "prd",
+					"description": "PRD document context",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "codebase",
+					"description": "Codebase context",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "target_domain",
+					"description": "Domain to generate (always 'backend' for this prompt)",
+					"type": "string",
+					"required": true
+				}
+			]
 		},
 		"07_documentation.generate-backlog-artifacts": {
 			"id": "07_documentation.generate-backlog-artifacts",
-			"version": " 1.0.0",
-			"category": " documentation",
-			"experimental": false,
-			"name": " Generate Backlog Artifacts",
-			"description": " Generate backlog documentation files and related artifacts from validated task list",
+			"version": "1.0.0",
+			"category": "documentation",
+			"experimental": true,
+			"name": "Generate Backlog Artifacts",
+			"description": "Generate backlog documentation files and related artifacts from validated task list",
 			"tags": ["backlog", "documentation", "artifact-generation"],
-			"agents": ["product-manager"],
 			"outputs": ["backlog_document", "backlog_file_path", "backup_file_path", "generated_artifacts"],
 			"model_requirements": {
 				"min_context": 128000,
 				"recommended": ["claude-haiku-4.5"]
 			},
 			"dependencies": {
-				"requires": ["review.validate-backlog"]
+				"requires": ["context.use-modern-cli-tools", "review.validate-backlog"]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "task_list",
+					"description": "Validated task list with metadata",
+					"type": "array",
+					"required": true
+				},
+				{
+					"name": "task_dependencies",
+					"description": "Task dependency graph",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "priority_order",
+					"description": "Execution order by phase",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "validation_results",
+					"description": "Validation results from review stage",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "prd_metadata",
+					"description": "Project metadata from PRD",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "format",
+					"description": "Output format (markdown/github/jira)",
+					"type": "string",
+					"required": false,
+					"default": "markdown",
+					"validation": {
+						"enum": ["markdown", "github", "jira"]
+					}
+				}
+			]
 		},
 		"07_documentation.generate-code-review-report": {
 			"id": "07_documentation.generate-code-review-report",
-			"version": " 1.0.0",
-			"category": " documentation",
-			"experimental": false,
-			"name": " Generate Code Review Report",
-			"description": " Generate comprehensive, actionable code review report with prioritized recommendations",
+			"version": "1.0.0",
+			"category": "documentation",
+			"experimental": true,
+			"name": "Generate Code Review Report",
+			"description": "Generate comprehensive, actionable code review report with prioritized recommendations",
 			"tags": ["documentation", "code-review", "reporting"],
 			"agents": ["lead"],
 			"outputs": ["review_report", "recommendations", "next_steps"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-5"]
 			},
 			"dependencies": {
-				"requires": ["review.assess-code-quality"]
+				"requires": ["context.use-modern-cli-tools", "review.assess-code-quality"]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "quality_score",
+					"description": "Overall quality score from assessment",
+					"type": "number",
+					"required": true
+				},
+				{
+					"name": "issues_found",
+					"description": "Aggregated issues from all validations",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "review_decision",
+					"description": "Final decision (APPROVE/REQUEST_CHANGES/BLOCK)",
+					"type": "string",
+					"required": true
+				},
+				{
+					"name": "blocking_issues",
+					"description": "List of blocking issues",
+					"type": "array",
+					"required": true
+				},
+				{
+					"name": "validation_results",
+					"description": "Results from each validation",
+					"type": "object",
+					"required": true
+				}
+			]
 		},
 		"07_documentation.generate-feedback-report": {
 			"id": "07_documentation.generate-feedback-report",
-			"version": " 1.0.0",
-			"category": " documentation",
-			"experimental": false,
-			"name": " Generate Feedback Report",
-			"description": " Create comprehensive feedback report synthesizing all collected metrics and recommendations",
+			"version": "1.0.0",
+			"category": "documentation",
+			"experimental": true,
+			"name": "Generate Feedback Report",
+			"description": "Create comprehensive feedback report synthesizing all collected metrics and recommendations",
 			"tags": ["documentation", "feedback", "reporting"],
-			"agents": ["product-manager"],
 			"outputs": ["feedback_report", "report_path", "summary_statistics"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-5"]
 			},
 			"dependencies": {
 				"requires": [
+					"context.use-modern-cli-tools",
 					"context.identify-completed-workflow",
 					"review.calculate-performance-metrics",
 					"review.evaluate-quality-outcomes",
 					"review.identify-improvement-areas"
 				]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "workflow_executed",
+					"description": "Workflow type",
+					"type": "string",
+					"required": true
+				},
+				{
+					"name": "satisfaction_score",
+					"description": "User satisfaction rating (1-10)",
+					"type": "number",
+					"required": false
+				},
+				{
+					"name": "time_efficiency_score",
+					"description": "Time efficiency score (0-100)",
+					"type": "number",
+					"required": true
+				},
+				{
+					"name": "overall_quality_score",
+					"description": "Overall quality score (0-100)",
+					"type": "number",
+					"required": true
+				},
+				{
+					"name": "agent_improvements",
+					"description": "Agent improvement recommendations",
+					"type": "array",
+					"required": true
+				},
+				{
+					"name": "prompt_refinements",
+					"description": "Prompt refinement suggestions",
+					"type": "array",
+					"required": true
+				},
+				{
+					"name": "workflow_optimizations",
+					"description": "Workflow optimization opportunities",
+					"type": "array",
+					"required": true
+				}
+			]
 		},
 		"07_documentation.generate-feedback-summary": {
 			"id": "07_documentation.generate-feedback-summary",
-			"version": " 1.0.0",
-			"category": " documentation",
-			"experimental": false,
-			"name": " Generate Feedback Summary",
-			"description": " Create a concise feedback summary for display - no file output",
+			"version": "1.0.0",
+			"category": "documentation",
+			"experimental": true,
+			"name": "Generate Feedback Summary",
+			"description": "Create a concise feedback summary for display - no file output",
 			"tags": ["documentation", "feedback", "summary"],
-			"agents": ["product-manager"],
 			"outputs": ["feedback_summary", "key_insights", "recommendations"],
 			"model_requirements": {
 				"min_context": 64000,
-				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-5"]
 			},
 			"dependencies": {
 				"requires": [
+					"context.use-modern-cli-tools",
 					"context.identify-completed-workflow",
 					"review.calculate-performance-metrics",
 					"review.evaluate-quality-outcomes",
 					"review.identify-improvement-areas"
 				]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "workflow_executed",
+					"description": "Workflow type",
+					"type": "string",
+					"required": true
+				},
+				{
+					"name": "execution_duration",
+					"description": "Total execution duration",
+					"type": "number",
+					"required": false
+				},
+				{
+					"name": "satisfaction_score",
+					"description": "User satisfaction rating (1-10)",
+					"type": "number",
+					"required": false
+				},
+				{
+					"name": "time_efficiency_score",
+					"description": "Time efficiency score (0-100)",
+					"type": "number",
+					"required": false
+				},
+				{
+					"name": "error_rate",
+					"description": "Error rate percentage",
+					"type": "number",
+					"required": false
+				},
+				{
+					"name": "completion_success_rate",
+					"description": "Completion success rate",
+					"type": "number",
+					"required": false
+				},
+				{
+					"name": "bottlenecks_identified",
+					"description": "List of identified bottlenecks",
+					"type": "array",
+					"required": false
+				},
+				{
+					"name": "overall_quality_score",
+					"description": "Overall quality score (0-100)",
+					"type": "number",
+					"required": false
+				},
+				{
+					"name": "code_quality_score",
+					"description": "Code quality score",
+					"type": "number",
+					"required": false
+				},
+				{
+					"name": "test_quality_score",
+					"description": "Test quality score",
+					"type": "number",
+					"required": false
+				},
+				{
+					"name": "review_quality_score",
+					"description": "Review quality score",
+					"type": "number",
+					"required": false
+				},
+				{
+					"name": "agent_improvements",
+					"description": "Agent improvement recommendations",
+					"type": "array",
+					"required": false
+				},
+				{
+					"name": "prompt_refinements",
+					"description": "Prompt refinement suggestions",
+					"type": "array",
+					"required": false
+				},
+				{
+					"name": "workflow_optimizations",
+					"description": "Workflow optimization opportunities",
+					"type": "array",
+					"required": false
+				}
+			]
 		},
 		"07_documentation.generate-frontend-docs": {
 			"id": "07_documentation.generate-frontend-docs",
-			"version": " 1.0.0",
-			"category": " documentation",
-			"experimental": false,
-			"name": " Generate Frontend Documentation",
-			"description": " Generate 4 frontend documentation files (ARCHITECTURE, DESIGN, TESTING, CODING-ASSERTIONS)",
+			"version": "1.0.0",
+			"category": "documentation",
+			"experimental": true,
+			"name": "Generate Frontend Documentation",
+			"description": "Generate 4 frontend documentation files (ARCHITECTURE, DESIGN, TESTING, CODING-ASSERTIONS)",
 			"tags": ["documentation", "frontend", "react"],
 			"agents": ["software-engineer-typescript-frontend"],
 			"outputs": ["architecture_document", "design_document", "testing_document", "coding_assertions_document"],
@@ -2054,36 +4430,104 @@
 				"recommended": ["claude-haiku-4.5"]
 			},
 			"dependencies": {
-				"requires": ["onboard.analyze-documentation-requirements"]
+				"requires": ["onboard.analyze-documentation-requirements", "context.use-modern-cli-tools"]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "documentation_plan",
+					"description": "Full documentation plan object (extract frontend domain)",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "diagram_requirements",
+					"description": "Full diagram requirements object (extract frontend domain)",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "cross_refs",
+					"description": "Cross-reference mappings",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "prd",
+					"description": "PRD document context",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "codebase",
+					"description": "Codebase context",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "target_domain",
+					"description": "Domain to generate (always 'frontend' for this prompt)",
+					"type": "string",
+					"required": true
+				}
+			]
 		},
 		"07_documentation.generate-functional-review-report": {
 			"id": "07_documentation.generate-functional-review-report",
-			"version": " 1.0.0",
-			"category": " documentation",
-			"experimental": false,
-			"name": " Generate Functional Review Report",
-			"description": " Synthesize functional validation results into comprehensive, actionable report with go/no-go decision",
+			"version": "1.0.0",
+			"category": "documentation",
+			"experimental": true,
+			"name": "Generate Functional Review Report",
+			"description": "Synthesize functional validation results into comprehensive, actionable report with go/no-go decision",
 			"tags": ["documentation", "functional-review", "reporting"],
 			"agents": ["lead"],
 			"outputs": ["functional_report", "go_no_go_decision", "recommendations"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-5"]
 			},
 			"dependencies": {
-				"requires": ["review.validate-functional-requirements"]
+				"requires": ["context.use-modern-cli-tools", "review.validate-functional-requirements"]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "completeness_score",
+					"description": "Overall completeness score from validation",
+					"type": "number",
+					"required": true
+				},
+				{
+					"name": "functional_gaps",
+					"description": "Identified functional gaps",
+					"type": "array",
+					"required": true
+				},
+				{
+					"name": "ux_issues",
+					"description": "UX and usability issues",
+					"type": "array",
+					"required": true
+				},
+				{
+					"name": "workflow_validation",
+					"description": "Workflow validation results",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "requirements_coverage",
+					"description": "Requirements coverage details",
+					"type": "object",
+					"required": true
+				}
+			]
 		},
 		"07_documentation.generate-infrastructure-docs": {
 			"id": "07_documentation.generate-infrastructure-docs",
-			"version": " 1.0.0",
-			"category": " documentation",
-			"experimental": false,
-			"name": " Generate Infrastructure Documentation",
-			"description": " Generate 6 infrastructure documentation files (HLD, CONTAINER, DEPLOYMENT, LOGGING, LZ, WORKFLOW)",
+			"version": "1.0.0",
+			"category": "documentation",
+			"experimental": true,
+			"name": "Generate Infrastructure Documentation",
+			"description": "Generate 6 infrastructure documentation files (HLD, CONTAINER, DEPLOYMENT, LOGGING, LZ, WORKFLOW)",
 			"tags": ["documentation", "infrastructure", "devops"],
 			"agents": ["platform-engineer"],
 			"outputs": [
@@ -2100,36 +4544,99 @@
 				"recommended": ["claude-haiku-4.5"]
 			},
 			"dependencies": {
-				"requires": ["onboard.analyze-documentation-requirements"]
+				"requires": ["onboard.analyze-documentation-requirements", "context.use-modern-cli-tools"]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "documentation_plan",
+					"description": "Full documentation plan object (extract infrastructure domain)",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "diagram_requirements",
+					"description": "Full diagram requirements object (extract infrastructure domain)",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "cross_refs",
+					"description": "Cross-reference mappings",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "prd",
+					"description": "PRD document context",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "codebase",
+					"description": "Codebase context",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "target_domain",
+					"description": "Domain to generate (always 'infrastructure' for this prompt)",
+					"type": "string",
+					"required": true
+				},
+				{
+					"name": "security_requirements",
+					"description": "Security policies, compliance frameworks, and threat model context",
+					"type": "object",
+					"required": false
+				}
+			]
 		},
 		"07_documentation.generate-prd": {
 			"id": "07_documentation.generate-prd",
-			"version": " 1.1.0",
-			"category": " documentation",
-			"experimental": false,
-			"name": " Generate PRD",
-			"description": " Generate comprehensive Product Requirements Document from analyzed requirements",
+			"version": "1.1.0",
+			"category": "documentation",
+			"experimental": true,
+			"name": "Generate PRD",
+			"description": "Generate comprehensive Product Requirements Document from analyzed requirements",
 			"tags": ["prd-generation", "documentation", "requirements-documentation"],
 			"agents": ["product-manager"],
 			"outputs": ["prd_document", "executive_summary"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5", "gpt-4o"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-5", "gpt-4o"]
 			},
 			"dependencies": {
-				"requires": ["context.load-specifications", "onboard.analyze-requirements"]
+				"requires": ["context.load-specifications", "onboard.analyze-requirements", "context.use-modern-cli-tools"]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "specifications",
+					"description": "Loaded specifications",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "analysis",
+					"description": "Requirements analysis with user stories",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "template",
+					"description": "PRD template type",
+					"type": "string",
+					"required": false,
+					"default": "standard"
+				}
+			]
 		},
 		"07_documentation.persist-documentation": {
 			"id": "07_documentation.persist-documentation",
-			"version": " 1.0.0",
-			"category": " documentation",
-			"experimental": false,
-			"name": " Persist Documentation",
-			"description": " Verify written documentation files and create handoff summary",
+			"version": "1.0.0",
+			"category": "documentation",
+			"experimental": true,
+			"name": "Persist Documentation",
+			"description": "Verify written documentation files and create handoff summary",
 			"tags": ["documentation", "file-writing", "persistence"],
 			"agents": ["lead"],
 			"outputs": ["written_files", "backup_files", "handoff_summary"],
@@ -2138,55 +4645,178 @@
 				"recommended": ["claude-haiku-4.5"]
 			},
 			"dependencies": {
-				"requires": ["review.validate-documentation"]
+				"requires": ["review.validate-documentation", "context.use-modern-cli-tools"]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "infrastructure_docs",
+					"description": "Infrastructure generation metadata (files already written)",
+					"type": "object",
+					"required": false
+				},
+				{
+					"name": "backend_docs",
+					"description": "Backend generation metadata (files already written)",
+					"type": "object",
+					"required": false
+				},
+				{
+					"name": "frontend_docs",
+					"description": "Frontend generation metadata (files already written)",
+					"type": "object",
+					"required": false
+				},
+				{
+					"name": "validation_results",
+					"description": "Validation results from review stage",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "completeness_score",
+					"description": "Overall completeness score",
+					"type": "number",
+					"required": true
+				},
+				{
+					"name": "output_dir",
+					"description": "Output directory from --output-dir argument",
+					"type": "string",
+					"required": false
+				},
+				{
+					"name": "project_metadata",
+					"description": "Project metadata from context stage",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "domain_assignments",
+					"description": "Which domains were enabled for generation",
+					"type": "object",
+					"required": true
+				}
+			]
 		},
 		"07_documentation.review-and-persist-parallel": {
 			"id": "07_documentation.review-and-persist-parallel",
-			"version": " 1.0.0",
-			"category": " documentation",
-			"experimental": false,
-			"name": " Review and Persist Documentation (Merged)",
-			"description": " Merged review and persist stage for parallel documentation generation - saves 60s per workflow",
+			"version": "1.0.0",
+			"category": "documentation",
+			"experimental": true,
+			"name": "Review and Persist Documentation (Merged)",
+			"description": "Merged review and persist stage for parallel documentation generation - saves 60s per workflow",
 			"tags": ["documentation", "review", "persist", "parallel", "optimisation"],
 			"agents": ["lead"],
 			"outputs": ["validation_results", "completeness_score", "written_files", "handoff_summary", "time_saved"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-5"]
 			},
 			"dependencies": {
-				"requires": ["documentation.generate-all-domains-parallel"]
+				"requires": ["context.use-modern-cli-tools", "documentation.generate-all-domains-parallel"]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "infrastructure_docs",
+					"description": "Infrastructure documentation metadata from generation stage",
+					"type": "object",
+					"required": false
+				},
+				{
+					"name": "backend_docs",
+					"description": "Backend documentation metadata from generation stage",
+					"type": "object",
+					"required": false
+				},
+				{
+					"name": "frontend_docs",
+					"description": "Frontend documentation metadata from generation stage",
+					"type": "object",
+					"required": false
+				},
+				{
+					"name": "documentation_plan",
+					"description": "Documentation plan from context stage",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "cross_references",
+					"description": "Cross-reference mappings from context stage",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "domain_assignments",
+					"description": "Which domains were generated",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "output_dir",
+					"description": "Output directory (default: knowledge-base/)",
+					"type": "string",
+					"required": false
+				},
+				{
+					"name": "project_metadata",
+					"description": "Project metadata from context stage",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "generation_metrics",
+					"description": "Metrics from generation stage",
+					"type": "object",
+					"required": true
+				}
+			]
 		},
 		"07_documentation.update-changelog": {
 			"id": "07_documentation.update-changelog",
-			"version": " 1.0.0",
-			"category": " documentation",
-			"experimental": false,
-			"name": " Update Changelog",
-			"description": " Automatically update CHANGELOG.md with structured release notes from commits",
+			"version": "1.0.0",
+			"category": "documentation",
+			"experimental": true,
+			"name": "Update Changelog",
+			"description": "Automatically update CHANGELOG.md with structured release notes from commits",
 			"tags": ["changelog", "release-notes", "documentation"],
 			"agents": ["lead", "software-engineer"],
 			"outputs": ["changelog_updated", "changelog_entry"],
 			"model_requirements": {
 				"min_context": 200000,
-				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-5"]
 			},
 			"dependencies": {
-				"requires": ["code.stage-and-commit"]
+				"requires": ["context.use-modern-cli-tools", "code.stage-and-commit"]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "commit_messages",
+					"description": "Array of commit messages",
+					"type": "array",
+					"required": true
+				},
+				{
+					"name": "version",
+					"description": "Version number for this release",
+					"type": "string",
+					"required": true
+				},
+				{
+					"name": "change_type",
+					"description": "Primary change type",
+					"type": "string",
+					"required": true
+				}
+			]
 		},
 		"07_documentation.update-inline-docs": {
 			"id": "07_documentation.update-inline-docs",
-			"version": " 1.0.0",
-			"category": " documentation",
-			"experimental": false,
-			"name": " Update Inline Documentation",
-			"description": " Add comprehensive inline documentation to implemented code",
+			"version": "1.0.0",
+			"category": "documentation",
+			"experimental": true,
+			"name": "Update Inline Documentation",
+			"description": "Add comprehensive inline documentation to implemented code",
 			"tags": ["documentation", "code-comments", "maintainability"],
 			"agents": [
 				"software-engineer-typescript-backend",
@@ -2197,69 +4827,72 @@
 			"outputs": ["documentation_updated", "inline_comments_added", "type_annotations_complete"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-5"]
 			},
 			"dependencies": {
-				"requires": ["code.implement-changes"]
+				"requires": ["context.use-modern-cli-tools", "code.implement-changes"]
 			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "code_changes",
+					"description": "Changes from implement-changes",
+					"type": "object",
+					"required": true
+				},
+				{
+					"name": "files_modified",
+					"description": "List of modified files",
+					"type": "array",
+					"required": true
+				}
+			]
 		},
 		"07_documentation.update-knowledge-base": {
 			"id": "07_documentation.update-knowledge-base",
-			"version": " 1.0.0",
-			"category": " documentation",
-			"experimental": false,
-			"name": " Update Knowledge Base",
-			"description": " Integrate feedback learnings into persistent knowledge base for continuous improvement",
+			"version": "1.0.0",
+			"category": "documentation",
+			"experimental": true,
+			"name": "Update Knowledge Base",
+			"description": "Integrate feedback learnings into persistent knowledge base for continuous improvement",
 			"tags": ["documentation", "knowledge-management", "continuous-learning"],
-			"agents": ["product-manager"],
 			"outputs": ["knowledge_base_updated", "patterns_learned", "best_practices_added"],
 			"model_requirements": {
 				"min_context": 128000,
-				"recommended": ["claude-sonnet-4.6", "claude-sonnet-4.5"]
+				"recommended": ["claude-sonnet-4.6", "claude-sonnet-5"]
 			},
 			"dependencies": {
-				"requires": ["documentation.generate-feedback-report", "review.identify-improvement-areas"]
+				"requires": [
+					"context.use-modern-cli-tools",
+					"documentation.generate-feedback-report",
+					"review.identify-improvement-areas"
+				]
 			},
-			"inputs": []
-		},
-		"06_test.execute-pre-checks": {
-			"id": "06_test.execute-pre-checks",
-			"version": " 1.0.0",
-			"category": " test",
-			"experimental": true,
-			"name": " Execute Pre-Checks",
-			"description": " Detect the project ecosystem then run language-appropriate quality checks (type checking, linting, formatting, security audit, quick tests) in parallel",
-			"tags": ["pre-check", "linting", "type-checking", "security-audit", "multi-language"],
-			"agents": ["qa"],
-			"outputs": ["check_results", "issues_found", "auto_fixes_applied", "overall_status"],
-			"model_requirements": {
-				"min_context": 32000,
-				"recommended": ["claude-haiku-4.5", "claude-sonnet-4.6"]
-			},
-			"dependencies": {
-				"requires": ["context.use-modern-cli-tools"]
-			},
-			"inputs": []
-		},
-		"06_test.generate-precheck-report": {
-			"id": "06_test.generate-precheck-report",
-			"version": " 1.0.0",
-			"category": " test",
-			"experimental": true,
-			"name": " Generate Pre-Check Report",
-			"description": " Format pre-check results from any language ecosystem into a structured summary, detailed, or JSON report",
-			"tags": ["pre-check", "reporting", "quality-assessment", "multi-language"],
-			"agents": ["qa"],
-			"outputs": ["precheck_report", "recommendations"],
-			"model_requirements": {
-				"min_context": 16000,
-				"recommended": ["claude-haiku-4.5", "claude-sonnet-4.6"]
-			},
-			"dependencies": {
-				"requires": ["test.execute-pre-checks"]
-			},
-			"inputs": []
+			"inputs": [
+				{
+					"name": "feedback_report",
+					"description": "Generated feedback report content",
+					"type": "string",
+					"required": true
+				},
+				{
+					"name": "agent_improvements",
+					"description": "Agent improvement recommendations",
+					"type": "array",
+					"required": true
+				},
+				{
+					"name": "prompt_refinements",
+					"description": "Prompt refinement suggestions",
+					"type": "array",
+					"required": true
+				},
+				{
+					"name": "workflow_optimizations",
+					"description": "Workflow optimization opportunities",
+					"type": "array",
+					"required": true
+				}
+			]
 		}
 	}
 }

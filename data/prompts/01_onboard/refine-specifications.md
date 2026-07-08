@@ -12,8 +12,7 @@ tags:
 model_requirements:
   min_context: 128000
   recommended:
-    - gpt-5-thinking-high
-    - gpt-o1-high
+    - gpt-5.5
 agents:
   - product-manager
 dependencies:
@@ -166,7 +165,6 @@ Structure the information into the Markdown format below.
 - **Primary**: [1-2 sentence description with key characteristics]
 - **Secondary**: [1 sentence if applicable]
 - **Personas** (MAX 2):
-  - **[Name]**: [1 sentence describing role and key need]
   - **[Name]**: [1 sentence describing role and key need]
 
 ---

@@ -16,7 +16,7 @@ describe('calculateActualCost', () => {
 			total_tokens: 1500
 		};
 
-		const result = calculateActualCost(usage, 'claude-3-5-sonnet-latest');
+		const result = calculateActualCost(usage, 'claude-sonnet-4.6');
 
 		// input: 1000/1M * 3.0 = 0.003
 		// output: 500/1M * 15.0 = 0.0075
@@ -33,7 +33,7 @@ describe('calculateActualCost', () => {
 			total_tokens: 1500
 		};
 
-		const result = calculateActualCost(usage, 'claude-3-5-sonnet-latest');
+		const result = calculateActualCost(usage, 'claude-sonnet-4.6');
 
 		// input: 1000/1M * 3.0 = 0.003
 		// output: 500/1M * 15.0 = 0.0075
@@ -51,7 +51,7 @@ describe('calculateActualCost', () => {
 			total_tokens: 1500
 		};
 
-		const result = calculateActualCost(usage, 'claude-3-5-sonnet-latest');
+		const result = calculateActualCost(usage, 'claude-sonnet-4.6');
 
 		// input: 1000/1M * 3.0 = 0.003
 		// output: 500/1M * 15.0 = 0.0075

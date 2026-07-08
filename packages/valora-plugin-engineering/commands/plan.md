@@ -14,7 +14,7 @@ allowed-tools:
   - mcp_github
   # MCP: Semantic context search
   - mcp_context7
-model: claude-opus-4.6
+model: claude-opus-4.8
 agent: lead
 prompts:
   pipeline:
