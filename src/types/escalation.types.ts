@@ -20,7 +20,10 @@ export type EscalationDecisionType = 'abort' | 'modify' | 'proceed';
  * LLM's escalation output structure embedded in responses
  */
 export interface EscalationSignal {
-	confidence: number; // 0-100
+	/** Self-reported by the model (0-100) — not independently computed or verified. */
+	confidence: number;
+	/** Whether `confidence` was actually reported by the model ('reported') or synthesized because the model omitted/malformed the field ('defaulted'). */
+	confidenceSource: 'defaulted' | 'reported';
 	proposed_action: string;
 	reasoning: string;
 	requires_escalation: boolean;
@@ -42,6 +45,8 @@ export interface EscalationDecision {
  */
 export interface EscalationContext {
 	agentRole: string;
+	/** Whether a "Modify" decision would actually cause a retry. False on the final retry attempt — the handler should not offer a choice that silently does nothing. */
+	allowModify: boolean;
 	escalationCriteria: string[];
 	llmResponse: string;
 	signal: EscalationSignal;
@@ -69,13 +74,31 @@ export interface EscalationParseResult {
 }
 
 /**
+ * Configuration for sampling the model multiple times to independently check a
+ * borderline confidence report, rather than trusting the model's single self-assessment.
+ */
+export interface SelfConsistencyConfig {
+	/** Only sample when confidence is in [threshold, threshold + borderlineBand) and no escalation was otherwise triggered. */
+	borderlineBand: number;
+	enabled: boolean;
+	/** Extra LLM calls fired per borderline check (total samples = 1 + sampleCount). */
+	sampleCount: number;
+}
+
+/**
  * Configuration for escalation detection
  */
 export interface EscalationConfig {
 	/** Confidence threshold below which escalation is triggered (0-100) */
 	confidenceThreshold: number;
-	/** Whether to require explicit escalation block in response */
+	/**
+	 * When true, a stage configured with escalation criteria that responds without a
+	 * parseable `_escalation` block is treated as an escalation itself (fail closed)
+	 * rather than silently proceeding as if no escalation were required.
+	 */
 	requireExplicitBlock: boolean;
+	/** See `SelfConsistencyConfig`. */
+	selfConsistency: SelfConsistencyConfig;
 }
 
 /**
@@ -83,5 +106,10 @@ export interface EscalationConfig {
  */
 export const DEFAULT_ESCALATION_CONFIG: EscalationConfig = {
 	confidenceThreshold: 70,
-	requireExplicitBlock: true
+	requireExplicitBlock: true,
+	selfConsistency: {
+		borderlineBand: 10,
+		enabled: true,
+		sampleCount: 2
+	}
 };

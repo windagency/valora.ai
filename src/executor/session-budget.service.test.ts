@@ -106,5 +106,11 @@ describe('SessionBudgetService', () => {
 			expect(signal.triggered_criteria).toContain('budget_exhausted');
 			expect(signal.proposed_action).toContain('stage-x');
 		});
+
+		it('reports a synthetic (not model-reported) full-confidence value, since this is a deterministic system halt', () => {
+			const signal = service.buildBudgetEscalationSignal(0.9, 1.0, 'stage-x');
+			expect(signal.confidence).toBe(100);
+			expect(signal.confidenceSource).toBe('defaulted');
+		});
 	});
 });

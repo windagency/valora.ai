@@ -86,7 +86,7 @@ export class EscalationHandlerService {
 		this.console.labelValue('Stage', stageName);
 		this.console.labelValue('Agent', agentRole);
 		this.console.labelValue('Risk Level', formattedRisk);
-		this.console.labelValue('Confidence', this.formatConfidence(signal.confidence));
+		this.console.labelValue('Confidence', this.formatConfidenceDisplay(signal));
 		this.console.divider();
 		this.console.blank();
 		this.console.bold('Triggered Criteria:');
@@ -120,6 +120,18 @@ export class EscalationHandlerService {
 	}
 
 	/**
+	 * Format the confidence value for display, flagging when it was synthesized
+	 * (the model did not actually report a confidence value) rather than reported.
+	 */
+	private formatConfidenceDisplay(signal: EscalationSignal): string {
+		const formatted = this.formatConfidence(signal.confidence);
+		if (signal.confidenceSource === 'defaulted') {
+			return `${formatted} ${this.color.gray('(not reported by model)')}`;
+		}
+		return formatted;
+	}
+
+	/**
 	 * Format confidence with color
 	 */
 	private formatConfidence(confidence: number): string {
@@ -139,23 +151,29 @@ export class EscalationHandlerService {
 	/**
 	 * Prompt user for escalation decision
 	 */
-	private async promptForDecision(_context: EscalationContext): Promise<EscalationDecision> {
+	private async promptForDecision(context: EscalationContext): Promise<EscalationDecision> {
+		const choices = [
+			{
+				name: 'Proceed - Continue with the proposed action',
+				value: 'proceed'
+			},
+			...(context.allowModify
+				? [
+						{
+							name: 'Modify - Provide additional guidance and retry',
+							value: 'modify'
+						}
+					]
+				: []),
+			{
+				name: 'Abort - Stop execution and cancel the pipeline',
+				value: 'abort'
+			}
+		];
+
 		const answers = await this.promptAdapter.prompt([
 			{
-				choices: [
-					{
-						name: 'Proceed - Continue with the proposed action',
-						value: 'proceed'
-					},
-					{
-						name: 'Modify - Provide additional guidance and retry',
-						value: 'modify'
-					},
-					{
-						name: 'Abort - Stop execution and cancel the pipeline',
-						value: 'abort'
-					}
-				],
+				choices,
 				default: 'proceed',
 				message: 'How would you like to proceed?',
 				name: 'decision',

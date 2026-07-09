@@ -27,6 +27,7 @@ export class SessionBudgetService {
 	buildBudgetEscalationSignal(spentUsd: number, limitUsd: number, stageName: string): EscalationSignal {
 		return {
 			confidence: 100,
+			confidenceSource: 'defaulted',
 			proposed_action: `Halt stage '${stageName}' — session budget exhausted (spent $${spentUsd.toFixed(4)} of $${limitUsd.toFixed(4)} limit)`,
 			reasoning: 'The configured session budget has been reached. Human review is required before proceeding.',
 			requires_escalation: true,

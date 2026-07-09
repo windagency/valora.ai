@@ -1,5 +1,5 @@
 ---
-updated: 2026-05-07
+updated: 2026-07-09
 ---
 
 # Data Flow Architecture
@@ -315,7 +315,8 @@ flowchart TD
 │   ├── embeddings.bin   #   Packed Float32Array of embedding vectors
 │   ├── embeddings.index.json
 │   └── _legacy/         #   Auto-archived legacy JSON, if any
-└── spending.jsonl        ← append-only per-request cost ledger
+├── spending.jsonl        ← append-only per-request cost ledger
+└── escalations.jsonl     ← append-only escalation-decision ledger (confidence calibration)
 ```
 
 ### spending.jsonl Record Format
@@ -338,6 +339,24 @@ flowchart TD
 	"batchDiscounted": false
 }
 ```
+
+### escalations.jsonl Record Format
+
+Written by `EscalationLedger` (`src/utils/escalation-ledger.ts`), populated via a subscriber on the pipeline's `escalation:triggered`/`escalation:resolved`/`escalation:aborted` events — the escalation decision logic itself never writes to this file directly. Deliberately excludes free-text fields (`reasoning`, `proposed_action`); only bounded, structured fields are persisted.
+
+```json
+{
+	"stage": "plan.assess-risks",
+	"confidence": 74,
+	"confidenceSource": "reported",
+	"riskLevel": "medium",
+	"triggeredCriteria": ["self_consistency_disagreement"],
+	"decision": "modify",
+	"timestamp": "2026-07-09T14:23:01.000Z"
+}
+```
+
+Read back via `ConfidenceCalibrationAnalytics` (`valora monitoring confidence-report`) to empirically check whether stated confidence correlates with what a human actually decided.
 
 ### Session File Format
 

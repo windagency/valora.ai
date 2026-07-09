@@ -15,6 +15,7 @@ import { generatePerformanceReport, getPerformanceProfiler } from 'utils/perform
 import { getCurrentResourceUsage, getResourceMonitor, getResourceStats } from 'utils/resource-monitor';
 import { type GetRecordsOptions, getSpendingTracker } from 'utils/spending-tracker';
 
+import { configureConfidenceReportSubcommand } from './confidence-report';
 import { configureUsageSubcommand } from './usage';
 import { configureUsageOptimizeSubcommand } from './usage-optimize';
 
@@ -634,4 +635,5 @@ export function configureMonitoringCommand(program: CommandAdapter): void {
 
 	const usageCmd = configureUsageSubcommand(monitoringCmd);
 	configureUsageOptimizeSubcommand(usageCmd);
+	configureConfidenceReportSubcommand(monitoringCmd);
 }

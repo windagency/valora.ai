@@ -67,6 +67,7 @@ import {
 } from 'services/index';
 import { SessionLifecycle } from 'session/lifecycle';
 import { SessionStore } from 'session/store';
+import { bootstrapEscalationLedger } from 'utils/escalation-ledger-subscriber';
 import { getRateLimiter } from 'utils/rate-limiter';
 
 /**
@@ -251,6 +252,7 @@ export async function initializePlugins(container: DIContainer): Promise<void> {
 	// Load LLM provider SDKs and vault lazily — keeps CLI startup fast for
 	// commands that don't need them (--help, config, session, etc.).
 	await Promise.all([import('llm/providers'), bootstrapMemoryFromConfig()]);
+	bootstrapEscalationLedger();
 
 	const pluginLoader = container.resolve<PluginLoaderService>(SERVICE_IDENTIFIERS.PLUGIN_LOADER);
 

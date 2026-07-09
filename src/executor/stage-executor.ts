@@ -18,6 +18,7 @@ import type {
 	LLMCompletionOptions,
 	LLMCompletionResult,
 	LLMMessage,
+	LLMProvider,
 	LLMToolCall,
 	LLMToolDefinition,
 	LLMToolResult,
@@ -57,6 +58,10 @@ import { getCompressionStats, stripAnsiCodes } from './output-compression.servic
 import { getOutputParsingService, type OutputParsingService } from './output-parsing.service';
 import { getPipelineEmitter, type PipelineEventEmitter } from './pipeline-events';
 import { loadAvailableAgents, loadProjectGuidance, loadProjectKnowledge } from './project-guidance-loader';
+import {
+	getSelfConsistencySamplerService,
+	type SelfConsistencySamplerService
+} from './self-consistency-sampler.service';
 import { getSessionBudgetService, type SessionBudgetService } from './session-budget.service';
 import { getStageOutputCache, type StageOutputCache } from './stage-output-cache';
 import { getStageValidationService, type StageValidationService } from './stage-validation.service';
@@ -183,6 +188,38 @@ export interface WorktreeInfoContext {
 }
 
 /**
+ * Outcome of evaluating a stage's response against its escalation criteria.
+ * - 'continue': no escalation required (or none configured) — proceed to normal completion handling.
+ * - 'output': the escalation is terminal (e.g. aborted) — use this StageOutput as the stage result.
+ * - 'retry': the human requested modification — the stage should be re-run with the given guidance.
+ */
+type EscalationOutcome =
+	| { guidance: string; kind: 'retry' }
+	| { kind: 'continue' }
+	| { kind: 'output'; output: StageOutput };
+
+/**
+ * Outcome of handling a completed LLM response for a stage.
+ * 'retry' signals the caller to re-invoke the LLM with additional guidance appended
+ * (bounded to a single retry — see `performStageExecution`).
+ */
+type StageCompletionResult = { guidance: string; type: 'retry' } | { output: StageOutput; type: 'final' };
+
+/**
+ * Everything needed to independently re-sample the model for a self-consistency check —
+ * i.e. to ask the same question again outside the tool loop that produced the original signal.
+ */
+interface SelfConsistencyReplayContext {
+	completionOptions: LLMCompletionOptions;
+	/** Model name actually used for the original call, for cost-estimating the extra samples. */
+	model: string;
+	/** Actual token usage from the original completion, used to estimate per-call cost. */
+	originalUsage: LLMUsage | undefined;
+	provider: LLMProvider;
+	sessionId: string | undefined;
+}
+
+/**
  * Context for completion handler methods
  * Consolidates parameters to avoid long parameter lists
  */
@@ -225,6 +262,7 @@ export class StageExecutor {
 	private mcpToolHandler: MCPToolHandler;
 	private messageBuilderService: MessageBuilderService;
 	private outputParsingService: OutputParsingService;
+	private selfConsistencySamplerService: SelfConsistencySamplerService;
 	private sessionBudgetService: SessionBudgetService;
 	private stageOutputCache: StageOutputCache;
 	private toolExecutionService: ToolExecutionService;
@@ -242,6 +280,7 @@ export class StageExecutor {
 		this.toolExecutionService = getToolExecutionService();
 		this.outputParsingService = getOutputParsingService();
 		this.messageBuilderService = getMessageBuilderService();
+		this.selfConsistencySamplerService = getSelfConsistencySamplerService();
 		this.stageOutputCache = getStageOutputCache();
 		const appConfig = getConfigLoader().get();
 		this.sessionBudgetService = getSessionBudgetService(getSpendingTracker(), appConfig.budgets);
@@ -549,17 +588,8 @@ export class StageExecutor {
 		this.toolExecutionService.setEffectiveConstraints(executionContext.effectiveConstraints);
 
 		// Budget circuit-breaker — halt before LLM call if session budget is exhausted
-		const sessionId = executionContext.sessionInfo?.sessionId;
-		if (sessionId) {
-			const budgetBreach = this.checkBudget(
-				sessionId,
-				`${stage.stage}.${stage.prompt}`,
-				startTime,
-				enrichedInputs,
-				logger
-			);
-			if (budgetBreach) return budgetBreach;
-		}
+		const budgetBreach = this.checkBudgetIfSessionPresent(executionContext, stage, startTime, enrichedInputs, logger);
+		if (budgetBreach) return budgetBreach;
 
 		// Emit LLM request event
 		this.eventEmitter.emitLLMRequest({
@@ -567,36 +597,116 @@ export class StageExecutor {
 			stage: `${stage.stage}.${stage.prompt}`
 		});
 
-		// Call LLM with tool loop
-		// In dry-run mode, tools are passed to LLM but simulated during execution
-		const { completion, summary } = await this.callLLMWithToolLoop(
-			executionContext,
-			systemMessage,
-			userMessage,
-			config.modelOverride,
-			config.modeOverride,
-			config.tools,
-			stage,
-			logger
-		);
-		const duration = Date.now() - startTime;
-		this.recordStageComplete(completion, summary, duration);
+		// Call LLM with tool loop, retrying at most once with human-provided guidance
+		// when an escalation review results in a "modify" decision.
+		let currentUserMessage = userMessage;
+		const MAX_ATTEMPTS = 2;
+		for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+			// In dry-run mode, tools are passed to LLM but simulated during execution
+			const { completion, summary } = await this.callLLMWithToolLoop(
+				executionContext,
+				systemMessage,
+				currentUserMessage,
+				config.modelOverride,
+				config.modeOverride,
+				config.tools,
+				stage,
+				logger
+			);
+			const duration = Date.now() - startTime;
+			this.recordStageComplete(completion, summary, duration);
 
-		// Emit LLM response event - prefer actual model returned by provider over configured model
-		const model = completion.model ?? config.modelOverride ?? executionContext.model ?? 'default';
-		this.emitLLMResponseEvent(stage, model, duration, completion);
+			// Emit LLM response event - prefer actual model returned by provider over configured model
+			const model = completion.model ?? config.modelOverride ?? executionContext.model ?? 'default';
+			this.emitLLMResponseEvent(stage, model, duration, completion);
 
-		// Handle completion
-		return this.handleStageCompletion(
-			completion,
-			summary,
-			stage,
-			executionContext,
-			resources.escalationCriteria,
-			enrichedInputs,
-			duration,
-			logger
-		);
+			// Replay context for an optional self-consistency check — a simplified single-turn
+			// re-ask (system + the message actually sent this attempt, no tool history) rather than
+			// replaying the full tool-loop conversation.
+			const selfConsistencyContext = this.buildSelfConsistencyReplayContext(
+				executionContext,
+				systemMessage,
+				currentUserMessage,
+				config.modelOverride,
+				config.modeOverride,
+				completion,
+				model
+			);
+
+			// Handle completion
+			const result = await this.handleStageCompletion(
+				completion,
+				summary,
+				stage,
+				executionContext,
+				resources.escalationCriteria,
+				enrichedInputs,
+				duration,
+				logger,
+				/* allowRetry */ attempt < MAX_ATTEMPTS,
+				selfConsistencyContext
+			);
+
+			if (result.type === 'final') {
+				return result.output;
+			}
+
+			logger.info('Re-running stage with human-provided guidance from escalation review', {
+				attempt: attempt + 1,
+				stage: `${stage.stage}.${stage.prompt}`
+			});
+			currentUserMessage = this.messageBuilderService.appendGuidance(currentUserMessage, result.guidance);
+		}
+
+		// Unreachable: MAX_ATTEMPTS bounds the loop and the final attempt never allows retry.
+		throw new Error('Stage execution exceeded retry bound without producing a final result');
+	}
+
+	/**
+	 * Budget circuit-breaker — only checks when a session is present (no session means
+	 * nothing to check against, e.g. a one-off command with no persisted spending history).
+	 */
+	private checkBudgetIfSessionPresent(
+		executionContext: ExecutionContext,
+		stage: PipelineStage,
+		startTime: number,
+		enrichedInputs: Record<string, unknown>,
+		logger: ReturnType<typeof getLogger>
+	): null | StageOutput {
+		const sessionId = executionContext.sessionInfo?.sessionId;
+		if (!sessionId) return null;
+		return this.checkBudget(sessionId, `${stage.stage}.${stage.prompt}`, startTime, enrichedInputs, logger);
+	}
+
+	/**
+	 * Builds the replay context an optional self-consistency check would use to independently
+	 * re-sample the model — see `maybeApplySelfConsistencyCheck`.
+	 */
+	private buildSelfConsistencyReplayContext(
+		executionContext: ExecutionContext,
+		systemMessage: string,
+		userMessage: string,
+		modelOverride: string | undefined,
+		modeOverride: string | undefined,
+		completion: LLMCompletionResult,
+		model: string
+	): SelfConsistencyReplayContext {
+		return {
+			completionOptions: this.buildCompletionOptions(
+				executionContext,
+				[
+					{ content: systemMessage, role: 'system' },
+					{ content: userMessage, role: 'user' }
+				],
+				undefined,
+				modelOverride,
+				modeOverride
+			),
+			model,
+			originalUsage: completion.usage,
+			provider: executionContext.provider,
+			sessionId: executionContext.sessionInfo?.sessionId
+		};
 	}
 
 	/**
@@ -869,8 +979,10 @@ export class StageExecutor {
 		escalationCriteria: string[] | undefined,
 		enrichedInputs: Record<string, unknown>,
 		duration: number,
-		logger: ReturnType<typeof getLogger>
-	): Promise<StageOutput> {
+		logger: ReturnType<typeof getLogger>,
+		allowRetry: boolean,
+		selfConsistencyContext: SelfConsistencyReplayContext
+	): Promise<StageCompletionResult> {
 		const handlerCtx: CompletionHandlerContext = {
 			completion,
 			duration,
@@ -881,25 +993,31 @@ export class StageExecutor {
 		};
 
 		if (completion.guidedCompletion) {
-			return this.handleGuidedCompletion(handlerCtx);
+			return { output: this.handleGuidedCompletion(handlerCtx), type: 'final' };
 		}
 
 		if (escalationCriteria && escalationCriteria.length > 0) {
-			const escalationResult = await this.processEscalation(
+			const outcome = await this.processEscalation(
 				completion.content,
 				stage,
 				executionContext.agentRole,
 				escalationCriteria,
 				duration,
 				enrichedInputs,
-				logger
+				logger,
+				allowRetry,
+				selfConsistencyContext,
+				executionSummary
 			);
-			if (escalationResult) {
-				return escalationResult;
+			if (outcome.kind === 'output') {
+				return { output: outcome.output, type: 'final' };
+			}
+			if (outcome.kind === 'retry') {
+				return { guidance: outcome.guidance, type: 'retry' };
 			}
 		}
 
-		return this.handleNormalCompletion(handlerCtx);
+		return { output: this.handleNormalCompletion(handlerCtx), type: 'final' };
 	}
 
 	/**
@@ -1898,9 +2016,10 @@ Summarize ALL changes you made during tool execution. Output ONLY the JSON code 
 	}
 
 	/**
-	 * Process escalation for a stage response
-	 * Returns StageOutput if escalation results in abort or needs to stop pipeline
-	 * Returns null if escalation is handled and execution should continue normally
+	 * Process escalation for a stage response.
+	 * Fails closed: a response missing the mandatory `_escalation` block is itself
+	 * treated as an escalation (see `getMissingSignalEscalation`) rather than silently
+	 * proceeding as if no escalation were required.
 	 */
 	private async processEscalation(
 		responseContent: string,
@@ -1909,18 +2028,37 @@ Summarize ALL changes you made during tool execution. Output ONLY the JSON code 
 		escalationCriteria: string[],
 		duration: number,
 		resolvedInputs: Record<string, unknown>,
-		logger: ReturnType<typeof getLogger>
-	): Promise<null | StageOutput> {
+		logger: ReturnType<typeof getLogger>,
+		allowRetry: boolean,
+		selfConsistencyContext: SelfConsistencyReplayContext,
+		executionSummary: ExecutionSummary | undefined
+	): Promise<EscalationOutcome> {
 		const stageName = `${stage.stage}.${stage.prompt}`;
 
 		// Parse response for escalation signal
 		const parseResult = this.escalationDetectionService.parseResponse(responseContent);
-		const { signal } = parseResult;
+		let signal = parseResult.signal;
 
-		// Check if escalation should be triggered
-		if (!this.escalationDetectionService.shouldTriggerEscalation(signal)) {
-			logger.debug('No escalation triggered for stage', { stageName });
-			return null;
+		if (!signal) {
+			const missingSignal = this.escalationDetectionService.getMissingSignalEscalation(stageName);
+			if (!missingSignal) {
+				logger.debug('No escalation signal found in response (requireExplicitBlock disabled)', { stageName });
+				return { kind: 'continue' };
+			}
+			logger.warn('Stage response omitted the mandatory _escalation block; forcing escalation', { stageName });
+			signal = missingSignal;
+		} else if (!this.escalationDetectionService.shouldTriggerEscalation(signal)) {
+			// Free, deterministic check first — if the stage's own tool-loop telemetry already
+			// contradicts a confident "no escalation needed" report, no need to spend LLM calls
+			// on self-consistency sampling too.
+			const overrideSignal =
+				this.checkExecutionTelemetryMismatch(signal, executionSummary, stageName, logger) ??
+				(await this.maybeApplySelfConsistencyCheck(signal, selfConsistencyContext, stageName, logger));
+			if (!overrideSignal) {
+				logger.debug('No escalation triggered for stage', { stageName });
+				return { kind: 'continue' };
+			}
+			signal = overrideSignal;
 		}
 
 		// Emit escalation triggered event
@@ -1929,9 +2067,10 @@ Summarize ALL changes you made during tool execution. Output ONLY the JSON code 
 		// Build escalation context and handle escalation
 		const context: EscalationContext = {
 			agentRole,
+			allowModify: allowRetry,
 			escalationCriteria,
 			llmResponse: responseContent,
-			signal: signal!,
+			signal,
 			stageName
 		};
 
@@ -1939,7 +2078,135 @@ Summarize ALL changes you made during tool execution. Output ONLY the JSON code 
 		this.escalationHandlerService.displayEscalationSummary(context, result);
 
 		// Process escalation result
-		return this.handleEscalationResultActions(result, stage, stageName, duration, resolvedInputs, signal!, logger);
+		return this.handleEscalationResultActions(result, stage, stageName, duration, resolvedInputs, signal, logger);
+	}
+
+	/**
+	 * Cross-checks a "no escalation needed" report against the stage's own tool-loop
+	 * telemetry — data the pipeline already computes (see `isDegraded` in
+	 * `handleNormalCompletion`) but never previously compared against the confidence claim.
+	 * Unlike self-consistency sampling, this costs nothing extra and applies to every
+	 * escalation-gated stage, not just a borderline confidence band — it checks the model's
+	 * claim against independently-verified facts about what actually happened this stage,
+	 * not against the model's own words again.
+	 */
+	private checkExecutionTelemetryMismatch(
+		signal: EscalationSignal,
+		executionSummary: ExecutionSummary | undefined,
+		stageName: string,
+		logger: ReturnType<typeof getLogger>
+	): EscalationSignal | null {
+		if (!executionSummary) {
+			return null;
+		}
+
+		const reasons: string[] = [];
+		if (executionSummary.wasLoopExhausted) {
+			reasons.push('the tool loop was exhausted before completing');
+		}
+		if (executionSummary.fatalFailureCount > 0) {
+			reasons.push(`${executionSummary.fatalFailureCount} mutating tool call(s) failed`);
+		}
+
+		if (reasons.length === 0) {
+			return null;
+		}
+
+		logger.warn('Execution telemetry contradicts a confident "no escalation needed" report; forcing escalation', {
+			reasons,
+			stageName
+		});
+
+		return {
+			confidence: signal.confidence,
+			confidenceSource: 'defaulted',
+			proposed_action: signal.proposed_action,
+			reasoning: `The model reported no escalation needed, but ${reasons.join(' and ')} — this stage's own execution telemetry contradicts that report.`,
+			requires_escalation: true,
+			risk_level: 'high',
+			triggered_criteria: ['execution_telemetry_mismatch']
+		};
+	}
+
+	/**
+	 * When the model reports confidence just above the escalation threshold and says no
+	 * escalation is needed, independently re-sample the model a few times rather than trusting
+	 * that single self-report. Returns a forced escalation signal if the samples disagree with
+	 * the original verdict (or all fail to parse), otherwise null (trust the original as-is).
+	 *
+	 * Scoped narrowly to control cost: only fires in the borderline band just above the
+	 * threshold, and is skipped (fails open, logged) if it would exceed the session budget —
+	 * this is a best-effort reliability enhancement, not core correctness.
+	 */
+	private async maybeApplySelfConsistencyCheck(
+		signal: EscalationSignal,
+		replay: SelfConsistencyReplayContext,
+		stageName: string,
+		logger: ReturnType<typeof getLogger>
+	): Promise<EscalationSignal | null> {
+		const { confidenceThreshold, selfConsistency } = this.escalationDetectionService.getConfig();
+
+		if (!selfConsistency.enabled || signal.confidenceSource !== 'reported') {
+			return null;
+		}
+
+		const upperBound = confidenceThreshold + selfConsistency.borderlineBand;
+		if (signal.confidence < confidenceThreshold || signal.confidence >= upperBound) {
+			return null;
+		}
+
+		if (replay.sessionId) {
+			const estimatedCostUsd = this.estimateSelfConsistencySampleCost(replay) * selfConsistency.sampleCount;
+			if (this.sessionBudgetService.wouldExceed(replay.sessionId, { estimatedCostUsd })) {
+				logger.warn('Skipping self-consistency sampling — would exceed session budget', { stageName });
+				return null;
+			}
+		}
+
+		const { agreementRatio, disagrees } = await this.selfConsistencySamplerService.checkAgreement(
+			replay.provider,
+			replay.completionOptions,
+			signal,
+			this.escalationDetectionService,
+			selfConsistency.sampleCount
+		);
+
+		if (!disagrees) {
+			return null;
+		}
+
+		logger.warn("Self-consistency check disagreed with the model's own report; forcing escalation", {
+			agreementRatio,
+			confidence: signal.confidence,
+			stageName
+		});
+
+		return {
+			confidence: signal.confidence,
+			confidenceSource: 'defaulted',
+			proposed_action: signal.proposed_action,
+			reasoning: `Self-consistency check disagreed with the original "no escalation needed" report (agreement ratio ${agreementRatio.toFixed(2)}).`,
+			requires_escalation: true,
+			risk_level: 'high',
+			triggered_criteria: ['self_consistency_disagreement']
+		};
+	}
+
+	/**
+	 * Estimate the cost of one additional self-consistency sample from the original
+	 * completion's actual token usage. Returns 0 when usage or pricing is unknown — the
+	 * budget check then falls back to comparing already-recorded spend against the limit,
+	 * the same conservative behavior `checkBudget` already uses elsewhere in this file.
+	 */
+	private estimateSelfConsistencySampleCost(replay: SelfConsistencyReplayContext): number {
+		const usage = replay.originalUsage;
+		const pricing = getModelPricing(replay.model);
+		if (!usage || !pricing) {
+			return 0;
+		}
+		const inputCost = (usage.prompt_tokens / 1_000_000) * pricing.input;
+		const outputCost = (usage.completion_tokens / 1_000_000) * pricing.output;
+		return inputCost + outputCost;
 	}
 
 	/**
@@ -1953,6 +2220,7 @@ Summarize ALL changes you made during tool execution. Output ONLY the JSON code 
 		this.eventEmitter.emitEscalationTriggered({
 			agentRole,
 			confidence: signal?.confidence ?? 0,
+			confidenceSource: signal?.confidenceSource ?? 'defaulted',
 			riskLevel: signal?.risk_level ?? 'medium',
 			stage: stageName,
 			triggeredCriteria: signal?.triggered_criteria ?? []
@@ -1970,13 +2238,13 @@ Summarize ALL changes you made during tool execution. Output ONLY the JSON code 
 		resolvedInputs: Record<string, unknown>,
 		signal: EscalationSignal,
 		logger: ReturnType<typeof getLogger>
-	): null | StageOutput {
+	): EscalationOutcome {
 		if (result.shouldAbort) {
 			this.eventEmitter.emitEscalationAborted({
 				reason: 'User aborted after escalation review',
 				stage: stageName
 			});
-			return this.handleEscalationAbort(stage, duration, resolvedInputs, signal);
+			return { kind: 'output', output: this.handleEscalationAbort(stage, duration, resolvedInputs, signal) };
 		}
 
 		this.eventEmitter.emitEscalationResolved({
@@ -1987,17 +2255,20 @@ Summarize ALL changes you made during tool execution. Output ONLY the JSON code 
 
 		if (result.shouldProceed) {
 			logger.debug('Escalation handled: proceeding with execution', { stageName });
-			return null;
+			return { kind: 'continue' };
 		}
 
 		if (result.modifiedGuidance) {
-			logger.info('Escalation handled: modification requested', {
+			// context.allowModify (set from allowRetry) means the "Modify" choice is only ever
+			// offered to the human when a retry is actually possible — so this is always a real retry.
+			logger.info('Escalation handled: re-running stage with human-provided guidance', {
 				guidance: result.modifiedGuidance,
 				stageName
 			});
+			return { guidance: result.modifiedGuidance, kind: 'retry' };
 		}
 
-		return null;
+		return { kind: 'continue' };
 	}
 
 	/**

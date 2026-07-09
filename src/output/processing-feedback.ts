@@ -1119,7 +1119,7 @@ export class ProcessingFeedback {
 		const formatters: Record<string, (v: unknown) => string> = {
 			agent: (v) => `agent: ${v}`,
 			command: (v) => `cmd: ${v}`,
-			confidence: (v) => `confidence: ${(Number(v) * 100).toFixed(0)}%`,
+			confidence: (v) => `confidence: ${this.formatConfidencePercent(Number(v))}%`,
 			duration: (v) => `${(Number(v) / 1000).toFixed(1)}s`,
 			error: (v) => String(v),
 			model: (v) => `model: ${v}`,
@@ -1145,6 +1145,17 @@ export class ProcessingFeedback {
 			return `${key}: ${strValue}`;
 		}
 		return `${key}: ${strValue.slice(0, 27)}...`;
+	}
+
+	/**
+	 * "confidence" is logged on two different scales across the codebase: 0-1 (task
+	 * classification, agent selection) and 0-100 (escalation signals). A 0-1 score is by
+	 * definition never greater than 1, so anything above that is already a percentage —
+	 * scale up only the former to avoid double-scaling the latter (e.g. 74 -> "7400%").
+	 */
+	private formatConfidencePercent(value: number): string {
+		const percent = value <= 1 ? value * 100 : value;
+		return percent.toFixed(0);
 	}
 
 	/**
