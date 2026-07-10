@@ -42,7 +42,7 @@ async function checkBinaryRequirements(
 	const plugin = new PluginLoaderService().catalogAll().find((p) => p.manifest?.name === shortName);
 	const requirements = plugin?.manifest?.requiresBinary ?? [];
 	for (const req of requirements) {
-		const isPresent = req.checkCommand ? (await installer(req.checkCommand)) === 0 : await checker(req.name);
+		const isPresent = await isBinaryRequirementPresent(req, checker, installer, promptFn);
 		if (isPresent) continue;
 		if (await tryInstallBinary(req, installer, promptFn)) continue;
 		console.warn(`⚠ Plugin requires '${req.name}' which was not found on PATH.`);
@@ -52,10 +52,16 @@ async function checkBinaryRequirements(
 	}
 }
 
-async function defaultPromptInstall(name: string, installCommand: string): Promise<boolean> {
+/**
+ * Exported for direct testing — this is invoked for `checkCommand`,
+ * `installCommand`, and `postInstallCommand` alike, so the message must not
+ * claim a specific purpose ("the install command") when it might be showing
+ * a presence-check or setup command instead.
+ */
+export async function defaultPromptInstall(name: string, command: string): Promise<boolean> {
 	if (!process.stdout.isTTY) return false;
-	console.log(`The plugin requires '${name}'. The install command is:\n  ${installCommand}\n`);
-	return promptYesNo(`Run this command to install '${name}'? [y/N] `);
+	console.log(`The plugin '${name}' wants to run this command:\n  ${command}\n`);
+	return promptYesNo(`Run this command for '${name}'? [y/N] `);
 }
 
 async function isBinaryOnPath(name: string): Promise<boolean> {
@@ -65,6 +71,26 @@ async function isBinaryOnPath(name: string): Promise<boolean> {
 	} catch (err) {
 		return (err as NodeJS.ErrnoException).code !== 'ENOENT';
 	}
+}
+
+/**
+ * `checkCommand` is arbitrary plugin-manifest-declared shell text — running
+ * it unconditionally would be the exact privilege-escalation surface
+ * `tryInstallBinary` already requires confirmation for on `installCommand`/
+ * `postInstallCommand`. Require the same confirmation here; declining falls
+ * back to the safe PATH-only presence check rather than silently treating
+ * the binary as absent (which would trigger an unwanted install attempt).
+ */
+async function isBinaryRequirementPresent(
+	req: PluginBinaryRequirement,
+	checker: BinaryChecker,
+	installer: BinaryInstaller,
+	promptFn: (name: string, installCommand: string) => Promise<boolean>
+): Promise<boolean> {
+	if (!req.checkCommand) return checker(req.name);
+	const confirmed = await promptFn(req.name, req.checkCommand);
+	if (!confirmed) return checker(req.name);
+	return (await installer(req.checkCommand)) === 0;
 }
 
 async function runShellCommand(command: string): Promise<number> {
@@ -89,9 +115,16 @@ async function tryInstallBinary(
 	const code = await installer(req.installCommand);
 	if (code === 0) {
 		console.log(`✓ ${req.name} downloaded successfully.`);
+		// installCommand's approval is not blanket consent for a different,
+		// possibly-unseen command — require its own confirmation too, same as
+		// installCommand and checkCommand.
 		if (req.postInstallCommand) {
-			console.log(`Setting up ${req.name}…`);
-			await installer(req.postInstallCommand);
+			if (await promptFn(req.name, req.postInstallCommand)) {
+				console.log(`Setting up ${req.name}…`);
+				await installer(req.postInstallCommand);
+			} else {
+				console.warn(`⚠ Skipped setup for ${req.name} (declined).`);
+			}
 		}
 	} else {
 		console.warn(`⚠ Failed to download '${req.name}' (exit code ${String(code)}).`);

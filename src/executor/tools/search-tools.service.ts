@@ -8,18 +8,22 @@
  * - Glob file search
  * - Grep content search
  * - Codebase semantic search
+ *
+ * Uses SafeExecutor.execute (spawn with an argument array, no shell) — the
+ * `pattern`/`path` arguments here come straight from an LLM tool call with no
+ * sanitization, and search patterns routinely contain quotes/backticks/`$()`
+ * when searching for code that itself contains those characters (e.g.
+ * searching for `exec("`). Interpolating them into a shell string let an
+ * embedded `"` break out and run arbitrary commands via completely ordinary
+ * grep/glob_file_search usage — no adversarial intent required.
  */
-
-import { exec } from 'child_process';
-import { promisify } from 'util';
 
 import type { getLogger } from 'output/logger';
 
 import { getASTIndexService } from 'ast/ast-index.service';
 import { searchSymbols } from 'ast/ast-query.service';
 import { DEFAULT_TIMEOUT_MS, MAX_GREP_OUTPUT_LINES } from 'config/constants';
-
-const execAsync = promisify(exec);
+import { SafeExecutor } from 'utils/safe-exec';
 
 type Logger = ReturnType<typeof getLogger>;
 
@@ -27,6 +31,13 @@ type Logger = ReturnType<typeof getLogger>;
  * Paths to exclude from grep searches
  */
 const GREP_EXCLUDE_PATHS = ['.valora/sessions', 'node_modules', '.git', 'dist', 'build', '*.log', '*.json'];
+const GREP_EXCLUDE_ARGS = GREP_EXCLUDE_PATHS.flatMap((p) => ['--glob', `!${p}`]);
+const GREP_FALLBACK_EXCLUDE_ARGS = [
+	'--exclude-dir=node_modules',
+	'--exclude-dir=.git',
+	'--exclude-dir=.valora',
+	'--exclude-dir=data'
+];
 
 /**
  * Service for search operations
@@ -50,22 +61,37 @@ export class SearchToolsService {
 		}
 
 		try {
-			// Use fd for better performance and .gitignore awareness, fall back to find
-			const command = `fd --glob "${pattern}" --type f --max-results 100 2>/dev/null || find . -path "${pattern}" -type f 2>/dev/null | head -100`;
-			const { stdout } = await execAsync(command, {
+			const stdout = await this.runGlobSearch(pattern);
+			const matches = stdout.trim().split('\n').slice(0, 100).join('\n');
+			return matches || 'No files found matching pattern';
+		} catch {
+			return 'No files found matching pattern';
+		}
+	}
+
+	/** Try fd first (fast, .gitignore-aware); fall back to find if fd is unavailable or errors. */
+	private async runGlobSearch(pattern: string): Promise<string> {
+		try {
+			// `--glob` is fd's own boolean mode-switch flag — not a value-taking
+			// option — so `--glob=<pattern>` is rejected outright (fd errors on
+			// binding a value to a flag that takes none). The pattern is fd's own
+			// positional argument; `--` marks the end of fd's own options so a
+			// pattern starting with "-" can't be parsed as one of fd's own flags.
+			const { stdout } = await SafeExecutor.execute(
+				'fd',
+				['--glob', '--type', 'f', '--max-results', '100', '--', pattern],
+				{
+					cwd: this.workingDir,
+					timeout: DEFAULT_TIMEOUT_MS
+				}
+			);
+			return stdout;
+		} catch {
+			const { stdout } = await SafeExecutor.execute('find', ['.', '-path', pattern, '-type', 'f'], {
 				cwd: this.workingDir,
 				timeout: DEFAULT_TIMEOUT_MS
 			});
-
-			const matches = stdout.trim();
-
-			if (!matches) {
-				return 'No files found matching pattern';
-			}
-
-			return matches;
-		} catch {
-			return 'No files found matching pattern';
+			return stdout;
 		}
 	}
 
@@ -81,27 +107,50 @@ export class SearchToolsService {
 		}
 
 		try {
-			// Build exclusion patterns for ripgrep
-			const excludes = GREP_EXCLUDE_PATHS.map((p) => `--glob '!${p}'`).join(' ');
-
-			// Use ripgrep for better performance with exclusions, fall back to grep.
-			// Wrap in parens so | head applies to the whole pipeline, not just the grep fallback.
-			const command = `(rg --line-number ${excludes} "${pattern}" "${path}" 2>/dev/null || grep -rn --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=.valora --exclude-dir=data "${pattern}" "${path}" 2>/dev/null) | head -${MAX_GREP_OUTPUT_LINES}`;
-			const { stdout } = await execAsync(command, {
-				cwd: this.workingDir,
-				timeout: DEFAULT_TIMEOUT_MS
-			});
-
+			const stdout = await this.runGrepSearch(pattern, path);
 			if (!stdout) return 'No matches found';
 
 			const lines = stdout.trimEnd().split('\n');
+			const limited = lines.slice(0, MAX_GREP_OUTPUT_LINES).join('\n');
 			const suffix =
 				lines.length >= MAX_GREP_OUTPUT_LINES
 					? `\n[Results limited to ${MAX_GREP_OUTPUT_LINES} lines — narrow your pattern for more precision]`
 					: '';
-			return stdout.trimEnd() + suffix;
+			return limited + suffix;
 		} catch {
 			return 'No matches found';
+		}
+	}
+
+	/** Try ripgrep first (fast, respects excludes); fall back to grep if rg is unavailable, errors, or finds nothing. */
+	private async runGrepSearch(pattern: string, path: string): Promise<string> {
+		// `--` marks the end of rg's/grep's own options — without it, a pattern
+		// starting with "-" (e.g. rg's `--pre=COMMAND`, which spawns COMMAND per
+		// matched file, or grep's `-f` reading the *next* argument as a
+		// patterns-file instead of `path`) is parsed as a flag by the invoked
+		// binary itself. Array-form spawn alone stops shell injection, not this
+		// — a distinct argument-injection primitive against the same untrusted
+		// tool-call `pattern`.
+		try {
+			const { stdout } = await SafeExecutor.execute(
+				'rg',
+				['--line-number', ...GREP_EXCLUDE_ARGS, '--', pattern, path],
+				{
+					cwd: this.workingDir,
+					timeout: DEFAULT_TIMEOUT_MS
+				}
+			);
+			return stdout;
+		} catch {
+			const { stdout } = await SafeExecutor.execute(
+				'grep',
+				['-rn', ...GREP_FALLBACK_EXCLUDE_ARGS, '--', pattern, path],
+				{
+					cwd: this.workingDir,
+					timeout: DEFAULT_TIMEOUT_MS
+				}
+			);
+			return stdout;
 		}
 	}
 

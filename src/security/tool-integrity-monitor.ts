@@ -102,6 +102,34 @@ export class ToolIntegrityMonitor {
 	}
 
 	/**
+	 * Check integrity of arbitrary content identified by a generic id — used
+	 * for plugin rug-pull detection (fingerprinting a plugin's manifest +
+	 * code entrypoint), reusing the same baseline store as MCP tool-set
+	 * fingerprinting. Unlike {@link checkIntegrity}, there is no per-item
+	 * diff — plugin content is treated as a single opaque blob.
+	 */
+	checkContentIntegrity(id: string, content: string): IntegrityCheckResult {
+		const currentFingerprint = createHash('sha256').update(content).digest('hex');
+		const previousFingerprint = this.fingerprints.get(id);
+
+		if (previousFingerprint === undefined) {
+			this.fingerprints.set(id, currentFingerprint);
+			this.persistToDisk();
+			return { changed: false, currentFingerprint };
+		}
+
+		if (currentFingerprint === previousFingerprint) {
+			return { changed: false, currentFingerprint, previousFingerprint };
+		}
+
+		this.logContentChangeEvent(id, previousFingerprint, currentFingerprint);
+		this.fingerprints.set(id, currentFingerprint);
+		this.persistToDisk();
+
+		return { changed: true, currentFingerprint, previousFingerprint };
+	}
+
+	/**
 	 * Get the stored fingerprint for a server.
 	 */
 	getFingerprint(serverId: string): string | undefined {
@@ -226,6 +254,19 @@ export class ToolIntegrityMonitor {
 		}
 
 		return { added, changed, removed };
+	}
+
+	private logContentChangeEvent(id: string, previousFingerprint: string, currentFingerprint: string): void {
+		const event = createSecurityEvent('plugin_code_changed', 'critical', {
+			currentFingerprint,
+			id,
+			previousFingerprint
+		});
+		this.events.push(event);
+		getAuditSink().append(event);
+
+		const logger = getLogger();
+		logger.warn(`[Security] Plugin content changed for ${id}`, { currentFingerprint, previousFingerprint });
 	}
 
 	private logEvent(serverId: string, previousFingerprint: string, currentFingerprint: string, diff: ToolSetDiff): void {

@@ -105,8 +105,10 @@ export class PromptInjectionDetector {
 		let totalScore = 0;
 		const markers: string[] = [];
 
-		// Normalise homoglyphs for detection
-		const normalised = this.normaliseHomoglyphs(content);
+		// Normalise fullwidth/compatibility forms (e.g. fullwidth "ｉｇｎｏｒｅ" →
+		// "ignore") and strip zero-width characters (ZWSP/ZWJ/ZWNJ/BOM) used to
+		// break up keyword matches, then normalise homoglyphs for detection.
+		const normalised = this.normaliseHomoglyphs(this.stripInvisibleCharacters(content.normalize('NFKC')));
 
 		// Check all pattern categories
 		totalScore += this.matchPatterns(normalised, INSTRUCTION_OVERRIDE_PATTERNS, 'instruction_override', markers);
@@ -188,6 +190,20 @@ export class PromptInjectionDetector {
 			}
 		}
 		return score;
+	}
+
+	/**
+	 * Strip invisible/format Unicode characters used to split an injection
+	 * keyword across characters the pattern regexes would otherwise treat as
+	 * contiguous (e.g. "ignore" + ZWSP + "previous"). `\p{Cf}` (Unicode "format"
+	 * general category) covers ZWSP/ZWJ/ZWNJ, BOM, soft hyphen, Mongolian vowel
+	 * separator, the LTR/RTL marks and embedding/override/isolate controls, and
+	 * word joiner and friends in one principled sweep rather than enumerating
+	 * each codepoint as an evasion technique surfaces it; variation selectors
+	 * (U+FE00-U+FE0F) sit outside Cf and are added explicitly.
+	 */
+	private stripInvisibleCharacters(text: string): string {
+		return text.replace(/\p{Cf}|[\uFE00-\uFE0F]/gu, '');
 	}
 
 	/**

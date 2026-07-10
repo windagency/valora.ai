@@ -5,12 +5,8 @@
  * during command execution that may inadvertently modify git state.
  */
 
-import { exec } from 'child_process';
-import { promisify } from 'util';
-
 import { getLogger } from 'output/logger';
-
-const execAsync = promisify(exec);
+import { SafeExecutor } from 'utils/safe-exec';
 
 export interface GitStatus {
 	hasStagedChanges: boolean;
@@ -62,7 +58,7 @@ export class GitStashProtectionService {
 	 */
 	async checkGitStatus(): Promise<GitStatus> {
 		try {
-			const { stdout } = await execAsync('git status --porcelain', {
+			const { stdout } = await SafeExecutor.execute('git', ['status', '--porcelain'], {
 				cwd: process.cwd()
 			});
 
@@ -152,7 +148,7 @@ export class GitStashProtectionService {
 			this.stashName = `${STASH_MESSAGE_PREFIX}-${timestamp}`;
 
 			// Stash all changes including untracked files
-			await execAsync(`git stash push -u -m "${this.stashName}"`, {
+			await SafeExecutor.execute('git', ['stash', 'push', '-u', '-m', this.stashName], {
 				cwd: process.cwd()
 			});
 
@@ -184,7 +180,7 @@ export class GitStashProtectionService {
 
 		try {
 			// Pop the stash to restore changes
-			await execAsync('git stash pop', {
+			await SafeExecutor.execute('git', ['stash', 'pop'], {
 				cwd: process.cwd()
 			});
 

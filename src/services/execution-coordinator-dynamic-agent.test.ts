@@ -33,6 +33,22 @@ vi.mock('utils/file-utils', async (importOriginal) => {
 		resolveAIPath: vi.fn(() => '/mock/logs/path')
 	};
 });
+const mockLoadAgent = vi.fn().mockResolvedValue({
+	capabilities: { can_review_code: true, can_run_tests: true, can_write_code: true, can_write_knowledge: true },
+	content: '',
+	description: 'test agent',
+	role: 'test-agent',
+	specialization: 'test',
+	tone: 'concise-technical',
+	version: '1.0.0'
+});
+vi.mock('executor/agent-loader', () => ({
+	AgentLoader: vi.fn().mockImplementation(() => ({
+		listAgents: vi.fn().mockResolvedValue([]),
+		loadAgent: mockLoadAgent,
+		registerPluginDir: vi.fn()
+	}))
+}));
 vi.mock('ui/prompt-adapter.interface', () => ({
 	getPromptAdapter: vi.fn(() => ({
 		prompt: vi.fn().mockResolvedValue({ selectedAgent: 'software-engineer-typescript-backend' })

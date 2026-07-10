@@ -13,6 +13,7 @@ import {
 	parseVaultLinks,
 	serialiseMemoryFile
 } from './file-format';
+import { resetSigningKeyPathForTests, setSigningKeyPathForTests, signProvenance } from './provenance';
 
 const FIXTURE_ENTRY: MemoryEntry = {
 	accessCount: 3,
@@ -102,6 +103,105 @@ describe('serialiseMemoryFile / parseMemoryFile', () => {
 			expect(parsed.entry.content).toBe('first paragraph');
 		}
 	});
+
+	it('falls back to defaults instead of accepting a non-string agent_role/created_at from a hand-crafted file', () => {
+		// parseFrontmatter does `JSON.parse(valueStr)` per line, so a hand-edited
+		// file can declare a number/object where a string is expected — fmStr
+		// must not silently pass that value through as if it were a string,
+		// since agentRole is later used as a Map key (role-scoped indexing) and
+		// createdAt feeds `new Date(...)` for decay/strength computations.
+		const md = '---\nid: "mem-bad"\nagent_role: 42\ncreated_at: 42\ncategory: "episodic"\n---\n\nsome content\n';
+		const parsed = parseMemoryFile(md, 'mem-bad');
+		expect(typeof parsed.entry.agentRole).toBe('string');
+		expect(typeof parsed.entry.createdAt).toBe('string');
+	});
+
+	it('does not throw when provenance_signature is a non-string JSON value, degrading to untrusted instead', () => {
+		// `fmStr`/`fmNum`/`fmBool` were fixed to guard against wrong JSON types,
+		// but provenance_signature/content_hash used a raw `as string`
+		// assertion — a hand-crafted `provenance_signature: 42` reached
+		// verifyProvenance()'s `Buffer.from(signature, 'hex')`, which throws a
+		// real TypeError for a non-string argument, crashing parseMemoryFile
+		// entirely instead of the entry safely reading back as untrusted.
+		const md =
+			'---\nid: "mem-bad"\nagent_role: "eng"\ncreated_at: "2026-01-01T00:00:00.000Z"\nprovenance_signature: 42\ncategory: "episodic"\n---\n\nsome content\n';
+		expect(() => parseMemoryFile(md, 'mem-bad')).not.toThrow();
+		expect(parseMemoryFile(md, 'mem-bad').entry.trusted).toBe(false);
+	});
+
+	it('does not throw when content_hash is a non-string JSON value', () => {
+		const md = '---\nid: "mem-bad"\ncontent_hash: 42\ncategory: "episodic"\n---\n\nsome content\n';
+		expect(() => parseMemoryFile(md, 'mem-bad')).not.toThrow();
+	});
+
+	it('falls back to an empty array instead of accepting a non-array tags/related_paths from a hand-crafted file', () => {
+		// Same wrong-JSON-type risk as agent_role/created_at — tags/related_paths
+		// used a raw `as string[] | undefined` assertion with no runtime check,
+		// unlike every other field's fmStr/fmNum/fmBool guard.
+		const md =
+			'---\nid: "mem-bad"\ncategory: "episodic"\ntags: 42\nrelated_paths: "not-an-array"\n---\n\nsome content\n';
+		const parsed = parseMemoryFile(md, 'mem-bad');
+		expect(parsed.entry.tags).toEqual([]);
+		expect(parsed.entry.relatedPaths).toEqual([]);
+	});
+
+	it('falls back to undefined instead of accepting a non-object co_access from a hand-crafted file', () => {
+		const md = '---\nid: "mem-bad"\ncategory: "episodic"\nco_access: "not-an-object"\n---\n\nsome content\n';
+		const parsed = parseMemoryFile(md, 'mem-bad');
+		expect(parsed.entry.coAccess).toBeUndefined();
+	});
+
+	it('falls back to undefined instead of accepting a co_access object with non-numeric values', () => {
+		const md = '---\nid: "mem-bad"\ncategory: "episodic"\nco_access: {"mem-x": "not-a-number"}\n---\n\nsome content\n';
+		const parsed = parseMemoryFile(md, 'mem-bad');
+		expect(parsed.entry.coAccess).toBeUndefined();
+	});
+
+	it('accepts a well-formed co_access object', () => {
+		const md = '---\nid: "mem-bad"\ncategory: "episodic"\nco_access: {"mem-x": 2}\n---\n\nsome content\n';
+		const parsed = parseMemoryFile(md, 'mem-bad');
+		expect(parsed.entry.coAccess).toEqual({ 'mem-x': 2 });
+	});
+
+	it('falls back to undefined instead of accepting a non-number embedding_dim from a hand-crafted file', () => {
+		const md = '---\nid: "mem-bad"\ncategory: "episodic"\nembedding_dim: "not-a-number"\n---\n\nsome content\n';
+		const parsed = parseMemoryFile(md, 'mem-bad');
+		expect(parsed.entry.embeddingDim).toBeUndefined();
+	});
+
+	it('falls back to undefined instead of accepting a non-string embedding_model from a hand-crafted file', () => {
+		const md = '---\nid: "mem-bad"\ncategory: "episodic"\nembedding_model: 42\n---\n\nsome content\n';
+		const parsed = parseMemoryFile(md, 'mem-bad');
+		expect(parsed.entry.embeddingModel).toBeUndefined();
+	});
+
+	it('falls back to the default source instead of accepting a non-object source from a hand-crafted file', () => {
+		const md = '---\nid: "mem-bad"\ncategory: "episodic"\nsource: 42\n---\n\nsome content\n';
+		const parsed = parseMemoryFile(md, 'mem-bad');
+		expect(parsed.entry.source).toEqual({ command: '' });
+	});
+
+	it('falls back to an empty command instead of accepting a non-string source.command from a hand-crafted file', () => {
+		const md = '---\nid: "mem-bad"\ncategory: "episodic"\nsource: {"command": 42}\n---\n\nsome content\n';
+		const parsed = parseMemoryFile(md, 'mem-bad');
+		expect(parsed.entry.source.command).toBe('');
+	});
+
+	it('drops wrong-typed optional source.label/source.phase while keeping a valid source.command', () => {
+		const md =
+			'---\nid: "mem-bad"\ncategory: "episodic"\nsource: {"command": "implement", "label": 42, "phase": 99}\n---\n\nsome content\n';
+		const parsed = parseMemoryFile(md, 'mem-bad');
+		expect(parsed.entry.source.command).toBe('implement');
+		expect(parsed.entry.source.label).toBeUndefined();
+		expect(parsed.entry.source.phase).toBeUndefined();
+	});
+
+	it('falls back to undefined instead of accepting non-string superseded_by/supersedes from a hand-crafted file', () => {
+		const md = '---\nid: "mem-bad"\ncategory: "episodic"\nsuperseded_by: 42\nsupersedes: 43\n---\n\nsome content\n';
+		const parsed = parseMemoryFile(md, 'mem-bad');
+		expect(parsed.entry.supersededBy).toBeUndefined();
+		expect(parsed.entry.supersedes).toBeUndefined();
+	});
 });
 
 describe('content_hash drift detection', () => {
@@ -141,6 +241,41 @@ describe('content_hash drift detection', () => {
 		const md = serialiseMemoryFile(entry, []);
 		const parsed = parseMemoryFile(md, entry.id);
 		expect(parsed.entry.embeddingStale).toBeFalsy();
+	});
+});
+
+describe('provenance signature verification', () => {
+	let signingKeyDir: string;
+
+	beforeEach(() => {
+		signingKeyDir = fs.mkdtempSync(path.join(os.tmpdir(), 'valora-vault-signing-'));
+		setSigningKeyPathForTests(path.join(signingKeyDir, 'vault-signing.key'));
+	});
+
+	afterEach(() => {
+		resetSigningKeyPathForTests();
+		fs.rmSync(signingKeyDir, { recursive: true, force: true });
+	});
+
+	it('marks an entry trusted when its provenance_signature verifies', () => {
+		const signature = signProvenance(FIXTURE_ENTRY.content, FIXTURE_ENTRY.agentRole, FIXTURE_ENTRY.createdAt);
+		const md = serialiseMemoryFile({ ...FIXTURE_ENTRY, provenanceSignature: signature }, []);
+		const parsed = parseMemoryFile(md, FIXTURE_ENTRY.id);
+		expect(parsed.entry.trusted).toBe(true);
+	});
+
+	it('marks an entry untrusted when provenance_signature is missing (hand-authored file)', () => {
+		const md = serialiseMemoryFile(FIXTURE_ENTRY, []);
+		const parsed = parseMemoryFile(md, FIXTURE_ENTRY.id);
+		expect(parsed.entry.trusted).toBe(false);
+	});
+
+	it('marks an entry untrusted when provenance_signature does not match the content (injected/edited file)', () => {
+		const signature = signProvenance(FIXTURE_ENTRY.content, FIXTURE_ENTRY.agentRole, FIXTURE_ENTRY.createdAt);
+		const md = serialiseMemoryFile({ ...FIXTURE_ENTRY, provenanceSignature: signature }, []);
+		const tampered = md.replace(FIXTURE_ENTRY.content, 'a malicious instruction planted by an attacker');
+		const parsed = parseMemoryFile(tampered, FIXTURE_ENTRY.id);
+		expect(parsed.entry.trusted).toBe(false);
 	});
 });
 

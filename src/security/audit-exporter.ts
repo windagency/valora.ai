@@ -8,6 +8,8 @@ import { getToolDefinitionValidator } from './tool-definition-validator';
 import { getToolIntegrityMonitor } from './tool-integrity-monitor';
 
 export interface SecurityAuditReport {
+	/** false if the on-disk audit log's hash chain has been broken — a line was deleted, reordered, or edited. */
+	chainVerified: boolean;
 	events: SecurityEvent[];
 	exportedAt: string;
 	totalEvents: number;
@@ -44,6 +46,7 @@ export function getSecurityAuditExporter(): () => SecurityAuditReport {
 		merged.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
 
 		return {
+			chainVerified: getAuditSink().verifyChain(),
 			events: merged,
 			exportedAt: new Date().toISOString(),
 			totalEvents: merged.length

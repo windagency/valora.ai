@@ -28,10 +28,37 @@ import { getPackageDataDir } from 'utils/paths';
 import type { MCPApprovalCacheService } from './mcp-approval-cache.service';
 import type { MCPAuditLoggerService } from './mcp-audit-logger.service';
 
+import { EXTERNAL_MCP_SERVER_CONFIG_SCHEMA } from './mcp-server-config.schema';
+
 /**
  * Default path to the external MCP registry
  */
 const DEFAULT_REGISTRY_PATH = join(getPackageDataDir(), 'external-mcp.default.json');
+
+/**
+ * Validate each candidate registry entry against the MCP server config
+ * schema, skipping (and logging) any that fail — a malformed or malicious
+ * entry must not reach `connect()` with an unchecked `command`/`url`/`env`.
+ */
+function validateRegistryServers(
+	candidates: unknown[],
+	registryPath: string,
+	logger: ReturnType<typeof getLogger>
+): ExternalMCPServerConfig[] {
+	const validated: ExternalMCPServerConfig[] = [];
+	for (const candidate of candidates) {
+		const result = EXTERNAL_MCP_SERVER_CONFIG_SCHEMA.safeParse(candidate);
+		if (result.success) {
+			validated.push(result.data);
+		} else {
+			logger.warn('Skipping invalid MCP server entry in registry', {
+				issues: result.error.flatten(),
+				path: registryPath
+			});
+		}
+	}
+	return validated;
+}
 
 let pendingPluginServers: ExternalMCPServerConfig[] = [];
 
@@ -85,7 +112,9 @@ export class MCPClientManagerService {
 		} else {
 			try {
 				const content = await readFile(fullPath);
-				this.registry = JSON.parse(content) as ExternalMCPRegistry;
+				const parsed = JSON.parse(content) as { schema_version?: string; servers?: unknown[] };
+				const validatedServers = validateRegistryServers(parsed.servers ?? [], fullPath, logger);
+				this.registry = { schema_version: parsed.schema_version ?? '1.0.0', servers: validatedServers };
 				this.registryLoaded = true;
 
 				logger.debug('Loaded external MCP registry', {

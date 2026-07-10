@@ -4,7 +4,7 @@ import * as path from 'path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { getSystemPluginsDir, hasAnyValoraConfig } from './paths';
+import { getSystemPluginsDir, getWorkspaceTrustCheckRoot, hasAnyValoraConfig } from './paths';
 
 describe('getSystemPluginsDir', () => {
 	const originalPlatform = process.platform;
@@ -82,5 +82,39 @@ describe('hasAnyValoraConfig', () => {
 	it('returns true when the system plugins directory exists', () => {
 		fs.mkdirSync(path.join(tmpDir, 'system-plugins'));
 		expect(hasAnyValoraConfig()).toBe(true);
+	});
+});
+
+describe('getWorkspaceTrustCheckRoot', () => {
+	let tmpDir: string;
+	let originalCwd: string;
+
+	beforeEach(() => {
+		tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'valora-trust-root-test-'));
+		originalCwd = process.cwd();
+		process.chdir(tmpDir);
+	});
+
+	afterEach(() => {
+		process.chdir(originalCwd);
+		fs.rmSync(tmpDir, { recursive: true, force: true });
+	});
+
+	it('falls back to process.cwd() when no .valora ancestor exists', () => {
+		expect(getWorkspaceTrustCheckRoot()).toBe(process.cwd());
+	});
+
+	it('resolves to the project directory itself when .valora exists there', () => {
+		fs.mkdirSync(path.join(tmpDir, '.valora'));
+		expect(getWorkspaceTrustCheckRoot()).toBe(tmpDir);
+	});
+
+	it('walks up to the ancestor containing .valora when invoked from a subdirectory', () => {
+		fs.mkdirSync(path.join(tmpDir, '.valora'));
+		const subDir = path.join(tmpDir, 'src', 'deep', 'nested');
+		fs.mkdirSync(subDir, { recursive: true });
+		process.chdir(subDir);
+
+		expect(getWorkspaceTrustCheckRoot()).toBe(tmpDir);
 	});
 });

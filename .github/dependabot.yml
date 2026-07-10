@@ -16,3 +16,12 @@ updates:
     labels:
       - 'dependencies'
     versioning-strategy: 'increase'
+  - package-ecosystem: 'github-actions'
+    directory: '/'
+    schedule:
+      interval: 'weekly'
+      day: 'monday'
+    open-pull-requests-limit: 10
+    labels:
+      - 'dependencies'
+      - 'github-actions'

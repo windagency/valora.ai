@@ -24,5 +24,13 @@ export function configureSecurityCommand(program: CommandAdapter): void {
 			} else {
 				console.log(json);
 			}
+
+			if (!report.chainVerified) {
+				console.log(
+					color.red(
+						'WARNING: audit log hash chain verification failed — a prior entry may have been deleted, reordered, or edited.'
+					)
+				);
+			}
 		});
 }

@@ -90,6 +90,22 @@ export interface MemoryEntry {
 	embeddingDim?: number;
 	embeddingModel?: string;
 	/**
+	 * HMAC-SHA256 signature over content/agentRole/createdAt, stamped by
+	 * `MemoryManager.create()` — the only legitimate write path. Persisted to
+	 * frontmatter as `provenance_signature`. Absent on legacy or externally
+	 * authored entries (e.g. hand-edited in Obsidian).
+	 */
+	provenanceSignature?: string;
+	/**
+	 * In-memory only marker (NOT persisted to frontmatter): true when
+	 * `provenanceSignature` verifies against the entry's content/agentRole/
+	 * createdAt using the local vault signing key. False for entries with a
+	 * missing or invalid signature — such entries did not originate from
+	 * `MemoryManager.create()` and are excluded from context injection by
+	 * default (see `MemoryManager.query()`).
+	 */
+	trusted?: boolean;
+	/**
 	 * In-memory only marker (NOT persisted to frontmatter): set during parse when
 	 * the file's `content_hash` does not match the actual body. Indicates the
 	 * stored embedding was computed against an older content and must be

@@ -438,4 +438,89 @@ describe('MemoryExtractionService', () => {
 			expect(a).not.toBe(b);
 		});
 	});
+
+	// ------------------------------------------------------------------ credential redaction
+	describe('Credential redaction', () => {
+		it('redacts an API key embedded in an error object before persisting', async () => {
+			const service = new MemoryExtractionService();
+			await service.extractFromFeedbackOutputs(
+				[
+					{
+						outputs: {
+							errors_encountered: [{ message: 'auth failed', key: 'sk-ant-api03-abcdefghijklmnopqrstuvwxyz1234567890' }]
+						},
+						success: true
+					}
+				],
+				'sess-001',
+				'product-manager'
+			);
+
+			const [, options] = mockManagerInstance.create.mock.calls[0] as [string, Record<string, unknown>];
+			expect(options['content']).not.toContain('sk-ant-api03');
+			expect(options['content']).toContain('[REDACTED]');
+		});
+
+		it('redacts a credential embedded in a bottleneck object before persisting', async () => {
+			const service = new MemoryExtractionService();
+			await service.extractFromFeedbackOutputs(
+				[
+					{
+						outputs: { bottlenecks_identified: [{ detail: 'token=ghp_abcdefghijklmnopqrstuvwxyz1234567890ABCD' }] },
+						success: true
+					}
+				],
+				'sess-001',
+				'product-manager'
+			);
+
+			const [, options] = mockManagerInstance.create.mock.calls[0] as [string, Record<string, unknown>];
+			expect(options['content']).not.toContain('ghp_abcdefghijklmnopqrstuvwxyz1234567890ABCD');
+		});
+
+		it('redacts credentials embedded in pain points before persisting', async () => {
+			const service = new MemoryExtractionService();
+			await service.extractFromFeedbackOutputs(
+				[{ outputs: { pain_points: [{ detail: 'AKIAABCDEFGHIJKLMNOP leaked in logs' }] }, success: true }],
+				'sess-001',
+				'product-manager'
+			);
+
+			const [, options] = mockManagerInstance.create.mock.calls[0] as [string, Record<string, unknown>];
+			expect(options['content']).not.toContain('AKIAABCDEFGHIJKLMNOP');
+		});
+
+		it('does not alter content with no credential-shaped substrings', async () => {
+			const service = new MemoryExtractionService();
+			await service.extractFromFeedbackOutputs(
+				[{ outputs: { errors_encountered: ['a plain error message'] }, success: true }],
+				'sess-001',
+				'product-manager'
+			);
+
+			const [, options] = mockManagerInstance.create.mock.calls[0] as [string, Record<string, unknown>];
+			expect(options['content']).toBe('Error during product-manager: "a plain error message"');
+		});
+
+		it('redacts a credential pasted into free-text feedback comments', async () => {
+			const service = new MemoryExtractionService();
+			await service.extractFromFeedbackOutputs(
+				[
+					{
+						outputs: {
+							satisfaction_score: 9,
+							feedback_comments: 'Great workflow! Oh btw my key is sk-ant-api03-abcdefghijklmnopqrstuvwxyz1234567890'
+						},
+						success: true
+					}
+				],
+				'sess-001',
+				'product-manager'
+			);
+
+			const [, options] = mockManagerInstance.create.mock.calls[0] as [string, Record<string, unknown>];
+			expect(options['content']).not.toContain('sk-ant-api03');
+			expect(options['content']).toContain('[REDACTED]');
+		});
+	});
 });

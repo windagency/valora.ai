@@ -8,14 +8,24 @@
  * IMPORTANT: This module distinguishes between:
  * - GUIDANCE FILES (AGENTS.md, CLAUDE.md, etc.) - Always loaded, instruct AI behaviour
  * - PROJECT KNOWLEDGE (knowledge-base/*) - Selectively loaded per command to save tokens
+ *
+ * Both are project-declared content injected into the LLM prompt — guidance
+ * files explicitly with "You MUST follow these instructions strictly" —
+ * reachable by cloning any repo and running any `valora` command inside it,
+ * no `.valora/` declaration or install step required. Same "untrusted
+ * project content steering agent behaviour with no confirmation" class as
+ * `.valora/config.json`'s hooks field and `.valora/lsp-servers.json`; gated
+ * behind the same `isWorkspaceTrusted()` mechanism rather than a new one.
  */
 
 import * as path from 'path';
+import { isWorkspaceTrusted } from 'security/workspace-trust.service';
 
 import { getColorAdapter } from 'output/color-adapter.interface';
 import { getLogger } from 'output/logger';
 import { getProcessingFeedback } from 'output/processing-feedback';
 import { dirExists, fileExists, readFile } from 'utils/file-utils';
+import { getWorkspaceTrustCheckRoot } from 'utils/paths';
 
 interface GuidanceFile {
 	content: string;
@@ -48,6 +58,30 @@ const GUIDANCE_FILE_PATTERNS = [
  * Value: combined guidance content or null if no guidance files found
  */
 const guidanceCache = new Map<string, null | string>();
+
+let hasWarnedUntrustedProjectGuidance = false;
+let hasWarnedUntrustedProjectKnowledge = false;
+
+function warnUntrustedGuidance(projectRoot: string, logger: ReturnType<typeof getLogger>): void {
+	if (hasWarnedUntrustedProjectGuidance) return;
+	hasWarnedUntrustedProjectGuidance = true;
+	logger.warn(
+		`[Security] ${projectRoot} declares AI guidance files (AGENTS.md/CLAUDE.md/etc.), which would be injected ` +
+			`into the LLM context with instructions to follow them strictly. Skipping until this project is trusted — ` +
+			`run 'valora config trust' if you trust this project's configuration.`,
+		{ projectRoot }
+	);
+}
+
+function warnUntrustedKnowledge(projectRoot: string, logger: ReturnType<typeof getLogger>): void {
+	if (hasWarnedUntrustedProjectKnowledge) return;
+	hasWarnedUntrustedProjectKnowledge = true;
+	logger.warn(
+		`[Security] ${projectRoot}'s knowledge-base/ content would be injected into the LLM context. Skipping until ` +
+			`this project is trusted — run 'valora config trust' if you trust this project's configuration.`,
+		{ projectRoot }
+	);
+}
 
 /**
  * Get the project root directory — the directory from which Valora is being run.
@@ -142,6 +176,18 @@ export async function loadProjectGuidance(): Promise<null | string> {
 
 	logger.debug('Searching for AI guidance files', { projectRoot });
 
+	// The trust check resolves to the nearest .valora/ ancestor (matching
+	// hook-execution.service.ts), not raw cwd — so a project trusted at its
+	// root doesn't silently lose guidance loading when valora is run from a
+	// subdirectory. File search/caching stay on cwd (projectRoot); only the
+	// trust decision uses the walked-up root.
+	const trustCheckRoot = getWorkspaceTrustCheckRoot();
+	if (hasProjectGuidance() && !isWorkspaceTrusted(trustCheckRoot)) {
+		warnUntrustedGuidance(trustCheckRoot, logger);
+		guidanceCache.set(projectRoot, null);
+		return null;
+	}
+
 	// Load guidance from root only (not knowledge-base)
 	const foundGuidance = await loadRootGuidanceFiles(projectRoot, logger);
 
@@ -218,6 +264,8 @@ export function clearGuidanceCache(): void {
 	guidanceCache.clear();
 	knowledgeCache.clear();
 	agentContentCache.clear();
+	hasWarnedUntrustedProjectGuidance = false;
+	hasWarnedUntrustedProjectKnowledge = false;
 }
 
 /**
@@ -287,6 +335,13 @@ export async function loadProjectKnowledge(knowledgeFiles: string[]): Promise<nu
 
 	if (!dirExists(knowledgeBasePath)) {
 		logger.debug('Knowledge base directory not found', { path: knowledgeBasePath });
+		return null;
+	}
+
+	// Same walked-up trust root as loadProjectGuidance() — see its comment.
+	const trustCheckRoot = getWorkspaceTrustCheckRoot();
+	if (!isWorkspaceTrusted(trustCheckRoot)) {
+		warnUntrustedKnowledge(trustCheckRoot, logger);
 		return null;
 	}
 

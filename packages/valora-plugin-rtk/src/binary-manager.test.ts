@@ -1,3 +1,5 @@
+import * as os from 'node:os';
+import * as path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
@@ -89,6 +91,31 @@ describe('RtkBinaryManagerImpl', () => {
 			});
 			await expect(manager.install()).rejects.toThrow(RtkInstallError);
 		});
+
+		it('writes the install script into a freshly created, unpredictable temp directory rather than a fixed guessable path', async () => {
+			// A pid+timestamp path sits directly in the shared os.tmpdir() with a
+			// predictable name — on a multi-tenant filesystem, another local
+			// process can pre-plant a symlink at the guessed path before install()
+			// runs, causing the (legitimate, hash-verified) script content to
+			// overwrite whatever that symlink points to. A freshly created,
+			// randomly-named directory (mkdtemp) closes that race.
+			let capturedPath = '';
+			const executeScript = vi.fn().mockImplementation((scriptPath: string) => {
+				capturedPath = scriptPath;
+				return Promise.resolve();
+			});
+			const manager = new RtkBinaryManagerImpl({
+				checkRtk: rejected('ENOENT'),
+				downloadScript: () => Promise.resolve(SAMPLE_SCRIPT),
+				executeScript,
+				installSha256: SAMPLE_SCRIPT_SHA,
+				installUrl: 'https://example.com/install.sh'
+			});
+
+			await manager.install();
+
+			expect(path.dirname(capturedPath)).not.toBe(os.tmpdir());
+		});
 	});
 
 	describe('ensureInstalled()', () => {
@@ -150,6 +177,40 @@ describe('RtkBinaryManagerImpl', () => {
 				else process.env['VALORA_PLUGIN_RTK_INSTALL_URL'] = originalUrl;
 				if (originalSha === undefined) delete process.env['VALORA_PLUGIN_RTK_INSTALL_SHA256'];
 				else process.env['VALORA_PLUGIN_RTK_INSTALL_SHA256'] = originalSha;
+			}
+		});
+
+		it('logs a loud warning when either install-script override env var is set', () => {
+			const originalUrl = process.env['VALORA_PLUGIN_RTK_INSTALL_URL'];
+			process.env['VALORA_PLUGIN_RTK_INSTALL_URL'] = 'https://override.example.com/install.sh';
+			const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+			try {
+				new RtkBinaryManagerImpl();
+
+				expect(warnSpy).toHaveBeenCalledWith(expect.stringMatching(/override|VALORA_PLUGIN_RTK_INSTALL/i));
+			} finally {
+				warnSpy.mockRestore();
+				if (originalUrl === undefined) delete process.env['VALORA_PLUGIN_RTK_INSTALL_URL'];
+				else process.env['VALORA_PLUGIN_RTK_INSTALL_URL'] = originalUrl;
+			}
+		});
+
+		it('does not warn when no override env vars are set', () => {
+			const originalUrl = process.env['VALORA_PLUGIN_RTK_INSTALL_URL'];
+			const originalSha = process.env['VALORA_PLUGIN_RTK_INSTALL_SHA256'];
+			delete process.env['VALORA_PLUGIN_RTK_INSTALL_URL'];
+			delete process.env['VALORA_PLUGIN_RTK_INSTALL_SHA256'];
+			const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+			try {
+				new RtkBinaryManagerImpl();
+
+				expect(warnSpy).not.toHaveBeenCalled();
+			} finally {
+				warnSpy.mockRestore();
+				if (originalUrl !== undefined) process.env['VALORA_PLUGIN_RTK_INSTALL_URL'] = originalUrl;
+				if (originalSha !== undefined) process.env['VALORA_PLUGIN_RTK_INSTALL_SHA256'] = originalSha;
 			}
 		});
 	});

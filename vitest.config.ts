@@ -80,6 +80,7 @@ export default defineConfig({
 			'src/**/*.{test,spec}.ts',
 			'__tests__/**/*.{test,spec}.ts',
 			'packages/valora-plugin-memory-vault/src/**/*.{test,spec}.ts',
+			'packages/valora-runtime/src/**/*.{test,spec}.ts',
 			'scripts/**/*.{test,spec}.ts'
 		],
 		// Use threads for better performance, but allow fallback to single thread

@@ -13,6 +13,8 @@
 
 import type { MemoryEntry } from '@windagency/valora-plugin-api';
 
+import { redactCredentials } from '@windagency/valora-runtime';
+
 import { MemoryManager } from './manager.js';
 import { runAutoMigrationIfNeeded } from './migration/auto-migrate.js';
 import { getDefaultVaultDir, getLegacyJsonDir } from './vault/default-vault-dir.js';
@@ -89,7 +91,7 @@ export class MemoryExtractionService {
 			const entry = await this.manager.create('episodic', {
 				agentRole,
 				confidence: 'observed',
-				content: `Performance bottleneck: ${JSON.stringify(bottleneck)}`,
+				content: `Performance bottleneck: ${redactCredentials(JSON.stringify(bottleneck)).result}`,
 				isError: false,
 				relatedPaths,
 				sessionId,
@@ -119,7 +121,7 @@ export class MemoryExtractionService {
 			const entry = await this.manager.create('episodic', {
 				agentRole,
 				confidence: 'observed',
-				content: `Error during ${agentRole}: ${JSON.stringify(error)}`,
+				content: `Error during ${agentRole}: ${redactCredentials(JSON.stringify(error)).result}`,
 				isError: true,
 				relatedPaths,
 				sessionId,
@@ -144,7 +146,7 @@ export class MemoryExtractionService {
 			const entry = await this.manager.create('episodic', {
 				agentRole,
 				confidence: 'inferred',
-				content: `Agent improvement opportunity: ${JSON.stringify(outputs.agent_improvements)}`,
+				content: `Agent improvement opportunity: ${redactCredentials(JSON.stringify(outputs.agent_improvements)).result}`,
 				isError: false,
 				relatedPaths,
 				sessionId,
@@ -158,7 +160,7 @@ export class MemoryExtractionService {
 			const entry = await this.manager.create('episodic', {
 				agentRole,
 				confidence: 'inferred',
-				content: `Workflow optimization: ${JSON.stringify(outputs.workflow_optimizations)}`,
+				content: `Workflow optimization: ${redactCredentials(JSON.stringify(outputs.workflow_optimizations)).result}`,
 				isError: false,
 				relatedPaths,
 				sessionId,
@@ -190,7 +192,7 @@ export class MemoryExtractionService {
 			const entry = await this.manager.create('episodic', {
 				agentRole,
 				confidence: 'verified',
-				content: `Session rated ${satisfactionScore}/10. ${outputs.feedback_comments ?? ''}`,
+				content: `Session rated ${satisfactionScore}/10. ${redactCredentials(outputs.feedback_comments ?? '').result}`,
 				isError: false,
 				relatedPaths,
 				sessionId,
@@ -204,7 +206,7 @@ export class MemoryExtractionService {
 			const entry = await this.manager.create('episodic', {
 				agentRole,
 				confidence: 'observed',
-				content: `Pain points: ${JSON.stringify(painPoints)}`,
+				content: `Pain points: ${redactCredentials(JSON.stringify(painPoints)).result}`,
 				isError: false,
 				relatedPaths,
 				sessionId,

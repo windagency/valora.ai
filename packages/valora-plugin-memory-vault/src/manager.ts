@@ -32,6 +32,7 @@ import {
 	MEMORY_HALF_LIFE_CAP_MULTIPLIER
 } from './constants.js';
 import { computeEffectiveHalfLife, computeStrength } from './decay.js';
+import { signProvenance } from './vault/provenance.js';
 
 export type { PurgeCriteria, PurgeResult };
 
@@ -85,6 +86,8 @@ export class MemoryManager {
 			tags: options.tags,
 			updatedAt: now
 		};
+
+		entry.provenanceSignature = signProvenance(entry.content, entry.agentRole, entry.createdAt);
 
 		if (options.supersedes !== undefined) {
 			entry.supersedes = options.supersedes;
@@ -179,6 +182,13 @@ export class MemoryManager {
 		const episodicEntry = entries.find((e) => e.id === episodicId);
 		if (episodicEntry === undefined) {
 			throw new Error(`Episodic entry not found: ${episodicId}`);
+		}
+		// Defense-in-depth against provenance laundering: promoting stamps a
+		// fresh, valid signature on whatever content is given, so an entry that
+		// failed verification must never reach this path — even if some future
+		// caller forgets to pre-filter by `trusted`.
+		if (episodicEntry.trusted === false) {
+			throw new Error(`Refusing to promote untrusted entry (failed provenance verification): ${episodicId}`);
 		}
 
 		const mergedTags = tags !== undefined ? [...new Set([...episodicEntry.tags, ...tags])] : episodicEntry.tags;
@@ -389,6 +399,10 @@ export class MemoryManager {
 
 	private matchesQueryOptions(entry: MemoryEntry, options: MemoryQueryOptions, strength: number): boolean {
 		if (entry.confidence === 'stale') return false;
+		// Excluded from recall/injection: signature verification failed, meaning
+		// this entry did not originate from create() (hand-edited or externally
+		// injected). `trusted === undefined` (legacy/unsigned) is not excluded.
+		if (entry.trusted === false) return false;
 		const minStrength = options.minStrength ?? DEFAULT_MEMORY_PRUNE_THRESHOLD;
 		if (strength < minStrength) return false;
 		if (!this.hasTagMatch(entry, options.tags)) return false;

@@ -3,6 +3,7 @@
  */
 
 import * as path from 'node:path';
+import { isWorkspaceTrusted, revokeWorkspaceTrust, trustWorkspace } from 'security/workspace-trust.service';
 
 import type { CommandAdapter } from 'cli/command-adapter.interface';
 
@@ -75,5 +76,37 @@ export function configureConfigCommand(program: CommandAdapter): void {
 			const configLoader = getConfigLoader();
 
 			console.info(configLoader.getConfigPath());
+		});
+
+	configCmd
+		.command('trust')
+		.description(
+			"Trust this project's .valora/config.json to run its own declared hooks. " +
+				'Required before any project-declared hook command will execute — ' +
+				'untrusted project hooks are skipped with a warning instead of running automatically.'
+		)
+		.action(() => {
+			const color = getColorAdapter();
+			const projectDir = process.cwd();
+			trustWorkspace(projectDir);
+			console.log(color.green(`✓ Trusted ${projectDir}`));
+		});
+
+	configCmd
+		.command('untrust')
+		.description("Revoke a previously trusted project's ability to run its own declared hooks.")
+		.action(() => {
+			const color = getColorAdapter();
+			const projectDir = process.cwd();
+			revokeWorkspaceTrust(projectDir);
+			console.log(color.green(`✓ Revoked trust for ${projectDir}`));
+		});
+
+	configCmd
+		.command('trust-status')
+		.description('Show whether the current project is trusted to run its own declared hooks')
+		.action(() => {
+			const projectDir = process.cwd();
+			console.log(isWorkspaceTrusted(projectDir) ? `Trusted: ${projectDir}` : `Not trusted: ${projectDir}`);
 		});
 }

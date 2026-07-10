@@ -21,6 +21,7 @@ import { SessionStore } from 'session/store';
 import { getPromptAdapter } from 'ui/prompt-adapter.interface';
 import { getSpinnerAdapter, type Spinner } from 'ui/spinner-adapter.interface';
 import { formatError } from 'utils/error-handler';
+import { InputValidator } from 'utils/input-validator';
 
 const prompt = getPromptAdapter();
 const spinner = getSpinnerAdapter();
@@ -519,9 +520,13 @@ async function cleanupExplorationWithState(
 }
 
 /**
- * Clean up leftover worktrees and branches when exploration state is already gone
+ * Clean up leftover worktrees and branches when exploration state is already gone.
+ * Exported for direct unit testing — this function previously interpolated
+ * `explorationId` into a raw shell command string (CWE-78); it now validates
+ * the ID and lists branches via `WorktreeManager.listBranchesByPrefix()`'s
+ * array-form, no-shell exec instead.
  */
-async function cleanupLeftoverBranches(
+export async function cleanupLeftoverBranches(
 	explorationId: string,
 	worktreeManager: WorktreeManager,
 	loading: Spinner
@@ -541,17 +546,14 @@ async function cleanupLeftoverBranches(
 	}
 
 	// Delete leftover branches by pattern
-	const { execSync } = await import('child_process');
 	try {
-		const branches = execSync(`git branch --list "exploration/${explorationId}*"`, { encoding: 'utf-8' })
-			.split('\n')
-			.map((b: string) => b.trim())
-			.filter(Boolean);
+		InputValidator.validateExplorationId(explorationId);
+		const branches = await worktreeManager.listBranchesByPrefix(`exploration/${explorationId}`);
 		for (const branch of branches) {
 			await worktreeManager.deleteBranch(branch, true);
 		}
 	} catch {
-		// No leftover branches found
+		// No leftover branches found, or explorationId failed validation
 	}
 }
 

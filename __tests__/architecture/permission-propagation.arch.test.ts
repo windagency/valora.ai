@@ -51,4 +51,15 @@ describe('Permission propagation architecture', () => {
 		const src = read('executor/execution-context.ts');
 		expect(src).toContain('public readonly effectiveConstraints: EffectivePermissions');
 	});
+
+	it('ExecutionCoordinator loads the resolved agent and wires its constraints into the root ExecutionContext', () => {
+		// Downstream enforcement (isForbidden/requiresApproval, asserted above) is only
+		// meaningful if the root context is ever populated with real persona constraints.
+		// Without this, effectiveConstraints silently defaults to empty for every command —
+		// exactly the gap that let SECURITY.md/system-card.md claim enforcement that wasn't
+		// actually wired.
+		const src = read('cli/execution-coordinator.ts');
+		expect(src).toContain('this.agentLoader.loadAgent(');
+		expect(src).toContain('agentConstraints: agent.constraints');
+	});
 });

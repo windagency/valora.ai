@@ -157,4 +157,48 @@ describe('ToolIntegrityMonitor', () => {
 			expect(result.changed).toBe(false); // First connection after clear
 		});
 	});
+
+	describe('checkContentIntegrity (plugin rug-pull detection)', () => {
+		it('does not report a change on first use — seeds the baseline', () => {
+			const result = monitor.checkContentIntegrity('plugin:secops', 'manifest+entrypoint content v1');
+			expect(result.changed).toBe(false);
+			expect(result.currentFingerprint).toMatch(/^[0-9a-f]{64}$/);
+		});
+
+		it('does not report a change when content is identical across calls', () => {
+			monitor.checkContentIntegrity('plugin:secops', 'manifest+entrypoint content v1');
+			const result = monitor.checkContentIntegrity('plugin:secops', 'manifest+entrypoint content v1');
+			expect(result.changed).toBe(false);
+		});
+
+		it('reports a change when content differs from the stored baseline', () => {
+			monitor.checkContentIntegrity('plugin:secops', 'manifest+entrypoint content v1');
+			const result = monitor.checkContentIntegrity('plugin:secops', 'manifest+entrypoint content v2 — different code');
+			expect(result.changed).toBe(true);
+			expect(result.previousFingerprint).not.toBe(result.currentFingerprint);
+		});
+
+		it('logs a plugin_code_changed security event when content drifts', () => {
+			monitor.checkContentIntegrity('plugin:secops', 'v1');
+			monitor.checkContentIntegrity('plugin:secops', 'v2');
+			const events = monitor.getEvents();
+			expect(events.some((e) => e.type === 'plugin_code_changed')).toBe(true);
+		});
+
+		it('tracks separate plugins independently', () => {
+			monitor.checkContentIntegrity('plugin:secops', 'secops-v1');
+			monitor.checkContentIntegrity('plugin:qa', 'qa-v1');
+			const secopsResult = monitor.checkContentIntegrity('plugin:secops', 'secops-v1');
+			const qaResult = monitor.checkContentIntegrity('plugin:qa', 'qa-v1');
+			expect(secopsResult.changed).toBe(false);
+			expect(qaResult.changed).toBe(false);
+		});
+
+		it('persists the baseline across monitor instances (same file)', () => {
+			monitor.checkContentIntegrity('plugin:secops', 'v1');
+			const reloaded = new ToolIntegrityMonitor({ baselineFilePath: join(dataDir, 'baselines.json') });
+			const result = reloaded.checkContentIntegrity('plugin:secops', 'v1');
+			expect(result.changed).toBe(false);
+		});
+	});
 });

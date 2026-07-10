@@ -11,6 +11,7 @@ import type { DecisionsPool, InsightsPool } from 'types/exploration.types';
 
 import { getLogger } from 'output/logger';
 import { ensureDir } from 'utils/file-utils';
+import { SafeExecutor } from 'utils/safe-exec';
 
 const logger = getLogger();
 
@@ -365,15 +366,15 @@ Exploration ID: ${this.explorationId}
 	 * Archive shared volume to a tar.gz file
 	 */
 	async archive(outputPath: string): Promise<void> {
-		const { exec } = await import('child_process');
-		const { promisify } = await import('util');
-		const execAsync = promisify(exec);
-
 		try {
 			logger.info(`Archiving shared volume to ${outputPath}`);
-			await execAsync(
-				`tar -czf ${outputPath} -C ${path.dirname(this.sharedVolumePath)} ${path.basename(this.sharedVolumePath)}`
-			);
+			await SafeExecutor.execute('tar', [
+				'-czf',
+				outputPath,
+				'-C',
+				path.dirname(this.sharedVolumePath),
+				path.basename(this.sharedVolumePath)
+			]);
 			logger.info(`Shared volume archived successfully`);
 		} catch (error) {
 			const typedError = error as Error;

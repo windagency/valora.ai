@@ -2,11 +2,20 @@
  * LSP Language Registry
  *
  * Maps file extensions to language server configurations.
- * Servers are configurable via .valora/lsp-servers.json.
+ * Servers are configurable via .valora/lsp-servers.json — but that file is
+ * project-declared, untrusted content (anyone who can get a victim to clone a
+ * repo and run any `valora` command inside it controls it), and its
+ * `command`/`args` are spawned verbatim the moment a matching file is
+ * touched. Same root-cause class as `.valora/config.json`'s hooks field
+ * (see `hook-execution.service.ts`) — reuse the same workspace-trust gate
+ * rather than building a second trust mechanism.
  */
 
 import { existsSync, readFileSync } from 'fs';
 import { extname, join } from 'path';
+import { isWorkspaceTrusted } from 'security/workspace-trust.service';
+
+import { getLogger } from 'output/logger';
 
 import type { LSPLanguage, LSPServerConfig } from './lsp.types';
 
@@ -45,9 +54,16 @@ const DEFAULT_SERVERS: Record<string, LSPServerConfig> = {
  */
 let extensionMap: Map<string, LSPServerConfig> | null = null;
 let configuredServers: null | Record<string, LSPServerConfig> = null;
+let hasWarnedUntrustedProjectLsp = false;
 
 /**
- * Load server configurations, merging project-level overrides
+ * Load server configurations, merging project-level overrides.
+ *
+ * Overrides are only merged once `projectRoot` has been explicitly trusted
+ * (`valora config trust`, see `workspace-trust.service.ts`) — otherwise a
+ * project's `.valora/lsp-servers.json` could redirect any file extension to
+ * an arbitrary attacker-chosen binary with zero victim interaction beyond
+ * touching a matching file.
  */
 function loadServers(projectRoot?: string): Record<string, LSPServerConfig> {
 	if (configuredServers) return configuredServers;
@@ -58,11 +74,22 @@ function loadServers(projectRoot?: string): Record<string, LSPServerConfig> {
 	if (projectRoot) {
 		const configPath = join(projectRoot, '.valora', 'lsp-servers.json');
 		if (existsSync(configPath)) {
-			try {
-				const overrides = JSON.parse(readFileSync(configPath, 'utf-8')) as Record<string, LSPServerConfig>;
-				configuredServers = { ...configuredServers, ...overrides };
-			} catch {
-				// Invalid config — use defaults
+			if (isWorkspaceTrusted(projectRoot)) {
+				try {
+					const overrides = JSON.parse(readFileSync(configPath, 'utf-8')) as Record<string, LSPServerConfig>;
+					configuredServers = { ...configuredServers, ...overrides };
+				} catch {
+					// Invalid config — use defaults
+				}
+			} else if (!hasWarnedUntrustedProjectLsp) {
+				hasWarnedUntrustedProjectLsp = true;
+				getLogger().warn(
+					`[Security] ${projectRoot}'s .valora/lsp-servers.json declares custom language servers, ` +
+						`which would spawn an arbitrary attacker-chosen program the moment a matching file is touched. ` +
+						`Skipping this override until this project is trusted — run 'valora config trust' if you trust ` +
+						`this project's configuration.`,
+					{ projectRoot }
+				);
 			}
 		}
 	}
@@ -118,4 +145,5 @@ export function getAllServers(projectRoot?: string): Record<string, LSPServerCon
 export function resetLanguageRegistry(): void {
 	extensionMap = null;
 	configuredServers = null;
+	hasWarnedUntrustedProjectLsp = false;
 }

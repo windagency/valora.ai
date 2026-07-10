@@ -13,6 +13,7 @@
 import { exec } from 'child_process';
 import fs from 'fs';
 import path from 'path';
+import { isWorkspaceTrusted } from 'security/workspace-trust.service';
 
 import type {
 	HookCommand,
@@ -30,12 +31,13 @@ import { getConfigLoader } from 'config/loader';
 import { getLogger } from 'output/logger';
 import { getPipelineEmitter } from 'output/pipeline-emitter';
 import { formatErrorMessage } from 'utils/error-utils';
-import { getPackageDataDir, getPackageRoot } from 'utils/paths';
+import { getPackageDataDir, getPackageRoot, getProjectConfigDir } from 'utils/paths';
 import { checkReDoSRisk, safeRegexTest } from 'utils/safe-regex';
 
 const DEFAULT_HOOK_TIMEOUT_MS = 10_000;
 
 export class HookExecutionService {
+	private hasWarnedUntrustedProjectHooks = false;
 	private hooksFileCache: null | { hooks?: HooksConfig } = null;
 	private hooksFileMtime: number = 0;
 	private readonly logger = getLogger();
@@ -396,13 +398,7 @@ export class HookExecutionService {
 	 */
 	private getHooksConfig(): HooksConfig | undefined {
 		const hooksFromFile = this.loadHooksFile()?.hooks;
-
-		let hooksFromConfig: HooksConfig | undefined;
-		try {
-			hooksFromConfig = getConfigLoader().get().hooks;
-		} catch {
-			// Config not yet loaded
-		}
+		const hooksFromConfig = this.getTrustGatedConfigHooks();
 
 		let merged: HooksConfig | undefined;
 		if (hooksFromFile && hooksFromConfig) {
@@ -415,6 +411,60 @@ export class HookExecutionService {
 			(acc, pluginHook) => (acc ? (this.mergeHooksConfigs(acc, pluginHook) ?? acc) : pluginHook),
 			merged
 		);
+	}
+
+	/**
+	 * `config/loader.ts` merges global (`~/.valora/config.json`) and project
+	 * (`.valora/config.json`) hooks into one value with no source tracking —
+	 * but only the project one is untrusted content (anyone who can get a
+	 * victim to clone a repo and run any `valora` command inside it controls
+	 * it; global config is the user's own file). Read the project's config
+	 * file directly to check whether IT specifically declares hooks; if so,
+	 * require the project directory to be explicitly trusted
+	 * (`valora config trust`, see `workspace-trust.service.ts`) before any
+	 * config-sourced hooks run at all. Global-only hooks (no project
+	 * declaration, or no project config file present) are never gated.
+	 */
+	private getTrustGatedConfigHooks(): HooksConfig | undefined {
+		let hooksFromConfig: HooksConfig | undefined;
+		try {
+			hooksFromConfig = getConfigLoader().get().hooks;
+		} catch {
+			// Config not yet loaded
+		}
+		if (!hooksFromConfig) return undefined;
+
+		const projectConfigDir = getProjectConfigDir();
+		if (!projectConfigDir) return hooksFromConfig;
+
+		let projectDeclaresHooks = false;
+		try {
+			const raw = fs.readFileSync(path.join(projectConfigDir, 'config.json'), 'utf-8');
+			projectDeclaresHooks = Boolean((JSON.parse(raw) as { hooks?: HooksConfig }).hooks);
+		} catch {
+			projectDeclaresHooks = false;
+		}
+		if (!projectDeclaresHooks) return hooksFromConfig;
+
+		// Equivalent to getWorkspaceTrustCheckRoot(), computed directly from the
+		// already-fetched projectConfigDir above rather than re-walking the
+		// filesystem a second time — this runs on every tool call (via
+		// hasHooks()), uncached, so the redundant walk-up is worth avoiding here
+		// even though it's negligible in absolute terms.
+		const projectRoot = path.dirname(projectConfigDir);
+		if (isWorkspaceTrusted(projectRoot)) return hooksFromConfig;
+
+		if (!this.hasWarnedUntrustedProjectHooks) {
+			this.hasWarnedUntrustedProjectHooks = true;
+			this.logger.warn(
+				`[Security] ${projectRoot}'s .valora/config.json declares custom hooks, which would run ` +
+					`automatically on every tool call with no confirmation. Skipping all config-sourced hooks ` +
+					`(including any from your global config) until this project is trusted — run 'valora config trust' ` +
+					`if you trust this project's configuration.`,
+				{ projectRoot }
+			);
+		}
+		return undefined;
 	}
 
 	/**

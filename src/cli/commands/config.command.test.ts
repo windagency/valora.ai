@@ -20,6 +20,7 @@ vi.mock('config/loader', () => ({
 
 vi.mock('output/color-adapter.interface', () => ({
 	getColorAdapter: vi.fn(() => ({
+		green: (s: string) => s,
 		red: (s: string) => s
 	}))
 }));
@@ -31,6 +32,15 @@ vi.mock('utils/paths', () => ({
 
 vi.mock('utils/error-handler', () => ({
 	formatError: vi.fn((e: Error) => e.message)
+}));
+
+const mockTrustWorkspace = vi.fn();
+const mockRevokeWorkspaceTrust = vi.fn();
+const mockIsWorkspaceTrusted = vi.fn();
+vi.mock('security/workspace-trust.service', () => ({
+	isWorkspaceTrusted: (...args: unknown[]) => mockIsWorkspaceTrusted(...args),
+	revokeWorkspaceTrust: (...args: unknown[]) => mockRevokeWorkspaceTrust(...args),
+	trustWorkspace: (...args: unknown[]) => mockTrustWorkspace(...args)
 }));
 
 import * as path from 'node:path';
@@ -105,5 +115,56 @@ describe('config setup', () => {
 
 		consoleErrorSpy.mockRestore();
 		exitSpy.mockRestore();
+	});
+});
+
+describe('config trust', () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+	});
+
+	it('trusts the current working directory', async () => {
+		const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+
+		await runCommand(makeProgram(), ['config', 'trust']);
+
+		expect(mockTrustWorkspace).toHaveBeenCalledWith(process.cwd());
+		expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining(process.cwd()));
+
+		consoleLogSpy.mockRestore();
+	});
+
+	it('revokes trust for the current working directory', async () => {
+		const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+
+		await runCommand(makeProgram(), ['config', 'untrust']);
+
+		expect(mockRevokeWorkspaceTrust).toHaveBeenCalledWith(process.cwd());
+		expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining(process.cwd()));
+
+		consoleLogSpy.mockRestore();
+	});
+
+	it('reports trust status for the current working directory', async () => {
+		mockIsWorkspaceTrusted.mockReturnValue(true);
+		const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+
+		await runCommand(makeProgram(), ['config', 'trust-status']);
+
+		expect(mockIsWorkspaceTrusted).toHaveBeenCalledWith(process.cwd());
+		expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('Trusted'));
+
+		consoleLogSpy.mockRestore();
+	});
+
+	it('reports not-trusted status when the directory has never been trusted', async () => {
+		mockIsWorkspaceTrusted.mockReturnValue(false);
+		const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+
+		await runCommand(makeProgram(), ['config', 'trust-status']);
+
+		expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('Not trusted'));
+
+		consoleLogSpy.mockRestore();
 	});
 });

@@ -81,6 +81,12 @@ describe('CredentialGuard', () => {
 			expect(guard.isSensitiveEnvVar('VAULT_TOKEN')).toBe(true);
 			expect(guard.isSensitiveEnvVar('KUBECONFIG')).toBe(true);
 		});
+
+		it('blocks non-exact-match private/encryption key variable names', () => {
+			expect(guard.isSensitiveEnvVar('SSH_PRIVATE_KEY')).toBe(true);
+			expect(guard.isSensitiveEnvVar('TLS_ENCRYPTION_KEY')).toBe(true);
+			expect(guard.isSensitiveEnvVar('APP_PRIVATE_KEY')).toBe(true);
+		});
 	});
 
 	describe('sanitiseEnvironment', () => {
@@ -233,6 +239,22 @@ describe('CredentialGuard', () => {
 			const output = 'Scanning /workspace/project/node_modules/some-package/dist/index.js for issues';
 			const scanned = guard.scanOutput(output);
 			expect(scanned).toContain('node_modules');
+		});
+
+		// --- Genuine entropy fallback: no adjacent credential keyword ---
+		it('redacts a high-entropy token with no adjacent credential keyword', () => {
+			const highEntropy = 'xK9mP2vQrL4nJ8wZ1aY5bC7dF3gH6eI0jU2kM9nR5s';
+			const output = `Response header value: ${highEntropy}`;
+			const scanned = guard.scanOutput(output);
+			expect(scanned).not.toContain(highEntropy);
+			expect(scanned).toContain('[REDACTED]');
+		});
+
+		it('does not redact a low-entropy repetitive string with no adjacent keyword', () => {
+			const lowEntropy = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+			const output = `Padding value: ${lowEntropy}`;
+			const scanned = guard.scanOutput(output);
+			expect(scanned).toContain(lowEntropy);
 		});
 	});
 

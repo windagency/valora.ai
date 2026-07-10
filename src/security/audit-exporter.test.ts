@@ -20,4 +20,10 @@ describe('getSecurityAuditExporter', () => {
 		expect(() => new Date(report.exportedAt)).not.toThrow();
 		expect(new Date(report.exportedAt).toISOString()).toBe(report.exportedAt);
 	});
+
+	it('reports whether the on-disk audit log hash chain is intact', () => {
+		const exporter = getSecurityAuditExporter();
+		const report = exporter();
+		expect(typeof report.chainVerified).toBe('boolean');
+	});
 });

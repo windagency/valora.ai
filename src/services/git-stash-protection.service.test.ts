@@ -2,20 +2,17 @@
  * Tests for GitStashProtectionService
  */
 
-import * as childProcess from 'child_process';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createGitStashProtection, GitStashProtectionService } from './git-stash-protection.service';
 
-// Mock child_process.exec with proper promisify support
-vi.mock('child_process', () => {
-	const mockExec = vi.fn();
-	return {
-		exec: mockExec
-	};
-});
+const mockExecute = vi.fn();
+vi.mock('utils/safe-exec', () => ({
+	SafeExecutor: {
+		execute: (...args: unknown[]) => mockExecute(...args)
+	}
+}));
 
-// Mock the logger
 vi.mock('output/logger', () => ({
 	getLogger: () => ({
 		debug: vi.fn(),
@@ -25,24 +22,12 @@ vi.mock('output/logger', () => ({
 	})
 }));
 
-const mockExec = childProcess.exec as unknown as ReturnType<typeof vi.fn>;
+function queueResult(stdout: string, stderr = ''): void {
+	mockExecute.mockResolvedValueOnce({ exitCode: 0, stderr, stdout });
+}
 
-/**
- * Helper to set up exec mock with callback-style response
- * promisify expects the callback as the last argument and follows Node.js callback convention
- */
-function setupExecMock(stdout: string, stderr = '', error: Error | null = null): void {
-	mockExec.mockImplementation((...args: unknown[]) => {
-		// promisify calls exec with (cmd, opts) and adds the callback internally
-		// The callback is the last argument
-		const callback = args[args.length - 1];
-		if (typeof callback === 'function') {
-			// Call with (error, result) for promisify
-			process.nextTick(() => {
-				callback(error, { stderr, stdout });
-			});
-		}
-	});
+function queueError(message: string): void {
+	mockExecute.mockRejectedValueOnce(new Error(message));
 }
 
 describe('GitStashProtectionService', () => {
@@ -56,9 +41,17 @@ describe('GitStashProtectionService', () => {
 	});
 
 	describe('checkGitStatus', () => {
+		it('calls SafeExecutor.execute("git", [...]) with no shell involved', async () => {
+			queueResult('M  staged-file.ts\n');
+
+			await service.checkGitStatus();
+
+			expect(mockExecute).toHaveBeenCalledWith('git', ['status', '--porcelain'], expect.anything());
+		});
+
 		it('should detect staged changes', async () => {
 			// 'M ' means staged (first column M, second column space)
-			setupExecMock('M  staged-file.ts\n');
+			queueResult('M  staged-file.ts\n');
 
 			const status = await service.checkGitStatus();
 
@@ -69,7 +62,7 @@ describe('GitStashProtectionService', () => {
 
 		it('should detect both staged and unstaged changes', async () => {
 			// 'MM' means both staged and unstaged (modified, staged, then modified again)
-			setupExecMock('MM modified-file.ts\n');
+			queueResult('MM modified-file.ts\n');
 
 			const status = await service.checkGitStatus();
 
@@ -80,7 +73,7 @@ describe('GitStashProtectionService', () => {
 
 		it('should detect untracked files', async () => {
 			// '??' means untracked
-			setupExecMock('?? new-file.ts\n');
+			queueResult('?? new-file.ts\n');
 
 			const status = await service.checkGitStatus();
 
@@ -90,7 +83,7 @@ describe('GitStashProtectionService', () => {
 		});
 
 		it('should report clean working tree', async () => {
-			setupExecMock('');
+			queueResult('');
 
 			const status = await service.checkGitStatus();
 
@@ -102,8 +95,20 @@ describe('GitStashProtectionService', () => {
 	});
 
 	describe('createStash', () => {
+		it('passes the stash message as a literal array element to git, with no shell involved', async () => {
+			queueResult('Saved working directory');
+
+			await service.createStash();
+
+			expect(mockExecute).toHaveBeenCalledWith(
+				'git',
+				['stash', 'push', '-u', '-m', expect.stringContaining('ai-feedback-auto-stash')],
+				expect.anything()
+			);
+		});
+
 		it('should create a stash successfully', async () => {
-			setupExecMock('Saved working directory');
+			queueResult('Saved working directory');
 
 			const result = await service.createStash();
 
@@ -113,12 +118,12 @@ describe('GitStashProtectionService', () => {
 		});
 
 		it('should handle stash failure', async () => {
-			setupExecMock('', '', new Error('No local changes to save'));
+			queueError('No local changes to save');
 
 			const result = await service.createStash();
 
 			expect(result.stashCreated).toBe(false);
-			expect(result.error).toBe('No local changes to save');
+			expect(result.error).toContain('No local changes to save');
 		});
 	});
 
@@ -127,12 +132,13 @@ describe('GitStashProtectionService', () => {
 			const result = await service.restoreStash();
 
 			expect(result.restored).toBe(false);
-			expect(mockExec).not.toHaveBeenCalled();
+			expect(mockExecute).not.toHaveBeenCalled();
 		});
 
 		it('should restore stash successfully', async () => {
 			// First create a stash
-			setupExecMock('Success');
+			queueResult('Success');
+			queueResult('Success');
 
 			await service.createStash();
 			const result = await service.restoreStash();
@@ -143,27 +149,8 @@ describe('GitStashProtectionService', () => {
 
 		it('should handle restore failure', async () => {
 			// First create a stash, then fail on restore
-			let callCount = 0;
-			mockExec.mockImplementation(
-				(
-					cmd: string,
-					opts: unknown,
-					callback?: (err: Error | null, result: { stdout: string; stderr: string }) => void
-				) => {
-					const cb = (typeof opts === 'function' ? opts : callback) as (
-						err: Error | null,
-						result: { stdout: string; stderr: string }
-					) => void;
-					callCount++;
-					if (callCount === 1) {
-						// Create stash succeeds
-						cb(null, { stderr: '', stdout: 'Saved' });
-					} else {
-						// Pop stash fails
-						cb(new Error('CONFLICT in file.ts'), { stderr: '', stdout: '' });
-					}
-				}
-			);
+			queueResult('Saved');
+			queueError('CONFLICT in file.ts');
 
 			await service.createStash();
 			const result = await service.restoreStash();
@@ -175,7 +162,7 @@ describe('GitStashProtectionService', () => {
 
 	describe('promptAndStash', () => {
 		it('should skip stash if no uncommitted changes', async () => {
-			setupExecMock('');
+			queueResult('');
 
 			const result = await service.promptAndStash();
 
@@ -183,23 +170,9 @@ describe('GitStashProtectionService', () => {
 		});
 
 		it('should prompt user and create stash when user confirms', async () => {
-			// First call returns status with changes, second creates stash
-			let callCount = 0;
-			mockExec.mockImplementation((...args: unknown[]) => {
-				const callback = args[args.length - 1];
-				if (typeof callback === 'function') {
-					process.nextTick(() => {
-						callCount++;
-						if (callCount === 1) {
-							// git status shows staged changes
-							callback(null, { stderr: '', stdout: 'M  file.ts\n' });
-						} else {
-							// git stash succeeds
-							callback(null, { stderr: '', stdout: 'Saved' });
-						}
-					});
-				}
-			});
+			// git status shows staged changes, then git stash succeeds
+			queueResult('M  file.ts\n');
+			queueResult('Saved');
 			mockConfirmFn.mockResolvedValue(true);
 
 			const result = await service.promptAndStash(true);
@@ -209,7 +182,7 @@ describe('GitStashProtectionService', () => {
 		});
 
 		it('should not create stash when user declines', async () => {
-			setupExecMock('M  file.ts\n');
+			queueResult('M  file.ts\n');
 			mockConfirmFn.mockResolvedValue(false);
 
 			const result = await service.promptAndStash(true);
@@ -222,20 +195,8 @@ describe('GitStashProtectionService', () => {
 			// Create service without confirmFn
 			const nonInteractiveService = createGitStashProtection();
 
-			let callCount = 0;
-			mockExec.mockImplementation((...args: unknown[]) => {
-				const callback = args[args.length - 1];
-				if (typeof callback === 'function') {
-					process.nextTick(() => {
-						callCount++;
-						if (callCount === 1) {
-							callback(null, { stderr: '', stdout: 'M  file.ts\n' });
-						} else {
-							callback(null, { stderr: '', stdout: 'Saved' });
-						}
-					});
-				}
-			});
+			queueResult('M  file.ts\n');
+			queueResult('Saved');
 
 			// Interactive is false, so it should auto-stash
 			const result = await nonInteractiveService.promptAndStash(false);
