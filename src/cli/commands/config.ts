@@ -13,7 +13,7 @@ import { createContainer, initializePlugins } from 'di/container';
 import { getColorAdapter } from 'output/color-adapter.interface';
 import { sanitizeData } from 'utils/data-sanitizer';
 import { formatError } from 'utils/error-handler';
-import { getRuntimeDataDir } from 'utils/paths';
+import { getRuntimeDataDir, getWorkspaceTrustCheckRoot } from 'utils/paths';
 
 /**
  * Configure config command
@@ -87,7 +87,7 @@ export function configureConfigCommand(program: CommandAdapter): void {
 		)
 		.action(() => {
 			const color = getColorAdapter();
-			const projectDir = process.cwd();
+			const projectDir = getWorkspaceTrustCheckRoot();
 			trustWorkspace(projectDir);
 			console.log(color.green(`✓ Trusted ${projectDir}`));
 		});
@@ -97,7 +97,7 @@ export function configureConfigCommand(program: CommandAdapter): void {
 		.description("Revoke a previously trusted project's ability to run its own declared hooks.")
 		.action(() => {
 			const color = getColorAdapter();
-			const projectDir = process.cwd();
+			const projectDir = getWorkspaceTrustCheckRoot();
 			revokeWorkspaceTrust(projectDir);
 			console.log(color.green(`✓ Revoked trust for ${projectDir}`));
 		});
@@ -106,7 +106,7 @@ export function configureConfigCommand(program: CommandAdapter): void {
 		.command('trust-status')
 		.description('Show whether the current project is trusted to run its own declared hooks')
 		.action(() => {
-			const projectDir = process.cwd();
+			const projectDir = getWorkspaceTrustCheckRoot();
 			console.log(isWorkspaceTrusted(projectDir) ? `Trusted: ${projectDir}` : `Not trusted: ${projectDir}`);
 		});
 }

@@ -355,6 +355,18 @@ describe('atomicWriteFile', () => {
 		expect(fs.readFileSync(filePath, 'utf-8')).toBe('nested');
 	});
 
+	it('applies an optional mode to the file before it becomes visible at its final path', () => {
+		// Without this, a caller writing sensitive content (e.g. a signing key)
+		// has to chmod AFTER atomicWriteFile returns — a window during which the
+		// file exists at its final, well-known path with default (non-restrictive)
+		// permissions. Passing mode through lets the file be chmod'd on its
+		// still-hidden tmp name before the rename that makes it visible at all.
+		const filePath = path.join(tmpDir, 'secret.key');
+		atomicWriteFile(filePath, 'sensitive-content', 0o600);
+		const mode = fs.statSync(filePath).mode & 0o777;
+		expect(mode).toBe(0o600);
+	});
+
 	it('does not consume a pre-existing `<path>.tmp` left by another writer', () => {
 		// Models the multi-process race: writer A creates `<path>.tmp` and pauses;
 		// writer B must not overwrite that file with its own content (which would

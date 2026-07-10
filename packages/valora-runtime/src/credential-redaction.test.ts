@@ -22,6 +22,49 @@ describe('redactCredentials', () => {
 		expect(result).toContain('[REDACTED]');
 	});
 
+	it('redacts the full body and footer of a private-key block, not just the header line', () => {
+		// The old pattern (`-----BEGIN\s+(?:RSA\s+)?PRIVATE\s+KEY-----`, no body
+		// consumption) only matched the opening marker line — the actual base64
+		// key material and the `-----END...-----` footer passed through
+		// completely unredacted.
+		const pem =
+			'-----BEGIN RSA PRIVATE KEY-----\n' +
+			'MIIEpAIBAAKCAQEA1c7+9z5Pad7OejecsQ0bu3aumnAxuNooB6VD3TFReQFRAg==\n' +
+			'-----END RSA PRIVATE KEY-----';
+		const { redacted, result } = redactCredentials(pem);
+		expect(redacted).toBe(true);
+		expect(result).not.toContain('MIIEpAIBAAKCAQEA1c7');
+		expect(result).not.toContain('-----END RSA PRIVATE KEY-----');
+	});
+
+	it('redacts EC/OPENSSH private-key blocks, not just RSA', () => {
+		const pem =
+			'-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQ==\n-----END OPENSSH PRIVATE KEY-----';
+		const { redacted, result } = redactCredentials(pem);
+		expect(redacted).toBe(true);
+		expect(result).not.toContain('b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQ==');
+	});
+
+	it('redacts a GitHub OAuth token (gho_ prefix)', () => {
+		const { redacted, result } = redactCredentials('token=gho_abcdefghijklmnopqrstuvwxyz1234567890ABCD');
+		expect(redacted).toBe(true);
+		expect(result).not.toContain('gho_abcdefghijklmnopqrstuvwxyz1234567890ABCD');
+	});
+
+	it('redacts a GitHub fine-grained personal access token (github_pat_ prefix)', () => {
+		const { redacted, result } = redactCredentials(
+			'token=github_pat_11ABCDEFG0abcdefghijklmnopqrstuvwxyz1234567890ABCDEFGHIJ'
+		);
+		expect(redacted).toBe(true);
+		expect(result).not.toContain('github_pat_11ABCDEFG0abcdefghijklmnopqrstuvwxyz1234567890ABCDEFGHIJ');
+	});
+
+	it('redacts an AWS secret access key even when it contains a "/" (base64 charset the entropy fallback excludes)', () => {
+		const { redacted, result } = redactCredentials('aws_secret_access_key=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY');
+		expect(redacted).toBe(true);
+		expect(result).not.toContain('wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY');
+	});
+
 	it('redacts a database connection string with embedded credentials', () => {
 		const { redacted, result } = redactCredentials('postgres://user:hunter2@db.example.com:5432/app');
 		expect(redacted).toBe(true);

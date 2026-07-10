@@ -21,12 +21,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import fs from 'fs';
 
 // Mock dependencies
+const mockLoggerWarn = vi.fn();
 vi.mock('output/logger', () => ({
 	getLogger: () => ({
 		debug: vi.fn(),
 		error: vi.fn(),
 		info: vi.fn(),
-		warn: vi.fn()
+		warn: mockLoggerWarn
 	})
 }));
 
@@ -382,6 +383,48 @@ describe('HookExecutionService', () => {
 			expect(result.allowed).toBe(false);
 			expect(result.blockReason).toBeDefined();
 			expect(result.hooksExecuted).toBe(1);
+		});
+
+		it('redacts a credential a deny (exit 2) hook echoes to stderr before it becomes the block reason', async () => {
+			// A project-declared hook is less-trusted content — if it dies (or
+			// deliberately denies) while echoing an env var to stderr, that
+			// reason string flows straight into emitToolHookBlocked/pipeline
+			// events with no redaction.
+			setupConfig({
+				PreToolUse: [
+					{ matcher: 'write', hooks: [{ type: 'command', command: 'echo AKIAABCDEFGHIJKLMNOP 1>&2; exit 2' }] }
+				]
+			});
+
+			const result = await service.executePreToolUseHooks(makeToolCall('write'));
+			expect(result.allowed).toBe(false);
+			expect(result.blockReason).not.toContain('AKIAABCDEFGHIJKLMNOP');
+		});
+
+		it('redacts a credential a fail-open (non-0/2 exit) hook echoes to stderr before it reaches the fail-open warn log', async () => {
+			// The secret is only ever present in the runtime environment, never
+			// in the hook's own configured command text — isolating "did the
+			// runtime stderr get redacted" from "the command string itself
+			// happened to be logged verbatim" (a separate, lower-risk surface).
+			mockLoggerWarn.mockClear();
+			process.env['VALORA_TEST_LEAKED_TOKEN'] = 'ghp_abcdefghijklmnopqrstuvwxyz1234567890ABCD';
+			setupConfig({
+				PreToolUse: [
+					{
+						matcher: 'write',
+						hooks: [{ type: 'command', command: 'echo $VALORA_TEST_LEAKED_TOKEN 1>&2; exit 1' }]
+					}
+				]
+			});
+
+			try {
+				await service.executePreToolUseHooks(makeToolCall('write'));
+			} finally {
+				delete process.env['VALORA_TEST_LEAKED_TOKEN'];
+			}
+
+			const loggedStderr = mockLoggerWarn.mock.calls.map((call) => JSON.stringify(call)).join(' ');
+			expect(loggedStderr).not.toContain('ghp_abcdefghijklmnopqrstuvwxyz1234567890ABCD');
 		});
 
 		it('should allow when hook exits with code 0', async () => {

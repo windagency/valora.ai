@@ -20,18 +20,28 @@ export const OUTPUT_CREDENTIAL_PATTERNS: RegExp[] = [
 	/sk-[a-zA-Z0-9_-]{20,}/g,
 	/pk-[a-zA-Z0-9_-]{20,}/g,
 	/api[_-]?key[=:]\s*["']?[a-zA-Z0-9_-]{16,}/gi,
-	// AWS access keys
-	/AKIA[0-9A-Z]{16}/g,
-	// GitHub tokens (PAT, Actions, runner, App installation)
-	/gh[psru]_[A-Za-z0-9_]{36}/g,
+	// AWS access key IDs (long-term) and STS temporary session key IDs
+	/A(?:KIA|SIA)[0-9A-Z]{16}/g,
+	// AWS secret access keys have no fixed prefix (unlike the access key ID
+	// above) — anchored to the common env-var/config key name to avoid
+	// matching arbitrary base64-ish text. Charset includes `/`, unlike the
+	// entropy fallback's deliberately narrower one (see its own comment) —
+	// real AWS secret keys are base64 and often contain `/`.
+	/aws[_-]?secret[_-]?access[_-]?key[=:]\s*["']?[A-Za-z0-9/+=]{20,}/gi,
+	// GitHub tokens (PAT, OAuth, Actions, runner, App installation)
+	/gh[opsru]_[A-Za-z0-9_]{36}/g,
+	// GitHub fine-grained personal access tokens
+	/github_pat_[A-Za-z0-9_]{20,}/g,
 	// JWT — three base64url segments starting with eyJ (header), eyJ (payload), signature
 	/eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g,
 	// Bearer tokens
 	/Bearer\s+[a-zA-Z0-9_\-.]{20,}/g,
 	// Generic long secrets (base64-ish with prefix)
 	/(?:token|secret|password|credential)[=:]\s*["']?[a-zA-Z0-9+/=_-]{20,}/gi,
-	// Private key blocks
-	/-----BEGIN\s+(?:RSA\s+)?PRIVATE\s+KEY-----/g,
+	// Private key blocks — consumes the whole body and footer, not just the
+	// opening marker line, and covers RSA/EC/DSA/OPENSSH/encrypted variants
+	// (any all-caps qualifier before "PRIVATE KEY"), not just RSA/unqualified.
+	/-----BEGIN\s+[A-Z ]*PRIVATE\s+KEY-----[\s\S]*?-----END\s+[A-Z ]*PRIVATE\s+KEY-----/g,
 	// Connection strings with credentials
 	/(?:mongodb|postgres|mysql|redis):\/\/[^:]+:[^@]+@/gi
 ];

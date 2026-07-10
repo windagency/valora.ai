@@ -17,6 +17,7 @@ import type {
 
 import { ensureDir } from 'utils/file-utils';
 import { generateExplorationId } from 'utils/id-generator';
+import { InputValidator } from 'utils/input-validator';
 import { getRuntimeDataDir } from 'utils/paths';
 
 /**
@@ -269,9 +270,18 @@ export class ExplorationStateManager {
 	}
 
 	/**
-	 * Get exploration directory path
+	 * Get exploration directory path. Every other path-building method here
+	 * (`getMetadataPath`/`getStatePath`/`getSharedVolumePath`/
+	 * `getWorktreeDataPath`) funnels through this one, so validating the raw
+	 * CLI-supplied `explorationId` here (rather than at each of the 5 call
+	 * sites individually) closes the whole class at once — a traversal ID
+	 * (`../../../../etc`) previously walked straight out of
+	 * `explorationsDir`, and via `deleteExploration`'s `fs.rm(...,
+	 * {recursive:true, force:true})`, became an arbitrary directory-deletion
+	 * primitive.
 	 */
 	getExplorationDir(explorationId: string): string {
+		InputValidator.validateExplorationId(explorationId);
 		return path.join(this.explorationsDir, explorationId);
 	}
 

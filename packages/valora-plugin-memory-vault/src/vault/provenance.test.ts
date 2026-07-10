@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -40,6 +40,20 @@ describe('provenance signing', () => {
 
 	it('fails verification for a forged signature with no valid key', () => {
 		expect(verifyProvenance('some content', 'product-manager', '2026-07-09T00:00:00.000Z', 'deadbeef')).toBe(false);
+	});
+
+	it('creates the signing key with 0600 permissions (regression guard for the key-creation permission window)', () => {
+		// The previous implementation wrote the key with atomicWriteFile's
+		// default permissions, then chmod'd to 0600 in a SEPARATE call — a
+		// window during which the file existed at its final, well-known path
+		// with default (non-0600) permissions. Now passed straight through to
+		// atomicWriteFile's own `mode` parameter (see file-format.test.ts's
+		// dedicated test for the ordering guarantee that actually closes the
+		// window); this test just locks in the end state.
+		signProvenance('some content', 'product-manager', '2026-07-09T00:00:00.000Z');
+		const keyPath = join(dir, 'vault-signing.key');
+		const mode = statSync(keyPath).mode & 0o777;
+		expect(mode).toBe(0o600);
 	});
 
 	it('persists the signing key across calls so re-signing the same inputs is stable', () => {

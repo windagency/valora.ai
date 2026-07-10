@@ -13,6 +13,7 @@
 import { exec } from 'child_process';
 import fs from 'fs';
 import path from 'path';
+import { getCredentialGuard } from 'security/credential-guard';
 import { isWorkspaceTrusted } from 'security/workspace-trust.service';
 
 import type {
@@ -141,7 +142,7 @@ export class HookExecutionService {
 			} else {
 				this.logger.warn(`PreToolUse hook exited with code ${exitCode}, allowing (fail-open)`, {
 					command: hook.command,
-					stderr: stderr.trim()
+					stderr: getCredentialGuard().scanOutput(stderr.trim())
 				});
 				result.errors.push(`Hook "${hook.command}" exited with code ${exitCode}`);
 			}
@@ -169,7 +170,8 @@ export class HookExecutionService {
 	): boolean {
 		const parsed = this.parseHookOutput(stdout);
 		const reason =
-			parsed?.hookSpecificOutput?.permissionDecisionReason ?? (stderr.trim() || 'Blocked by PreToolUse hook');
+			parsed?.hookSpecificOutput?.permissionDecisionReason ??
+			(getCredentialGuard().scanOutput(stderr.trim()) || 'Blocked by PreToolUse hook');
 
 		result.allowed = false;
 		result.blockReason = reason;

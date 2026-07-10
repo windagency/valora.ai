@@ -25,9 +25,11 @@ vi.mock('output/color-adapter.interface', () => ({
 	}))
 }));
 
+const mockGetWorkspaceTrustCheckRoot = vi.fn(() => process.cwd());
 vi.mock('utils/paths', () => ({
 	getRuntimeDataDir: vi.fn(() => '/mock/runtime'),
-	getGlobalConfigDir: vi.fn(() => '/mock/global')
+	getGlobalConfigDir: vi.fn(() => '/mock/global'),
+	getWorkspaceTrustCheckRoot: (...args: unknown[]) => mockGetWorkspaceTrustCheckRoot(...args)
 }));
 
 vi.mock('utils/error-handler', () => ({
@@ -121,6 +123,7 @@ describe('config setup', () => {
 describe('config trust', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
+		mockGetWorkspaceTrustCheckRoot.mockReturnValue(process.cwd());
 	});
 
 	it('trusts the current working directory', async () => {
@@ -164,6 +167,54 @@ describe('config trust', () => {
 		await runCommand(makeProgram(), ['config', 'trust-status']);
 
 		expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('Not trusted'));
+
+		consoleLogSpy.mockRestore();
+	});
+
+	it('calls trustWorkspace with the resolved trust-check root, not raw cwd', async () => {
+		// Every other isWorkspaceTrusted() consumer (hook-execution.service.ts,
+		// project-guidance-loader.ts, lsp-language-registry.ts) resolves via
+		// getWorkspaceTrustCheckRoot()'s walk-up to the nearest .valora/
+		// ancestor. These CLI commands used raw process.cwd() instead — from a
+		// subdirectory, `trust` under-trusts (fails safe, just confusing), but
+		// `untrust` is the dangerous direction: it revokes a key that was never
+		// in the store, a silent no-op, while every enforcement point still
+		// reports the ancestor root as trusted.
+		const ancestorRoot = '/repo/root';
+		mockGetWorkspaceTrustCheckRoot.mockReturnValue(ancestorRoot);
+		const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+
+		await runCommand(makeProgram(), ['config', 'trust']);
+
+		expect(mockTrustWorkspace).toHaveBeenCalledWith(ancestorRoot);
+		expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining(ancestorRoot));
+
+		consoleLogSpy.mockRestore();
+	});
+
+	it('calls revokeWorkspaceTrust with the resolved trust-check root, not raw cwd', async () => {
+		const ancestorRoot = '/repo/root';
+		mockGetWorkspaceTrustCheckRoot.mockReturnValue(ancestorRoot);
+		const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+
+		await runCommand(makeProgram(), ['config', 'untrust']);
+
+		expect(mockRevokeWorkspaceTrust).toHaveBeenCalledWith(ancestorRoot);
+		expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining(ancestorRoot));
+
+		consoleLogSpy.mockRestore();
+	});
+
+	it('calls isWorkspaceTrusted with the resolved trust-check root, not raw cwd', async () => {
+		const ancestorRoot = '/repo/root';
+		mockGetWorkspaceTrustCheckRoot.mockReturnValue(ancestorRoot);
+		mockIsWorkspaceTrusted.mockReturnValue(true);
+		const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+
+		await runCommand(makeProgram(), ['config', 'trust-status']);
+
+		expect(mockIsWorkspaceTrusted).toHaveBeenCalledWith(ancestorRoot);
+		expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining(ancestorRoot));
 
 		consoleLogSpy.mockRestore();
 	});

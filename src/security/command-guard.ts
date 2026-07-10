@@ -76,8 +76,11 @@ const ALLOWED_BASE_COMMANDS = new Set<string>([
 	'gzip',
 	'sed',
 	// Build / container tooling
+	// Deliberately excludes `make`: a Makefile recipe is arbitrary shell in a
+	// file, not a statically-extractable argv sub-command like find/xargs/env's
+	// — there is no way to scope or recursively re-validate it, so `make
+	// <target>` is a total, unconditional bypass of every check in this file.
 	'docker',
-	'make',
 	// Python / Rust ecosystems (`-c` / `-e` forms blocked by EVAL_PATTERNS)
 	'cargo',
 	'pip',
@@ -138,6 +141,13 @@ const EVAL_PATTERNS: RegExp[] = [
 	// long form — matching only the bare `-e` token missed both.
 	/\bnode\s+-[a-zA-Z]*e/,
 	/\bnode\s+--eval\b/,
+	// `npx -c`/`--call` is a documented flag that runs an arbitrary shell
+	// command — the same primitive as `python -c`/`node -e`, on an
+	// allowlisted launcher that had no equivalent pattern.
+	/\bnpx\s+(?:-[a-zA-Z]*c\b|--call\b)/,
+	// `bun -e`/`--eval` mirrors node's own eval flag.
+	/\bbun\s+-[a-zA-Z]*e/,
+	/\bbun\s+--eval\b/,
 	/\bruby\s+-e\b/,
 	/\bperl\s+-e\b/
 ];
@@ -363,10 +373,32 @@ function isFindExecTerminator(token: string): boolean {
  */
 const XARGS_VALUE_FLAGS = new Set(['-a', '-d', '-E', '-I', '-L', '-n', '-P', '-s']);
 
-/** env flags that consume the following token as a value, not a sub-command start. */
-const ENV_VALUE_FLAGS = new Set(['-C', '-S', '-u']);
+/**
+ * env flags that consume the following token as a value, not a sub-command
+ * start. Long forms (`--chdir`/`--split-string`/`--unset`) are just as
+ * value-taking as their short equivalents (GNU env's own `--help` confirms
+ * all six) — omitting them let the unattached long form advance the parser
+ * by only 1 token instead of 2, misreading a smuggled sub-command's own base
+ * name as the flag's value and letting it evade re-validation entirely.
+ */
+const ENV_VALUE_FLAGS = new Set(['--chdir', '--split-string', '--unset', '-C', '-S', '-u']);
 
 const ENV_ASSIGNMENT_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*=/;
+
+/**
+ * True if `envArgs` (env's own args, not including `env` itself) carries a
+ * `-C`/`--chdir` flag in any form. `env -C <dir>` changes the *real* working
+ * directory the recursively-validated sub-command runs in — every
+ * cwd-relative scoping check (`rm`/`cp`/docker mounts) evaluates the
+ * sub-command's paths against the guard's own unchanged `process.cwd()`, not
+ * the real chdir target, so `env -C /etc rm passwd` looks like an ordinary
+ * in-cwd delete but actually deletes `/etc/passwd` at runtime. No downstream
+ * check can safely account for a runtime chdir, so this must be blocked
+ * outright rather than threaded through every scoping check.
+ */
+function hasEnvChdirFlag(envArgs: string[]): boolean {
+	return envArgs.some((t) => t === '-C' || t === '--chdir' || t.startsWith('--chdir='));
+}
 
 /**
  * Script-execution primitives embedded *inside* an allowlisted command's own
@@ -392,6 +424,23 @@ const DOCKER_DANGEROUS_FLAG_PATTERNS: RegExp[] = [
 	/--pid[=\s]host\b/,
 	/--network[=\s]host\b/,
 	/--security-opt\b/
+];
+
+/**
+ * `git` flags/config-keys that grant an immediate or persistent
+ * arbitrary-command execution primitive, checked against the whole joined
+ * argument string (mirroring `DOCKER_DANGEROUS_FLAG_PATTERNS`) since some are
+ * only meaningful with their attached value and can appear as either `-c
+ * key=value` (immediate, this invocation only) or `git config key value`
+ * (persistent, written to the repo/global config for every future
+ * invocation). `credential\.\S*helper` also matches URL-scoped keys
+ * (`credential.https://x.com.helper`), not just the bare form.
+ */
+const GIT_DANGEROUS_PATTERNS: RegExp[] = [
+	/\bext::/,
+	/--exec-path\b/,
+	/\bcore\.hooksPath\b/i,
+	/\bcredential\.\S*helper\b/i
 ];
 
 /** `docker <group> <subcommand>` prefixes whose long form must resolve to the same subcommand as the top-level shortcut. */
@@ -444,6 +493,11 @@ function matchLongFlagValue(token: string, longFlag: string, nextToken: string |
 	if (token === longFlag) return nextToken;
 	if (token.startsWith(`${longFlag}=`)) return token.slice(longFlag.length + 1);
 	return undefined;
+}
+
+/** Extracts BuildKit `-o`/`--output`'s `dest=<path>` sub-value from its comma-separated key=value spec (e.g. `type=local,dest=/tmp/x`). */
+function extractDockerOutputDest(spec: string): string | undefined {
+	return /(?:^|,)dest=([^,]+)/.exec(spec)?.[1];
 }
 
 /**
@@ -818,7 +872,15 @@ export class CommandGuard {
 	}
 
 	private validateEnvArgs(tokens: string[]): CommandValidationResult {
-		const subCommands = this.extractEnvSubCommand(tokens.slice(1));
+		const rest = tokens.slice(1);
+		if (hasEnvChdirFlag(rest)) {
+			return {
+				allowed: false,
+				reason:
+					'env -C/--chdir blocked — changes the real working directory a recursively-validated sub-command runs in, which no cwd-relative scoping check can safely account for'
+			};
+		}
+		const subCommands = this.extractEnvSubCommand(rest);
 		if (subCommands.length === 0) {
 			return {
 				allowed: false,
@@ -1061,6 +1123,37 @@ export class CommandGuard {
 		return { allowed: true };
 	}
 
+	/**
+	 * `git` had zero scoping at all: `git -C <path> clean -fdx` deletes
+	 * arbitrary files outside cwd (the same escape primitive `rm`/`cp`/docker
+	 * mounts are scoped against), the `ext::` remote-helper transport forks an
+	 * arbitrary program, and `core.hooksPath`/`credential.helper` (immediate
+	 * `-c`/`--config`, or persistent `git config`) set an arbitrary-command
+	 * hook. Live-verified: all four bypasses actually executed the smuggled
+	 * command/deleted the file in this sandbox before this fix.
+	 */
+	private validateGitArgs(tokens: string[]): CommandValidationResult {
+		const rest = tokens.slice(1);
+		const joined = rest.join(' ');
+
+		for (const pattern of GIT_DANGEROUS_PATTERNS) {
+			if (pattern.test(joined)) {
+				return { allowed: false, reason: `Dangerous git flag/config blocked: matches pattern ${pattern.source}` };
+			}
+		}
+
+		for (let i = 0; i < rest.length; i++) {
+			if (rest[i] !== '-C') continue;
+			const target = rest[i + 1];
+			if (target === undefined) continue;
+			if (isUnresolvableArgument(target) || this.isOutsideWorkingDirectory(target)) {
+				return { allowed: false, reason: `git -C target outside working directory blocked: ${target}` };
+			}
+		}
+
+		return { allowed: true };
+	}
+
 	/** Checks every bind-mount (-v/--mount) and I/O (-i/-o, save/load/export) host path for cwd-escape and protected-file targeting. */
 	private checkDockerHostPaths(rest: string[], subcommand: string | undefined): CommandValidationResult {
 		for (let i = 0; i < rest.length; i++) {
@@ -1115,10 +1208,12 @@ export class CommandGuard {
 	}
 
 	/**
-	 * `build`'s `-f`/`--file` (an arbitrary host file read as the Dockerfile)
-	 * and `--iidfile` (an arbitrary host file write) are real host-path flags,
-	 * but `build` was never dispatched to any docker-specific path check at
-	 * all until now.
+	 * `build`'s `-f`/`--file` (an arbitrary host file read as the Dockerfile),
+	 * `--iidfile`/`--metadata-file` (arbitrary host file writes), and
+	 * `-o`/`--output`'s `dest=<path>` sub-value (BuildKit's arbitrary
+	 * host-directory export write, e.g. `type=local,dest=/tmp/exfil`) are all
+	 * real host-path flags, but `build` was never dispatched to any
+	 * docker-specific path check at all until round 11 added `-f`/`--iidfile`.
 	 */
 	private extractDockerBuildPathFlag(
 		subcommand: string | undefined,
@@ -1126,9 +1221,21 @@ export class CommandGuard {
 		nextToken: string | undefined
 	): string | undefined {
 		if (subcommand !== 'build') return undefined;
-		if (token === '-f' || token === '--file' || token === '--iidfile') return nextToken;
-		if (token.startsWith('--file=')) return token.slice('--file='.length);
-		if (token.startsWith('--iidfile=')) return token.slice('--iidfile='.length);
+		if (token === '-f') return nextToken;
+
+		const plainPathFlag =
+			matchLongFlagValue(token, '--file', nextToken) ??
+			matchLongFlagValue(token, '--iidfile', nextToken) ??
+			matchLongFlagValue(token, '--metadata-file', nextToken);
+		if (plainPathFlag !== undefined) return plainPathFlag;
+
+		return this.extractDockerBuildOutputPathFlag(token, nextToken);
+	}
+
+	/** `-o`/`--output type=local,dest=<path>` (BuildKit export) — its value is a comma-separated spec, not a bare path, so `dest=` must be pulled out separately from the plain path flags above. */
+	private extractDockerBuildOutputPathFlag(token: string, nextToken: string | undefined): string | undefined {
+		if (token === '-o' || token === '--output') return nextToken ? extractDockerOutputDest(nextToken) : undefined;
+		if (token.startsWith('--output=')) return extractDockerOutputDest(token.slice('--output='.length));
 		return undefined;
 	}
 
@@ -1172,11 +1279,15 @@ export class CommandGuard {
 	private validateDockerImportArgs(positionalArgs: string[]): CommandValidationResult {
 		for (let i = 0; i < positionalArgs.length; i++) {
 			const token = positionalArgs[i]!;
+			// Must be checked before the startsWith('-') branch below: '-'.startsWith('-')
+			// is true, so that branch would otherwise always catch it first and this
+			// check would never run, falling through to treat the NEXT positional
+			// (REPOSITORY[:TAG], not a filesystem path) as the host-path candidate.
+			if (token === '-' || /^https?:\/\//.test(token)) return { allowed: true };
 			if (token.startsWith('-')) {
 				if (DOCKER_IMPORT_VALUE_FLAGS.has(token)) i += 1;
 				continue;
 			}
-			if (token === '-' || /^https?:\/\//.test(token)) return { allowed: true };
 			if (isUnresolvableArgument(token) || this.isOutsideWorkingDirectory(token)) {
 				return { allowed: false, reason: `docker import source outside working directory blocked: ${token}` };
 			}
@@ -1314,6 +1425,7 @@ export class CommandGuard {
 	/** Dispatches to the per-command path/flag scoping check, if this base command has one. */
 	private checkScopedPathCommand(baseCommand: string, tokens: string[]): CommandValidationResult {
 		if (baseCommand === 'docker') return this.validateDockerArgs(tokens);
+		if (baseCommand === 'git') return this.validateGitArgs(tokens);
 		if (baseCommand === 'rm') return this.validateRmArgs(tokens);
 		if (baseCommand === 'cp') return this.validateCpArgs(tokens);
 		if (baseCommand === 'env') return this.validateEnvArgs(tokens);

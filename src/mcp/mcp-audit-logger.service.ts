@@ -5,6 +5,7 @@
  * Tracks approval decisions, connections, tool calls, and errors.
  */
 
+import { redactCredentials } from '@windagency/valora-runtime';
 import { existsSync, mkdirSync } from 'fs';
 import { dirname, join, resolve } from 'path';
 
@@ -450,6 +451,14 @@ export class MCPAuditLoggerService {
 	 */
 	private async writeEntry(entry: MCPAuditLogEntry): Promise<void> {
 		const logger = getLogger();
+
+		// A stdio MCP server whose connection env/args embed a credential can
+		// leak it into a spawn-failure error message — redact before this
+		// reaches either the in-memory log or the persisted .jsonl file, not
+		// just at one of the three call sites that produce this field.
+		if (entry.error !== undefined) {
+			entry = { ...entry, error: redactCredentials(entry.error).result };
+		}
 
 		// Add to memory log
 		this.memoryLog.push(entry);

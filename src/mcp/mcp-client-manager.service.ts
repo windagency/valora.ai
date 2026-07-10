@@ -28,6 +28,7 @@ import { getPackageDataDir } from 'utils/paths';
 import type { MCPApprovalCacheService } from './mcp-approval-cache.service';
 import type { MCPAuditLoggerService } from './mcp-audit-logger.service';
 
+import { checkMcpConnectionConfigDrift } from './mcp-connection-integrity';
 import { EXTERNAL_MCP_SERVER_CONFIG_SCHEMA } from './mcp-server-config.schema';
 
 /**
@@ -225,6 +226,17 @@ export class MCPClientManagerService {
 					serverId
 				});
 				// Invalidate cached approval so user is re-prompted
+				await this.approvalCache.revokeApproval(serverId);
+			}
+
+			// Check connection-config integrity (command/args/env drift) — a
+			// stale cached approval must not survive a config swap that keeps
+			// the exposed tool names/schemas identical.
+			const connectionDrift = checkMcpConnectionConfigDrift(serverId, config.connection);
+			if (connectionDrift.changed) {
+				logger.warn('MCP server connection config changed since last approval — approval invalidated', {
+					serverId
+				});
 				await this.approvalCache.revokeApproval(serverId);
 			}
 

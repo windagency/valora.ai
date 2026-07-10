@@ -1,7 +1,7 @@
 import type { Edge, EdgeKind, MemoryEntry, MemorySource } from '@windagency/valora-plugin-api';
 
 import { createHash } from 'node:crypto';
-import { mkdirSync, renameSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, renameSync, writeFileSync } from 'node:fs';
 import * as path from 'node:path';
 
 import { verifyProvenance } from './provenance.js';
@@ -248,10 +248,18 @@ function buildTmpPath(filePath: string): string {
  * the writing process PID and a counter so concurrent writers never collide
  * on the staging file.
  */
-export function atomicWriteFile(filePath: string, content: string): void {
+/**
+ * `mode`, if given, is applied to the tmp file *before* the rename that makes
+ * it visible at `filePath` — a caller writing sensitive content (e.g. a
+ * signing key) can request restrictive permissions with no window during
+ * which the file exists at its final, well-known path with default
+ * (non-restrictive) permissions.
+ */
+export function atomicWriteFile(filePath: string, content: string, mode?: number): void {
 	mkdirSync(path.dirname(filePath), { recursive: true });
 	const tmpPath = buildTmpPath(filePath);
 	writeFileSync(tmpPath, content, 'utf-8');
+	if (mode !== undefined) chmodSync(tmpPath, mode);
 	renameSync(tmpPath, filePath);
 }
 

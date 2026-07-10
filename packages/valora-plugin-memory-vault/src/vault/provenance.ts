@@ -36,7 +36,7 @@
 
 import { getGlobalConfigDir } from '@windagency/valora-runtime';
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
-import { chmodSync, existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import * as path from 'node:path';
 
 import { atomicWriteFile } from './file-format.js';
@@ -65,8 +65,7 @@ function getOrCreateSigningKey(): Buffer {
 	}
 
 	const key = randomBytes(KEY_LENGTH_BYTES);
-	atomicWriteFile(keyPath, key.toString('hex'));
-	chmodSync(keyPath, 0o600);
+	atomicWriteFile(keyPath, key.toString('hex'), 0o600);
 	return key;
 }
 
