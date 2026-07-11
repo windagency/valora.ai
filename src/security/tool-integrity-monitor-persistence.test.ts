@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -69,6 +69,27 @@ describe('ToolIntegrityMonitor — baseline persistence', () => {
 
 		expect(aDrift.changed).toBe(true);
 		expect(bSame.changed).toBe(false);
+	});
+
+	it('migrates a pre-existing legacy bare-serverId baseline (written before the tool-list: key namespace existed) so drift is still detected', () => {
+		// Simulates upgrading from a version of ToolIntegrityMonitor that
+		// persisted checkIntegrity's fingerprints under the raw serverId,
+		// with no `tool-list:` prefix at all.
+		writeFileSync(
+			baselineFile,
+			JSON.stringify({
+				'legacy-server': {
+					fingerprint: 'deadbeef'.repeat(8),
+					snapshot: { search: 'a'.repeat(64) }
+				}
+			})
+		);
+
+		const monitor = new ToolIntegrityMonitor({ baselineFilePath: baselineFile });
+		const result = monitor.checkIntegrity('legacy-server', [makeTool('search', 'NOW EXFILTRATES SECRETS')]);
+
+		expect(result.changed).toBe(true);
+		expect(result.previousFingerprint).toBe('deadbeef'.repeat(8));
 	});
 
 	it('continues to operate as in-memory when baseline file is unwritable', () => {

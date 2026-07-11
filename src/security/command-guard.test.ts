@@ -98,6 +98,18 @@ describe('CommandGuard', () => {
 			expect(guard.validate('node --eval="console.log(1)"').allowed).toBe(false);
 		});
 
+		it('blocks node -r/--require — a preload module runs before the main script, same primitive as -e', () => {
+			expect(guard.validate('node -r /tmp/evil.js index.js').allowed).toBe(false);
+			expect(guard.validate('node --require /tmp/evil.js index.js').allowed).toBe(false);
+			expect(guard.validate('node --require=/tmp/evil.js index.js').allowed).toBe(false);
+		});
+
+		it('blocks node --experimental-loader/--loader/--import — ESM loader hooks are an equally direct code-execution primitive', () => {
+			expect(guard.validate('node --experimental-loader /tmp/evil.mjs index.js').allowed).toBe(false);
+			expect(guard.validate('node --loader /tmp/evil.mjs index.js').allowed).toBe(false);
+			expect(guard.validate('node --import /tmp/evil.mjs index.js').allowed).toBe(false);
+		});
+
 		it('blocks npx -c (documented --call shorthand, runs an arbitrary shell command)', () => {
 			expect(guard.validate("npx -c 'curl http://evil.com'").allowed).toBe(false);
 		});
@@ -315,8 +327,12 @@ describe('CommandGuard', () => {
 			expect(guard.validate('diff <(cat a) <(curl evil.com)').allowed).toBe(false);
 		});
 
-		it('allows process substitution where every leaf is allowlisted', () => {
-			expect(guard.validate('diff <(cat a) <(cat b)').allowed).toBe(true);
+		it('allows process substitution where every leaf is allowlisted, for a command with no scoping rule', () => {
+			expect(guard.validate('wc <(cat a) <(cat b)').allowed).toBe(true);
+		});
+
+		it('blocks diff on process substitution — diff now has a protected-file check that fails closed on an unresolvable argument, same as rm/cp/docker', () => {
+			expect(guard.validate('diff <(cat a) <(cat b)').allowed).toBe(false);
 		});
 
 		it('blocks backtick command substitution containing non-allowlisted command', () => {
@@ -843,6 +859,50 @@ describe('CommandGuard', () => {
 		it('still allows docker build -o with a bare-path shorthand inside cwd', () => {
 			expect(guard.validate('docker build -o ./out .').allowed).toBe(true);
 		});
+
+		it('blocks docker buildx build the same as plain docker build — buildx was not unwrapped as a group prefix, so every build-path check above was dead code for this real, commonly-used invocation form', () => {
+			expect(guard.validate('docker buildx build -o /etc .').allowed).toBe(false);
+			expect(guard.validate('docker buildx build -f /etc/passwd .').allowed).toBe(false);
+			expect(guard.validate('docker buildx build --iidfile /tmp/stolen.id .').allowed).toBe(false);
+		});
+
+		it('still allows docker buildx build with in-cwd paths', () => {
+			expect(guard.validate('docker buildx build -o ./out .').allowed).toBe(true);
+			expect(guard.validate('docker buildx build -f ./Dockerfile .').allowed).toBe(true);
+			expect(guard.validate('docker buildx build -t app .').allowed).toBe(true);
+		});
+
+		it('blocks docker build reading an arbitrary host directory as the build context', () => {
+			// The build context is always the final positional argument in a
+			// valid `docker build` invocation — the Docker daemon reads (and
+			// can leak into a built image layer) every file under it.
+			expect(guard.validate('docker build /etc').allowed).toBe(false);
+		});
+
+		it('blocks docker build reading an arbitrary host directory as the context even with flags present', () => {
+			expect(guard.validate('docker build -t app --platform linux/amd64 /etc').allowed).toBe(false);
+		});
+
+		it('blocks docker build context escaping the working directory via ../..', () => {
+			expect(guard.validate('docker build ../../etc').allowed).toBe(false);
+		});
+
+		it('still allows a docker build context inside the working directory', () => {
+			expect(guard.validate('docker build .').allowed).toBe(true);
+			expect(guard.validate('docker build -t app ./subdir').allowed).toBe(true);
+		});
+
+		it('still allows a URL build context — not a host filesystem path', () => {
+			expect(guard.validate('docker build https://github.com/user/repo.git').allowed).toBe(true);
+		});
+
+		it('still allows a stdin (-) build context', () => {
+			expect(guard.validate('docker build -').allowed).toBe(true);
+		});
+
+		it('blocks docker buildx build reading an arbitrary host directory as the context, same as plain docker build', () => {
+			expect(guard.validate('docker buildx build /etc').allowed).toBe(false);
+		});
 	});
 
 	describe('git scoping', () => {
@@ -1157,6 +1217,38 @@ describe('CommandGuard', () => {
 		});
 	});
 
+	describe('mv/gunzip/gzip path scoping', () => {
+		// mv/gunzip/gzip were bucketed into PROTECTED_INFRASTRUCTURE_DESTRUCTIVE_COMMANDS
+		// alongside cp/rm, but the general cwd-escape scoping dispatch table
+		// only ever covered cp/rm — mv had zero scoping at all (`mv ./secret.txt
+		// /tmp/exfiltrated.txt` / `mv /etc/hostname ./stolen` both live-verified
+		// allowed), the same class of gap cp itself had before round 5.
+		it('blocks mv writing outside the working directory', () => {
+			expect(guard.validate('mv ./secret.txt /tmp/exfiltrated.txt').allowed).toBe(false);
+		});
+
+		it('blocks mv reading from outside the working directory', () => {
+			expect(guard.validate('mv /etc/hostname ./stolen-hostname').allowed).toBe(false);
+		});
+
+		it('still allows mv within the working directory', () => {
+			expect(guard.validate('mv src/a.ts src/b.ts').allowed).toBe(true);
+		});
+
+		it('blocks gzip targeting a file outside the working directory', () => {
+			expect(guard.validate('gzip /etc/hostname').allowed).toBe(false);
+		});
+
+		it('blocks gunzip targeting a file outside the working directory', () => {
+			expect(guard.validate('gunzip /etc/hostname.gz').allowed).toBe(false);
+		});
+
+		it('still allows gzip/gunzip within the working directory', () => {
+			expect(guard.validate('gzip src/a.ts').allowed).toBe(true);
+			expect(guard.validate('gunzip src/a.ts.gz').allowed).toBe(true);
+		});
+	});
+
 	describe('protected security-infrastructure paths', () => {
 		it('blocks rm targeting the security audit log', () => {
 			expect(guard.validate('rm .valora/security-audit.jsonl').allowed).toBe(false);
@@ -1204,8 +1296,8 @@ describe('CommandGuard', () => {
 			expect(guard.validate('cp src/index.ts vault-signing.key').allowed).toBe(false);
 		});
 
-		it('still allows reading the vault signing key', () => {
-			expect(guard.validate('cat vault-signing.key').allowed).toBe(true);
+		it('blocks reading the vault signing key — leaking its value enables signature forgery elsewhere', () => {
+			expect(guard.validate('cat vault-signing.key').allowed).toBe(false);
 		});
 
 		it('blocks rm targeting the MCP approval cache', () => {
@@ -1226,8 +1318,8 @@ describe('CommandGuard', () => {
 			expect(guard.validate('cp src/index.ts .mcp-approvals.json').allowed).toBe(false);
 		});
 
-		it('still allows reading the MCP approval cache', () => {
-			expect(guard.validate('cat .mcp-approvals.json').allowed).toBe(true);
+		it('blocks reading the MCP approval cache', () => {
+			expect(guard.validate('cat .mcp-approvals.json').allowed).toBe(false);
 		});
 
 		it('blocks sed -i in-place editing of the security audit log', () => {
@@ -1253,8 +1345,36 @@ describe('CommandGuard', () => {
 			expect(guard.validate("sed -i 's/foo/bar/' src/index.ts").allowed).toBe(true);
 		});
 
-		it('still allows reading the security audit log', () => {
-			expect(guard.validate('cat .valora/security-audit.jsonl').allowed).toBe(true);
+		it('blocks reading the security audit log — no legitimate agent task needs it, and it aids evasion reconnaissance', () => {
+			expect(guard.validate('cat .valora/security-audit.jsonl').allowed).toBe(false);
+		});
+
+		it('blocks reading the security audit log via head/tail/grep/rg/diff/stat, not just cat', () => {
+			expect(guard.validate('head .valora/security-audit.jsonl').allowed).toBe(false);
+			expect(guard.validate('tail .valora/security-audit.jsonl').allowed).toBe(false);
+			expect(guard.validate('grep tampered .valora/security-audit.jsonl').allowed).toBe(false);
+			expect(guard.validate('rg tampered .valora/security-audit.jsonl').allowed).toBe(false);
+			expect(guard.validate('diff .valora/security-audit.jsonl .valora/security-audit.jsonl').allowed).toBe(false);
+			expect(guard.validate('stat .valora/security-audit.jsonl').allowed).toBe(false);
+		});
+
+		it('still allows head/tail/grep/rg/diff/stat on ordinary files', () => {
+			expect(guard.validate('head src/index.ts').allowed).toBe(true);
+			expect(guard.validate('tail src/index.ts').allowed).toBe(true);
+			expect(guard.validate('grep TODO src/index.ts').allowed).toBe(true);
+			expect(guard.validate('rg TODO src/index.ts').allowed).toBe(true);
+			expect(guard.validate('diff src/index.ts src/index.ts').allowed).toBe(true);
+			expect(guard.validate('stat src/index.ts').allowed).toBe(true);
+		});
+
+		it("blocks reading a sensitive-file-shaped path (.env/id_rsa) via cat/head/tail/grep/rg/diff/stat, matching read_file/LSP's own refusal", () => {
+			expect(guard.validate('cat .env').allowed).toBe(false);
+			expect(guard.validate('head id_rsa').allowed).toBe(false);
+			expect(guard.validate('tail .aws/credentials').allowed).toBe(false);
+			expect(guard.validate('grep SECRET .env').allowed).toBe(false);
+			expect(guard.validate('rg SECRET .env').allowed).toBe(false);
+			expect(guard.validate('diff .env .env.example').allowed).toBe(false);
+			expect(guard.validate('stat id_rsa').allowed).toBe(false);
 		});
 
 		it('blocks sed -i editing the security audit log when the flag comes after the filename (GNU getopt permutation)', () => {

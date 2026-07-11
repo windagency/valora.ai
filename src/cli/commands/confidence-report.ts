@@ -18,24 +18,33 @@ import {
 	type TriggeredCriterionSummary
 } from 'utils/confidence-calibration-analytics';
 import { formatError } from 'utils/error-handler';
+import { InputValidator } from 'utils/input-validator';
 
 export function configureConfidenceReportSubcommand(monitoringCmd: CommandAdapter): CommandAdapter {
-	return monitoringCmd
-		.command('confidence-report')
-		.description('Show empirical calibration of escalation confidence vs. human decisions')
-		.option('--since <date>', 'Filter records since date (ISO 8601)')
-		.option('--stage <name>', 'Filter to a single stage')
-		.option('--format <fmt>', 'Output format (json|table|markdown)', 'table')
-		.option('--output <path>', 'Write report to file path')
-		.action((options: Record<string, unknown>) => {
-			const color = getColorAdapter();
-			try {
-				runConfidenceReportAction(options);
-			} catch (error) {
-				console.error(color.red('Failed to retrieve confidence calibration data:'), formatError(error as Error));
-				process.exit(1);
-			}
-		});
+	return (
+		monitoringCmd
+			.command('confidence-report')
+			.description('Show empirical calibration of escalation confidence vs. human decisions')
+			.option('--since <date>', 'Filter records since date (ISO 8601)')
+			.option('--stage <name>', 'Filter to a single stage')
+			.option('--format <fmt>', 'Output format (json|table|markdown)', 'table')
+			// Named --export, not --output: a global `--output <format>` option
+			// (choices markdown/json/yaml) is registered on the root program, and
+			// silently wins over a same-named subcommand-local option — a real
+			// path here always errored "Allowed choices are markdown, json, yaml"
+			// before this action handler ever ran, live-verified against the
+			// actual CLI.
+			.option('--export <path>', 'Write report to file path')
+			.action((options: Record<string, unknown>) => {
+				const color = getColorAdapter();
+				try {
+					runConfidenceReportAction(options);
+				} catch (error) {
+					console.error(color.red('Failed to retrieve confidence calibration data:'), formatError(error as Error));
+					process.exit(1);
+				}
+			})
+	);
 }
 
 function displayBucketTable(buckets: ConfidenceBucketSummary[], color: ReturnType<typeof getColorAdapter>): void {
@@ -92,7 +101,8 @@ function runConfidenceReportAction(options: Record<string, unknown>): void {
 	};
 
 	const fmt = (options['format'] as string | undefined) ?? 'table';
-	const outputPath = options['output'] as string | undefined;
+	const rawExportPath = options['export'] as string | undefined;
+	const outputPath = rawExportPath ? InputValidator.validatePath(rawExportPath, process.cwd()) : undefined;
 
 	const formatActions: Record<string, () => void> = {
 		json: () => emitReport(analytics.generateJsonReport(opts), outputPath, color),

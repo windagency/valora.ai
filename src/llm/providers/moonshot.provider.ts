@@ -12,6 +12,7 @@
 
 import { Agent as HttpsAgent } from 'https';
 import OpenAI from 'openai';
+import { getCredentialGuard } from 'security/credential-guard';
 
 import type { LLMCompletionOptions, LLMCompletionResult, LLMUsage } from 'types/llm.types';
 
@@ -116,7 +117,7 @@ export class MoonshotProvider extends BaseLLMProvider {
 			return await withRetry(operation, { baseDelayMs: 1000, context, maxRetries: 3 });
 		} catch (error) {
 			throw new ProviderError(
-				`Moonshot API error: ${(error as Error).message}`,
+				`Moonshot API error: ${getCredentialGuard().scanOutput((error as Error).message)}`,
 				{ error, model: options.model, provider: BuiltinProviders.MOONSHOT },
 				context
 			);

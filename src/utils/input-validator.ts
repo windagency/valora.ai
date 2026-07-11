@@ -278,8 +278,12 @@ export class InputValidator {
 		const absolutePath = this.resolveExistingSymlinks(targetPath);
 		const absoluteRoot = this.resolveExistingSymlinks(allowedRoot);
 
-		// Check if path is within allowed root
-		if (!absolutePath.startsWith(absoluteRoot)) {
+		// Check if path is within allowed root. A bare `startsWith` would wrongly
+		// admit a sibling directory whose name happens to be prefixed by the
+		// root (e.g. root "/a/b" admitting "/a/b-evil/...") — require an exact
+		// match or a path separator immediately after the root.
+		const isWithinRoot = absolutePath === absoluteRoot || absolutePath.startsWith(absoluteRoot + path.sep);
+		if (!isWithinRoot) {
 			throw new InputValidationError('Path is outside allowed directory', 'path', targetPath);
 		}
 

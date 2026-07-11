@@ -5,7 +5,11 @@
  * against oversized payloads, deep nesting, and malformed data.
  */
 
-import { beforeEach, describe, expect, it } from 'vitest';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
+
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
 	InputValidator,
 	InputValidatorOptions,
@@ -459,5 +463,39 @@ describe('Forbidden Path Validation', () => {
 			expect(() => validateNotForbiddenPath('src/index.ts', 'write to')).not.toThrow();
 			expect(() => validateNotForbiddenPath('knowledge-base/docs.md', 'modify')).not.toThrow();
 		});
+	});
+});
+
+describe('validatePath', () => {
+	let rootDir: string;
+
+	beforeEach(() => {
+		rootDir = fs.mkdtempSync(path.join(os.tmpdir(), 'valora-validate-path-'));
+	});
+
+	afterEach(() => {
+		fs.rmSync(rootDir, { recursive: true, force: true });
+	});
+
+	it('allows a path genuinely inside the allowed root', () => {
+		const target = path.join(rootDir, 'nested', 'file.json');
+		expect(InputValidator.validatePath(target, rootDir)).toBe(target);
+	});
+
+	it('rejects a sibling directory whose name is merely prefixed by the allowed root — bare startsWith wrongly admits it with no trailing-separator boundary', () => {
+		// A root of "<rootDir>" must not admit "<rootDir>-evil/...": the string
+		// "<rootDir>-evil" starts with the literal characters of "<rootDir>"
+		// even though it is a completely unrelated sibling directory.
+		const siblingDir = `${rootDir}-evil`;
+		fs.mkdirSync(siblingDir, { recursive: true });
+		const target = path.join(siblingDir, 'secret.json');
+
+		expect(() => InputValidator.validatePath(target, rootDir)).toThrow(/outside allowed directory/);
+
+		fs.rmSync(siblingDir, { recursive: true, force: true });
+	});
+
+	it('allows the allowed root itself with no trailing separator', () => {
+		expect(InputValidator.validatePath(rootDir, rootDir)).toBe(rootDir);
 	});
 });

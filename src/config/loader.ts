@@ -4,9 +4,11 @@
 
 import * as path from 'path';
 import { isWorkspaceTrusted } from 'security/workspace-trust.service';
+import { URL } from 'url';
 
 import { getProviderRegistry } from 'llm/registry';
 import { getLogger } from 'output/logger';
+import { BuiltinProviders } from 'types/provider-names.types';
 import { ConfigurationError } from 'utils/error-handler';
 import { formatErrorMessage } from 'utils/error-utils';
 import { ensureDir, fileExists, readJSON, writeJSON } from 'utils/file-utils';
@@ -32,6 +34,17 @@ const ENV_PARSERS = {
 	integer: (v: string) => parseInt(v, 10),
 	string: (v: string) => v
 } as const;
+
+/**
+ * Providers whose whole purpose is talking to a local/self-hosted endpoint —
+ * `localhost`/`127.0.0.1`/`host.docker.internal`-shaped baseUrls are their
+ * expected default, not a suspicious override. Every other provider is a
+ * cloud API with no legitimate reason to point at a private/link-local
+ * address at all.
+ */
+const LOCAL_FIRST_PROVIDERS = new Set<string>([BuiltinProviders.LOCAL, 'ollama']);
+
+const CLOUD_METADATA_HOSTNAMES = new Set(['metadata', 'metadata.google.internal']);
 
 export class ConfigLoader {
 	private config: Config | null = null;
@@ -90,6 +103,7 @@ export class ConfigLoader {
 
 		try {
 			this.config = CONFIG_SCHEMA.parse(mergedConfig);
+			this.sanitizeProviderBaseUrls();
 			this.autoMigrateDefaultProvider();
 			return this.config;
 		} catch (error) {
@@ -97,6 +111,44 @@ export class ConfigLoader {
 				errors: error
 			});
 		}
+	}
+
+	/**
+	 * Applies regardless of trust level — a trusted-but-compromised config, a
+	 * malicious plugin, or a misconfigured env var can set a provider's
+	 * `baseUrl` just as easily as an untrusted project config can, and every
+	 * provider sends the real API key as a plaintext Authorization header to
+	 * whatever `baseUrl` names. Strips (doesn't throw on) an unsafe value so a
+	 * single bad provider entry can't crash config load for the whole run.
+	 */
+	private sanitizeProviderBaseUrls(): void {
+		if (!this.config?.providers) return;
+
+		for (const [providerKey, providerConfig] of Object.entries(this.config.providers)) {
+			this.sanitizeSingleProviderBaseUrl(providerKey, providerConfig);
+		}
+	}
+
+	private sanitizeSingleProviderBaseUrl(providerKey: string, providerConfig: undefined | { baseUrl?: string }): void {
+		if (!providerConfig?.baseUrl) return;
+
+		let parsed: URL;
+		try {
+			parsed = new URL(providerConfig.baseUrl);
+		} catch {
+			delete providerConfig.baseUrl;
+			return;
+		}
+
+		const isSafeScheme = parsed.protocol === 'http:' || parsed.protocol === 'https:';
+		const isLocalFirstProvider = LOCAL_FIRST_PROVIDERS.has(providerKey);
+		const isUnsafeHost = !isLocalFirstProvider && isPrivateOrLinkLocalHost(parsed.hostname);
+		if (isSafeScheme && !isUnsafeHost) return;
+
+		getLogger().warn(
+			`[Security] Provider "${providerKey}" declares an unsafe baseUrl (${isSafeScheme ? 'private/link-local/metadata host' : 'non-http(s) scheme'}) — ignored. The real API key would otherwise be sent to this endpoint.`
+		);
+		delete providerConfig.baseUrl;
 	}
 
 	/**
@@ -287,14 +339,24 @@ export class ConfigLoader {
 	 */
 	private loadDefaultsFromEnv(config: Partial<Config>): void {
 		const interactive = process.env['VALORA_INTERACTIVE'] ?? process.env['AI_INTERACTIVE'];
+		const logLevel = process.env['VALORA_LOG_LEVEL'] ?? process.env['AI_LOG_LEVEL'];
+		if (interactive === undefined && !logLevel) return;
+
+		// DEFAULT_CONFIG.defaults carries an explicit own-property
+		// `default_provider: undefined` — spreading it to seed this layer's
+		// `defaults` object would otherwise silently reset an already-resolved
+		// default_provider from an earlier, trusted layer back to undefined
+		// once mergeSingleConfig shallow-spreads this layer on top (the same
+		// clobbering class stripUntrustedProviderOverrides guards against for a
+		// different, untrusted-layer cause — this function has no business
+		// touching default_provider at all, so drop it immediately).
+		config.defaults ??= { ...DEFAULT_CONFIG.defaults };
+		delete config.defaults.default_provider;
+
 		if (interactive !== undefined) {
-			config.defaults ??= { ...DEFAULT_CONFIG.defaults };
 			config.defaults.interactive = interactive === 'true';
 		}
-
-		const logLevel = process.env['VALORA_LOG_LEVEL'] ?? process.env['AI_LOG_LEVEL'];
 		if (logLevel) {
-			config.defaults ??= { ...DEFAULT_CONFIG.defaults };
 			config.defaults.log_level = logLevel as 'debug' | 'error' | 'info' | 'warn';
 		}
 	}
@@ -617,6 +679,46 @@ export class ConfigLoader {
 		this.rawConfig = null;
 		return this.load();
 	}
+}
+
+/**
+ * Best-effort check for a literal private/link-local/loopback host — string-
+ * level only (no DNS resolution), so an arbitrary hostname that happens to
+ * *resolve* to a private address isn't caught here. Still closes the primary
+ * threat: a baseUrl override naming a private IP, `localhost`, or a
+ * cloud-metadata hostname directly (exactly the shape a config override would
+ * use), for any provider not in `LOCAL_FIRST_PROVIDERS`.
+ */
+function isPrivateOrLinkLocalHost(hostname: string): boolean {
+	// URL.hostname keeps the brackets on an IPv6 literal (e.g. "[::1]").
+	const host = hostname.toLowerCase().replace(/^\[|\]$/g, '');
+
+	if (host === 'localhost' || host.endsWith('.localhost')) return true;
+	if (CLOUD_METADATA_HOSTNAMES.has(host)) return true;
+
+	const ipv4Match = /^(\d{1,3})\.(\d{1,3})\.\d{1,3}\.\d{1,3}$/.exec(host);
+	if (ipv4Match) return isPrivateOrLoopbackIpv4(Number(ipv4Match[1]), Number(ipv4Match[2]));
+
+	return isPrivateOrLoopbackIpv6(host);
+}
+
+const IPV4_SINGLE_OCTET_PRIVATE_FIRSTS = new Set([0, 10, 127]);
+
+function isPrivateOrLoopbackIpv4(first: number, second: number): boolean {
+	if (IPV4_SINGLE_OCTET_PRIVATE_FIRSTS.has(first)) return true;
+	if (first === 172) return second >= 16 && second <= 31;
+	if (first === 192) return second === 168;
+	if (first === 169) return second === 254; // link-local, incl. cloud metadata
+	return false;
+}
+
+function isPrivateOrLoopbackIpv6(host: string): boolean {
+	if (host === '::1' || host === '::') return true;
+	if (/^fe[89ab][0-9a-f]:/.test(host)) return true; // IPv6 link-local, fe80::/10
+	if (/^f[cd][0-9a-f]{2}:/.test(host)) return true; // IPv6 unique local, fc00::/7
+	const ipv4MappedMatch = /^::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/.exec(host);
+	if (ipv4MappedMatch) return isPrivateOrLinkLocalHost(ipv4MappedMatch[1]!);
+	return false;
 }
 
 // Tracks provider keys that have already been warned about in this process run

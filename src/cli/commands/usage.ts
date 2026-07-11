@@ -12,6 +12,7 @@ import type { SpendingRecord } from 'utils/spending-tracker';
 
 import { getColorAdapter } from 'output/color-adapter.interface';
 import { formatError } from 'utils/error-handler';
+import { InputValidator } from 'utils/input-validator';
 import { formatNumber } from 'utils/number-format';
 import {
 	type ActivityUsage,
@@ -296,7 +297,13 @@ export function configureUsageSubcommand(monitoringCmd: CommandAdapter): Command
 			'Section to export as CSV (byModel|byCommand|bySession|byActivity|byProject|byAgent|daily)',
 			'byModel'
 		)
-		.option('--output <path>', 'Write report to file path')
+		// Named --export, not --output: a global `--output <format>` option
+		// (choices markdown/json/yaml) is registered on the root program, and
+		// silently wins over a same-named subcommand-local option — a real
+		// path here always errored "Allowed choices are markdown, json, yaml"
+		// before this action handler ever ran, live-verified against the
+		// actual CLI.
+		.option('--export <path>', 'Write report to file path')
 		.action((options: Record<string, unknown>) => {
 			const color = getColorAdapter();
 			try {
@@ -367,7 +374,8 @@ function runUsageAction(options: Record<string, unknown>): void {
 
 	const topN = options['top'] ? parseInt(options['top'] as string, 10) : 10;
 	const fmt = (options['format'] as string | undefined) ?? 'table';
-	const outputPath = options['output'] as string | undefined;
+	const rawExportPath = options['export'] as string | undefined;
+	const outputPath = rawExportPath ? InputValidator.validatePath(rawExportPath, process.cwd()) : undefined;
 
 	const formatActions: Record<string, () => void> = {
 		csv: () => {

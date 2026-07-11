@@ -22,6 +22,7 @@ import {
 	submitAnthropicBatch
 } from 'batch/providers/anthropic.batch-provider';
 import { createHash } from 'crypto';
+import { getCredentialGuard } from 'security/credential-guard';
 import { Agent as UndiciAgent, fetch as undiciFetch } from 'undici';
 
 import type { LLMCompletionOptions, LLMCompletionResult, LLMMessage, LLMUsage } from 'types/llm.types';
@@ -178,7 +179,7 @@ export class AnthropicProvider extends BaseLLMProvider implements BatchableProvi
 			);
 		} catch (error) {
 			throw new ProviderError(
-				`Anthropic API error: ${(error as Error).message}`,
+				`Anthropic API error: ${getCredentialGuard().scanOutput((error as Error).message)}`,
 				{
 					error: error,
 					model: options.model,

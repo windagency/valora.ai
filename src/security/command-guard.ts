@@ -16,6 +16,7 @@ import { getGlobalConfigDir, getRuntimeDataDir } from 'utils/paths';
 import { resolveRealPathBestEffort } from 'utils/real-path';
 
 import { getAuditSink } from './audit-sink';
+import { getCredentialGuard } from './credential-guard';
 import { createSecurityEvent, type SecurityEvent } from './security-event.types';
 
 /**
@@ -141,6 +142,15 @@ const EVAL_PATTERNS: RegExp[] = [
 	// long form — matching only the bare `-e` token missed both.
 	/\bnode\s+-[a-zA-Z]*e/,
 	/\bnode\s+--eval\b/,
+	// `-r`/`--require` preloads and executes an arbitrary module before the
+	// main script runs — an equally direct code-execution primitive as -e,
+	// just via a different flag. `--experimental-loader`/`--loader`/`--import`
+	// register an ESM loader hook, which is executed the same way.
+	/\bnode\s+-[a-zA-Z]*r\b/,
+	/\bnode\s+--require\b/,
+	/\bnode\s+--experimental-loader\b/,
+	/\bnode\s+--loader\b/,
+	/\bnode\s+--import\b/,
 	// `npx -c`/`--call` is a documented flag that runs an arbitrary shell
 	// command — the same primitive as `python -c`/`node -e`, on an
 	// allowlisted launcher that had no equivalent pattern.
@@ -468,8 +478,16 @@ function hasYqInPlaceFlag(decodedTokens: string[]): boolean {
 	);
 }
 
-/** `docker <group> <subcommand>` prefixes whose long form must resolve to the same subcommand as the top-level shortcut. */
-const DOCKER_COMMAND_GROUP_PREFIXES = new Set(['container', 'image']);
+/**
+ * `docker <group> <subcommand>` prefixes whose long form must resolve to the
+ * same subcommand as the top-level shortcut. `buildx` isn't a resource-type
+ * group like `container`/`image`, but structurally it shifts the effective
+ * subcommand the same way — `docker buildx build` must resolve to `build` so
+ * every `-f`/`--iidfile`/`-o`/`--output`/`--metadata-file` host-path check
+ * built for `docker build` also covers this real, commonly-used form instead
+ * of silently never firing for it.
+ */
+const DOCKER_COMMAND_GROUP_PREFIXES = new Set(['buildx', 'container', 'image']);
 
 /** docker subcommands whose `-i`/`-o` (or `--input`/`--output`) flag takes a real host file path, not stdin/stdout. */
 const DOCKER_HOST_PATH_IO_SUBCOMMANDS: Record<string, 'input' | 'output'> = {
@@ -825,6 +843,17 @@ export class CommandGuard {
 	}
 
 	/**
+	 * Public entry point for callers outside the command-execution path (e.g.
+	 * a CLI command validating its own `--out`-style flag) that need to reject
+	 * a target path matching a protected security-infrastructure file, without
+	 * duplicating the basename/realpath/inode-sharing logic those checks share
+	 * with every allowlisted-command scoping check in this file.
+	 */
+	isProtectedInfrastructureTarget(token: string): boolean {
+		return this.tokenReferencesProtectedFile(token);
+	}
+
+	/**
 	 * True if the argument names a protected file directly, or resolves (via
 	 * a symlink, at any path depth) to one — so an alias with an unrelated
 	 * name can't hide the real target. Also true for an unresolved command
@@ -1177,7 +1206,35 @@ export class CommandGuard {
 		if (subcommand === 'import') {
 			return this.validateDockerImportArgs(rest.slice(subcommandIndex + 1));
 		}
+		if (subcommand === 'build') {
+			return this.validateDockerBuildContextArg(rest);
+		}
 
+		return { allowed: true };
+	}
+
+	/**
+	 * The build context is always the final positional argument in a valid
+	 * `docker build`/`docker buildx build` invocation — every value-taking
+	 * flag's own value is a separate, earlier token, so no flag-arity table is
+	 * needed to avoid misidentifying one as the context. Reading (and
+	 * potentially leaking into a built image layer) an arbitrary host
+	 * directory via `docker build /etc` was previously entirely unscoped.
+	 */
+	private validateDockerBuildContextArg(rest: string[]): CommandValidationResult {
+		const context = rest[rest.length - 1];
+		if (!context || context === '-' || /^https?:\/\//.test(context) || context.startsWith('-')) {
+			return { allowed: true };
+		}
+		if (isUnresolvableArgument(context) || this.isOutsideWorkingDirectory(context)) {
+			return { allowed: false, reason: `docker build context outside working directory blocked: ${context}` };
+		}
+		if (this.tokenReferencesProtectedFile(context)) {
+			return {
+				allowed: false,
+				reason: `docker build context targeting protected security-infrastructure file blocked: ${context}`
+			};
+		}
 		return { allowed: true };
 	}
 
@@ -1406,10 +1463,46 @@ export class CommandGuard {
 	 * destination alike) must resolve inside the working directory.
 	 */
 	private validateCpArgs(tokens: string[]): CommandValidationResult {
+		return this.validateCwdScopedArgs(tokens, 'cp');
+	}
+
+	/**
+	 * `mv`/`gunzip`/`gzip` are bucketed into `PROTECTED_INFRASTRUCTURE_DESTRUCTIVE_COMMANDS`
+	 * alongside `cp`/`rm`, but the general cwd-escape scoping dispatch never
+	 * covered them — `mv ./secret.txt /tmp/exfiltrated.txt` and
+	 * `mv /etc/hostname ./stolen` were both live-verified allowed. Shares
+	 * `cp`'s exact scoping logic (every non-flag argument must resolve inside
+	 * cwd) rather than duplicating it three times.
+	 */
+	private validateCwdScopedArgs(tokens: string[], commandLabel: string): CommandValidationResult {
 		for (const token of tokens.slice(1)) {
 			if (token.startsWith('-')) continue;
 			if (isUnresolvableArgument(token) || this.isOutsideWorkingDirectory(token)) {
-				return { allowed: false, reason: `cp target outside working directory blocked: ${token}` };
+				return { allowed: false, reason: `${commandLabel} target outside working directory blocked: ${token}` };
+			}
+		}
+		return { allowed: true };
+	}
+
+	/**
+	 * `cat`/`head`/`tail`/`grep`/`rg`/`diff`/`stat` are read-only inspection
+	 * commands with no equivalent to rm/cp's path scoping at all — they could
+	 * read (and return to the LLM) any protected security-infrastructure file
+	 * (`vault-signing.key`, `security-audit.jsonl`, etc.) or any credential-shaped
+	 * file (`.env`, `id_rsa`, `.aws/credentials`) the exact same way `read_file`
+	 * and the LSP tools already refuse to. Not scoped to cwd in general —
+	 * these commands have many legitimate outside-cwd uses (comparing against
+	 * a reference file, inspecting system files) that rm/cp/docker don't; only
+	 * the specific files no legitimate agent task ever needs are blocked.
+	 */
+	private validateReadOnlyInspectionArgs(tokens: string[]): CommandValidationResult {
+		for (const token of tokens.slice(1)) {
+			if (token.startsWith('-')) continue;
+			if (this.tokenReferencesProtectedFile(token)) {
+				return { allowed: false, reason: `reading protected security-infrastructure file blocked: ${token}` };
+			}
+			if (getCredentialGuard().isSensitiveFile(token)) {
+				return { allowed: false, reason: `reading sensitive file blocked: ${token}` };
 			}
 		}
 		return { allowed: true };
@@ -1635,17 +1728,27 @@ export class CommandGuard {
 	/** Dispatches to the per-command path/flag scoping check, if this base command has one. */
 	private checkScopedPathCommand(baseCommand: string, tokens: string[]): CommandValidationResult {
 		const scopedCheck: Record<string, () => CommandValidationResult> = {
+			cat: () => this.validateReadOnlyInspectionArgs(tokens),
 			cp: () => this.validateCpArgs(tokens),
+			diff: () => this.validateReadOnlyInspectionArgs(tokens),
 			docker: () => this.validateDockerArgs(tokens),
 			env: () => this.validateEnvArgs(tokens),
 			eslint: () => this.validateConfigPathArgs(tokens, ['-c', '--config']),
 			gh: () => this.validateGhArgs(tokens),
 			git: () => this.validateGitArgs(tokens),
+			grep: () => this.validateReadOnlyInspectionArgs(tokens),
+			gunzip: () => this.validateCwdScopedArgs(tokens, 'gunzip'),
+			gzip: () => this.validateCwdScopedArgs(tokens, 'gzip'),
+			head: () => this.validateReadOnlyInspectionArgs(tokens),
 			jq: () => this.validateJqYqArgs(tokens),
+			mv: () => this.validateCwdScopedArgs(tokens, 'mv'),
 			prettier: () => this.validateConfigPathArgs(tokens, ['--config', '--plugin']),
 			pytest: () => this.validatePytestArgs(tokens),
+			rg: () => this.validateReadOnlyInspectionArgs(tokens),
 			rm: () => this.validateRmArgs(tokens),
 			sort: () => this.validateOutputFlagArgs(tokens, baseCommand),
+			stat: () => this.validateReadOnlyInspectionArgs(tokens),
+			tail: () => this.validateReadOnlyInspectionArgs(tokens),
 			tree: () => this.validateOutputFlagArgs(tokens, baseCommand),
 			uniq: () => this.validateUniqArgs(tokens),
 			vitest: () => this.validateConfigPathArgs(tokens, ['-c', '--config']),

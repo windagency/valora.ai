@@ -18,6 +18,7 @@ import { SessionStore } from 'session/store';
 import { getPromptAdapter } from 'ui/prompt-adapter.interface';
 import { getSpinnerAdapter } from 'ui/spinner-adapter.interface';
 import { formatError } from 'utils/error-handler';
+import { InputValidator } from 'utils/input-validator';
 
 const prompt = getPromptAdapter();
 const spinner = getSpinnerAdapter();
@@ -454,9 +455,24 @@ ${color.gray("  💡 Tip: Use 'valora session archive' to mark sessions as compl
 		.option('--no-artifacts', 'Exclude session artifacts')
 		.action(async (...args: Array<Record<string, unknown>>) => {
 			const sessionId = args[0] as unknown as string;
-			const outputPath = args[1] as unknown as string | undefined;
+			const rawOutputPath = args[1] as unknown as string | undefined;
 			const options = args[2] as unknown as Record<string, unknown>;
 			const color = getColorAdapter();
+
+			// outputPath previously reached fs.createWriteStream with zero path
+			// validation — an arbitrary-outside-cwd write via an ordinary
+			// `session export <id> <path>` call.
+			let outputPath: string | undefined;
+			if (rawOutputPath) {
+				try {
+					outputPath = InputValidator.validatePath(rawOutputPath, process.cwd());
+				} catch (error) {
+					console.error(color.red('Invalid outputPath:'), (error as Error).message);
+					process.exit(1);
+					return;
+				}
+			}
+
 			const loading = spinner.create('Exporting session...').start();
 
 			try {

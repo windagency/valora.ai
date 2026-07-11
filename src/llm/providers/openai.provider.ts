@@ -20,6 +20,7 @@ import {
 } from 'batch/providers/openai.batch-provider';
 import { Agent as HttpsAgent } from 'https';
 import OpenAI from 'openai';
+import { getCredentialGuard } from 'security/credential-guard';
 
 import type { LLMCompletionOptions, LLMCompletionResult, LLMUsage } from 'types/llm.types';
 
@@ -124,7 +125,7 @@ export class OpenAIProvider extends BaseLLMProvider implements BatchableProvider
 			);
 		} catch (error) {
 			throw new ProviderError(
-				`OpenAI API error: ${(error as Error).message}`,
+				`OpenAI API error: ${getCredentialGuard().scanOutput((error as Error).message)}`,
 				{
 					error: error,
 					model: options.model,

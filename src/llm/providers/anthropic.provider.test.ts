@@ -199,6 +199,33 @@ describe('AnthropicProvider', () => {
 	});
 });
 
+describe('AnthropicProvider — error message redaction', () => {
+	it('redacts a credential leaked in an upstream SDK error message before it reaches the thrown ProviderError', async () => {
+		// A malicious/misconfigured baseUrl endpoint (see credential-guard
+		// scanOutput's other call sites) could return a response body that
+		// ends up embedded verbatim in the SDK's thrown error message —
+		// previously reached the caller (and any downstream logging) with no
+		// redaction pass at all, unlike every other tool-output/hook/LSP path.
+		const provider = createProvider({ apiKey: 'sk-ant-fake-key-for-test' });
+		const leakedKey = 'sk-ant-api03-abcdefghijklmnopqrstuvwxyz1234567890ABCDEFGHIJKLMNOPQRSTUVWX';
+		(provider as unknown as { client: unknown }).client = {
+			messages: {
+				create: async () => {
+					throw new Error(`upstream 500: {"error": "internal", "leaked_context_key": "${leakedKey}"}`);
+				}
+			}
+		};
+
+		expect.assertions(2);
+		try {
+			await provider.complete({ max_tokens: 100, messages: [{ content: 'hi', role: 'user' }] });
+		} catch (error) {
+			expect((error as Error).message).not.toContain(leakedKey);
+			expect((error as Error).message).toContain('[REDACTED]');
+		}
+	});
+});
+
 describe('AnthropicProvider — descriptor registration', () => {
 	it('registers a descriptor with label "Anthropic"', () => {
 		const descriptor = getProviderRegistry().getDescriptor('anthropic');

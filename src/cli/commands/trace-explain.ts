@@ -6,6 +6,7 @@ import type { TraceEvent } from 'observability/observability.types';
 
 import { ReasoningTraceRecorder } from 'observability/reasoning-trace-recorder';
 import { getColorAdapter } from 'output/color-adapter.interface';
+import { InputValidator } from 'utils/input-validator';
 import { getRuntimeDataDir } from 'utils/paths';
 
 export function configureTraceCommand(program: CommandAdapter): void {
@@ -18,7 +19,14 @@ export function configureTraceCommand(program: CommandAdapter): void {
 		.action((...rawArgs: Array<Record<string, unknown>>) => {
 			const sessionId = rawArgs[0] as unknown as string;
 			const stage = rawArgs[1] as unknown as string;
-			const traceFile = resolveTraceFile(sessionId, stage);
+			let traceFile: string;
+			try {
+				traceFile = resolveTraceFile(sessionId, stage);
+			} catch (error) {
+				console.error(color.red('Invalid session-id/stage:'), (error as Error).message);
+				process.exit(1);
+				return;
+			}
 
 			if (!fs.existsSync(traceFile)) {
 				console.error(color.red(`Trace file not found: ${traceFile}`));
@@ -58,7 +66,14 @@ export function configureTraceCommand(program: CommandAdapter): void {
 		.action((...rawArgs: Array<Record<string, unknown>>) => {
 			const sessionId = rawArgs[0] as unknown as string;
 			const stage = rawArgs[1] as unknown as string;
-			const traceFile = resolveTraceFile(sessionId, stage);
+			let traceFile: string;
+			try {
+				traceFile = resolveTraceFile(sessionId, stage);
+			} catch (error) {
+				console.error(color.red('Invalid session-id/stage:'), (error as Error).message);
+				process.exit(1);
+				return;
+			}
 			const result = ReasoningTraceRecorder.verify(traceFile);
 
 			if (result.valid) {
@@ -72,6 +87,19 @@ export function configureTraceCommand(program: CommandAdapter): void {
 				process.exit(1);
 			}
 		});
+}
+
+export function resolveTraceFile(sessionId: string, stage: string): string {
+	// Both segments previously reached this path join unvalidated — a
+	// traversal-shaped session-id or stage escaped getRuntimeDataDir()/traces/
+	// entirely, reachable from a single `valora trace explain/verify` call
+	// with no CommandGuard involvement at all (base command is `valora`, not
+	// a shell command). validateSessionId's charset (no `/`, no `..`) rejects
+	// both cases identically — reused here rather than inventing a second,
+	// narrower "stage" validator for a structurally identical constraint.
+	InputValidator.validateSessionId(sessionId);
+	InputValidator.validateSessionId(stage);
+	return path.join(getRuntimeDataDir(), 'traces', sessionId, `${stage}.jsonl`);
 }
 
 function printEvent(event: TraceEvent, color: ReturnType<typeof getColorAdapter>): void {
@@ -93,8 +121,4 @@ function printEvent(event: TraceEvent, color: ReturnType<typeof getColorAdapter>
 		console.log(`      ${color.gray(k + ':')} ${display}`);
 	}
 	console.log('');
-}
-
-function resolveTraceFile(sessionId: string, stage: string): string {
-	return path.join(getRuntimeDataDir(), 'traces', sessionId, `${stage}.jsonl`);
 }

@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises';
 import { getSecurityAuditExporter } from 'security/audit-exporter';
+import { getCommandGuard } from 'security/command-guard';
 
 import type { CommandAdapter } from 'cli/command-adapter.interface';
 
@@ -24,12 +25,19 @@ export function configureSecurityCommand(program: CommandAdapter): void {
 				// that can run this command could clobber vault-signing.key/
 				// trusted-workspaces.json/mcp-baselines.json/security-audit.jsonl
 				// themselves, the exact files this security infrastructure is
-				// meant to protect from tampering.
+				// meant to protect from tampering. cwd-containment alone isn't
+				// enough: .valora/security-audit.jsonl sits INSIDE a project's
+				// own cwd, so the protected-basename check must run separately.
 				let validatedPath: string;
 				try {
 					validatedPath = InputValidator.validatePath(options.out, process.cwd());
 				} catch (error) {
 					console.error(color.red('Invalid --out path:'), (error as Error).message);
+					process.exit(1);
+					return;
+				}
+				if (getCommandGuard().isProtectedInfrastructureTarget(validatedPath)) {
+					console.error(color.red('Invalid --out path:'), 'targets a protected security-infrastructure file');
 					process.exit(1);
 					return;
 				}

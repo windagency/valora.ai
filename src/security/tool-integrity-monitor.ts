@@ -56,6 +56,15 @@ const DEFAULT_BASELINE_FILENAME = 'mcp-baselines.json';
  */
 const TOOL_LIST_KEY_PREFIX = 'tool-list:';
 
+/**
+ * Every prefix `checkContentIntegrity` callers actually use today. Any
+ * persisted key matching neither this list nor `TOOL_LIST_KEY_PREFIX` must be
+ * a legacy bare-serverId key from before the tool-list namespace existed —
+ * migrated on load so pre-existing baselines keep detecting drift instead of
+ * silently vanishing and re-seeding from whatever is currently running.
+ */
+const KNOWN_CONTENT_KEY_PREFIXES = ['plugin:', 'mcp-connection:'];
+
 export class ToolIntegrityMonitor {
 	private baselineFilePath: string;
 	private events: SecurityEvent[] = [];
@@ -182,15 +191,22 @@ export class ToolIntegrityMonitor {
 		try {
 			const raw = readFileSync(this.baselineFilePath, 'utf8');
 			const parsed = JSON.parse(raw) as PersistedBaselines;
-			for (const [serverId, baseline] of Object.entries(parsed)) {
+			for (const [rawKey, baseline] of Object.entries(parsed)) {
 				if (typeof baseline?.fingerprint !== 'string' || typeof baseline.snapshot !== 'object') continue;
-				this.fingerprints.set(serverId, baseline.fingerprint);
-				this.toolSnapshots.set(serverId, new Map(Object.entries(baseline.snapshot)));
+				const key = this.migrateLegacyKey(rawKey);
+				this.fingerprints.set(key, baseline.fingerprint);
+				this.toolSnapshots.set(key, new Map(Object.entries(baseline.snapshot)));
 			}
 		} catch {
 			// Treat any read or parse failure as a missing baseline; the next
 			// successful checkIntegrity will rewrite the file.
 		}
+	}
+
+	private migrateLegacyKey(key: string): string {
+		if (key.startsWith(TOOL_LIST_KEY_PREFIX)) return key;
+		if (KNOWN_CONTENT_KEY_PREFIXES.some((prefix) => key.startsWith(prefix))) return key;
+		return `${TOOL_LIST_KEY_PREFIX}${key}`;
 	}
 
 	private persistToDisk(): void {

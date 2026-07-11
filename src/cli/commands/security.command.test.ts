@@ -71,6 +71,24 @@ describe('security audit-export', () => {
 		await fs.rm(outsideDir, { force: true, recursive: true });
 	});
 
+	it('blocks --out pointing at a protected security-infrastructure basename even when it sits inside the working directory', async () => {
+		// cwd-containment alone doesn't stop this: .valora/security-audit.jsonl
+		// sits INSIDE a project's own cwd, so a check that only verifies
+		// "inside cwd" does nothing to prevent overwriting the real audit log
+		// sitting right there.
+		const target = path.join(tmpDir, '.valora', 'security-audit.jsonl');
+		const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+		const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never);
+
+		await runCommand(makeProgram(), ['security', 'audit-export', '--out', target]);
+
+		expect(exitSpy).toHaveBeenCalledWith(1);
+		await expect(fs.access(target)).rejects.toThrow();
+
+		consoleErrorSpy.mockRestore();
+		exitSpy.mockRestore();
+	});
+
 	it('still allows --out pointing inside the working directory', async () => {
 		const target = path.join(tmpDir, 'export.json');
 
