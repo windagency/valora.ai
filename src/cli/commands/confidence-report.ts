@@ -6,6 +6,7 @@
  */
 
 import { writeFileSync } from 'fs';
+import { getCommandGuard } from 'security/command-guard';
 
 import type { CommandAdapter } from 'cli/command-adapter.interface';
 
@@ -103,6 +104,9 @@ function runConfidenceReportAction(options: Record<string, unknown>): void {
 	const fmt = (options['format'] as string | undefined) ?? 'table';
 	const rawExportPath = options['export'] as string | undefined;
 	const outputPath = rawExportPath ? InputValidator.validatePath(rawExportPath, process.cwd()) : undefined;
+	if (outputPath && getCommandGuard().isProtectedInfrastructureTarget(outputPath)) {
+		throw new Error('Invalid --export path: targets a protected security-infrastructure file');
+	}
 
 	const formatActions: Record<string, () => void> = {
 		json: () => emitReport(analytics.generateJsonReport(opts), outputPath, color),

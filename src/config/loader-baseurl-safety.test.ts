@@ -84,6 +84,17 @@ describe('ConfigLoader — provider baseUrl scheme/host safety', () => {
 		expect(config.providers['xai']?.baseUrl).toBeUndefined();
 	});
 
+	it('strips an IPv4-mapped-IPv6 metadata-endpoint baseUrl even though Node normalizes it to hex-group form, not dotted-decimal', async () => {
+		// Node's URL parser always normalizes ::ffff:169.254.169.254 to
+		// ::ffff:a9fe:a9fe (hex groups) — a regex matching only the
+		// dotted-decimal form never fires against real URL.hostname output.
+		writeProjectConfig({ providers: { xai: { baseUrl: 'http://[::ffff:169.254.169.254]/latest/meta-data' } } });
+
+		const config = await makeLoader().load();
+
+		expect(config.providers['xai']?.baseUrl).toBeUndefined();
+	});
+
 	it('strips a private-network (RFC1918) baseUrl for a non-local provider', async () => {
 		writeProjectConfig({ providers: { moonshot: { baseUrl: 'https://10.0.0.5/v1' } } });
 

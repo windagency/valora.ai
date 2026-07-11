@@ -3,6 +3,7 @@ import { join } from 'path';
 
 import type { StageOutput } from 'types/command.types';
 
+import { InputValidator } from 'utils/input-validator';
 import { getRuntimeDataDir } from 'utils/paths';
 
 const DEFAULT_TTL_MS = 24 * 60 * 60 * 1000;
@@ -67,7 +68,17 @@ export class CheckpointManager {
 		writeFileSync(filePath, JSON.stringify(file, null, 2), 'utf-8');
 	}
 
+	/**
+	 * Defense-in-depth: sessionId/commandName are internally-controlled today
+	 * (sessionId from SessionStore's own generator, commandName constrained
+	 * to the resolved command registry), not raw externally-influenced input
+	 * reaching this file-path-building function directly — but validating
+	 * cheaply here at the choke point costs nothing and closes the risk if a
+	 * future caller ever changes that.
+	 */
 	private filePath(sessionId: string, commandName: string): string {
+		InputValidator.validateSessionId(sessionId);
+		InputValidator.validateSessionId(commandName);
 		return join(this.dataDir, `${sessionId}-${commandName}.json`);
 	}
 

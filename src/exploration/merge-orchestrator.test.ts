@@ -150,8 +150,8 @@ describe('MergeOrchestrator', () => {
 			});
 
 			expect(result.success).toBe(true);
-			expect(mockExecute).toHaveBeenCalledWith('git', ['checkout', '--ours', maliciousPath], expect.anything());
-			expect(mockExecute).toHaveBeenCalledWith('git', ['add', maliciousPath], expect.anything());
+			expect(mockExecute).toHaveBeenCalledWith('git', ['checkout', '--ours', '--', maliciousPath], expect.anything());
+			expect(mockExecute).toHaveBeenCalledWith('git', ['add', '--', maliciousPath], expect.anything());
 		});
 	});
 
@@ -187,6 +187,37 @@ describe('MergeOrchestrator', () => {
 			expect(mockExecute).toHaveBeenCalledWith('git', ['checkout', worktree.branch_name], expect.anything());
 			expect(mockExecute).toHaveBeenCalledWith('git', ['rebase', 'main'], expect.anything());
 			expect(mockExecute).toHaveBeenCalledWith('git', ['merge', '--ff-only', worktree.branch_name], expect.anything());
+		});
+	});
+
+	describe('autoResolveConflicts — option/pathspec injection via an untrusted branch conflict file name', () => {
+		// conflict.file_path comes verbatim from parsing `git status
+		// --porcelain` of an UNTRUSTED exploration branch's working tree —
+		// with no `--` end-of-options marker, git parses an option-shaped
+		// path (e.g. `--upload-pack=...`) as a FLAG, not a literal path, even
+		// as a single argv element. Array-form SafeExecutor.execute only
+		// stops shell metacharacter injection, not this git-level ambiguity.
+		it("passes '--' before the conflicted file path in both checkout --ours and add", async () => {
+			const maliciousPath = '--upload-pack=touch /tmp/pwned';
+			let mergeAttempted = false;
+			mockExecute.mockImplementation(async (command: string, args: string[]) => {
+				const [first, second] = args;
+				if (first === 'merge' && second === '--no-ff') {
+					mergeAttempted = true;
+					throw new Error(`Command failed with exit code 1: CONFLICT (content): Merge conflict in ${maliciousPath}`);
+				}
+				if (first === 'status' && second === '--porcelain' && mergeAttempted) {
+					return gitOk(`UU ${maliciousPath}\n`);
+				}
+				return defaultResponder(command, args);
+			});
+
+			const orchestrator = new MergeOrchestrator('/repo');
+
+			await orchestrator.mergeExploration('exp-1', 1, { auto_resolve_conflicts: true, strategy: 'direct' });
+
+			expect(mockExecute).toHaveBeenCalledWith('git', ['checkout', '--ours', '--', maliciousPath], expect.anything());
+			expect(mockExecute).toHaveBeenCalledWith('git', ['add', '--', maliciousPath], expect.anything());
 		});
 	});
 });

@@ -7,13 +7,21 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFile
 import { join } from 'path';
 
 import { getLogger } from 'output/logger';
+import { InputValidator } from 'utils/input-validator';
 import { getRuntimeDataDir } from 'utils/paths';
 
 import type { PersistedBatch } from './batch.types';
 
 const getBatchDir = (): string => join(getRuntimeDataDir(), 'batches');
 
+// localId reaches this as a raw CLI argument via `batch status/results/cancel
+// <localId>` with no validation at all — an unvalidated `../` sequence was a
+// live traversal-based arbitrary-file-read primitive, chained into an
+// arbitrary-file-write primitive via updateBatch() re-persisting a loaded
+// file's own (potentially tampered) localId field. Validated once here, the
+// sole path-building choke point every read/write site funnels through.
 function batchFilePath(localId: string): string {
+	InputValidator.validateBatchId(localId);
 	return join(getBatchDir(), `${localId}.json`);
 }
 
@@ -39,8 +47,8 @@ export function generateLocalId(): string {
  * Persist a batch to disk
  */
 export function persistBatch(batch: PersistedBatch): void {
-	const dir = ensureBatchDir();
-	const filePath = join(dir, `${batch.localId}.json`);
+	ensureBatchDir();
+	const filePath = batchFilePath(batch.localId);
 	writeFileSync(filePath, JSON.stringify(batch, null, 2), 'utf-8');
 }
 

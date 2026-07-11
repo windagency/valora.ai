@@ -224,6 +224,26 @@ describe('AnthropicProvider — error message redaction', () => {
 			expect((error as Error).message).toContain('[REDACTED]');
 		}
 	});
+
+	it('redacts a credential leaked in an upstream SDK error message on the streaming path too — round 14 only fixed the non-streaming "API error" throw', async () => {
+		const provider = createProvider({ apiKey: 'sk-ant-fake-key-for-test' });
+		const leakedKey = 'sk-ant-api03-abcdefghijklmnopqrstuvwxyz1234567890ABCDEFGHIJKLMNOPQRSTUVWX';
+		(provider as unknown as { client: unknown }).client = {
+			messages: {
+				create: async () => {
+					throw new Error(`upstream 500: {"error": "internal", "leaked_context_key": "${leakedKey}"}`);
+				}
+			}
+		};
+
+		expect.assertions(2);
+		try {
+			await provider.streamComplete({ max_tokens: 100, messages: [{ content: 'hi', role: 'user' }] }, () => {});
+		} catch (error) {
+			expect((error as Error).message).not.toContain(leakedKey);
+			expect((error as Error).message).toContain('[REDACTED]');
+		}
+	});
 });
 
 describe('AnthropicProvider — descriptor registration', () => {

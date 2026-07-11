@@ -4,6 +4,8 @@
  * Provides access to performance metrics, profiling data, and system monitoring.
  */
 
+import { getCommandGuard } from 'security/command-guard';
+
 import type { CommandAdapter } from 'cli/command-adapter.interface';
 
 import { getColorAdapter } from 'output/color-adapter.interface';
@@ -570,6 +572,11 @@ export function configureMonitoringCommand(program: CommandAdapter): void {
 						directory = InputValidator.validatePath(options['out'] as string, process.cwd());
 					} catch (error) {
 						console.error(color.red('Invalid --out path:'), (error as Error).message);
+						process.exit(1);
+						return;
+					}
+					if (getCommandGuard().isProtectedInfrastructureTarget(directory)) {
+						console.error(color.red('Invalid --out path:'), 'targets a protected security-infrastructure file');
 						process.exit(1);
 						return;
 					}

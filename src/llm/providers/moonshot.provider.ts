@@ -155,10 +155,13 @@ export class MoonshotProvider extends BaseLLMProvider {
 
 			return await this.processStream(stream, onChunk);
 		} catch (error) {
-			throw new ProviderError(`Moonshot streaming error: ${(error as Error).message}`, {
-				error,
-				provider: BuiltinProviders.MOONSHOT
-			});
+			throw new ProviderError(
+				`Moonshot streaming error: ${getCredentialGuard().scanOutput((error as Error).message)}`,
+				{
+					error,
+					provider: BuiltinProviders.MOONSHOT
+				}
+			);
 		}
 	}
 

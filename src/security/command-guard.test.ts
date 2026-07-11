@@ -653,6 +653,14 @@ describe('CommandGuard', () => {
 		it('blocks bind-mounting the home directory via tilde expansion', () => {
 			expect(guard.validate('docker run -v ~:/host alpine').allowed).toBe(false);
 		});
+
+		it('blocks bind-mounting a path outside the working directory with -v even when the host path is single-quoted', () => {
+			expect(guard.validate("docker run -v '/etc':/host alpine").allowed).toBe(false);
+		});
+
+		it('blocks --privileged even when single-quoted', () => {
+			expect(guard.validate("docker run '--privileged' alpine").allowed).toBe(false);
+		});
 	});
 
 	describe('docker cp scoping', () => {
@@ -697,6 +705,10 @@ describe('CommandGuard', () => {
 
 		it('blocks docker container cp targeting the vault signing key too', () => {
 			expect(guard.validate('docker container cp mycontainer:/app/out.txt vault-signing.key').allowed).toBe(false);
+		});
+
+		it('blocks copying a host path outside the working directory even when single-quoted', () => {
+			expect(guard.validate("docker cp '/etc/passwd' mycontainer:/tmp/stolen").allowed).toBe(false);
 		});
 	});
 
@@ -902,6 +914,53 @@ describe('CommandGuard', () => {
 
 		it('blocks docker buildx build reading an arbitrary host directory as the context, same as plain docker build', () => {
 			expect(guard.validate('docker buildx build /etc').allowed).toBe(false);
+		});
+
+		it('blocks docker build reading an arbitrary host directory as the context even when single-quoted', () => {
+			expect(guard.validate("docker build '/etc'").allowed).toBe(false);
+		});
+
+		it('blocks docker build when the out-of-cwd context is NOT the last token — real docker (Cobra/pflag) permits flags after positional args, so "last token = context" is false', () => {
+			expect(guard.validate('docker build /etc -f Dockerfile').allowed).toBe(false);
+			expect(guard.validate('docker build /etc -t app').allowed).toBe(false);
+		});
+
+		it('still allows a reordered docker build invocation with an in-cwd context', () => {
+			expect(guard.validate('docker build ./subdir -f Dockerfile').allowed).toBe(true);
+			expect(guard.validate('docker build -t app ./subdir').allowed).toBe(true);
+		});
+	});
+
+	describe('npm/pnpm --prefix/-C/--dir scoping', () => {
+		// npm --prefix/pnpm -C/--dir change the effective directory a
+		// package.json's scripts run from — the same "changes effective cwd"
+		// primitive already scoped for git -C/env -C. Live-verified against
+		// real npm/pnpm: both execute an arbitrary package.json's scripts
+		// from any directory on disk, completely bypassing cwd-scoping.
+		it('blocks npm --prefix targeting a directory outside the working directory', () => {
+			expect(guard.validate('npm --prefix /tmp/evil run build').allowed).toBe(false);
+		});
+
+		it('blocks npm --prefix= (attached form) targeting outside the working directory', () => {
+			expect(guard.validate('npm --prefix=/tmp/evil run build').allowed).toBe(false);
+		});
+
+		it('blocks pnpm -C targeting a directory outside the working directory', () => {
+			expect(guard.validate('pnpm -C /tmp/evil run build').allowed).toBe(false);
+		});
+
+		it('blocks pnpm --dir targeting a directory outside the working directory', () => {
+			expect(guard.validate('pnpm --dir /tmp/evil run build').allowed).toBe(false);
+		});
+
+		it('still allows npm --prefix/pnpm -C targeting a directory inside the working directory', () => {
+			expect(guard.validate('npm --prefix ./subpkg run build').allowed).toBe(true);
+			expect(guard.validate('pnpm -C ./subpkg run build').allowed).toBe(true);
+		});
+
+		it('still allows plain npm/pnpm commands with no --prefix/-C/--dir flag', () => {
+			expect(guard.validate('npm install').allowed).toBe(true);
+			expect(guard.validate('pnpm install').allowed).toBe(true);
 		});
 	});
 
@@ -1197,6 +1256,14 @@ describe('CommandGuard', () => {
 		it('blocks rm targeting a named user home directory via tilde expansion', () => {
 			expect(guard.validate('rm -rf ~otheruser/secrets').allowed).toBe(false);
 		});
+
+		it('blocks rm targeting an outside-cwd path even when single-quoted — validateRmArgs never decoded tokens, unlike validateGitArgs and friends', () => {
+			expect(guard.validate("rm -rf '/etc/passwd'").allowed).toBe(false);
+		});
+
+		it('blocks rm --no-preserve-root even when quoted', () => {
+			expect(guard.validate("rm '--no-preserve-root' -rf /").allowed).toBe(false);
+		});
 	});
 
 	describe('cp path scoping', () => {
@@ -1214,6 +1281,10 @@ describe('CommandGuard', () => {
 
 		it('still allows cp within the working directory', () => {
 			expect(guard.validate('cp src/a.ts src/b.ts').allowed).toBe(true);
+		});
+
+		it('blocks cp targeting an outside-cwd path even when single-quoted', () => {
+			expect(guard.validate("cp '/etc/passwd' stolen.txt").allowed).toBe(false);
 		});
 	});
 
@@ -1246,6 +1317,37 @@ describe('CommandGuard', () => {
 		it('still allows gzip/gunzip within the working directory', () => {
 			expect(guard.validate('gzip src/a.ts').allowed).toBe(true);
 			expect(guard.validate('gunzip src/a.ts.gz').allowed).toBe(true);
+		});
+
+		it('blocks mv targeting an outside-cwd path even when single-quoted', () => {
+			expect(guard.validate("mv '/etc/hostname' ./stolen").allowed).toBe(false);
+		});
+
+		it('blocks gzip targeting an outside-cwd path even when single-quoted', () => {
+			expect(guard.validate("gzip '/etc/hostname'").allowed).toBe(false);
+		});
+	});
+
+	describe('mkdir/touch path scoping', () => {
+		// Both are allowlisted under the "file operations within working
+		// directory" comment, but neither had any scoping at all — no
+		// cwd-escape check, no protected-file check. touch on an existing
+		// protected file silently updates its mtime undetected.
+		it('blocks mkdir creating a directory outside the working directory', () => {
+			expect(guard.validate('mkdir /tmp/valora-poc-outside').allowed).toBe(false);
+		});
+
+		it('blocks touch targeting a file outside the working directory', () => {
+			expect(guard.validate('touch /tmp/valora-poc-outside-touch').allowed).toBe(false);
+		});
+
+		it('blocks touch targeting the vault signing key', () => {
+			expect(guard.validate('touch vault-signing.key').allowed).toBe(false);
+		});
+
+		it('still allows mkdir/touch within the working directory', () => {
+			expect(guard.validate('mkdir src/newdir').allowed).toBe(true);
+			expect(guard.validate('touch src/newfile.txt').allowed).toBe(true);
 		});
 	});
 
@@ -1375,6 +1477,12 @@ describe('CommandGuard', () => {
 			expect(guard.validate('rg SECRET .env').allowed).toBe(false);
 			expect(guard.validate('diff .env .env.example').allowed).toBe(false);
 			expect(guard.validate('stat id_rsa').allowed).toBe(false);
+		});
+
+		it('blocks cat reading a protected/sensitive file even when single-quoted or quote-concatenated — validateReadOnlyInspectionArgs never decoded tokens', () => {
+			expect(guard.validate("cat 'vault-signing.key'").allowed).toBe(false);
+			expect(guard.validate('cat vault-signing."key"').allowed).toBe(false);
+			expect(guard.validate("cat '.env'").allowed).toBe(false);
 		});
 
 		it('blocks sed -i editing the security audit log when the flag comes after the filename (GNU getopt permutation)', () => {

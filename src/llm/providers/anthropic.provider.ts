@@ -234,10 +234,13 @@ export class AnthropicProvider extends BaseLLMProvider implements BatchableProvi
 
 			return await this.processStream(stream, onChunk);
 		} catch (error) {
-			throw new ProviderError(`Anthropic streaming error: ${(error as Error).message}`, {
-				error: error,
-				provider: BuiltinProviders.ANTHROPIC
-			});
+			throw new ProviderError(
+				`Anthropic streaming error: ${getCredentialGuard().scanOutput((error as Error).message)}`,
+				{
+					error: error,
+					provider: BuiltinProviders.ANTHROPIC
+				}
+			);
 		}
 	}
 

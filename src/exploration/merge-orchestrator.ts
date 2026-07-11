@@ -658,8 +658,15 @@ export class MergeOrchestrator {
 			try {
 				// Simple strategy: take 'ours' (target branch) for now
 				// In a real implementation, this could be much smarter
-				await this.runGit(['checkout', '--ours', conflict.file_path]);
-				await this.runGit(['add', conflict.file_path]);
+				//
+				// conflict.file_path is parsed from an untrusted exploration
+				// branch's own `git status --porcelain` output — an
+				// option-shaped path (e.g. `--upload-pack=...`) would
+				// otherwise be parsed by git as a FLAG, not a literal path,
+				// even as a single argv element. `--` forces git to treat
+				// everything after it as a positional path.
+				await this.runGit(['checkout', '--ours', '--', conflict.file_path]);
+				await this.runGit(['add', '--', conflict.file_path]);
 
 				conflict.resolved = true;
 				conflict.resolution_strategy = 'ours';

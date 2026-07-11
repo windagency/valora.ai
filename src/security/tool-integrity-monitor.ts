@@ -193,7 +193,8 @@ export class ToolIntegrityMonitor {
 			const parsed = JSON.parse(raw) as PersistedBaselines;
 			for (const [rawKey, baseline] of Object.entries(parsed)) {
 				if (typeof baseline?.fingerprint !== 'string' || typeof baseline.snapshot !== 'object') continue;
-				const key = this.migrateLegacyKey(rawKey);
+				const hasNonEmptySnapshot = Object.keys(baseline.snapshot).length > 0;
+				const key = this.migrateLegacyKey(rawKey, hasNonEmptySnapshot);
 				this.fingerprints.set(key, baseline.fingerprint);
 				this.toolSnapshots.set(key, new Map(Object.entries(baseline.snapshot)));
 			}
@@ -203,9 +204,22 @@ export class ToolIntegrityMonitor {
 		}
 	}
 
-	private migrateLegacyKey(key: string): string {
+	/**
+	 * A key string alone can't always disambiguate "legacy bare serverId" from
+	 * "already-migrated content key" — MCP server ids carry no character
+	 * restriction, so a legacy key could itself literally be `plugin:foo`.
+	 * `hasNonEmptySnapshot` is a reliable structural tiebreaker:
+	 * `checkContentIntegrity` never touches `toolSnapshots` at all, so its
+	 * persisted snapshot is always `{}` — a non-empty snapshot can only have
+	 * come from `checkIntegrity`, regardless of what the key string looks
+	 * like. The remaining, unresolvable edge case (a legacy server with
+	 * literally zero tools whose id happens to be prefix-shaped) is narrow
+	 * enough to accept as a documented limitation rather than solve.
+	 */
+	private migrateLegacyKey(key: string, hasNonEmptySnapshot: boolean): string {
 		if (key.startsWith(TOOL_LIST_KEY_PREFIX)) return key;
-		if (KNOWN_CONTENT_KEY_PREFIXES.some((prefix) => key.startsWith(prefix))) return key;
+		const looksLikeContentKey = KNOWN_CONTENT_KEY_PREFIXES.some((prefix) => key.startsWith(prefix));
+		if (looksLikeContentKey && !hasNonEmptySnapshot) return key;
 		return `${TOOL_LIST_KEY_PREFIX}${key}`;
 	}
 

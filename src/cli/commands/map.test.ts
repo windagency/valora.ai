@@ -87,4 +87,16 @@ describe('map --output-dir', () => {
 		errorSpy.mockRestore();
 		await fs.rm(outsideDir, { force: true, recursive: true });
 	});
+
+	it('blocks --output-dir pointing at a protected security-infrastructure basename even when it sits inside the working directory', async () => {
+		const target = path.join(tmpDir, '.valora', 'security-audit.jsonl');
+		const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+		await runCommand(makeProgram(), ['map', '--output-dir', target]);
+
+		expect(exitSpy).toHaveBeenCalledWith(1);
+		expect(mockGenerate).not.toHaveBeenCalled();
+
+		errorSpy.mockRestore();
+	});
 });

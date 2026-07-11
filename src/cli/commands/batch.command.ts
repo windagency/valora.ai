@@ -7,6 +7,8 @@
  * valora batch cancel <localId>
  */
 
+import type { PersistedBatch } from 'batch/batch.types';
+
 import { getBatchOrchestrator } from 'batch/batch-orchestrator';
 import { type BatchableProvider, isBatchableProvider } from 'batch/batch-provider.interface';
 import { loadBatch } from 'batch/batch-session';
@@ -22,6 +24,21 @@ import { getLogger } from 'output/logger';
 import 'llm/providers/anthropic.provider';
 import 'llm/providers/openai.provider';
 import 'llm/providers/google.provider';
+
+/**
+ * `localId` reaches this straight from raw CLI argv — `loadBatch` now throws
+ * (rather than returning null) for a malformed/traversal-shaped ID, so every
+ * bare `loadBatch(localId)` call site needs this wrapper to avoid an
+ * unhandled exception instead of a clean CLI error message.
+ */
+function loadBatchSafely(localId: string, color: ReturnType<typeof getColorAdapter>): null | PersistedBatch {
+	try {
+		return loadBatch(localId);
+	} catch (error) {
+		console.error(color.red(`Invalid batch ID: ${(error as Error).message}`));
+		return null;
+	}
+}
 
 /**
  * Resolve a batch-capable provider by name from app config.
@@ -88,7 +105,7 @@ export function configureBatchCommand(program: CommandAdapter): void {
 		.action((...args: Array<Record<string, unknown>>) => {
 			const localId = args[0] as unknown as string;
 			const color = getColorAdapter();
-			const persisted = loadBatch(localId);
+			const persisted = loadBatchSafely(localId, color);
 			if (!persisted) {
 				console.error(color.red(`Batch not found: ${localId}`));
 				process.exit(1);
@@ -117,7 +134,7 @@ export function configureBatchCommand(program: CommandAdapter): void {
 			const localId = args[0] as unknown as string;
 			const options = args[1] as unknown as { wait?: boolean };
 			const color = getColorAdapter();
-			const persisted = loadBatch(localId);
+			const persisted = loadBatchSafely(localId, color);
 
 			if (!persisted) {
 				console.error(color.red(`Batch not found: ${localId}`));
@@ -171,7 +188,7 @@ export function configureBatchCommand(program: CommandAdapter): void {
 		.action(async (...args: Array<Record<string, unknown>>) => {
 			const localId = args[0] as unknown as string;
 			const color = getColorAdapter();
-			const persisted = loadBatch(localId);
+			const persisted = loadBatchSafely(localId, color);
 
 			if (!persisted) {
 				console.error(color.red(`Batch not found: ${localId}`));

@@ -167,7 +167,7 @@ export class OpenAIProvider extends BaseLLMProvider implements BatchableProvider
 
 			return await this.processStream(stream, onChunk);
 		} catch (error) {
-			throw new ProviderError(`OpenAI streaming error: ${(error as Error).message}`, {
+			throw new ProviderError(`OpenAI streaming error: ${getCredentialGuard().scanOutput((error as Error).message)}`, {
 				error: error,
 				provider: BuiltinProviders.OPENAI
 			});

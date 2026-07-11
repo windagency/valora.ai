@@ -105,7 +105,7 @@ describe('BatchOrchestrator', () => {
 			const provider = makeMockProvider();
 			const orchestrator = new BatchOrchestrator();
 
-			await expect(orchestrator.getStatus('no-such-batch', provider)).rejects.toThrow('Batch not found');
+			await expect(orchestrator.getStatus('0000000000000000', provider)).rejects.toThrow('Batch not found');
 		});
 	});
 

@@ -12,7 +12,7 @@ import type { DocumentCategory, DocumentDefinition, DocumentType, DocumentWriteR
 
 import { getLogger } from 'output/logger';
 import { formatErrorMessage } from 'utils/error-utils';
-import { validateNotForbiddenPath } from 'utils/input-validator';
+import { InputValidator, validateNotForbiddenPath } from 'utils/input-validator';
 
 import type { DocumentPathResolverService } from './document-path-resolver.service';
 
@@ -101,22 +101,27 @@ export class DocumentWriterService {
 			// Validate path is not in forbidden paths (.valora/ folder)
 			validateNotForbiddenPath(customPath, 'write to');
 
-			const isUpdate = existsSync(customPath);
+			// validateNotForbiddenPath's denylist alone previously let this
+			// escape the working directory entirely — reachable via
+			// --document-path/documentPath on `exec`/shortcut CLI commands.
+			const resolvedPath = InputValidator.validatePath(customPath, process.cwd());
+
+			const isUpdate = existsSync(resolvedPath);
 
 			// Ensure directory exists
-			this.ensureDirectory(dirname(customPath));
+			this.ensureDirectory(dirname(resolvedPath));
 
 			// Write the document
-			writeFileSync(customPath, content, 'utf-8');
+			writeFileSync(resolvedPath, content, 'utf-8');
 
 			this.logger.info('Document written successfully', {
 				isUpdate,
-				path: customPath
+				path: resolvedPath
 			});
 
 			return {
 				isUpdate,
-				path: customPath,
+				path: resolvedPath,
 				success: true
 			};
 		} catch (error) {

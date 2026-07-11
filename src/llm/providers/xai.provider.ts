@@ -155,7 +155,7 @@ export class XAIProvider extends BaseLLMProvider {
 
 			return await this.processStream(stream, onChunk);
 		} catch (error) {
-			throw new ProviderError(`xAI streaming error: ${(error as Error).message}`, {
+			throw new ProviderError(`xAI streaming error: ${getCredentialGuard().scanOutput((error as Error).message)}`, {
 				error,
 				provider: BuiltinProviders.XAI
 			});

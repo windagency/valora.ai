@@ -716,8 +716,24 @@ function isPrivateOrLoopbackIpv6(host: string): boolean {
 	if (host === '::1' || host === '::') return true;
 	if (/^fe[89ab][0-9a-f]:/.test(host)) return true; // IPv6 link-local, fe80::/10
 	if (/^f[cd][0-9a-f]{2}:/.test(host)) return true; // IPv6 unique local, fc00::/7
-	const ipv4MappedMatch = /^::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/.exec(host);
-	if (ipv4MappedMatch) return isPrivateOrLinkLocalHost(ipv4MappedMatch[1]!);
+
+	// Node's URL parser always normalises an IPv4-mapped IPv6 literal to
+	// hex-group form (::ffff:169.254.169.254 -> ::ffff:a9fe:a9fe), never
+	// dotted-decimal — a regex matching only the dotted form never fires
+	// against real URL.hostname output. Only the first hex group is needed:
+	// it encodes the address's first two octets, which is all
+	// isPrivateOrLoopbackIpv4 checks.
+	const hexMappedMatch = /^::ffff:([0-9a-f]{1,4}):[0-9a-f]{1,4}$/.exec(host);
+	if (hexMappedMatch) {
+		const highBits = parseInt(hexMappedMatch[1]!, 16);
+		return isPrivateOrLoopbackIpv4((highBits >>> 8) & 0xff, highBits & 0xff);
+	}
+
+	// Belt-and-suspenders for a dotted-decimal form, in case some other
+	// caller ever passes one directly rather than through URL.hostname.
+	const dottedMappedMatch = /^::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/.exec(host);
+	if (dottedMappedMatch) return isPrivateOrLinkLocalHost(dottedMappedMatch[1]!);
+
 	return false;
 }
 

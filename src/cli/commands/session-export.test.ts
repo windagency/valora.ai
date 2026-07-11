@@ -100,6 +100,18 @@ describe('session export outputPath', () => {
 		await fs.rm(outsideDir, { force: true, recursive: true });
 	});
 
+	it('blocks an outputPath pointing at a protected security-infrastructure basename even when it sits inside the working directory', async () => {
+		const target = path.join(tmpDir, '.valora', 'security-audit.jsonl');
+		const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+		await runCommand(makeProgram(), ['session', 'export', 'sess-1', target]);
+
+		expect(exitSpy).toHaveBeenCalledWith(1);
+		expect(mockExportSession).not.toHaveBeenCalled();
+
+		errorSpy.mockRestore();
+	});
+
 	it('still allows an outputPath inside the working directory', async () => {
 		const target = path.join(tmpDir, 'export.zip');
 		mockExportSession.mockResolvedValueOnce(target);

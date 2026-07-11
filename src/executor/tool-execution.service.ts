@@ -70,7 +70,7 @@ import { SemanticAttributes, SpanKind, type TraceContext } from 'types/tracing.t
 import { getPromptAdapter } from 'ui/prompt-adapter.interface';
 import { formatErrorMessage } from 'utils/error-utils';
 import { readFile, writeFile } from 'utils/file-utils';
-import { validateNotForbiddenPath } from 'utils/input-validator';
+import { InputValidator, validateNotForbiddenPath } from 'utils/input-validator';
 import { getMetricsCollector, observeHistogram } from 'utils/metrics-collector';
 import { getTracer, type Span } from 'utils/tracing';
 
@@ -1745,18 +1745,26 @@ export class ToolExecutionService {
 
 	/**
 	 * Validate and resolve a path for write operations.
-	 * Validates both the original path and the resolved full path against forbidden paths.
+	 * Validates both the original path and the resolved full path against forbidden paths,
+	 * and — unlike the read-only `resolvePath()` used by read_file/list_dir, which is
+	 * deliberately not cwd-scoped — requires the resolved path to stay inside
+	 * `workingDir`. `resolvePath()`'s own absolute-verbatim/naive-concat logic runs
+	 * first so a relative `path` resolves against `workingDir` rather than
+	 * `process.cwd()` (which can differ, e.g. in exploration contexts); the result
+	 * is already absolute, so `InputValidator.validatePath`'s own `path.resolve()`
+	 * only normalises it and never falls back to `process.cwd()`.
 	 *
 	 * @param path - The path to validate and resolve
 	 * @param operation - The operation being attempted (e.g., "write to", "delete", "modify")
 	 * @returns The resolved full path
-	 * @throws Error if the path is in a forbidden location
+	 * @throws Error if the path is in a forbidden location or outside the working directory
 	 */
 	private validateAndResolvePath(path: string, operation: string): string {
 		// Validate the original path
 		validateNotForbiddenPath(path, operation);
 
-		const fullPath = this.resolvePath(path);
+		const preResolved = this.resolvePath(path);
+		const fullPath = InputValidator.validatePath(preResolved, this.workingDir);
 
 		// Also validate the resolved path (catches absolute path manipulation)
 		validateNotForbiddenPath(fullPath, operation);

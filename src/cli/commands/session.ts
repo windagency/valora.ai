@@ -2,6 +2,8 @@
  * Session command definitions for CLI
  */
 
+import { getCommandGuard } from 'security/command-guard';
+
 import type { CommandAdapter } from 'cli/command-adapter.interface';
 import type { SessionSummary } from 'types/session.types';
 
@@ -468,6 +470,11 @@ ${color.gray("  💡 Tip: Use 'valora session archive' to mark sessions as compl
 					outputPath = InputValidator.validatePath(rawOutputPath, process.cwd());
 				} catch (error) {
 					console.error(color.red('Invalid outputPath:'), (error as Error).message);
+					process.exit(1);
+					return;
+				}
+				if (getCommandGuard().isProtectedInfrastructureTarget(outputPath)) {
+					console.error(color.red('Invalid outputPath:'), 'targets a protected security-infrastructure file');
 					process.exit(1);
 					return;
 				}

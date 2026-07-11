@@ -657,7 +657,7 @@ function sharesInodeWithProtectedFile(candidatePath: string): boolean {
  * `sed`/`awk` are checked separately since they're only destructive to their
  * target when an in-place-edit flag is present.
  */
-const PROTECTED_INFRASTRUCTURE_DESTRUCTIVE_COMMANDS = new Set(['cp', 'gunzip', 'gzip', 'mv', 'rm']);
+const PROTECTED_INFRASTRUCTURE_DESTRUCTIVE_COMMANDS = new Set(['cp', 'gunzip', 'gzip', 'mv', 'rm', 'touch']);
 
 /** Does `sed`'s token list carry an in-place-edit flag, in any position (`-i`, `-i.bak`, `--in-place[=...]`)? */
 /**
@@ -1182,7 +1182,13 @@ export class CommandGuard {
 	}
 
 	private validateDockerArgs(tokens: string[]): CommandValidationResult {
-		const rest = tokens.slice(1);
+		// Decoded once here, at docker's single validation entry point, so
+		// every downstream helper (checkDockerHostPaths, validateDockerCpArgs,
+		// validateDockerImportArgs, validateDockerBuildContextArg) sees already-
+		// decoded tokens without needing its own decode call — a quoted host
+		// path (`docker run -v '/etc':/host ...`) previously evaded every one
+		// of these checks the same way it did for rm/cp/mv before this round.
+		const rest = tokens.slice(1).map((t) => decodeShellWord(t));
 		const joined = rest.join(' ');
 
 		for (const pattern of DOCKER_DANGEROUS_FLAG_PATTERNS) {
@@ -1214,26 +1220,31 @@ export class CommandGuard {
 	}
 
 	/**
-	 * The build context is always the final positional argument in a valid
-	 * `docker build`/`docker buildx build` invocation — every value-taking
-	 * flag's own value is a separate, earlier token, so no flag-arity table is
-	 * needed to avoid misidentifying one as the context. Reading (and
-	 * potentially leaking into a built image layer) an arbitrary host
-	 * directory via `docker build /etc` was previously entirely unscoped.
+	 * The build context is a single positional argument, but — unlike a shell
+	 * command line — docker's actual CLI parser (Cobra/pflag) does NOT require
+	 * it to be the final token: flags may legitimately follow it
+	 * (`docker build /some/context -f Dockerfile` is real, working docker
+	 * syntax, live-verified). Checking only `rest[rest.length - 1]` let an
+	 * out-of-cwd context slip through whenever any flag came after it. Rather
+	 * than building a flag-arity table to identify the one true context
+	 * token, every non-flag token is checked — matching `validateCwdScopedArgs`'s
+	 * existing "no flag-value bookkeeping needed" pattern for cp/mv/gunzip/gzip.
+	 * A flag's own value never resolves as an out-of-cwd absolute path in
+	 * practice (tags, targets, platforms, etc. aren't shaped like paths), so
+	 * this doesn't introduce new false positives.
 	 */
 	private validateDockerBuildContextArg(rest: string[]): CommandValidationResult {
-		const context = rest[rest.length - 1];
-		if (!context || context === '-' || /^https?:\/\//.test(context) || context.startsWith('-')) {
-			return { allowed: true };
-		}
-		if (isUnresolvableArgument(context) || this.isOutsideWorkingDirectory(context)) {
-			return { allowed: false, reason: `docker build context outside working directory blocked: ${context}` };
-		}
-		if (this.tokenReferencesProtectedFile(context)) {
-			return {
-				allowed: false,
-				reason: `docker build context targeting protected security-infrastructure file blocked: ${context}`
-			};
+		for (const token of rest) {
+			if (!token || token === '-' || /^https?:\/\//.test(token) || token.startsWith('-')) continue;
+			if (isUnresolvableArgument(token) || this.isOutsideWorkingDirectory(token)) {
+				return { allowed: false, reason: `docker build context outside working directory blocked: ${token}` };
+			}
+			if (this.tokenReferencesProtectedFile(token)) {
+				return {
+					allowed: false,
+					reason: `docker build context targeting protected security-infrastructure file blocked: ${token}`
+				};
+			}
 		}
 		return { allowed: true };
 	}
@@ -1440,7 +1451,7 @@ export class CommandGuard {
 	}
 
 	private validateRmArgs(tokens: string[]): CommandValidationResult {
-		const rest = tokens.slice(1);
+		const rest = tokens.slice(1).map((t) => decodeShellWord(t));
 
 		if (rest.includes('--no-preserve-root')) {
 			return { allowed: false, reason: 'rm --no-preserve-root blocked — root-deletion override' };
@@ -1475,10 +1486,36 @@ export class CommandGuard {
 	 * cwd) rather than duplicating it three times.
 	 */
 	private validateCwdScopedArgs(tokens: string[], commandLabel: string): CommandValidationResult {
-		for (const token of tokens.slice(1)) {
+		for (const token of tokens.slice(1).map((t) => decodeShellWord(t))) {
 			if (token.startsWith('-')) continue;
 			if (isUnresolvableArgument(token) || this.isOutsideWorkingDirectory(token)) {
 				return { allowed: false, reason: `${commandLabel} target outside working directory blocked: ${token}` };
+			}
+		}
+		return { allowed: true };
+	}
+
+	/**
+	 * `npm --prefix`/`pnpm -C`/`pnpm --dir` change the effective directory a
+	 * package.json's scripts run from — the same "changes effective cwd"
+	 * primitive already scoped for `git -C`/`env -C`. Live-verified against
+	 * real npm/pnpm: both execute an arbitrary package.json's scripts from
+	 * any directory on disk. `-C` never collides with real npm usage (npm has
+	 * no such short flag) and `--prefix` never collides with real pnpm usage,
+	 * so one check safely covers both package managers.
+	 */
+	private extractNpmPnpmRootFlagTarget(token: string, nextToken: string | undefined): string | undefined {
+		if (token === '-C') return nextToken;
+		return matchLongFlagValue(token, '--prefix', nextToken) ?? matchLongFlagValue(token, '--dir', nextToken);
+	}
+
+	private validateNpmPnpmArgs(tokens: string[]): CommandValidationResult {
+		const rest = tokens.slice(1).map((t) => decodeShellWord(t));
+		for (let i = 0; i < rest.length; i++) {
+			const target = this.extractNpmPnpmRootFlagTarget(rest[i]!, rest[i + 1]);
+			if (target === undefined) continue;
+			if (isUnresolvableArgument(target) || this.isOutsideWorkingDirectory(target)) {
+				return { allowed: false, reason: `${rest[i]} target outside working directory blocked: ${target}` };
 			}
 		}
 		return { allowed: true };
@@ -1496,7 +1533,7 @@ export class CommandGuard {
 	 * the specific files no legitimate agent task ever needs are blocked.
 	 */
 	private validateReadOnlyInspectionArgs(tokens: string[]): CommandValidationResult {
-		for (const token of tokens.slice(1)) {
+		for (const token of tokens.slice(1).map((t) => decodeShellWord(t))) {
 			if (token.startsWith('-')) continue;
 			if (this.tokenReferencesProtectedFile(token)) {
 				return { allowed: false, reason: `reading protected security-infrastructure file blocked: ${token}` };
@@ -1741,7 +1778,10 @@ export class CommandGuard {
 			gzip: () => this.validateCwdScopedArgs(tokens, 'gzip'),
 			head: () => this.validateReadOnlyInspectionArgs(tokens),
 			jq: () => this.validateJqYqArgs(tokens),
+			mkdir: () => this.validateCwdScopedArgs(tokens, 'mkdir'),
 			mv: () => this.validateCwdScopedArgs(tokens, 'mv'),
+			npm: () => this.validateNpmPnpmArgs(tokens),
+			pnpm: () => this.validateNpmPnpmArgs(tokens),
 			prettier: () => this.validateConfigPathArgs(tokens, ['--config', '--plugin']),
 			pytest: () => this.validatePytestArgs(tokens),
 			rg: () => this.validateReadOnlyInspectionArgs(tokens),
@@ -1749,6 +1789,7 @@ export class CommandGuard {
 			sort: () => this.validateOutputFlagArgs(tokens, baseCommand),
 			stat: () => this.validateReadOnlyInspectionArgs(tokens),
 			tail: () => this.validateReadOnlyInspectionArgs(tokens),
+			touch: () => this.validateCwdScopedArgs(tokens, 'touch'),
 			tree: () => this.validateOutputFlagArgs(tokens, baseCommand),
 			uniq: () => this.validateUniqArgs(tokens),
 			vitest: () => this.validateConfigPathArgs(tokens, ['-c', '--config']),

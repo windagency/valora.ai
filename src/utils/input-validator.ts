@@ -427,6 +427,28 @@ export class InputValidator {
 	}
 
 	/**
+	 * Validate a batch local ID — matches `generateLocalId()`'s exact output
+	 * shape (a 16-char lowercase-hex sha256 substring), stricter than
+	 * `validateSessionId`'s general charset since this ID is never
+	 * user-chosen. `batch-session.ts`'s `batchFilePath()`/`persistBatch()`
+	 * joined this into a filesystem path with no validation at all —
+	 * `localId` reaches it as a raw CLI argument via `batch status/results/
+	 * cancel <localId>`, so an unvalidated `../` sequence was a live
+	 * traversal-based arbitrary-file-read primitive, chained into an
+	 * arbitrary-file-write primitive via `updateBatch()` re-persisting a
+	 * loaded file's own (attacker-controlled) `localId` field.
+	 */
+	static validateBatchId(id: string): void {
+		if (!isNonEmptyString(id)) {
+			throw new InputValidationError('Batch ID is required', 'id', id);
+		}
+
+		if (!/^[a-f0-9]{16}$/.test(id)) {
+			throw new InputValidationError('Invalid batch ID format', 'id', id);
+		}
+	}
+
+	/**
 	 * Validate numeric input
 	 */
 	static validateNumber(value: number, min: number, max: number, name: string): void {

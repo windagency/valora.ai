@@ -3,6 +3,7 @@
  */
 
 import { getLSPToolsService } from 'lsp/lsp-tools.service';
+import { getCommandGuard } from 'security/command-guard';
 
 import type { CommandAdapter } from 'cli/command-adapter.interface';
 
@@ -40,6 +41,11 @@ export function configureMapCommand(program: CommandAdapter): void {
 				outputDir = InputValidator.validatePath(options.outputDir ?? 'documentation/generated', projectRoot);
 			} catch (error) {
 				console.error('Invalid --output-dir path:', (error as Error).message);
+				process.exit(1);
+				return;
+			}
+			if (getCommandGuard().isProtectedInfrastructureTarget(outputDir)) {
+				console.error('Invalid --output-dir path:', 'targets a protected security-infrastructure file');
 				process.exit(1);
 				return;
 			}

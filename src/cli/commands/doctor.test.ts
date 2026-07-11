@@ -163,6 +163,18 @@ describe('doctor --export', () => {
 		await fs.rm(outsideDir, { force: true, recursive: true });
 	});
 
+	it('blocks --export pointing at a protected security-infrastructure basename even when it sits inside the working directory', async () => {
+		const target = path.join(tmpDir, '.valora', 'security-audit.jsonl');
+		const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+		await runCommand(makeProgram(), ['doctor', '--export', target]);
+
+		expect(exitSpy).toHaveBeenCalledWith(1);
+		await expect(fs.access(target)).rejects.toThrow();
+
+		errorSpy.mockRestore();
+	});
+
 	it('still allows --export pointing inside the working directory', async () => {
 		const target = path.join(tmpDir, 'nested', 'report.json');
 

@@ -81,4 +81,22 @@ describe('usage --export', () => {
 		exitSpy.mockRestore();
 		await fs.rm(outsideDir, { force: true, recursive: true });
 	});
+
+	it('blocks --export pointing at a protected security-infrastructure basename even when it sits inside the working directory', async () => {
+		// Pre-create .valora/ so a failure can only come from the
+		// protected-basename check, not an unrelated ENOENT from
+		// writeFileSync having no parent directory to write into.
+		await fs.mkdir(path.join(tmpDir, '.valora'), { recursive: true });
+		const target = path.join(tmpDir, '.valora', 'security-audit.jsonl');
+		const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+		const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never);
+
+		await runCommand(makeProgram(), ['monitoring', 'usage', '--format', 'json', '--export', target]);
+
+		expect(exitSpy).toHaveBeenCalledWith(1);
+		await expect(fs.access(target)).rejects.toThrow();
+
+		errorSpy.mockRestore();
+		exitSpy.mockRestore();
+	});
 });

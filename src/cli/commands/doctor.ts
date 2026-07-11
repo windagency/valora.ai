@@ -3,6 +3,7 @@
  */
 
 import * as fs from 'fs';
+import { getCommandGuard } from 'security/command-guard';
 
 import type { CommandAdapter } from 'cli/command-adapter.interface';
 import type { LoadedPlugin } from 'types/plugin.types';
@@ -71,6 +72,11 @@ export function configureDoctorCommand(program: CommandAdapter): void {
 						validatedPath = InputValidator.validatePath(options.export, process.cwd());
 					} catch (error) {
 						console.error(color.red('Invalid --export path:'), (error as Error).message);
+						process.exit(1);
+						return;
+					}
+					if (getCommandGuard().isProtectedInfrastructureTarget(validatedPath)) {
+						console.error(color.red('Invalid --export path:'), 'targets a protected security-infrastructure file');
 						process.exit(1);
 						return;
 					}

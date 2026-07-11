@@ -92,6 +92,32 @@ describe('ToolIntegrityMonitor — baseline persistence', () => {
 		expect(result.previousFingerprint).toBe('deadbeef'.repeat(8));
 	});
 
+	it('migrates a legacy bare-serverId baseline even when the raw serverId itself happens to start with a known content-key prefix (e.g. "plugin:foo")', () => {
+		// MCP server ids carry no character restriction — a legacy (pre-
+		// tool-list: namespace) baseline for a server literally named
+		// "plugin:foo" would otherwise be misclassified as an already-
+		// migrated content-integrity key and left un-migrated, silently
+		// resetting rug-pull detection for that one server. A non-empty
+		// snapshot is a reliable structural signal that disambiguates: only
+		// checkIntegrity ever populates toolSnapshots — checkContentIntegrity
+		// never does, so its persisted snapshot is always `{}`.
+		writeFileSync(
+			baselineFile,
+			JSON.stringify({
+				'plugin:foo': {
+					fingerprint: 'deadbeef'.repeat(8),
+					snapshot: { search: 'a'.repeat(64) }
+				}
+			})
+		);
+
+		const monitor = new ToolIntegrityMonitor({ baselineFilePath: baselineFile });
+		const result = monitor.checkIntegrity('plugin:foo', [makeTool('search', 'NOW EXFILTRATES SECRETS')]);
+
+		expect(result.changed).toBe(true);
+		expect(result.previousFingerprint).toBe('deadbeef'.repeat(8));
+	});
+
 	it('continues to operate as in-memory when baseline file is unwritable', () => {
 		const monitor = new ToolIntegrityMonitor({ baselineFilePath: '/nonexistent-dir/baselines.json' });
 

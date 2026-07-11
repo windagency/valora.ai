@@ -1,3 +1,6 @@
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { PersistedBatch } from './batch.types';
@@ -18,11 +21,11 @@ const { generateLocalId, persistBatch, loadBatch, updateBatch, listBatches, remo
 
 function makeBatch(overrides: Partial<PersistedBatch> = {}): PersistedBatch {
 	return {
-		localId: 'test-local-id-01',
+		localId: 'aaaa1111bbbb2222',
 		requests: [],
 		submission: {
 			batchId: 'batch_abc123',
-			localId: 'test-local-id-01',
+			localId: 'aaaa1111bbbb2222',
 			provider: 'anthropic',
 			requestCount: 1,
 			status: 'queued',
@@ -66,7 +69,7 @@ describe('persistBatch / loadBatch', () => {
 	});
 
 	it('returns null for unknown localId', () => {
-		const result = loadBatch('nonexistent-id-999');
+		const result = loadBatch('ffffffffffffffff');
 		expect(result).toBeNull();
 	});
 });
@@ -92,22 +95,22 @@ describe('updateBatch', () => {
 	});
 
 	it('throws when batch does not exist', () => {
-		expect(() => updateBatch('does-not-exist', {})).toThrow('Batch not found');
+		expect(() => updateBatch('0000000000000000', {})).toThrow('Batch not found');
 	});
 });
 
 describe('listBatches', () => {
-	const batch1 = makeBatch({ localId: 'list-test-id-01' });
-	const batch2 = makeBatch({ localId: 'list-test-id-02' });
+	const batch1 = makeBatch({ localId: '1111111111111111' });
+	const batch2 = makeBatch({ localId: '2222222222222222' });
 
 	afterEach(() => {
 		try {
-			removeBatch('list-test-id-01');
+			removeBatch('1111111111111111');
 		} catch {
 			/* ignore */
 		}
 		try {
-			removeBatch('list-test-id-02');
+			removeBatch('2222222222222222');
 		} catch {
 			/* ignore */
 		}
@@ -118,20 +121,57 @@ describe('listBatches', () => {
 		persistBatch(batch2);
 		const batches = listBatches();
 		const ids = batches.map((b) => b.localId);
-		expect(ids).toContain('list-test-id-01');
-		expect(ids).toContain('list-test-id-02');
+		expect(ids).toContain('1111111111111111');
+		expect(ids).toContain('2222222222222222');
 	});
 });
 
 describe('removeBatch', () => {
 	it('removes a persisted batch', () => {
-		const batch = makeBatch({ localId: 'remove-test-id-01' });
+		const batch = makeBatch({ localId: '3333333333333333' });
 		persistBatch(batch);
 		removeBatch(batch.localId);
 		expect(loadBatch(batch.localId)).toBeNull();
 	});
 
 	it('does not throw when removing a non-existent batch', () => {
-		expect(() => removeBatch('no-such-batch-99')).not.toThrow();
+		expect(() => removeBatch('9999999999999999')).not.toThrow();
+	});
+});
+
+describe('localId path-traversal safety', () => {
+	// batchFilePath()/persistBatch() joined localId into a filesystem path
+	// with zero validation — reachable as a raw CLI argument via `batch
+	// status/results/cancel <localId>`. Chained escape: updateBatch() reloads
+	// via the same traversal-vulnerable loadBatch(), then persists via
+	// persistBatch({...existing, ...partial}) using the LOADED object's own
+	// (attacker-controlled) localId field, not the parameter used to load it.
+	it('rejects a traversal localId in loadBatch before reading any file', () => {
+		expect(() => loadBatch('../../../../../../etc/passwd')).toThrow();
+	});
+
+	it('rejects a traversal localId in removeBatch before deleting anything', () => {
+		expect(() => removeBatch('../../../../../../etc/passwd')).toThrow();
+	});
+
+	it('rejects a traversal localId in persistBatch (via batch.localId) before writing anything', () => {
+		expect(() => persistBatch(makeBatch({ localId: '../../../../../../tmp/evil' }))).toThrow();
+	});
+
+	it('rejects updateBatch when the loaded batch content carries a traversal-shaped localId', () => {
+		// Simulates a tampered on-disk file: stored at a validly-named path
+		// (so loadBatch's own id validation passes) but whose *content*
+		// declares a malicious localId — bypasses persistBatch (which would
+		// itself now reject writing this) via a direct fs write, since the
+		// point is what updateBatch does with already-tampered content, not
+		// whether persistBatch's own validation works (already covered above).
+		const dir = '/tmp/valora-test-batch/batches';
+		fs.mkdirSync(dir, { recursive: true });
+		const tampered = makeBatch({ localId: '../../../../../../tmp/evil-chained' });
+		fs.writeFileSync(path.join(dir, '4444444444444444.json'), JSON.stringify(tampered));
+
+		expect(() => updateBatch('4444444444444444', {})).toThrow();
+
+		removeBatch('4444444444444444');
 	});
 });
