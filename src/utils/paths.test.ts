@@ -6,6 +6,18 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { getSystemPluginsDir, getWorkspaceTrustCheckRoot, hasAnyValoraConfig } from './paths';
 
+// `process.chdir()` is unsupported in Node worker threads (e.g. Stryker's dry-run test
+// execution) — probe once at module load so the chdir-dependent describe blocks below skip
+// gracefully in that environment instead of crashing the whole run, while still executing
+// normally under regular Vitest/CI (which uses forks, not worker threads).
+let chdirSupported = true;
+try {
+	const cwd = process.cwd();
+	process.chdir(cwd);
+} catch {
+	chdirSupported = false;
+}
+
 describe('getSystemPluginsDir', () => {
 	const originalPlatform = process.platform;
 
@@ -45,7 +57,7 @@ describe('getSystemPluginsDir', () => {
 	});
 });
 
-describe('hasAnyValoraConfig', () => {
+describe.skipIf(!chdirSupported)('hasAnyValoraConfig', () => {
 	let tmpDir: string;
 	let originalCwd: string;
 
@@ -85,7 +97,7 @@ describe('hasAnyValoraConfig', () => {
 	});
 });
 
-describe('getWorkspaceTrustCheckRoot', () => {
+describe.skipIf(!chdirSupported)('getWorkspaceTrustCheckRoot', () => {
 	let tmpDir: string;
 	let originalCwd: string;
 

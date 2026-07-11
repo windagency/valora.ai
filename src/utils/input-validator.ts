@@ -69,6 +69,9 @@ const MALICIOUS_PATTERNS = [
 	// Dangerous options
 	{ name: 'dangerous_exec', pattern: /--exec\s+(?:rm|cat|wget|curl|bash|sh)/ },
 
+	// Code injection
+	{ name: 'code_injection_eval', pattern: /\beval\s*\(/ },
+
 	// Script injection
 	{ name: 'xss_script', pattern: /<script[^>]*>/i },
 	{ name: 'javascript_url', pattern: /javascript:/i },
@@ -127,7 +130,7 @@ export class InputValidator {
 					errors.push(`String length ${value.length} exceeds limit of ${this.config.maxStringLength}`);
 				}
 				// Check for malicious patterns
-				this.checkMaliciousPatterns(value, warnings);
+				this.checkMaliciousPatterns(value, errors);
 			} else if (Array.isArray(value)) {
 				if (value.length > maxArrayLen) {
 					maxArrayLen = value.length;
@@ -175,12 +178,14 @@ export class InputValidator {
 	}
 
 	/**
-	 * Check for malicious patterns in a string
+	 * Check for malicious patterns in a string. These are hard rejections (pushed
+	 * to `errors`, not `warnings`) — a matched pattern makes the input invalid,
+	 * consistent with `validateToolCallArgs`'s treatment of the same pattern list.
 	 */
-	private checkMaliciousPatterns(value: string, warnings: string[]): void {
+	private checkMaliciousPatterns(value: string, errors: string[]): void {
 		for (const { name, pattern } of MALICIOUS_PATTERNS) {
 			if (pattern.test(value)) {
-				warnings.push(`Potentially malicious pattern detected: ${name}`);
+				errors.push(`Potentially malicious pattern detected: ${name}`);
 			}
 		}
 	}

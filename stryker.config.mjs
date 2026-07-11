@@ -16,6 +16,26 @@ export default {
 	// Mutate only source files that have co-located unit tests.
 	// Modules with unit tests (from `find src -name "*.test.ts"`):
 	//   utils(10) services(8) exploration(4) config(3) cli(3) output(2) llm(2)
+	//
+	// security/executor/plugins added 2026-07-11: these are the three directories the
+	// test-suite audit found the worst anti-pattern findings in (audit-sink pollution,
+	// implementation-detail testing reaching into private state, a trivially-passing
+	// mock-fs symlink check) — mutation testing is the mechanical way to verify fixes in
+	// this area actually strengthen the tests, not just read better.
+	//
+	// Baseline from first run (2026-07-11): plugins/ scored 57.85% overall (clears both
+	// low/50 and break/40) — independently corroborated two audit findings:
+	// conflict-resolver-config.ts scored 0.00% (11/11 survived — it has no test file at
+	// all) and plugin-manifest.schema.ts scored 13.85% (matches the audit's "missing
+	// coverage for 5 of its exports" finding).
+	//
+	// security/ and executor/ full baselines are NOT yet established — both confirmed
+	// runnable (dry run passes; a stray-temp-dir issue that briefly blocked security/'s
+	// dry run was a one-off local artifact, not a config problem), but security/ alone
+	// is ~4900 mutants / ~30min and executor/ (46 source files, more than security/'s 11)
+	// is larger still — too long to run inline here. Run both as a dedicated follow-up
+	// with the mutation CI job's output as the source of truth once it lands; do not
+	// assume `break: 40` is already cleared for either.
 	mutate: [
 		'src/utils/*.ts',
 		'src/services/**/*.ts',
@@ -24,6 +44,9 @@ export default {
 		'src/cli/**/*.ts',
 		'src/output/**/*.ts',
 		'src/llm/**/*.ts',
+		'src/security/**/*.ts',
+		'src/executor/**/*.ts',
+		'src/plugins/**/*.ts',
 		'!src/**/*.test.ts',
 		'!src/**/*.spec.ts',
 		'!src/**/index.ts',

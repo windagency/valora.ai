@@ -39,6 +39,18 @@ vi.mock('output/color-adapter.interface', () => ({
 
 import { configureDoctorCommand, printPluginsSection } from './doctor';
 
+// `process.chdir()` is unsupported in Node worker threads (e.g. Stryker's dry-run test
+// execution) — probe once at module load so the chdir-dependent describe block below skips
+// gracefully in that environment instead of crashing the whole run, while still executing
+// normally under regular Vitest/CI (which uses forks, not worker threads).
+let chdirSupported = true;
+try {
+	const cwd = process.cwd();
+	process.chdir(cwd);
+} catch {
+	chdirSupported = false;
+}
+
 const noopColor = {
 	bold: (s: string) => s,
 	cyan: (s: string) => s,
@@ -128,7 +140,7 @@ async function runCommand(program: Command, args: string[]): Promise<void> {
 	await program.parseAsync(['node', 'valora', ...args]);
 }
 
-describe('doctor --export', () => {
+describe.skipIf(!chdirSupported)('doctor --export', () => {
 	let tmpDir: string;
 	let originalCwd: string;
 	let logSpy: ReturnType<typeof vi.spyOn>;

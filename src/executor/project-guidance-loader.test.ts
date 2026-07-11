@@ -61,6 +61,18 @@ function makePlugin(partial: Partial<LoadedPlugin>): LoadedPlugin {
 	};
 }
 
+// `process.chdir()` is unsupported in Node worker threads (e.g. Stryker's dry-run test
+// execution) — probe once at module load so the chdir-dependent describe blocks below skip
+// gracefully in that environment instead of crashing the whole run, while still executing
+// normally under regular Vitest/CI (which uses forks, not worker threads).
+let chdirSupported = true;
+try {
+	const cwd = process.cwd();
+	process.chdir(cwd);
+} catch {
+	chdirSupported = false;
+}
+
 function writeAgentFile(dir: string, role: string): void {
 	fs.mkdirSync(dir, { recursive: true });
 	fs.writeFileSync(
@@ -163,7 +175,7 @@ describe('loadAvailableAgents — plugin dir resolution', () => {
 	});
 });
 
-describe('loadProjectGuidance — workspace trust gating', () => {
+describe.skipIf(!chdirSupported)('loadProjectGuidance — workspace trust gating', () => {
 	// AGENTS.md/CLAUDE.md are injected into the LLM prompt with "You MUST
 	// follow these instructions strictly" — the same "untrusted project
 	// content steering agent behaviour with no confirmation" class as the
@@ -229,7 +241,7 @@ describe('loadProjectGuidance — workspace trust gating', () => {
 	});
 });
 
-describe('loadProjectKnowledge — workspace trust gating', () => {
+describe.skipIf(!chdirSupported)('loadProjectKnowledge — workspace trust gating', () => {
 	let tmpDir: string;
 	let originalCwd: string;
 

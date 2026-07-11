@@ -73,8 +73,7 @@ The suite combines the expertise of multiple engineering disciplines to create a
 __tests__/
 ├── utils/                          # Shared test utilities
 │   ├── agent-selection-test-helpers.ts
-│   ├── setup.ts                   # Global test setup
-│   └── testcontainers-helper.ts   # Container management
+│   └── setup.ts                   # Global test setup
 ├── integration/                   # Integration tests
 │   ├── analysis/
 │   ├── cli/
@@ -128,22 +127,24 @@ Examples:
 #### 🔗 **Integration Tests** (`__tests__/integration/`)
 
 - **Purpose**: Validate interactions between modules and external dependencies
-- **Scope**: Database operations, file I/O, API calls, service communication
-- **Tools**: Testcontainers, Vitest, isolated environments
+- **Scope**: File I/O, subprocess execution, API calls, service communication
+- **Tools**: Vitest with real temp-directory filesystem/git/subprocess I/O; Testcontainers for tests
+  that need a genuine external service (e.g. `packages/valora-plugin-ollama`'s Ollama container test).
+  Mocking the boundary a test claims to integrate is not permitted here — see CLAUDE.md.
 - **Coverage Focus**: Data flow, contract testing, dependency management
 
 #### 🌐 **E2E Tests** (`__tests__/e2e/`)
 
 - **Purpose**: Validate complete user workflows from start to finish
-- **Scope**: CLI commands, MCP server interactions, browser automation
-- **Tools**: Playwright, Testcontainers, headless browsers
+- **Scope**: CLI commands, MCP server interactions
+- **Tools**: Vitest, real built-binary invocation
 - **Coverage Focus**: User experience, system integration, cross-platform compatibility
 
 #### ✅ **Acceptance Tests** (`__tests__/acceptance/`)
 
 - **Purpose**: Validate business requirements and user stories
 - **Scope**: Complete features, user workflows, business rules
-- **Tools**: Testcontainers, Vitest, behavioral scenarios
+- **Tools**: Vitest, real built-binary invocation, behavioral scenarios
 - **Coverage Focus**: Business value, user satisfaction, functional completeness
 
 #### 🔒 **Security Tests** (`__tests__/security/`)
@@ -181,8 +182,11 @@ Examples:
 ### Testing Framework
 
 - **Vitest**: Modern, fast testing framework with TypeScript support
-- **Playwright**: Browser automation and E2E testing
-- **Testcontainers**: Isolated integration testing environments
+- **Testcontainers**: Isolated environments for the small subset of integration tests that need a
+  genuine external service (e.g. `packages/valora-plugin-ollama`); most integration/E2E/acceptance
+  tests use real temp-directory filesystem, git, and subprocess I/O directly, without a container
+- **Playwright**: a dependency, but only exercised by one narrowly-scoped browser check in the E2E
+  suite — not a general E2E/browser-automation tool for this CLI project
 
 ### Quality Assurance
 
@@ -328,7 +332,8 @@ _Note: Focus on valuable tests validating behavior rather than arbitrary coverag
 
 #### ✅ **Integration Tests**
 
-- [ ] Uses real dependencies via Testcontainers
+- [ ] Uses real dependencies (filesystem, git, subprocess) or Testcontainers for a genuine external
+      service — never mocks the boundary the test claims to integrate
 - [ ] Tests data flow between components
 - [ ] Validates error propagation
 - [ ] Tests resource cleanup
@@ -493,8 +498,8 @@ The VALORA test suite represents a **monumental achievement** in software testin
 Verified against codebase on **2026-04-23** by running all test suites and inspecting the file system.
 
 - **Total claims checked**: 28
-- **Confirmed**: 8 (file paths for `utils/setup.ts`, `utils/testcontainers-helper.ts`; test command scripts; tool dependencies for Vitest, Playwright, Testcontainers; naming convention examples for E2E/acceptance/security/performance/error test files)
-- **Corrections made**: 20
+- **Confirmed**: 8 (file path for `utils/setup.ts`; test command scripts; tool dependency for Vitest; naming convention examples for E2E/acceptance/security/performance/error test files)
+- **Corrections made (2026-04-23)**: 20
   - Date updated from `2025-01-21` to `2026-04-23`
   - Total test count: `263/263` → `1942/1943`
   - Pass rate: `100%` → `99.9% (1 skipped in E2E)`
@@ -516,3 +521,16 @@ Verified against codebase on **2026-04-23** by running all test suites and inspe
   - `pnpm test:watch` corrected to `pnpm test:dev:watch`
   - Summary paragraph count: `263` → `1942`
 - **Unverifiable**: 0
+
+### Correction pass (2026-07-11)
+
+The 2026-04-23 pass above incorrectly confirmed `utils/testcontainers-helper.ts` as an existing file
+and claimed integration/E2E/acceptance tests broadly use Testcontainers. Neither was true: the file
+does not exist anywhere in the repo, and — apart from one Testcontainers-based test in
+`packages/valora-plugin-ollama` — every integration/E2E/acceptance test uses real filesystem/git/
+subprocess I/O directly, with no container involved. `__tests__/integration/cli/provider-fallback.integration.test.ts`
+had also been mocking `config/loader` and `utils/file-utils` — the exact boundaries an integration
+test must exercise for real — and was rewritten to use a real temp config file and command markdown
+file on disk instead. This section, the Directory Layout, Technology Stack, and the per-category
+Tools/Coverage descriptions above were corrected accordingly. The broader test counts in the
+2026-04-23 summary were not re-verified in this pass and should be treated as stale.

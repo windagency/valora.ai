@@ -31,6 +31,18 @@ vi.mock('analysis/documentation.service', () => ({
 
 import { configureMapCommand } from './map';
 
+// `process.chdir()` is unsupported in Node worker threads (e.g. Stryker's dry-run test
+// execution) — probe once at module load so this chdir-dependent describe block skips
+// gracefully in that environment instead of crashing the whole run, while still executing
+// normally under regular Vitest/CI (which uses forks, not worker threads).
+let chdirSupported = true;
+try {
+	const cwd = process.cwd();
+	process.chdir(cwd);
+} catch {
+	chdirSupported = false;
+}
+
 function makeProgram(): Command {
 	const program = new Command();
 	program.exitOverride();
@@ -48,7 +60,7 @@ async function runCommand(program: Command, args: string[]): Promise<void> {
 	await program.parseAsync(['node', 'valora', ...args]);
 }
 
-describe('map --output-dir', () => {
+describe.skipIf(!chdirSupported)('map --output-dir', () => {
 	let tmpDir: string;
 	let originalCwd: string;
 	let exitSpy: ReturnType<typeof vi.spyOn>;

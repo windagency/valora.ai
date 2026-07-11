@@ -19,48 +19,63 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { ConfigLoader } from './loader';
 
-describe('ConfigLoader — env-defaults must not clobber an unrelated trusted default_provider', () => {
-	let projectDir: string;
-	let originalCwd: string;
-	let savedGlobalConfigDir: string | undefined;
-	let savedInteractive: string | undefined;
+// `process.chdir()` is unsupported in Node worker threads (e.g. Stryker's dry-run test
+// execution) — probe once at module load so this chdir-dependent describe block skips
+// gracefully in that environment instead of crashing the whole run, while still executing
+// normally under regular Vitest/CI (which uses forks, not worker threads).
+let chdirSupported = true;
+try {
+	const cwd = process.cwd();
+	process.chdir(cwd);
+} catch {
+	chdirSupported = false;
+}
 
-	beforeEach(() => {
-		originalCwd = process.cwd();
-		projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'valora-env-defaults-clobber-'));
-		process.chdir(projectDir);
+describe.skipIf(!chdirSupported)(
+	'ConfigLoader — env-defaults must not clobber an unrelated trusted default_provider',
+	() => {
+		let projectDir: string;
+		let originalCwd: string;
+		let savedGlobalConfigDir: string | undefined;
+		let savedInteractive: string | undefined;
 
-		savedGlobalConfigDir = process.env['VALORA_GLOBAL_CONFIG_DIR'];
-		const globalConfigDir = path.join(projectDir, '.global');
-		fs.mkdirSync(globalConfigDir);
-		process.env['VALORA_GLOBAL_CONFIG_DIR'] = globalConfigDir;
-		fs.writeFileSync(
-			path.join(globalConfigDir, 'config.json'),
-			JSON.stringify({
-				defaults: { default_provider: 'openai' },
-				providers: { anthropic: { apiKey: 'sk-a' }, openai: { apiKey: 'sk-o' } }
-			})
-		);
+		beforeEach(() => {
+			originalCwd = process.cwd();
+			projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'valora-env-defaults-clobber-'));
+			process.chdir(projectDir);
 
-		savedInteractive = process.env['VALORA_INTERACTIVE'];
-		process.env['VALORA_INTERACTIVE'] = 'false';
-	});
+			savedGlobalConfigDir = process.env['VALORA_GLOBAL_CONFIG_DIR'];
+			const globalConfigDir = path.join(projectDir, '.global');
+			fs.mkdirSync(globalConfigDir);
+			process.env['VALORA_GLOBAL_CONFIG_DIR'] = globalConfigDir;
+			fs.writeFileSync(
+				path.join(globalConfigDir, 'config.json'),
+				JSON.stringify({
+					defaults: { default_provider: 'openai' },
+					providers: { anthropic: { apiKey: 'sk-a' }, openai: { apiKey: 'sk-o' } }
+				})
+			);
 
-	afterEach(() => {
-		process.chdir(originalCwd);
-		fs.rmSync(projectDir, { force: true, recursive: true });
-		if (savedGlobalConfigDir === undefined) delete process.env['VALORA_GLOBAL_CONFIG_DIR'];
-		else process.env['VALORA_GLOBAL_CONFIG_DIR'] = savedGlobalConfigDir;
-		if (savedInteractive === undefined) delete process.env['VALORA_INTERACTIVE'];
-		else process.env['VALORA_INTERACTIVE'] = savedInteractive;
-	});
+			savedInteractive = process.env['VALORA_INTERACTIVE'];
+			process.env['VALORA_INTERACTIVE'] = 'false';
+		});
 
-	it("preserves a trusted global config's default_provider when an unrelated env var (VALORA_INTERACTIVE) is set", async () => {
-		const loader = new ConfigLoader(path.join(projectDir, '.nonexistent-package-config.json'));
+		afterEach(() => {
+			process.chdir(originalCwd);
+			fs.rmSync(projectDir, { force: true, recursive: true });
+			if (savedGlobalConfigDir === undefined) delete process.env['VALORA_GLOBAL_CONFIG_DIR'];
+			else process.env['VALORA_GLOBAL_CONFIG_DIR'] = savedGlobalConfigDir;
+			if (savedInteractive === undefined) delete process.env['VALORA_INTERACTIVE'];
+			else process.env['VALORA_INTERACTIVE'] = savedInteractive;
+		});
 
-		const config = await loader.load();
+		it("preserves a trusted global config's default_provider when an unrelated env var (VALORA_INTERACTIVE) is set", async () => {
+			const loader = new ConfigLoader(path.join(projectDir, '.nonexistent-package-config.json'));
 
-		expect(config.defaults.default_provider).toBe('openai');
-		expect(config.defaults.interactive).toBe(false); // the env var's own field still applies
-	});
-});
+			const config = await loader.load();
+
+			expect(config.defaults.default_provider).toBe('openai');
+			expect(config.defaults.interactive).toBe(false); // the env var's own field still applies
+		});
+	}
+);

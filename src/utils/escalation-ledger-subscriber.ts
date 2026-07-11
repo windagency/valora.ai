@@ -30,17 +30,17 @@ interface PendingSignal {
  * A "triggered" event's signal fields are held in memory just long enough to be merged
  * with the "resolved"/"aborted" event for the same stage that follows it.
  */
-export function subscribeEscalationLedger(emitter: PipelineEventEmitter, ledger: EscalationLedger): void {
+export function subscribeEscalationLedger(emitter: PipelineEventEmitter, ledger: EscalationLedger): () => void {
 	const pending = new Map<string, PendingSignal>();
 
-	emitter.on(PipelineEventType.ESCALATION_TRIGGERED, (data: EscalationTriggeredData) => {
+	const onTriggered = (data: EscalationTriggeredData): void => {
 		pending.set(data.stage, {
 			confidence: data.confidence,
 			confidenceSource: data.confidenceSource,
 			riskLevel: data.riskLevel as EscalationRiskLevel,
 			triggeredCriteria: data.triggeredCriteria
 		});
-	});
+	};
 
 	const recordDecision = (stage: string, decision: EscalationDecisionType): void => {
 		const signal = pending.get(stage);
@@ -57,16 +57,27 @@ export function subscribeEscalationLedger(emitter: PipelineEventEmitter, ledger:
 		});
 	};
 
-	emitter.on(PipelineEventType.ESCALATION_RESOLVED, (data: EscalationResolvedData) => {
+	const onResolved = (data: EscalationResolvedData): void => {
 		recordDecision(data.stage, data.decision);
-	});
+	};
 
-	emitter.on(PipelineEventType.ESCALATION_ABORTED, (data: EscalationAbortedData) => {
+	const onAborted = (data: EscalationAbortedData): void => {
 		recordDecision(data.stage, 'abort');
-	});
+	};
+
+	emitter.on(PipelineEventType.ESCALATION_TRIGGERED, onTriggered);
+	emitter.on(PipelineEventType.ESCALATION_RESOLVED, onResolved);
+	emitter.on(PipelineEventType.ESCALATION_ABORTED, onAborted);
+
+	return () => {
+		emitter.off(PipelineEventType.ESCALATION_TRIGGERED, onTriggered);
+		emitter.off(PipelineEventType.ESCALATION_RESOLVED, onResolved);
+		emitter.off(PipelineEventType.ESCALATION_ABORTED, onAborted);
+	};
 }
 
 let bootstrapped = false;
+let unsubscribe: (() => void) | null = null;
 
 /**
  * Subscribes the default `EscalationLedger` singleton to the default pipeline emitter
@@ -76,10 +87,17 @@ let bootstrapped = false;
 export function bootstrapEscalationLedger(): void {
 	if (bootstrapped) return;
 	bootstrapped = true;
-	subscribeEscalationLedger(getPipelineEmitter(), getEscalationLedger());
+	unsubscribe = subscribeEscalationLedger(getPipelineEmitter(), getEscalationLedger());
 }
 
-/** Test-only: allow bootstrapEscalationLedger() to be exercised again in isolation. */
+/**
+ * Test-only: allow bootstrapEscalationLedger() to be exercised again in isolation.
+ * Removes the listeners subscribeEscalationLedger() attached to the shared emitter
+ * singleton — without this, repeated bootstrap/reset cycles (e.g. across test files)
+ * would leak listeners onto that singleton for the lifetime of the process.
+ */
 export function resetEscalationLedgerBootstrap(): void {
 	bootstrapped = false;
+	unsubscribe?.();
+	unsubscribe = null;
 }

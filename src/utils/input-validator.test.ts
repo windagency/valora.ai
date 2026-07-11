@@ -103,12 +103,12 @@ describe('InputValidator', () => {
 			expect(result.errors.some((error) => /String length \d+ exceeds limit/.test(error))).toBe(true);
 		});
 
-		it('should check for malicious patterns in strings', () => {
+		it('rejects strings containing malicious patterns', () => {
 			const maliciousString = 'rm -rf / && echo hacked';
 			const result = validator.validate(maliciousString);
 
-			// Should have warnings about malicious patterns
-			expect(result.warnings.length).toBeGreaterThan(0);
+			expect(result.valid).toBe(false);
+			expect(result.errors.some((error) => /malicious pattern/.test(error))).toBe(true);
 		});
 	});
 
@@ -391,7 +391,7 @@ describe('Security-focused validation', () => {
 		expect(result.errors.some((error) => /Array length \d+ exceeds limit/.test(error))).toBe(true);
 	});
 
-	it('should detect malicious command injection patterns', () => {
+	it('rejects malicious command injection patterns', () => {
 		const maliciousInput = {
 			command: 'ls -la && rm -rf /',
 			path: '../../../etc/passwd',
@@ -400,8 +400,8 @@ describe('Security-focused validation', () => {
 
 		const result = validator.validate(maliciousInput);
 
-		// Should have warnings about malicious patterns
-		expect(result.warnings.length).toBeGreaterThan(0);
+		expect(result.valid).toBe(false);
+		expect(result.errors.length).toBeGreaterThan(0);
 	});
 });
 

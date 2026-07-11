@@ -23,6 +23,18 @@ vi.mock('output/color-adapter.interface', () => ({
 
 import { configureConfidenceReportSubcommand } from './confidence-report';
 
+// `process.chdir()` is unsupported in Node worker threads (e.g. Stryker's dry-run test
+// execution) — probe once at module load so this chdir-dependent describe block skips
+// gracefully in that environment instead of crashing the whole run, while still executing
+// normally under regular Vitest/CI (which uses forks, not worker threads).
+let chdirSupported = true;
+try {
+	const cwd = process.cwd();
+	process.chdir(cwd);
+} catch {
+	chdirSupported = false;
+}
+
 function makeProgram(): Command {
 	const program = new Command();
 	program.exitOverride();
@@ -42,7 +54,7 @@ async function runCommand(program: Command, args: string[]): Promise<void> {
 	await program.parseAsync(['node', 'valora', ...args]);
 }
 
-describe('confidence-report --export', () => {
+describe.skipIf(!chdirSupported)('confidence-report --export', () => {
 	let tmpDir: string;
 	let originalCwd: string;
 

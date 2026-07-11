@@ -1275,7 +1275,6 @@ describe('Agent Selection Test Suite', () => {
 		const performanceThresholds = {
 			// ms
 			accuracyRate: 0.4, // 85%
-			fallbackRate: 1.0,
 			resolutionTime: 500 // 15%
 		};
 
@@ -1506,7 +1505,17 @@ describe('Agent Selection Test Suite', () => {
 				}
 
 				const fallbackRate = performanceMetrics.fallbackCount / performanceMetrics.totalTests;
-				expect(fallbackRate).toBeLessThanOrEqual(performanceThresholds.fallbackRate);
+				// KNOWN GAP (found while removing the tautological `<= 1.0` placeholder this
+				// replaced): these 3 tasks currently measure fallbackRate === 1.0 against the real
+				// resolver — every one of them falls back, despite the test's own name asserting
+				// they're "well-defined". Tightening this to `toBeLessThan(1.0)` (the minimal,
+				// non-arbitrary fix that would at least catch total-fallback regressions) fails
+				// today. Diagnosing why requires investigating this describe block's
+				// DynamicAgentResolverService/registry setup and confidence-scoring behavior —
+				// out of scope for a test-assertion fix; needs a deliberate decision (fix the
+				// resolver/registry fixture, or accept and document the current behavior) before
+				// this can be tightened. Left as `<= 1.0` (still a placeholder) until then.
+				expect(fallbackRate).toBeLessThanOrEqual(1.0);
 			});
 
 			it('should have higher fallback rate for ambiguous tasks', async () => {

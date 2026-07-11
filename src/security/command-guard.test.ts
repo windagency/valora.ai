@@ -15,6 +15,18 @@ vi.mock('output/logger', () => ({
 	})
 }));
 
+// `process.chdir()` is unsupported in Node worker threads (e.g. Stryker's dry-run test
+// execution) — probe once at module load so the chdir-dependent describe blocks below skip
+// gracefully in that environment instead of crashing the whole run, while still executing
+// normally under regular Vitest/CI (which uses forks, not worker threads).
+let chdirSupported = true;
+try {
+	const cwd = process.cwd();
+	process.chdir(cwd);
+} catch {
+	chdirSupported = false;
+}
+
 describe('CommandGuard', () => {
 	let guard: CommandGuard;
 
@@ -1618,7 +1630,7 @@ describe('CommandGuard', () => {
 		});
 	});
 
-	describe('symlink resolution (path scoping is not purely lexical)', () => {
+	describe.skipIf(!chdirSupported)('symlink resolution (path scoping is not purely lexical)', () => {
 		let originalCwd: string;
 		let fakeCwd: string;
 		let outsideDir: string;
@@ -1666,7 +1678,7 @@ describe('CommandGuard', () => {
 		});
 	});
 
-	describe('hardlink resolution (inode identity, not just symlinks)', () => {
+	describe.skipIf(!chdirSupported)('hardlink resolution (inode identity, not just symlinks)', () => {
 		// A hardlink is a second directory entry pointing at the same inode as
 		// the original — realpathSync on the alias returns the alias's own
 		// path, not the original's, because there is nothing to dereference

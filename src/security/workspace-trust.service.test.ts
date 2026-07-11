@@ -6,6 +6,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { isWorkspaceTrusted, revokeWorkspaceTrust, trustWorkspace } from './workspace-trust.service';
 
+// `process.chdir()` is unsupported in Node worker threads (e.g. Stryker's dry-run test
+// execution) — probe once at module load so the one chdir-dependent test below skips
+// gracefully in that environment instead of crashing the whole run, while still executing
+// normally under regular Vitest/CI (which uses forks, not worker threads).
+let chdirSupported = true;
+try {
+	const cwd = process.cwd();
+	process.chdir(cwd);
+} catch {
+	chdirSupported = false;
+}
+
 describe('workspace trust', () => {
 	let dir: string;
 	let storePath: string;
@@ -49,16 +61,19 @@ describe('workspace trust', () => {
 		expect(isWorkspaceTrusted(projectDir, storePath)).toBe(false);
 	});
 
-	it('resolves relative and absolute forms of the same directory to the same trust entry', () => {
-		trustWorkspace(projectDir, storePath);
-		const originalCwd = process.cwd();
-		try {
-			process.chdir(dir);
-			expect(isWorkspaceTrusted('my-project', storePath)).toBe(true);
-		} finally {
-			process.chdir(originalCwd);
+	it.skipIf(!chdirSupported)(
+		'resolves relative and absolute forms of the same directory to the same trust entry',
+		() => {
+			trustWorkspace(projectDir, storePath);
+			const originalCwd = process.cwd();
+			try {
+				process.chdir(dir);
+				expect(isWorkspaceTrusted('my-project', storePath)).toBe(true);
+			} finally {
+				process.chdir(originalCwd);
+			}
 		}
-	});
+	);
 
 	it('resolves a symlinked project directory to the same trust entry as its real path', () => {
 		// Lexical resolve() alone can't see through a symlink — trusting the

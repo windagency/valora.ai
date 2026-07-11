@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { getPipelineEmitter, PipelineEventEmitter } from 'output/pipeline-emitter';
+import { PipelineEventType } from 'types/pipeline.types';
 
 import type { EscalationLedgerRecord } from './escalation-ledger';
 import {
@@ -126,5 +127,31 @@ describe('bootstrapEscalationLedger', () => {
 		const countAfterSecond = getPipelineEmitter().listenerCount('escalation:triggered');
 
 		expect(countAfterSecond).toBe(countAfterFirst);
+	});
+
+	it('removes its listeners from the shared emitter on reset, so a later bootstrap does not leak them permanently', () => {
+		const emitter = getPipelineEmitter();
+		const baselineTriggered = emitter.listenerCount(PipelineEventType.ESCALATION_TRIGGERED);
+		const baselineResolved = emitter.listenerCount(PipelineEventType.ESCALATION_RESOLVED);
+		const baselineAborted = emitter.listenerCount(PipelineEventType.ESCALATION_ABORTED);
+
+		bootstrapEscalationLedger();
+		resetEscalationLedgerBootstrap();
+
+		expect(emitter.listenerCount(PipelineEventType.ESCALATION_TRIGGERED)).toBe(baselineTriggered);
+		expect(emitter.listenerCount(PipelineEventType.ESCALATION_RESOLVED)).toBe(baselineResolved);
+		expect(emitter.listenerCount(PipelineEventType.ESCALATION_ABORTED)).toBe(baselineAborted);
+	});
+
+	it('does not accumulate listeners across repeated bootstrap/reset cycles', () => {
+		const emitter = getPipelineEmitter();
+		const baseline = emitter.listenerCount(PipelineEventType.ESCALATION_TRIGGERED);
+
+		for (let i = 0; i < 5; i++) {
+			bootstrapEscalationLedger();
+			resetEscalationLedgerBootstrap();
+		}
+
+		expect(emitter.listenerCount(PipelineEventType.ESCALATION_TRIGGERED)).toBe(baseline);
 	});
 });

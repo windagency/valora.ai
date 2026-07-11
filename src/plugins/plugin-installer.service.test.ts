@@ -49,6 +49,18 @@ vi.mock('utils/paths', async (importOriginal) => {
 	};
 });
 
+// `process.chdir()` is unsupported in Node worker threads (e.g. Stryker's dry-run test
+// execution) — probe once at module load so the two chdir-dependent tests below skip
+// gracefully in that environment instead of crashing the whole run, while still executing
+// normally under regular Vitest/CI (which uses forks, not worker threads).
+let chdirSupported = true;
+try {
+	const cwd = process.cwd();
+	process.chdir(cwd);
+} catch {
+	chdirSupported = false;
+}
+
 interface MockRunnerOptions {
 	packCode?: number;
 	packCodeByShortName?: Record<string, number>;
@@ -615,21 +627,24 @@ describe('PluginInstallerService', () => {
 			);
 		});
 
-		it('bootstraps .valora/plugins/ in cwd and installs there when no project dir exists', async () => {
-			const { getProjectPluginsDir } = await import('utils/paths');
-			vi.mocked(getProjectPluginsDir).mockReturnValue(null);
+		it.skipIf(!chdirSupported)(
+			'bootstraps .valora/plugins/ in cwd and installs there when no project dir exists',
+			async () => {
+				const { getProjectPluginsDir } = await import('utils/paths');
+				vi.mocked(getProjectPluginsDir).mockReturnValue(null);
 
-			const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'valora-bootstrap-'));
-			const originalCwd = process.cwd();
-			try {
-				process.chdir(projectDir);
-				await new PluginInstallerService(makeMockRunner()).install('rtk', 'project');
-				expect(fs.existsSync(path.join(projectDir, '.valora', 'plugins', 'valora-plugin-rtk'))).toBe(true);
-			} finally {
-				process.chdir(originalCwd);
-				fs.rmSync(projectDir, { recursive: true, force: true });
+				const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'valora-bootstrap-'));
+				const originalCwd = process.cwd();
+				try {
+					process.chdir(projectDir);
+					await new PluginInstallerService(makeMockRunner()).install('rtk', 'project');
+					expect(fs.existsSync(path.join(projectDir, '.valora', 'plugins', 'valora-plugin-rtk'))).toBe(true);
+				} finally {
+					process.chdir(originalCwd);
+					fs.rmSync(projectDir, { recursive: true, force: true });
+				}
 			}
-		});
+		);
 	});
 
 	describe('dependency resolution', () => {
@@ -906,23 +921,26 @@ describe('PluginInstallerService.installFromTarball', () => {
 		expect(stagingDirs).toHaveLength(0);
 	});
 
-	it('bootstraps .valora/plugins/ in cwd when installing from tarball with project scope and no existing project dir', async () => {
-		const { getProjectPluginsDir } = await import('utils/paths');
-		vi.mocked(getProjectPluginsDir).mockReturnValue(null);
+	it.skipIf(!chdirSupported)(
+		'bootstraps .valora/plugins/ in cwd when installing from tarball with project scope and no existing project dir',
+		async () => {
+			const { getProjectPluginsDir } = await import('utils/paths');
+			vi.mocked(getProjectPluginsDir).mockReturnValue(null);
 
-		const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'valora-bootstrap-tgz-'));
-		const tgzPath = makeRealTgz(projectDir, { name: 'valora-plugin-docs', version: '1.0.0' });
-		const originalCwd = process.cwd();
-		try {
-			process.chdir(projectDir);
-			const runner = makeMockRunner({ tgzManifest: { name: 'valora-plugin-docs', version: '1.0.0' } });
-			await new PluginInstallerService(runner).installFromTarball(tgzPath, 'project');
-			expect(fs.existsSync(path.join(projectDir, '.valora', 'plugins', 'valora-plugin-docs'))).toBe(true);
-		} finally {
-			process.chdir(originalCwd);
-			fs.rmSync(projectDir, { recursive: true, force: true });
+			const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'valora-bootstrap-tgz-'));
+			const tgzPath = makeRealTgz(projectDir, { name: 'valora-plugin-docs', version: '1.0.0' });
+			const originalCwd = process.cwd();
+			try {
+				process.chdir(projectDir);
+				const runner = makeMockRunner({ tgzManifest: { name: 'valora-plugin-docs', version: '1.0.0' } });
+				await new PluginInstallerService(runner).installFromTarball(tgzPath, 'project');
+				expect(fs.existsSync(path.join(projectDir, '.valora', 'plugins', 'valora-plugin-docs'))).toBe(true);
+			} finally {
+				process.chdir(originalCwd);
+				fs.rmSync(projectDir, { recursive: true, force: true });
+			}
 		}
-	});
+	);
 
 	it('rejects a tarball whose extracted manifest declares a path-escaping name', async () => {
 		const { getGlobalPluginsDir } = await import('utils/paths');
