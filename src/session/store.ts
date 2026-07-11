@@ -13,6 +13,7 @@ import { decryptSessionData, encryptSessionData } from 'utils/encryption';
 import { SessionError } from 'utils/error-handler';
 import { ensureDir, listFiles, readJSON, writeFile } from 'utils/file-utils';
 import { generateSessionId } from 'utils/id-generator';
+import { InputValidator } from 'utils/input-validator';
 import { getRuntimeDataDir } from 'utils/paths';
 
 import type { SessionCleanupScheduler } from './cleanup-scheduler';
@@ -374,6 +375,7 @@ export class SessionStore {
 	 * Get session file path
 	 */
 	private getSessionPath(sessionId: string): string {
+		InputValidator.validateSessionId(sessionId);
 		return path.join(this.sessionsDir, `${sessionId}.json`);
 	}
 
@@ -381,6 +383,7 @@ export class SessionStore {
 	 * Get snapshot file path
 	 */
 	private getSnapshotPath(sessionId: string): string {
+		InputValidator.validateSessionId(sessionId);
 		return path.join(this.sessionsDir, `${sessionId}.snapshot.json`);
 	}
 

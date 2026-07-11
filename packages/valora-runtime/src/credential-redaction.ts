@@ -38,10 +38,23 @@ export const OUTPUT_CREDENTIAL_PATTERNS: RegExp[] = [
 	/Bearer\s+[a-zA-Z0-9_\-.]{20,}/g,
 	// Generic long secrets (base64-ish with prefix)
 	/(?:token|secret|password|credential)[=:]\s*["']?[a-zA-Z0-9+/=_-]{20,}/gi,
-	// Private key blocks — consumes the whole body and footer, not just the
-	// opening marker line, and covers RSA/EC/DSA/OPENSSH/encrypted variants
-	// (any all-caps qualifier before "PRIVATE KEY"), not just RSA/unqualified.
-	/-----BEGIN\s+[A-Z ]*PRIVATE\s+KEY-----[\s\S]*?-----END\s+[A-Z ]*PRIVATE\s+KEY-----/g,
+	// Private key blocks — consumes the whole body and footer when present
+	// (not just the opening marker line), and covers RSA/EC/DSA/OPENSSH/
+	// encrypted variants (any all-caps qualifier before "PRIVATE KEY"), not
+	// just RSA/unqualified. GREEDY (not lazy): a decoy inner BEGIN/END pair
+	// embedded inside real key material made a lazy match stop at the FIRST
+	// (decoy) footer, leaking the real secret's back half plus the real
+	// footer after it. Greedy finds the LAST footer in the remaining text
+	// instead — worst case this over-redacts the gap between two separate
+	// real key blocks, which is the safe direction (never under-redacts).
+	/-----BEGIN\s+[A-Z ]*PRIVATE\s+KEY-----[\s\S]*-----END\s+[A-Z ]*PRIVATE\s+KEY-----/g,
+	// Truncated key with NO closing footer anywhere (streamed/cut-off tool
+	// output) — a separate pattern, not a `$` alternative folded into the one
+	// above (greedy would always satisfy `$` at the very end regardless of
+	// whether a real footer exists, defeating the point of preferring one).
+	// Only ever matches text the pattern above didn't already redact, since
+	// patterns apply sequentially to the accumulating result string.
+	/-----BEGIN\s+[A-Z ]*PRIVATE\s+KEY-----[\s\S]*$/g,
 	// Connection strings with credentials
 	/(?:mongodb|postgres|mysql|redis):\/\/[^:]+:[^@]+@/gi
 ];

@@ -400,6 +400,29 @@ export class InputValidator {
 	}
 
 	/**
+	 * Validate session ID format — a bare nanoid (no fixed prefix, unlike
+	 * exploration IDs), matching `generateSessionId()`'s `nanoid(12)` output.
+	 * `SessionStore.getSessionPath()` joined this into a filesystem path with
+	 * no validation at all — `sessionId` reaches it as a raw CLI argument via
+	 * `session delete <id>`/`show`/`export`, so an unvalidated `../` sequence
+	 * was a live, traversal-based arbitrary-`.json`-file-delete primitive.
+	 */
+	static validateSessionId(id: string): void {
+		if (!isNonEmptyString(id)) {
+			throw new InputValidationError('Session ID is required', 'id', id);
+		}
+
+		const validPattern = /^[a-zA-Z0-9_-]+$/;
+		if (!validPattern.test(id)) {
+			throw new InputValidationError('Invalid session ID format', 'id', id);
+		}
+
+		if (id.length > 64) {
+			throw new InputValidationError('Session ID too long', 'id', id);
+		}
+	}
+
+	/**
 	 * Validate numeric input
 	 */
 	static validateNumber(value: number, min: number, max: number, name: string): void {

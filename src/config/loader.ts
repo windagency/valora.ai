@@ -3,13 +3,14 @@
  */
 
 import * as path from 'path';
+import { isWorkspaceTrusted } from 'security/workspace-trust.service';
 
 import { getProviderRegistry } from 'llm/registry';
 import { getLogger } from 'output/logger';
 import { ConfigurationError } from 'utils/error-handler';
 import { formatErrorMessage } from 'utils/error-utils';
 import { ensureDir, fileExists, readJSON, writeJSON } from 'utils/file-utils';
-import { getGlobalConfigDir, getPackageDataDir, getProjectConfigDir } from 'utils/paths';
+import { getGlobalConfigDir, getPackageDataDir, getProjectConfigDir, getWorkspaceTrustCheckRoot } from 'utils/paths';
 
 import {
 	DEFAULT_DAILY_FILE_MAX_SIZE_MB,
@@ -143,11 +144,46 @@ export class ConfigLoader {
 			return {};
 		}
 		try {
-			return await readJSON<Partial<Config>>(projectConfigPath);
+			const projectConfig = await readJSON<Partial<Config>>(projectConfigPath);
+			return this.stripUntrustedProviderOverrides(projectConfig);
 		} catch {
 			// Non-fatal: skip invalid project config
 			return {};
 		}
+	}
+
+	/**
+	 * An untrusted project's config.json can override just a provider's
+	 * `baseUrl` (or `defaults.default_provider`) with no trust gate at all —
+	 * silently redirecting the real API key, resolved separately from a
+	 * trusted global config/env var, to an attacker-controlled endpoint on
+	 * the very next LLM call. Strip these two specific fields when the
+	 * project isn't trusted; every other project-config field still applies
+	 * normally. Deletes the keys outright rather than setting them to
+	 * `undefined` — `mergeSingleConfig` spreads `config.defaults` directly
+	 * (`{...result.defaults, ...config.defaults}`), so an explicit
+	 * `default_provider: undefined` would overwrite a legitimate value from
+	 * an earlier (trusted) layer instead of just not contributing one.
+	 */
+	private stripUntrustedProviderOverrides(projectConfig: Partial<Config>): Partial<Config> {
+		const hasProviderOverride = projectConfig.providers !== undefined;
+		const hasDefaultProviderOverride = projectConfig.defaults?.default_provider !== undefined;
+		if (!hasProviderOverride && !hasDefaultProviderOverride) return projectConfig;
+
+		const trustRoot = getWorkspaceTrustCheckRoot();
+		if (isWorkspaceTrusted(trustRoot)) return projectConfig;
+
+		getLogger().warn(
+			'Untrusted project .valora/config.json declares a provider/default_provider override — ignored until the project is trusted (see `valora config trust`)'
+		);
+
+		const stripped: Partial<Config> = { ...projectConfig };
+		delete stripped.providers;
+		if (stripped.defaults) {
+			stripped.defaults = { ...stripped.defaults };
+			delete stripped.defaults.default_provider;
+		}
+		return stripped;
 	}
 
 	/**

@@ -45,6 +45,17 @@ type PersistedBaselines = Record<string, PersistedBaseline>;
 
 const DEFAULT_BASELINE_FILENAME = 'mcp-baselines.json';
 
+/**
+ * `checkIntegrity`'s fingerprints share the same underlying store as
+ * `checkContentIntegrity`'s caller-chosen ids (e.g. `plugin:<name>`,
+ * `mcp-connection:<serverId>`). Since MCP server ids carry no character
+ * restriction, a server literally named e.g. `mcp-connection:foo` would
+ * otherwise collide with the content-integrity entry for a different server
+ * actually named `foo`. Namespacing this side only keeps both key spaces
+ * disjoint regardless of what a caller-chosen id or a server id contains.
+ */
+const TOOL_LIST_KEY_PREFIX = 'tool-list:';
+
 export class ToolIntegrityMonitor {
 	private baselineFilePath: string;
 	private events: SecurityEvent[] = [];
@@ -77,10 +88,11 @@ export class ToolIntegrityMonitor {
 	 */
 	checkIntegrity(serverId: string, currentTools: ExternalMCPTool[]): IntegrityCheckResult {
 		const currentFingerprint = this.computeFingerprint(currentTools);
-		const previousFingerprint = this.fingerprints.get(serverId);
+		const key = `${TOOL_LIST_KEY_PREFIX}${serverId}`;
+		const previousFingerprint = this.fingerprints.get(key);
 
 		if (previousFingerprint === undefined) {
-			this.fingerprints.set(serverId, currentFingerprint);
+			this.fingerprints.set(key, currentFingerprint);
 			this.storeToolSnapshot(serverId, currentTools);
 			this.persistToDisk();
 			return { changed: false, currentFingerprint };
@@ -94,7 +106,7 @@ export class ToolIntegrityMonitor {
 
 		this.logEvent(serverId, previousFingerprint, currentFingerprint, diff);
 
-		this.fingerprints.set(serverId, currentFingerprint);
+		this.fingerprints.set(key, currentFingerprint);
 		this.storeToolSnapshot(serverId, currentTools);
 		this.persistToDisk();
 
@@ -218,14 +230,14 @@ export class ToolIntegrityMonitor {
 				.digest('hex');
 			snapshot.set(tool.name, hash);
 		}
-		this.toolSnapshots.set(serverId, snapshot);
+		this.toolSnapshots.set(`${TOOL_LIST_KEY_PREFIX}${serverId}`, snapshot);
 	}
 
 	/**
 	 * Compute which tools were added, removed, or changed.
 	 */
 	private computeDiff(serverId: string, currentTools: ExternalMCPTool[]): ToolSetDiff {
-		const previousSnapshot = this.toolSnapshots.get(serverId) ?? new Map<string, string>();
+		const previousSnapshot = this.toolSnapshots.get(`${TOOL_LIST_KEY_PREFIX}${serverId}`) ?? new Map<string, string>();
 		const currentSnapshot = new Map<string, string>();
 
 		for (const tool of currentTools) {

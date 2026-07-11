@@ -37,6 +37,46 @@ describe('redactCredentials', () => {
 		expect(result).not.toContain('-----END RSA PRIVATE KEY-----');
 	});
 
+	it('does not let a decoy inner BEGIN/END pair make the match stop before the real secret and real footer', () => {
+		// Lazy [\s\S]*? stops at the FIRST position satisfying the terminator
+		// — a decoy inner BEGIN/END block embedded inside real key material
+		// makes it stop there, leaking everything after: the real secret's
+		// back half plus the real footer. Live-verified before this fix.
+		const withDecoy =
+			'-----BEGIN RSA PRIVATE KEY-----\n' +
+			'-----BEGIN FAKE PRIVATE KEY-----\n' +
+			'-----END FAKE PRIVATE KEY-----\n' +
+			'REALSECRETBACKHALF_SHOULD_THIS_LEAK\n' +
+			'-----END RSA PRIVATE KEY-----';
+		const { redacted, result } = redactCredentials(withDecoy);
+		expect(redacted).toBe(true);
+		expect(result).not.toContain('REALSECRETBACKHALF_SHOULD_THIS_LEAK');
+		expect(result).not.toContain('-----END RSA PRIVATE KEY-----');
+	});
+
+	it('redacts two separate real private-key blocks in one string, each fully', () => {
+		const twoKeys =
+			'-----BEGIN RSA PRIVATE KEY-----\nSECRETONE\n-----END RSA PRIVATE KEY-----\n' +
+			'plain text between\n' +
+			'-----BEGIN EC PRIVATE KEY-----\nSECRETTWO\n-----END EC PRIVATE KEY-----';
+		const { redacted, result } = redactCredentials(twoKeys);
+		expect(redacted).toBe(true);
+		expect(result).not.toContain('SECRETONE');
+		expect(result).not.toContain('SECRETTWO');
+	});
+
+	it('redacts a truncated private-key block with no closing footer (streamed/cut-off tool output)', () => {
+		// Regression guard: requiring a footer to match at all meant a
+		// genuinely truncated key (a real case for streamed/cut-off stderr)
+		// passed through completely unredacted, including the header line the
+		// OLD (pre-body-consumption) pattern would have caught on its own.
+		const truncated = '-----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEA...';
+		const { redacted, result } = redactCredentials(truncated);
+		expect(redacted).toBe(true);
+		expect(result).toContain('[REDACTED]');
+		expect(result).not.toContain('MIIEowIBAAKCAQEA');
+	});
+
 	it('redacts EC/OPENSSH private-key blocks, not just RSA', () => {
 		const pem =
 			'-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQ==\n-----END OPENSSH PRIVATE KEY-----';

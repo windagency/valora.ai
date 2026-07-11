@@ -386,18 +386,19 @@ const ENV_VALUE_FLAGS = new Set(['--chdir', '--split-string', '--unset', '-C', '
 const ENV_ASSIGNMENT_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*=/;
 
 /**
- * True if `envArgs` (env's own args, not including `env` itself) carries a
- * `-C`/`--chdir` flag in any form. `env -C <dir>` changes the *real* working
- * directory the recursively-validated sub-command runs in — every
- * cwd-relative scoping check (`rm`/`cp`/docker mounts) evaluates the
- * sub-command's paths against the guard's own unchanged `process.cwd()`, not
- * the real chdir target, so `env -C /etc rm passwd` looks like an ordinary
- * in-cwd delete but actually deletes `/etc/passwd` at runtime. No downstream
- * check can safely account for a runtime chdir, so this must be blocked
- * outright rather than threaded through every scoping check.
+ * True if `decodedEnvArgs` (env's own args, already `decodeShellWord()`-
+ * decoded, not including `env` itself) carries a `-C`/`--chdir` flag in any
+ * form. `env -C <dir>` changes the *real* working directory the
+ * recursively-validated sub-command runs in — every cwd-relative scoping
+ * check (`rm`/`cp`/docker mounts) evaluates the sub-command's paths against
+ * the guard's own unchanged `process.cwd()`, not the real chdir target, so
+ * `env -C /etc rm passwd` looks like an ordinary in-cwd delete but actually
+ * deletes `/etc/passwd` at runtime. No downstream check can safely account
+ * for a runtime chdir, so this must be blocked outright rather than threaded
+ * through every scoping check.
  */
-function hasEnvChdirFlag(envArgs: string[]): boolean {
-	return envArgs.some((t) => t === '-C' || t === '--chdir' || t.startsWith('--chdir='));
+function hasEnvChdirFlag(decodedEnvArgs: string[]): boolean {
+	return decodedEnvArgs.some((t) => t === '-C' || t === '--chdir' || t.startsWith('--chdir='));
 }
 
 /**
@@ -434,7 +435,9 @@ const DOCKER_DANGEROUS_FLAG_PATTERNS: RegExp[] = [
  * key=value` (immediate, this invocation only) or `git config key value`
  * (persistent, written to the repo/global config for every future
  * invocation). `credential\.\S*helper` also matches URL-scoped keys
- * (`credential.https://x.com.helper`), not just the bare form.
+ * (`credential.https://x.com.helper`), not just the bare form. Checked
+ * against `decodeShellWord()`-decoded tokens, not raw ones — see
+ * `validateGitArgs`'s docstring for why that matters.
  */
 const GIT_DANGEROUS_PATTERNS: RegExp[] = [
 	/\bext::/,
@@ -442,6 +445,28 @@ const GIT_DANGEROUS_PATTERNS: RegExp[] = [
 	/\bcore\.hooksPath\b/i,
 	/\bcredential\.\S*helper\b/i
 ];
+
+/** `gh` subcommands whose second positional (the value) is checked for a `!`-prefixed shell-command alias. */
+const GH_ALIAS_SHELL_PREFIX = '!';
+
+/**
+ * jq/yq's own built-in `env`/`$ENV` filter-language constructs dump every
+ * environment variable's value with no `$VAR` shell-sigil ever appearing in
+ * the command string, so `ENV_ACCESS_PATTERNS`' textual matching never fires
+ * — the same credential-exposure class as bare `env`, reached a different
+ * way. `(?<![.\w])` avoids matching "env" as a substring of a legitimate
+ * field-access filter like `.environment` (word-boundary alone isn't enough
+ * since `\b` before "env" is satisfied right after a literal `.` too).
+ */
+const JQ_ENV_ACCESS_PATTERNS: RegExp[] = [/(?<![.\w])env\b/, /\$ENV\b/];
+
+/** yq's in-place-edit flag, in any of its documented forms. */
+function hasYqInPlaceFlag(decodedTokens: string[]): boolean {
+	return decodedTokens.some(
+		(t) =>
+			t === '-i' || t === '--inplace' || t === '--in-place' || t.startsWith('--inplace=') || t.startsWith('--in-place=')
+	);
+}
 
 /** `docker <group> <subcommand>` prefixes whose long form must resolve to the same subcommand as the top-level shortcut. */
 const DOCKER_COMMAND_GROUP_PREFIXES = new Set(['container', 'image']);
@@ -495,9 +520,20 @@ function matchLongFlagValue(token: string, longFlag: string, nextToken: string |
 	return undefined;
 }
 
-/** Extracts BuildKit `-o`/`--output`'s `dest=<path>` sub-value from its comma-separated key=value spec (e.g. `type=local,dest=/tmp/x`). */
+/**
+ * Extracts BuildKit `-o`/`--output`'s host-path value: either the `dest=`
+ * sub-value from its comma-separated key=value spec (e.g.
+ * `type=local,dest=/tmp/x`), or — if the spec has no `=` at all — the whole
+ * spec itself, since BuildKit also accepts a bare path as an undocumented
+ * shorthand for `type=local,dest=<path>` (live-verified with real
+ * `docker buildx build -o <path> .`). A spec with `=` but no `dest=` key
+ * (e.g. `type=image`, which doesn't write to the host at all) correctly
+ * yields no path.
+ */
 function extractDockerOutputDest(spec: string): string | undefined {
-	return /(?:^|,)dest=([^,]+)/.exec(spec)?.[1];
+	const destMatch = /(?:^|,)dest=([^,]+)/.exec(spec);
+	if (destMatch) return destMatch[1];
+	return spec.includes('=') ? undefined : spec;
 }
 
 /**
@@ -543,6 +579,7 @@ function isUnresolvableArgument(token: string): boolean {
  * forging that grant, the same severity as erasing the audit log.
  */
 const PROTECTED_INFRASTRUCTURE_BASENAMES = new Set([
+	'.mcp-approvals.json',
 	'mcp-baselines.json',
 	'security-audit.jsonl',
 	'trusted-workspaces.json',
@@ -553,14 +590,16 @@ const PROTECTED_INFRASTRUCTURE_BASENAMES = new Set([
  * Absolute expected paths for each protected file, matching exactly how each
  * owning module resolves its own path (`audit-sink.ts`/`tool-integrity-monitor.ts`
  * use `getRuntimeDataDir()`; `workspace-trust.service.ts`/`provenance.ts` use
- * `getGlobalConfigDir()` only). Recomputed on each call rather than cached — a
- * protected file may not exist yet when this module first loads but be
+ * `getGlobalConfigDir()` only; `mcp-approval-cache.service.ts` uses
+ * `getRuntimeDataDir()/cache/`). Recomputed on each call rather than cached —
+ * a protected file may not exist yet when this module first loads but be
  * created later.
  */
 function getProtectedFileAbsolutePaths(): string[] {
 	return [
 		path.join(getRuntimeDataDir(), 'security-audit.jsonl'),
 		path.join(getRuntimeDataDir(), 'mcp-baselines.json'),
+		path.join(getRuntimeDataDir(), 'cache', '.mcp-approvals.json'),
 		path.join(getGlobalConfigDir(), 'trusted-workspaces.json'),
 		path.join(getGlobalConfigDir(), 'vault-signing.key')
 	];
@@ -624,6 +663,14 @@ function hasAwkInPlaceFlag(decodedTokens: string[]): boolean {
 	return decodedTokens.some(
 		(t, i) => (t === '-i' && decodedTokens[i + 1] === 'inplace') || t === '--in-place' || t.startsWith('--in-place=')
 	);
+}
+
+/** Dispatches to the per-command in-place-edit-flag check, if `baseCommand` has one. */
+function hasInPlaceEditFlag(baseCommand: string, decodedTokens: string[]): boolean {
+	if (baseCommand === 'sed') return hasSedInPlaceFlag(decodedTokens);
+	if (baseCommand === 'awk') return hasAwkInPlaceFlag(decodedTokens);
+	if (baseCommand === 'yq') return hasYqInPlaceFlag(decodedTokens);
+	return false;
 }
 
 const ENV_ACCESS_PATTERNS: RegExp[] = [
@@ -771,8 +818,7 @@ export class CommandGuard {
 		if (this.segmentRedirectsToProtectedFile(tokens)) return true;
 
 		const isDestructiveByDefault = PROTECTED_INFRASTRUCTURE_DESTRUCTIVE_COMMANDS.has(baseCommand);
-		const isInPlaceEdit =
-			(baseCommand === 'sed' && hasSedInPlaceFlag(tokens)) || (baseCommand === 'awk' && hasAwkInPlaceFlag(tokens));
+		const isInPlaceEdit = hasInPlaceEditFlag(baseCommand, tokens);
 		if (!isDestructiveByDefault && !isInPlaceEdit) return false;
 
 		return tokens.slice(1).some((t) => this.tokenReferencesProtectedFile(t));
@@ -845,7 +891,18 @@ export class CommandGuard {
 	 * stays allowed since it hands off to a specific, recursively-revalidated
 	 * sub-command.
 	 */
-	private extractEnvSubCommand(args: string[]): string[] {
+	/**
+	 * Decodes `rawArgs` via `decodeShellWord()` before any flag/assignment
+	 * matching — the original version compared raw, undecoded tokens, so a
+	 * quote-split flag (`-"C"`) evaded both this function's own parsing (a
+	 * disguised sub-command name could smuggle a blocked command past
+	 * re-validation) and `hasEnvChdirFlag`'s exact-string check (see
+	 * `validateEnvArgs`). Live-verified: creating a subdirectory literally
+	 * named after an allowlisted command and running `env -"C" <that-dir>
+	 * rm -rf /tmp/target` actually deleted the target directory.
+	 */
+	private extractEnvSubCommand(rawArgs: string[]): string[] {
+		const args = rawArgs.map((t) => decodeShellWord(t));
 		let i = 0;
 		while (i < args.length) {
 			const token = args[i]!;
@@ -873,7 +930,8 @@ export class CommandGuard {
 
 	private validateEnvArgs(tokens: string[]): CommandValidationResult {
 		const rest = tokens.slice(1);
-		if (hasEnvChdirFlag(rest)) {
+		const decodedRest = rest.map((t) => decodeShellWord(t));
+		if (hasEnvChdirFlag(decodedRest)) {
 			return {
 				allowed: false,
 				reason:
@@ -1131,9 +1189,26 @@ export class CommandGuard {
 	 * `-c`/`--config`, or persistent `git config`) set an arbitrary-command
 	 * hook. Live-verified: all four bypasses actually executed the smuggled
 	 * command/deleted the file in this sandbox before this fix.
+	 *
+	 * Tokens are decoded via `decodeShellWord()` before any check — the first
+	 * version of this method compared raw, undecoded tokens, which a
+	 * quote-split flag (`cor"e".hooksPath`, `-"C"`) defeated entirely. This is
+	 * the exact bypass class this file's own `decodeShellWord()` docstring
+	 * says took 3 rounds to close for other commands, reintroduced fresh here
+	 * — live-verified real hook execution and real file deletion through it
+	 * before this fix.
+	 *
+	 * `--git-dir`/`--work-tree` are scoped alongside `-C`: `--git-dir=<path>`
+	 * ALONE (no `--work-tree`) uses the *current* cwd as the implicit
+	 * work-tree while reading from the external repo's object database, so
+	 * `git --git-dir=<outside>/.git checkout -- file.txt` overwrites a file
+	 * IN cwd with content from a completely external repo — the destination
+	 * argument looks perfectly ordinary, so no path-based heuristic on the
+	 * checkout target itself would catch this; only gating `--git-dir`'s own
+	 * value does.
 	 */
 	private validateGitArgs(tokens: string[]): CommandValidationResult {
-		const rest = tokens.slice(1);
+		const rest = tokens.slice(1).map((t) => decodeShellWord(t));
 		const joined = rest.join(' ');
 
 		for (const pattern of GIT_DANGEROUS_PATTERNS) {
@@ -1143,15 +1218,20 @@ export class CommandGuard {
 		}
 
 		for (let i = 0; i < rest.length; i++) {
-			if (rest[i] !== '-C') continue;
-			const target = rest[i + 1];
+			const target = this.extractGitRootFlagTarget(rest[i]!, rest[i + 1]);
 			if (target === undefined) continue;
 			if (isUnresolvableArgument(target) || this.isOutsideWorkingDirectory(target)) {
-				return { allowed: false, reason: `git -C target outside working directory blocked: ${target}` };
+				return { allowed: false, reason: `git ${rest[i]} target outside working directory blocked: ${target}` };
 			}
 		}
 
 		return { allowed: true };
+	}
+
+	/** `-C`/`--git-dir`/`--work-tree` all redirect which repository/working tree git operates against. */
+	private extractGitRootFlagTarget(token: string, nextToken: string | undefined): string | undefined {
+		if (token === '-C') return nextToken;
+		return matchLongFlagValue(token, '--git-dir', nextToken) ?? matchLongFlagValue(token, '--work-tree', nextToken);
 	}
 
 	/** Checks every bind-mount (-v/--mount) and I/O (-i/-o, save/load/export) host path for cwd-escape and protected-file targeting. */
@@ -1336,6 +1416,136 @@ export class CommandGuard {
 	}
 
 	/**
+	 * jq/yq's own `env`/`$ENV` filter-language constructs dump the full
+	 * process environment with no `$VAR` shell-sigil ever appearing in the
+	 * command string — checked against the whole joined argument string,
+	 * mirroring `DOCKER_DANGEROUS_FLAG_PATTERNS`.
+	 */
+	private validateJqYqArgs(tokens: string[]): CommandValidationResult {
+		const joined = tokens
+			.slice(1)
+			.map((t) => decodeShellWord(t))
+			.join(' ');
+		for (const pattern of JQ_ENV_ACCESS_PATTERNS) {
+			if (pattern.test(joined)) {
+				return { allowed: false, reason: `jq/yq environment access blocked: matches pattern ${pattern.source}` };
+			}
+		}
+		return { allowed: true };
+	}
+
+	/**
+	 * `gh` had zero scoping infrastructure at all. `gh alias set <name>
+	 * '!<cmd>'` is documented gh CLI syntax for a shell-command alias
+	 * (live-verified real RCE via `gh alias set pwn '!...'` then `gh pwn`);
+	 * `gh extension install`/`upgrade` installs and runs arbitrary
+	 * third-party code with no sandboxing.
+	 */
+	private validateGhArgs(tokens: string[]): CommandValidationResult {
+		const rest = tokens.slice(1).map((t) => decodeShellWord(t));
+		if (rest[0] === 'alias' && rest[1] === 'set' && rest.slice(2).some((t) => t.startsWith(GH_ALIAS_SHELL_PREFIX))) {
+			return {
+				allowed: false,
+				reason:
+					'gh alias set with a "!"-prefixed shell-command value blocked — creates an arbitrary-command-execution alias'
+			};
+		}
+		if (rest[0] === 'extension' && (rest[1] === 'install' || rest[1] === 'upgrade')) {
+			return {
+				allowed: false,
+				reason: 'gh extension install/upgrade blocked — installs and runs arbitrary third-party code with no sandboxing'
+			};
+		}
+		return { allowed: true };
+	}
+
+	/** `sort`/`tree`'s `-o`/`--output <path>` write to an arbitrary host path — the same class of gap `cp` originally had. */
+	private validateOutputFlagArgs(tokens: string[], baseCommand: string): CommandValidationResult {
+		const rest = tokens.slice(1).map((t) => decodeShellWord(t));
+		for (let i = 0; i < rest.length; i++) {
+			const token = rest[i]!;
+			const target = token === '-o' ? rest[i + 1] : matchLongFlagValue(token, '--output', rest[i + 1]);
+			if (target === undefined) continue;
+			if (isUnresolvableArgument(target) || this.isOutsideWorkingDirectory(target)) {
+				return {
+					allowed: false,
+					reason: `${baseCommand} -o/--output target outside working directory blocked: ${target}`
+				};
+			}
+			if (this.tokenReferencesProtectedFile(target)) {
+				return {
+					allowed: false,
+					reason: `${baseCommand} -o/--output targeting protected security-infrastructure file blocked: ${target}`
+				};
+			}
+		}
+		return { allowed: true };
+	}
+
+	/** GNU `uniq`'s optional second positional (`uniq [OPTION]... [INPUT [OUTPUT]]`) is a bare output-path positional, not a flag. */
+	private validateUniqArgs(tokens: string[]): CommandValidationResult {
+		const positionals = tokens
+			.slice(1)
+			.map((t) => decodeShellWord(t))
+			.filter((t) => !t.startsWith('-'));
+		const output = positionals[1];
+		if (output === undefined) return { allowed: true };
+		if (isUnresolvableArgument(output) || this.isOutsideWorkingDirectory(output)) {
+			return { allowed: false, reason: `uniq output file outside working directory blocked: ${output}` };
+		}
+		if (this.tokenReferencesProtectedFile(output)) {
+			return {
+				allowed: false,
+				reason: `uniq output file targeting protected security-infrastructure file blocked: ${output}`
+			};
+		}
+		return { allowed: true };
+	}
+
+	/**
+	 * `eslint --config`/`-c`, `prettier --plugin`, and `vitest --config` all
+	 * `require()`/execute the pointed-to file as real code on load — an
+	 * outside-cwd path is a direct RCE primitive, live-verified for all three.
+	 */
+	private validateConfigPathArgs(tokens: string[], flagNames: string[]): CommandValidationResult {
+		const rest = tokens.slice(1).map((t) => decodeShellWord(t));
+		for (let i = 0; i < rest.length; i++) {
+			const token = rest[i]!;
+			let target: string | undefined;
+			for (const flag of flagNames) {
+				target = token === flag ? rest[i + 1] : matchLongFlagValue(token, flag, rest[i + 1]);
+				if (target !== undefined) break;
+			}
+			if (target === undefined) continue;
+			if (isUnresolvableArgument(target) || this.isOutsideWorkingDirectory(target)) {
+				return { allowed: false, reason: `Config/plugin path outside working directory blocked: ${target}` };
+			}
+		}
+		return { allowed: true };
+	}
+
+	/**
+	 * pytest auto-imports `conftest.py` from any directory it's pointed at —
+	 * zero flags needed, cheaper than the already-accepted "pytest runs your
+	 * own project's code" boundary. Every non-flag positional is scoped like
+	 * `cp`'s blanket check (a NodeID's `::test_name` suffix is stripped
+	 * first), plus `--rootdir`, which takes the same kind of directory path.
+	 */
+	private validatePytestArgs(tokens: string[]): CommandValidationResult {
+		const rest = tokens.slice(1).map((t) => decodeShellWord(t));
+		for (let i = 0; i < rest.length; i++) {
+			const token = rest[i]!;
+			const rootdirTarget = token === '--rootdir' ? rest[i + 1] : matchLongFlagValue(token, '--rootdir', rest[i + 1]);
+			const pathPart = rootdirTarget ?? (token.startsWith('-') ? undefined : token.split('::')[0]);
+			if (pathPart === undefined) continue;
+			if (isUnresolvableArgument(pathPart) || this.isOutsideWorkingDirectory(pathPart)) {
+				return { allowed: false, reason: `pytest target outside working directory blocked: ${token}` };
+			}
+		}
+		return { allowed: true };
+	}
+
+	/**
 	 * Cheap, name-only checks on the base command: homoglyph obfuscation,
 	 * network commands, remote-access commands. Split out of `validateSegment`
 	 * to keep its own cyclomatic complexity down.
@@ -1424,12 +1634,24 @@ export class CommandGuard {
 
 	/** Dispatches to the per-command path/flag scoping check, if this base command has one. */
 	private checkScopedPathCommand(baseCommand: string, tokens: string[]): CommandValidationResult {
-		if (baseCommand === 'docker') return this.validateDockerArgs(tokens);
-		if (baseCommand === 'git') return this.validateGitArgs(tokens);
-		if (baseCommand === 'rm') return this.validateRmArgs(tokens);
-		if (baseCommand === 'cp') return this.validateCpArgs(tokens);
-		if (baseCommand === 'env') return this.validateEnvArgs(tokens);
-		return { allowed: true };
+		const scopedCheck: Record<string, () => CommandValidationResult> = {
+			cp: () => this.validateCpArgs(tokens),
+			docker: () => this.validateDockerArgs(tokens),
+			env: () => this.validateEnvArgs(tokens),
+			eslint: () => this.validateConfigPathArgs(tokens, ['-c', '--config']),
+			gh: () => this.validateGhArgs(tokens),
+			git: () => this.validateGitArgs(tokens),
+			jq: () => this.validateJqYqArgs(tokens),
+			prettier: () => this.validateConfigPathArgs(tokens, ['--config', '--plugin']),
+			pytest: () => this.validatePytestArgs(tokens),
+			rm: () => this.validateRmArgs(tokens),
+			sort: () => this.validateOutputFlagArgs(tokens, baseCommand),
+			tree: () => this.validateOutputFlagArgs(tokens, baseCommand),
+			uniq: () => this.validateUniqArgs(tokens),
+			vitest: () => this.validateConfigPathArgs(tokens, ['-c', '--config']),
+			yq: () => this.validateJqYqArgs(tokens)
+		};
+		return scopedCheck[baseCommand]?.() ?? { allowed: true };
 	}
 }
 
