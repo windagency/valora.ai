@@ -729,6 +729,17 @@ function isPrivateOrLoopbackIpv6(host: string): boolean {
 		return isPrivateOrLoopbackIpv4((highBits >>> 8) & 0xff, highBits & 0xff);
 	}
 
+	// RFC 6052 NAT64/SIIT well-known prefix (64:ff9b::/96) embeds an IPv4
+	// address in its low 32 bits — the identical embedding technique as the
+	// ::ffff: IPv4-mapped form above, just a different prefix. Node
+	// normalises this to hex-group form too, so the same first-hex-group
+	// extraction applies.
+	const nat64Match = /^64:ff9b::([0-9a-f]{1,4}):[0-9a-f]{1,4}$/.exec(host);
+	if (nat64Match) {
+		const highBits = parseInt(nat64Match[1]!, 16);
+		return isPrivateOrLoopbackIpv4((highBits >>> 8) & 0xff, highBits & 0xff);
+	}
+
 	// Belt-and-suspenders for a dotted-decimal form, in case some other
 	// caller ever passes one directly rather than through URL.hostname.
 	const dottedMappedMatch = /^::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/.exec(host);

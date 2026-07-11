@@ -1,6 +1,7 @@
 import type {
 	DeterministicValidationResult,
 	DeterministicValidator,
+	ExecutedToolCall,
 	ValidatorContext
 } from 'executor/validators/types';
 
@@ -17,6 +18,22 @@ function extractOperations(output: Record<string, unknown>): string[] {
 	return ops.filter((op): op is string => typeof op === 'string');
 }
 
+/**
+ * Re-derives the real git-shaped commands actually executed via
+ * `run_terminal_cmd` during this stage — independent of what the stage's own
+ * `operations`/`commands` output claims. A compromised or hallucinating
+ * stage can force `passed: true` simply by omitting a dangerous operation
+ * from its self-report while still executing it via a real tool call; this
+ * ground-truth cross-check closes that specific spoof.
+ */
+function extractExecutedGitCommands(executedToolCalls: ExecutedToolCall[] | undefined): string[] {
+	if (!executedToolCalls) return [];
+	return executedToolCalls
+		.filter((call) => call.name === 'run_terminal_cmd')
+		.map((call) => call.arguments['command'])
+		.filter((command): command is string => typeof command === 'string');
+}
+
 function isDangerous(op: string): boolean {
 	return DANGEROUS_PATTERNS.some((pattern) => pattern.test(op));
 }
@@ -24,13 +41,15 @@ function isDangerous(op: string): boolean {
 export const gitOperationsValidator: DeterministicValidator = {
 	name: 'git-operations',
 
-	validate(output: Record<string, unknown>, _context: ValidatorContext): DeterministicValidationResult {
-		const operations = extractOperations(output);
+	validate(output: Record<string, unknown>, context: ValidatorContext): DeterministicValidationResult {
+		const operations = [...extractOperations(output), ...extractExecutedGitCommands(context.executedToolCalls)];
 		if (operations.length === 0) {
 			return { passed: true, shouldStopPipeline: false, violations: [] };
 		}
 
-		const violations = operations.filter(isDangerous).map((op) => `Dangerous git operation blocked: ${op}`);
+		const violations = [...new Set(operations.filter(isDangerous))].map(
+			(op) => `Dangerous git operation blocked: ${op}`
+		);
 
 		if (violations.length === 0) {
 			return { passed: true, shouldStopPipeline: false, violations: [] };

@@ -96,6 +96,20 @@ describe('SessionBudgetService', () => {
 			const unbounded = new SessionBudgetService(tracker as never, undefined);
 			expect(unbounded.wouldExceed('session-abc', { estimatedCostUsd: 999 })).toBe(false);
 		});
+
+		it('returns true when a single estimate exceeds per_command_usd, even with zero prior session spend', () => {
+			// per_command_usd is a documented, user-configurable per-call cap —
+			// it must trip on its own, independent of per_session_usd/cumulative
+			// spend, otherwise a user who set it believes each call is capped
+			// when nothing actually enforces it.
+			tracker.getRecords.mockReturnValue([]);
+			expect(service.wouldExceed('session-abc', { estimatedCostUsd: 0.6 })).toBe(true);
+		});
+
+		it('returns false when a single estimate is within per_command_usd', () => {
+			tracker.getRecords.mockReturnValue([]);
+			expect(service.wouldExceed('session-abc', { estimatedCostUsd: 0.3 })).toBe(false);
+		});
 	});
 
 	describe('buildBudgetEscalationSignal', () => {

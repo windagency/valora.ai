@@ -37,6 +37,37 @@ import { EXTERNAL_MCP_SERVER_CONFIG_SCHEMA } from './mcp-server-config.schema';
 const DEFAULT_REGISTRY_PATH = join(getPackageDataDir(), 'external-mcp.default.json');
 
 /**
+ * Minimal-safe-default set of inherited environment variables every spawned
+ * stdio MCP server receives regardless of its own declared `connection.env`.
+ * Previously the full `process.env` was copied wholesale — every credential
+ * the valora process holds (ANTHROPIC_API_KEY, etc.) reached every connected
+ * server even when it never declared needing it. A server that genuinely
+ * needs something beyond PATH/HOME must declare it explicitly in its own
+ * `connection.env`, matching the least-privilege precedent already applied
+ * throughout this codebase's other trust boundaries.
+ */
+const MCP_SERVER_ENV_ALLOWLIST = new Set(['HOME', 'PATH']);
+
+/**
+ * Builds the environment a spawned stdio MCP server receives: only the
+ * allowlisted inherited variables, overlaid with whatever the server's own
+ * config explicitly declares (a declared value wins over the allowlisted
+ * default for the same key).
+ */
+export function buildStdioServerEnv(
+	processEnv: NodeJS.ProcessEnv,
+	declaredEnv: Record<string, string> | undefined
+): Record<string, string> {
+	const env: Record<string, string> = {};
+	for (const key of MCP_SERVER_ENV_ALLOWLIST) {
+		const value = processEnv[key];
+		if (value !== undefined) env[key] = value;
+	}
+	if (declaredEnv) Object.assign(env, declaredEnv);
+	return env;
+}
+
+/**
  * Validate each candidate registry entry against the MCP server config
  * schema, skipping (and logging) any that fail — a malformed or malicious
  * entry must not reach `connect()` with an unchecked `command`/`url`/`env`.
@@ -448,16 +479,7 @@ export class MCPClientManagerService {
 			throw new Error('Command is required for stdio connection');
 		}
 
-		// Build environment, filtering out undefined values
-		const env: Record<string, string> = {};
-		for (const [key, value] of Object.entries(process.env)) {
-			if (value !== undefined) {
-				env[key] = value;
-			}
-		}
-		if (config.connection.env) {
-			Object.assign(env, config.connection.env);
-		}
+		const env = buildStdioServerEnv(process.env, config.connection.env);
 
 		const transport = new StdioClientTransport({
 			args: config.connection.args,

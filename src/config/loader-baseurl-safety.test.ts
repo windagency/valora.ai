@@ -95,6 +95,17 @@ describe('ConfigLoader — provider baseUrl scheme/host safety', () => {
 		expect(config.providers['xai']?.baseUrl).toBeUndefined();
 	});
 
+	it('strips a NAT64/SIIT well-known-prefix (RFC 6052) baseUrl embedding a metadata-endpoint address', async () => {
+		// 64:ff9b::/96 embeds an IPv4 address in its low 32 bits, the same
+		// technique as the ::ffff: IPv4-mapped form above, just a different
+		// well-known prefix — Node normalizes it to hex-group form here too.
+		writeProjectConfig({ providers: { xai: { baseUrl: 'http://[64:ff9b::169.254.169.254]/latest/meta-data' } } });
+
+		const config = await makeLoader().load();
+
+		expect(config.providers['xai']?.baseUrl).toBeUndefined();
+	});
+
 	it('strips a private-network (RFC1918) baseUrl for a non-local provider', async () => {
 		writeProjectConfig({ providers: { moonshot: { baseUrl: 'https://10.0.0.5/v1' } } });
 

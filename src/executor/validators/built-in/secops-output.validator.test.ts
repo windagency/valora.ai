@@ -1,8 +1,13 @@
 import { describe, it, expect } from 'vitest';
 
+import type { ExecutedToolCall } from 'executor/validators/types';
 import { secopOutputValidator } from './secops-output.validator';
 
 const CTX = { stageName: 'secops.analyze-codebase' };
+
+const ONE_REAL_TOOL_CALL: ExecutedToolCall[] = [{ arguments: { path: 'src/auth.ts' }, name: 'read_file' }];
+
+const CTX_WITH_INVESTIGATION = { ...CTX, executedToolCalls: ONE_REAL_TOOL_CALL };
 
 describe('secopOutputValidator', () => {
 	it('passes when no findings are present', () => {
@@ -46,10 +51,22 @@ describe('secopOutputValidator', () => {
 		expect(result.violations).toHaveLength(2);
 	});
 
-	it('passes when critical findings are all marked acknowledged', () => {
+	it('passes when critical findings are all marked acknowledged and at least one real tool call backs the investigation', () => {
 		const output = {
 			findings: [{ severity: 'critical', description: 'Known issue', acknowledged: true }]
 		};
-		expect(secopOutputValidator.validate(output, CTX).passed).toBe(true);
+		expect(secopOutputValidator.validate(output, CTX_WITH_INVESTIGATION).passed).toBe(true);
+	});
+
+	it('fails when a critical finding is marked acknowledged but the stage made zero real tool calls — self-reported acknowledgement alone is not enough', () => {
+		// "acknowledged: true" is set by the same stage reporting the finding —
+		// a compromised or hallucinating stage can mark every finding
+		// acknowledged with no real investigation backing it at all.
+		const output = {
+			findings: [{ severity: 'critical', description: 'Known issue', acknowledged: true }]
+		};
+		const result = secopOutputValidator.validate(output, CTX);
+		expect(result.passed).toBe(false);
+		expect(result.shouldStopPipeline).toBe(true);
 	});
 });

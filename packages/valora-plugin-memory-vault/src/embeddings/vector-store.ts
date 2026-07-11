@@ -181,13 +181,14 @@ function initializeState(dir: string, model: string, dim: number): VectorStoreSt
 		}
 	}
 
-	const offsets = loadOffsets(indexPath);
 	const buffer = loadBuffer(binPath);
+	const bytesPerVector = dim * Float32Array.BYTES_PER_ELEMENT;
+	const offsets = loadOffsets(indexPath, bytesPerVector, buffer.length);
 
 	return {
 		binPath,
 		buffer,
-		bytesPerVector: dim * Float32Array.BYTES_PER_ELEMENT,
+		bytesPerVector,
 		dim,
 		dir,
 		indexPath,
@@ -206,11 +207,23 @@ function loadBuffer(binPath: string): Buffer {
 	}
 }
 
-function loadOffsets(indexPath: string): Map<string, number> {
+/**
+ * A hand-crafted or corrupted `embeddings.index.json` can carry an offset
+ * that doesn't fit inside `embeddings.bin` (too large, negative, or
+ * non-integer) — reading it previously reached `Buffer.subarray` unchecked,
+ * producing a zero-length slice that then crashed `new Float32Array(...,
+ * dim)` with an uncaught `RangeError`, propagating through
+ * `semanticRecall` with no try/catch anywhere in the call chain. Dropping an
+ * invalid entry here — same "corrupt entry degrades gracefully" precedent as
+ * `sanitiseVaultMeta` — means that one bad entry loses recall for its own id,
+ * not the whole query.
+ */
+function loadOffsets(indexPath: string, bytesPerVector: number, bufferLength: number): Map<string, number> {
 	const offsets = new Map<string, number>();
 	try {
 		const raw = JSON.parse(readFileSync(indexPath, 'utf-8')) as VectorIndex;
 		for (const [id, offset] of Object.entries(raw.entries)) {
+			if (!Number.isInteger(offset) || offset < 0 || offset + bytesPerVector > bufferLength) continue;
 			offsets.set(id, offset);
 		}
 	} catch {

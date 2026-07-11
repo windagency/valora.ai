@@ -44,11 +44,12 @@ import { formatErrorMessage } from 'utils/error-utils';
 import { readFile } from 'utils/file-utils';
 import { getMetricsCollector } from 'utils/metrics-collector';
 import { getSpendingTracker } from 'utils/spending-tracker';
-import { getModelPricing } from 'utils/token-estimator';
+import { estimateTokens, getModelPricing } from 'utils/token-estimator';
 
 import type { AgentLoader } from './agent-loader';
 import type { ExecutionContext } from './execution-context';
 import type { PromptLoader } from './prompt-loader';
+import type { ExecutedToolCall } from './validators/types';
 
 import { type EscalationDetectionService, getEscalationDetectionService } from './escalation-detection.service';
 import { type EscalationHandlerService, getEscalationHandlerService } from './escalation-handler.service';
@@ -101,6 +102,45 @@ export function resolveModelOverride(
 /** Returns true when every tool result in an iteration was a dedup hit, indicating the LLM is spinning with no new information. */
 export function isToolLoopSpinning(batchDedupHits: number, toolCallCount: number): boolean {
 	return toolCallCount > 0 && batchDedupHits === toolCallCount;
+}
+
+/**
+ * Safely unwraps the real, independently-observed tool-call list a stage's
+ * result metadata carries (`metadata.executionQuality.executedToolCalls`,
+ * populated by `extractExecutionSummary`) — `StageOutput.metadata` is an
+ * untyped `Record<string, unknown>`, so this validates the shape at the
+ * boundary rather than trusting a bare cast. Returns an empty array (no
+ * ground-truth evidence available) for any shape that doesn't match, e.g. a
+ * completion path that never ran the tool loop at all.
+ */
+export function extractExecutedToolCallsFromMetadata(
+	metadata: Record<string, unknown> | undefined
+): ExecutedToolCall[] {
+	const executionQuality = metadata?.['executionQuality'];
+	if (typeof executionQuality !== 'object' || executionQuality === null) return [];
+	const calls = (executionQuality as Record<string, unknown>)['executedToolCalls'];
+	if (!Array.isArray(calls)) return [];
+	return calls.filter(
+		(call): call is ExecutedToolCall =>
+			typeof call === 'object' &&
+			call !== null &&
+			typeof (call as Record<string, unknown>)['name'] === 'string' &&
+			typeof (call as Record<string, unknown>)['arguments'] === 'object'
+	);
+}
+
+/**
+ * Predicts the cost of the imminent LLM call from the already-built prompt
+ * text, before the call is made — the budget circuit-breaker must estimate
+ * what's about to be spent, not just compare already-recorded spend against
+ * the limit (that only ever detects a budget already blown by prior stages).
+ */
+export function estimateStageCallCostUsd(systemMessage: string, userMessage: string, model: string): number {
+	const messages: LLMMessage[] = [
+		{ content: systemMessage, role: 'system' },
+		{ content: userMessage, role: 'user' }
+	];
+	return estimateTokens(messages, model).estimatedCost.amount;
 }
 
 const TOOL_BLOCKED_PREFIX = 'Tool call blocked by hook:';
@@ -239,6 +279,8 @@ interface CompletionHandlerContext {
  * stage output metadata so downstream consumers can detect degraded results.
  */
 interface ExecutionSummary {
+	/** Every tool call actually executed during the stage's tool loop — independently observed, not self-reported by the LLM. Fed to Track-Two DeterministicValidators as ground truth. */
+	executedToolCalls: ExecutedToolCall[];
 	/** Number of tool result messages that contained an error */
 	toolFailureCount: number;
 	/** Number of failures from mutating tools (write, search_replace, delete_file) */
@@ -493,8 +535,10 @@ export class StageExecutor {
 			return result;
 		}
 
-		// Validate the outputs
-		const validation = this.validationService.validate(stageName, result.outputs);
+		// Validate the outputs against real, independently-observed tool-call
+		// history, not just the stage's own self-reported output fields.
+		const executedToolCalls = extractExecutedToolCallsFromMetadata(result.metadata);
+		const validation = this.validationService.validate(stageName, result.outputs, executedToolCalls);
 
 		if (!validation.isValid) {
 			logger.warn(`Stage validation failed: ${stageName}`, {
@@ -588,7 +632,16 @@ export class StageExecutor {
 		this.toolExecutionService.setEffectiveConstraints(executionContext.effectiveConstraints);
 
 		// Budget circuit-breaker — halt before LLM call if session budget is exhausted
-		const budgetBreach = this.checkBudgetIfSessionPresent(executionContext, stage, startTime, enrichedInputs, logger);
+		const budgetBreach = this.checkBudgetIfSessionPresent(
+			executionContext,
+			stage,
+			startTime,
+			enrichedInputs,
+			systemMessage,
+			userMessage,
+			this.resolveBudgetCheckModel(config, executionContext),
+			logger
+		);
 		if (budgetBreach) return budgetBreach;
 
 		// Emit LLM request event
@@ -662,6 +715,14 @@ export class StageExecutor {
 		throw new Error('Stage execution exceeded retry bound without producing a final result');
 	}
 
+	/** Resolves the model name used to estimate the imminent call's cost for the budget circuit-breaker. */
+	private resolveBudgetCheckModel(
+		config: { modelOverride: string | undefined },
+		executionContext: ExecutionContext
+	): string {
+		return config.modelOverride ?? executionContext.model ?? 'default';
+	}
+
 	/**
 	 * Budget circuit-breaker — only checks when a session is present (no session means
 	 * nothing to check against, e.g. a one-off command with no persisted spending history).
@@ -671,11 +732,22 @@ export class StageExecutor {
 		stage: PipelineStage,
 		startTime: number,
 		enrichedInputs: Record<string, unknown>,
+		systemMessage: string,
+		userMessage: string,
+		model: string,
 		logger: ReturnType<typeof getLogger>
 	): null | StageOutput {
 		const sessionId = executionContext.sessionInfo?.sessionId;
 		if (!sessionId) return null;
-		return this.checkBudget(sessionId, `${stage.stage}.${stage.prompt}`, startTime, enrichedInputs, logger);
+		const estimatedCostUsd = estimateStageCallCostUsd(systemMessage, userMessage, model);
+		return this.checkBudget(
+			sessionId,
+			`${stage.stage}.${stage.prompt}`,
+			startTime,
+			enrichedInputs,
+			estimatedCostUsd,
+			logger
+		);
 	}
 
 	/**
@@ -1088,6 +1160,7 @@ export class StageExecutor {
 				return {
 					completion: patchedCompletion,
 					summary: {
+						executedToolCalls: [],
 						fatalFailureCount: 0,
 						recoverableFailureCount: 0,
 						toolFailureCount: 0,
@@ -1472,12 +1545,14 @@ export class StageExecutor {
 		let fatalFailureCount = 0;
 		let recoverableFailureCount = 0;
 		const verifiedModifiedFiles: string[] = [];
+		const executedToolCalls: ExecutedToolCall[] = [];
 
 		for (const msg of messages) {
 			if (msg.role === 'assistant' && msg.tool_calls) {
 				this.registerMutatingToolCalls(msg.tool_calls, mutatingTools, pendingFiles);
 				for (const tc of msg.tool_calls) {
 					toolCallNames.set(tc.id, tc.name);
+					executedToolCalls.push({ arguments: tc.arguments, name: tc.name });
 				}
 			} else if (msg.role === 'tool') {
 				const result = this.processToolResult(msg, pendingFiles, verifiedModifiedFiles, toolCallNames);
@@ -1487,7 +1562,7 @@ export class StageExecutor {
 			}
 		}
 
-		return { fatalFailureCount, recoverableFailureCount, toolFailureCount, verifiedModifiedFiles };
+		return { executedToolCalls, fatalFailureCount, recoverableFailureCount, toolFailureCount, verifiedModifiedFiles };
 	}
 
 	/**
@@ -1553,7 +1628,7 @@ export class StageExecutor {
 		totalIterations?: number
 	): Promise<{ completion: LLMCompletionResult; summary: ExecutionSummary }> {
 		const stageId = `${stage.stage}.${stage.prompt}`;
-		const { fatalFailureCount, recoverableFailureCount, toolFailureCount, verifiedModifiedFiles } =
+		const { executedToolCalls, fatalFailureCount, recoverableFailureCount, toolFailureCount, verifiedModifiedFiles } =
 			this.extractExecutionSummary(messages);
 		const lastToolsInvoked = this.extractLastToolsInvoked(messages);
 		const messageDepth = messages.length;
@@ -1581,6 +1656,7 @@ export class StageExecutor {
 		});
 
 		const summary: ExecutionSummary = {
+			executedToolCalls,
 			fatalFailureCount,
 			recoverableFailureCount,
 			toolFailureCount,
@@ -1834,6 +1910,7 @@ Summarize ALL changes you made during tool execution. Output ONLY the JSON code 
 				metadata: {
 					executionQuality: {
 						degraded: true,
+						executedToolCalls: executionSummary.executedToolCalls,
 						fatalFailureCount: executionSummary.fatalFailureCount,
 						hardStopped: true,
 						recoverableFailureCount: executionSummary.recoverableFailureCount,
@@ -1882,6 +1959,7 @@ Summarize ALL changes you made during tool execution. Output ONLY the JSON code 
 				...(executionSummary !== undefined && {
 					executionQuality: {
 						degraded: isDegraded,
+						executedToolCalls: executionSummary.executedToolCalls,
 						toolFailureCount: executionSummary.toolFailureCount,
 						toolIterations: executionSummary.totalToolIterations,
 						verifiedModifiedFiles: executionSummary.verifiedModifiedFiles,
@@ -1984,13 +2062,14 @@ Summarize ALL changes you made during tool execution. Output ONLY the JSON code 
 		stageName: string,
 		startTime: number,
 		resolvedInputs: Record<string, unknown>,
+		estimatedCostUsd: number,
 		logger: ReturnType<typeof getLogger>
 	): null | StageOutput {
 		const { totalCostUsd } = this.sessionBudgetService.getSessionTotal(sessionId);
 		const budgetConfig = getConfigLoader().get().budgets;
 		const limit = budgetConfig?.per_session_usd;
 
-		if (!this.sessionBudgetService.wouldExceed(sessionId, { estimatedCostUsd: 0 })) return null;
+		if (!this.sessionBudgetService.wouldExceed(sessionId, { estimatedCostUsd })) return null;
 
 		logger.warn('Session budget exceeded — halting before LLM call', { sessionId, stageName, totalCostUsd });
 

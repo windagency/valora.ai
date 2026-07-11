@@ -652,12 +652,15 @@ function sharesInodeWithProtectedFile(candidatePath: string): boolean {
 
 /**
  * Commands whose default behaviour targeting a file argument is destructive
- * (delete, overwrite, or replace-and-remove) — the same tamper primitive as
- * `rm`, just via a tool that doesn't read as file deletion at a glance.
- * `sed`/`awk` are checked separately since they're only destructive to their
- * target when an in-place-edit flag is present.
+ * (delete, overwrite, replace-and-remove) or otherwise defeats the protected
+ * file's normal lifecycle (`mkdir` pre-empting a not-yet-created protected
+ * file's name with a directory, permanently blocking its real creation — an
+ * availability primitive, not a tamper-existing-content one, but the same
+ * "protect this name" property applies). `sed`/`awk` are checked separately
+ * since they're only destructive to their target when an in-place-edit flag
+ * is present.
  */
-const PROTECTED_INFRASTRUCTURE_DESTRUCTIVE_COMMANDS = new Set(['cp', 'gunzip', 'gzip', 'mv', 'rm', 'touch']);
+const PROTECTED_INFRASTRUCTURE_DESTRUCTIVE_COMMANDS = new Set(['cp', 'gunzip', 'gzip', 'mkdir', 'mv', 'rm', 'touch']);
 
 /** Does `sed`'s token list carry an in-place-edit flag, in any position (`-i`, `-i.bak`, `--in-place[=...]`)? */
 /**
@@ -984,24 +987,33 @@ export class CommandGuard {
 	 * benign-looking first one (e.g. `find . -exec true \; -exec curl ... \;`).
 	 * This scans the whole argument list and returns every clause found.
 	 */
+	/**
+	 * Decodes `args` via `decodeShellWord()` before matching against
+	 * `FIND_EXEC_FLAGS` — the flag token itself can be quote-split
+	 * (`-'exec'`) exactly like any other argument in this file, and an
+	 * undecoded comparison never recognises it as `-exec` at all, so the
+	 * embedded sub-command is never extracted for re-validation and the whole
+	 * clause sails through unchecked.
+	 */
 	private extractFindExecSubCommand(args: string[]): string[] {
+		const decodedArgs = args.map((t) => decodeShellWord(t));
 		const subCommands: string[] = [];
 		let i = 0;
 
-		while (i < args.length) {
-			if (!FIND_EXEC_FLAGS.has(args[i]!)) {
+		while (i < decodedArgs.length) {
+			if (!FIND_EXEC_FLAGS.has(decodedArgs[i]!)) {
 				i += 1;
 				continue;
 			}
 
-			const rest = args.slice(i + 1);
+			const rest = decodedArgs.slice(i + 1);
 			const terminatorIndex = rest.findIndex((arg) => isFindExecTerminator(arg));
 			const subArgs = terminatorIndex === -1 ? rest : rest.slice(0, terminatorIndex);
 			if (subArgs.length > 0) subCommands.push(subArgs.join(' '));
 
 			// No terminator means the rest of the command is consumed by this
 			// clause with no clear boundary — stop scanning for further clauses.
-			i = terminatorIndex === -1 ? args.length : i + 1 + terminatorIndex + 1;
+			i = terminatorIndex === -1 ? decodedArgs.length : i + 1 + terminatorIndex + 1;
 		}
 
 		return subCommands;
@@ -1045,10 +1057,20 @@ export class CommandGuard {
 		return found;
 	}
 
+	/**
+	 * Decodes `args` via `decodeShellWord()` before matching against
+	 * `XARGS_VALUE_FLAGS` — an undecoded quote-split value flag (`-'L'`)
+	 * fails the exact-string match and falls through to the boolean-flag
+	 * branch, misaligning the index and treating the flag's own value as the
+	 * start of the sub-command. This fails closed (over-blocks a legitimate
+	 * invocation) rather than opening a bypass, but is fixed for consistency
+	 * with every other tokenizer in this file.
+	 */
 	private extractXargsSubCommand(args: string[]): string[] {
+		const decodedArgs = args.map((t) => decodeShellWord(t));
 		let i = 0;
-		while (i < args.length) {
-			const token = args[i]!;
+		while (i < decodedArgs.length) {
+			const token = decodedArgs[i]!;
 			if (XARGS_VALUE_FLAGS.has(token)) {
 				i += 2;
 				continue;
@@ -1059,7 +1081,7 @@ export class CommandGuard {
 			}
 			break;
 		}
-		const subArgs = args.slice(i);
+		const subArgs = decodedArgs.slice(i);
 		return subArgs.length > 0 ? [subArgs.join(' ')] : [];
 	}
 
@@ -1505,8 +1527,15 @@ export class CommandGuard {
 	 * so one check safely covers both package managers.
 	 */
 	private extractNpmPnpmRootFlagTarget(token: string, nextToken: string | undefined): string | undefined {
-		if (token === '-C') return nextToken;
-		return matchLongFlagValue(token, '--prefix', nextToken) ?? matchLongFlagValue(token, '--dir', nextToken);
+		// pnpm also accepts the attached `-C=<path>` form, chdir-ing identically
+		// to the separate-token `-C <path>` form — `matchLongFlagValue` already
+		// handles an exact-token-or-`=`-attached match generically, so it's
+		// reused here even though `-C` is a short, not long, flag name.
+		return (
+			matchLongFlagValue(token, '-C', nextToken) ??
+			matchLongFlagValue(token, '--prefix', nextToken) ??
+			matchLongFlagValue(token, '--dir', nextToken)
+		);
 	}
 
 	private validateNpmPnpmArgs(tokens: string[]): CommandValidationResult {
@@ -1709,14 +1738,25 @@ export class CommandGuard {
 		const baseCommandSafety = this.checkBaseCommandSafety(baseCommand, command);
 		if (!baseCommandSafety.allowed) return baseCommandSafety;
 
+		// EVAL_PATTERNS/SCRIPT_INJECTION_PATTERNS must match against decoded
+		// tokens, not the raw command string — a quote-split or
+		// quote-concatenated flag (`node -'e'`, `--e'val'=`) still reaches the
+		// program as the real flag once a shell decodes it, but a pattern
+		// tested against the raw text never sees it. Re-joining decoded tokens
+		// with a single space is imprecise for anything that depended on the
+		// original spacing, but every EVAL_PATTERNS/SCRIPT_INJECTION_PATTERNS
+		// entry only ever matches on token boundaries (`\s+`), never spacing
+		// within a token, so this is safe for this check specifically.
+		const decodedCommand = tokens.map((t) => decodeShellWord(t)).join(' ');
+
 		for (const pattern of EVAL_PATTERNS) {
-			if (pattern.test(command)) {
+			if (pattern.test(decodedCommand)) {
 				return this.block(command, `Arbitrary code execution blocked: matches pattern ${pattern.source}`);
 			}
 		}
 
 		for (const { baseCommand: scriptCommand, pattern } of SCRIPT_INJECTION_PATTERNS) {
-			if (baseCommand === scriptCommand && pattern.test(command)) {
+			if (baseCommand === scriptCommand && pattern.test(decodedCommand)) {
 				return this.block(
 					command,
 					`Script-execution primitive blocked in '${baseCommand}': matches pattern ${pattern.source}`

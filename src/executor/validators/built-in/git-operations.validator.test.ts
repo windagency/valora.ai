@@ -54,4 +54,47 @@ describe('gitOperationsValidator', () => {
 		const output = { commands: ['git push --force origin main'] };
 		expect(gitOperationsValidator.validate(output, CTX).passed).toBe(false);
 	});
+
+	describe('ground-truth cross-check against real tool-call history', () => {
+		it('fails when the LLM omits a dangerous operation from its self-reported operations array but actually executed it via a real run_terminal_cmd tool call', () => {
+			// The self-report claims nothing dangerous happened — a compromised
+			// or hallucinating stage can force `passed: true` at will by simply
+			// not mentioning the operation it ran. Ground truth (the real
+			// executed tool call) must be checked independently of what the
+			// stage claims about itself.
+			const output = { operations: ['git add .', 'git commit -m "fix"'] };
+			const context = {
+				...CTX,
+				executedToolCalls: [{ arguments: { command: 'git push --force origin main' }, name: 'run_terminal_cmd' }]
+			};
+			const result = gitOperationsValidator.validate(output, context);
+			expect(result.passed).toBe(false);
+			expect(result.shouldStopPipeline).toBe(true);
+		});
+
+		it('still passes when both the self-report and the real executed commands are safe', () => {
+			const output = { operations: ['git add .'] };
+			const context = {
+				...CTX,
+				executedToolCalls: [{ arguments: { command: 'git commit -m "fix"' }, name: 'run_terminal_cmd' }]
+			};
+			expect(gitOperationsValidator.validate(output, context).passed).toBe(true);
+		});
+
+		it('ignores non-git-shaped real tool calls (no false positive from ordinary terminal commands)', () => {
+			const context = {
+				...CTX,
+				executedToolCalls: [{ arguments: { command: 'ls -la' }, name: 'run_terminal_cmd' }]
+			};
+			expect(gitOperationsValidator.validate({}, context).passed).toBe(true);
+		});
+
+		it('ignores tool calls that are not run_terminal_cmd (e.g. read_file) even if their arguments happen to contain dangerous-looking text', () => {
+			const context = {
+				...CTX,
+				executedToolCalls: [{ arguments: { path: 'notes about git reset --hard' }, name: 'read_file' }]
+			};
+			expect(gitOperationsValidator.validate({}, context).passed).toBe(true);
+		});
+	});
 });
