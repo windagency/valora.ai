@@ -126,6 +126,33 @@ describe.skipIf(!chdirSupported)('ConfigLoader — provider baseUrl scheme/host 
 		expect(config.providers['moonshot']?.baseUrl).toBeUndefined();
 	});
 
+	it('strips a CGNAT (RFC 6598, 100.64.0.0/10) baseUrl — shared ISP-internal address space, not publicly routable', async () => {
+		writeProjectConfig({ providers: { xai: { baseUrl: 'http://100.64.0.1/v1' } } });
+
+		const config = await makeLoader().load();
+
+		expect(config.providers['xai']?.baseUrl).toBeUndefined();
+	});
+
+	it('does not strip a public address merely because its first octet is 100 but falls outside the CGNAT second-octet range', async () => {
+		writeProjectConfig({ providers: { xai: { baseUrl: 'https://100.200.0.1/v1' } } });
+
+		const config = await makeLoader().load();
+
+		expect(config.providers['xai']?.baseUrl).toBe('https://100.200.0.1/v1');
+	});
+
+	it("strips a loopback baseUrl given in decimal, octal, or short-dotted-quad form — Node's URL parser normalizes all of these to standard dotted-decimal before this check ever runs", async () => {
+		// e.g. http://2130706433/ (decimal), http://0177.0.0.1/ (octal), http://127.1/
+		// (short form) all normalize to 127.0.0.1 via URL.hostname — verified directly
+		// against Node's URL implementation, not assumed.
+		writeProjectConfig({ providers: { xai: { baseUrl: 'http://2130706433/v1' } } });
+
+		const config = await makeLoader().load();
+
+		expect(config.providers['xai']?.baseUrl).toBeUndefined();
+	});
+
 	it('strips a file:// scheme baseUrl for any provider', async () => {
 		writeProjectConfig({ providers: { xai: { baseUrl: 'file:///etc/passwd' } } });
 

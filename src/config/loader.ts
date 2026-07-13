@@ -709,6 +709,7 @@ function isPrivateOrLoopbackIpv4(first: number, second: number): boolean {
 	if (first === 172) return second >= 16 && second <= 31;
 	if (first === 192) return second === 168;
 	if (first === 169) return second === 254; // link-local, incl. cloud metadata
+	if (first === 100) return second >= 64 && second <= 127; // RFC 6598 CGNAT, 100.64.0.0/10
 	return false;
 }
 

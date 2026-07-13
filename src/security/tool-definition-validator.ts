@@ -119,10 +119,11 @@ export class ToolDefinitionValidator {
 			sanitized.description = sanitized.description.slice(0, MAX_DESCRIPTION_LENGTH) + '…';
 		}
 
-		// Validate schema
+		// Validate and sanitise schema
 		const schemaIssues = this.validateSchema(tool.inputSchema);
 		if (schemaIssues.length > 0) {
 			issues.push(...schemaIssues);
+			sanitized.inputSchema = this.sanitizeSchema(tool.inputSchema);
 		}
 
 		if (issues.length > 0) {
@@ -250,6 +251,36 @@ export class ToolDefinitionValidator {
 
 		const logger = getLogger();
 		logger.warn(`[Security] Suspicious tool definition: ${tool.name}`, { issues, serverId: tool.serverId });
+	}
+
+	/**
+	 * Return a copy of the schema with any suspicious-named parameter (and its
+	 * entry in "required", if present) removed — mirrors sanitizeDescription's
+	 * strip-on-flag behaviour, so a caller that only reads `result.tool` (not
+	 * `result.issues`/`result.valid`) still gets a schema with the flagged
+	 * credential-extraction parameter actually removed, not just logged.
+	 */
+	private sanitizeSchema(schema: Record<string, unknown>): Record<string, unknown> {
+		const properties = schema['properties'];
+		if (!properties || typeof properties !== 'object') return schema;
+
+		const sanitizedProperties: Record<string, unknown> = {};
+		for (const [name, propSchema] of Object.entries(properties as Record<string, unknown>)) {
+			if (SUSPICIOUS_PARAM_NAMES.has(name.toLowerCase())) continue;
+			sanitizedProperties[name] =
+				typeof propSchema === 'object' && propSchema !== null
+					? this.sanitizeSchema(propSchema as Record<string, unknown>)
+					: propSchema;
+		}
+
+		const sanitized: Record<string, unknown> = { ...schema, properties: sanitizedProperties };
+		if (Array.isArray(schema['required'])) {
+			sanitized['required'] = (schema['required'] as unknown[]).filter(
+				(name) => !(typeof name === 'string' && SUSPICIOUS_PARAM_NAMES.has(name.toLowerCase()))
+			);
+		}
+
+		return sanitized;
 	}
 }
 

@@ -1,4 +1,8 @@
+import * as path from 'node:path';
+
 import type { AgentConstraints } from 'types/agent.types';
+
+import { resolveRealPathBestEffort } from 'utils/real-path';
 
 export interface EffectivePermissions {
 	delegationDepth: number;
@@ -32,10 +36,20 @@ export class PermissionPropagationService {
 
 	/**
 	 * Returns true if the given file path falls under any forbidden path prefix.
+	 *
+	 * Both sides are resolved to their real (symlink-free, `..`-collapsed) form
+	 * before comparing — a lexical-only comparison can be defeated by an
+	 * unnormalized ".." segment, or by a mismatch between a caller's
+	 * already-symlink-resolved path and a `forbidden_paths` entry configured
+	 * using an unresolved symlink pointing at the same real location.
 	 */
 	isForbidden(filePath: string, forbiddenPaths: string[]): boolean {
 		if (forbiddenPaths.length === 0) return false;
-		return forbiddenPaths.some((forbidden) => filePath === forbidden || filePath.startsWith(forbidden + '/'));
+		const resolvedFilePath = resolveRealPathBestEffort(filePath);
+		return forbiddenPaths.some((forbidden) => {
+			const resolvedForbidden = resolveRealPathBestEffort(forbidden);
+			return resolvedFilePath === resolvedForbidden || resolvedFilePath.startsWith(resolvedForbidden + path.sep);
+		});
 	}
 
 	/**
