@@ -1,7 +1,5 @@
 import type * as ValoraMemoryVaultModule from '@windagency/valora-plugin-memory-vault';
 
-import { createContainer, initializePlugins } from 'di/container';
-import { getProviderRegistry } from 'llm/registry';
 import { getMemoryRegistry } from 'memory/registry';
 import { createSecurityEvent } from 'security/security-event.types';
 
@@ -14,6 +12,8 @@ import {
 	DEFAULT_MEMORY_EMBED_MODEL
 } from 'config/constants';
 import { getConfigLoader } from 'config/loader';
+import { createContainer, initializePlugins } from 'di/container';
+import { getProviderRegistry } from 'llm/registry';
 import { getColorAdapter } from 'output/color-adapter.interface';
 
 export interface MemoryCommandDirs {

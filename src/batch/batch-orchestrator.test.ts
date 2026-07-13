@@ -217,15 +217,13 @@ describe('BatchOrchestrator', () => {
 			vi.useFakeTimers();
 			try {
 				const provider = makeMockProvider({
-					getBatchStatus: vi
-						.fn()
-						.mockResolvedValue({
-							batchId: 'batch_test',
-							completedCount: 0,
-							failedCount: 0,
-							status: 'processing',
-							totalCount: 1
-						})
+					getBatchStatus: vi.fn().mockResolvedValue({
+						batchId: 'batch_test',
+						completedCount: 0,
+						failedCount: 0,
+						status: 'processing',
+						totalCount: 1
+					})
 				});
 				const orchestrator = new BatchOrchestrator();
 				const submission = await orchestrator.submit([makeRequest()], provider);
