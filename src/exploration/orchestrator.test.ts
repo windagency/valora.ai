@@ -77,7 +77,7 @@ vi.mock('./exploration-events', () => ({ getExplorationEvents: () => mockEmitter
 
 import type { Exploration, ExplorationConfig } from 'types/exploration.types';
 
-import { ExplorationOrchestrator } from './orchestrator';
+import { cleanupExploration, ExplorationOrchestrator, startExploration, stopExploration } from './orchestrator';
 
 function makeConfig(overrides: Partial<ExplorationConfig> = {}): ExplorationConfig {
 	return {
@@ -210,6 +210,24 @@ describe('ExplorationOrchestrator', () => {
 				.find((e: Exploration) => e.session_id === 'sess-1');
 			expect(savedWithSession).toBeDefined();
 		});
+
+		it('assembles a complete ExecutionContext and passes it to the strategy factory', async () => {
+			const orchestrator = new ExplorationOrchestrator();
+
+			await orchestrator.startExploration({ config: makeConfig(), task: 'do the thing' });
+
+			expect(mockCreateExecutionStrategy).toHaveBeenCalledWith(
+				'parallel',
+				expect.objectContaining({
+					containerManager: mockContainerManager,
+					exploration: expect.objectContaining({ id: 'exp-1' }),
+					resourceAllocator: mockResourceAllocator,
+					sharedVolumeManager: mockSharedVolumeManager,
+					stateManager: mockStateManager,
+					worktreeManager: mockWorktreeManager
+				})
+			);
+		});
 	});
 
 	describe('stopExploration', () => {
@@ -293,6 +311,111 @@ describe('ExplorationOrchestrator', () => {
 		});
 	});
 
+	describe('createWorktrees (via startExploration)', () => {
+		it('suffixes each worktree branch with its configured strategy instead of a bare index', async () => {
+			const configWithStrategies = makeConfig({ strategies: ['mvp-first', 'risk-first'] } as never);
+			mockStateManager.createExploration.mockResolvedValue(makeExploration({ config: configWithStrategies }));
+			const orchestrator = new ExplorationOrchestrator();
+
+			await orchestrator.startExploration({
+				config: configWithStrategies,
+				task: 'do the thing'
+			});
+
+			const [worktreeOptions] = mockWorktreeManager.createMultipleWorktrees.mock.calls[0] as [
+				Array<{ branch: string }>
+			];
+			expect(worktreeOptions[0]?.branch).toBe('exploration/exp-1-mvp-first');
+			expect(worktreeOptions[1]?.branch).toBe('exploration/exp-1-risk-first');
+		});
+
+		it('falls back to a bare numeric suffix when no strategies are configured', async () => {
+			const orchestrator = new ExplorationOrchestrator();
+
+			await orchestrator.startExploration({ config: makeConfig(), task: 'do the thing' });
+
+			const [worktreeOptions] = mockWorktreeManager.createMultipleWorktrees.mock.calls[0] as [
+				Array<{ branch: string }>
+			];
+			expect(worktreeOptions[0]?.branch).toBe('exploration/exp-1-1');
+			expect(worktreeOptions[1]?.branch).toBe('exploration/exp-1-2');
+		});
+	});
+
+	describe('cleanupContainers (via stopExploration)', () => {
+		it('stops and removes containers for worktrees that have a container_id', async () => {
+			mockStateManager.loadExploration.mockResolvedValue(
+				makeExploration({
+					status: 'running',
+					worktrees: [
+						{
+							branch_name: 'exploration/exp-1-1',
+							container_id: 'container-abc',
+							index: 1,
+							progress: {
+								current_stage: '',
+								errors: [],
+								insights_published: 0,
+								last_update: 't',
+								percentage: 0,
+								stages_completed: []
+							},
+							status: 'running',
+							worktree_path: '/wt-1'
+						}
+					]
+				})
+			);
+			const orchestrator = new ExplorationOrchestrator();
+
+			await orchestrator.stopExploration('exp-1');
+
+			expect(mockContainerManager.stopMultipleContainers).toHaveBeenCalledWith(['exploration-exp-1-worktree-1'], 30);
+			expect(mockContainerManager.removeMultipleContainers).toHaveBeenCalledWith(
+				['exploration-exp-1-worktree-1'],
+				true
+			);
+		});
+
+		it('swallows a container stop/remove failure without throwing', async () => {
+			mockContainerManager.stopMultipleContainers.mockRejectedValueOnce(new Error('docker daemon unreachable'));
+			mockStateManager.loadExploration.mockResolvedValue(
+				makeExploration({
+					status: 'running',
+					worktrees: [
+						{
+							branch_name: 'exploration/exp-1-1',
+							container_id: 'container-abc',
+							index: 1,
+							progress: {
+								current_stage: '',
+								errors: [],
+								insights_published: 0,
+								last_update: 't',
+								percentage: 0,
+								stages_completed: []
+							},
+							status: 'running',
+							worktree_path: '/wt-1'
+						}
+					]
+				})
+			);
+			const orchestrator = new ExplorationOrchestrator();
+
+			await expect(orchestrator.stopExploration('exp-1')).resolves.toBeUndefined();
+		});
+
+		it('does not attempt to stop/remove containers when no worktree has a container_id', async () => {
+			mockStateManager.loadExploration.mockResolvedValue(makeExploration({ status: 'running' }));
+			const orchestrator = new ExplorationOrchestrator();
+
+			await orchestrator.stopExploration('exp-1');
+
+			expect(mockContainerManager.stopMultipleContainers).not.toHaveBeenCalled();
+		});
+	});
+
 	describe('cleanup', () => {
 		it('releases resources, removes worktrees, and deletes exploration state', async () => {
 			const exploration = makeExploration({
@@ -341,5 +464,84 @@ describe('ExplorationOrchestrator', () => {
 
 			expect(mockStateManager.deleteExploration).toHaveBeenCalledWith('exp-1');
 		});
+
+		it('continues cleaning up remaining worktrees when an earlier one fails to remove', async () => {
+			mockWorktreeManager.removeWorktree.mockRejectedValueOnce(new Error('worktree locked'));
+			const makeWorktree = (index: number): Exploration['worktrees'][number] => ({
+				branch_name: `exploration/exp-1-${index}`,
+				index,
+				progress: {
+					current_stage: '',
+					errors: [],
+					insights_published: 0,
+					last_update: 't',
+					percentage: 0,
+					stages_completed: []
+				},
+				status: 'completed',
+				worktree_path: `/wt-${index}`
+			});
+			const exploration = makeExploration({ worktrees: [makeWorktree(1), makeWorktree(2)] });
+			const orchestrator = new ExplorationOrchestrator();
+
+			await orchestrator.cleanup(exploration);
+
+			expect(mockWorktreeManager.removeWorktree).toHaveBeenCalledWith('/wt-1', false);
+			expect(mockWorktreeManager.removeWorktree).toHaveBeenCalledWith('/wt-2', false);
+			expect(mockWorktreeManager.deleteBranch).toHaveBeenCalledWith('exploration/exp-1-2', false);
+			expect(mockStateManager.deleteExploration).toHaveBeenCalledWith('exp-1');
+		});
+	});
+});
+
+describe('module-level convenience functions', () => {
+	beforeEach(() => {
+		mockSafetyValidator.validate.mockResolvedValue({ errors: [], passed: true, warnings: [] });
+		mockStateManager.createExploration.mockResolvedValue(makeExploration());
+		mockWorktreeManager.createMultipleWorktrees.mockResolvedValue([
+			{ branch: 'exploration/exp-1-1', commit: 'abc', path: '/wt-1', prunable: false },
+			{ branch: 'exploration/exp-1-2', commit: 'def', path: '/wt-2', prunable: false }
+		]);
+		mockResourceAllocator.allocate.mockReturnValue({ cpu_limit: '1', memory_limit: '1g', port: 3000 });
+		mockSharedVolumeManager.initialize.mockResolvedValue({ root_path: '/shared' });
+		mockCreateExecutionStrategy.mockReturnValue({
+			execute: vi.fn().mockResolvedValue({
+				completed_branches: 1,
+				duration_ms: 100,
+				exploration_id: 'exp-1',
+				mode: 'parallel',
+				results: { decisions_made: 0, insights_collected: 0 },
+				success: true,
+				total_branches: 2,
+				winner_index: 1
+			})
+		});
+	});
+
+	afterEach(() => {
+		vi.clearAllMocks();
+	});
+
+	it('startExploration constructs an orchestrator and starts a new exploration', async () => {
+		const result = await startExploration('do the thing', makeConfig());
+
+		expect(result.success).toBe(true);
+		expect(result.exploration_id).toBe('exp-1');
+	});
+
+	it('stopExploration constructs an orchestrator and stops the named exploration', async () => {
+		mockStateManager.loadExploration.mockResolvedValue(makeExploration({ status: 'running' }));
+
+		await stopExploration('exp-1');
+
+		expect(mockEmitter.emitExplorationStopped).toHaveBeenCalled();
+	});
+
+	it('cleanupExploration loads the exploration status, then cleans it up', async () => {
+		mockStateManager.loadExploration.mockResolvedValue(makeExploration({ worktrees: [] }));
+
+		await cleanupExploration('exp-1', true);
+
+		expect(mockStateManager.deleteExploration).toHaveBeenCalledWith('exp-1');
 	});
 });

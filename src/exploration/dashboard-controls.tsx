@@ -21,24 +21,24 @@ const { Box, Text } = tui;
 
 const logger = getLogger();
 
-interface ControlsProps {
-	exploration: Exploration;
-	onExit: () => void;
-	onExplorationUpdate: (exploration: Exploration) => void;
-}
-
-interface ControlState {
+export interface ControlState {
 	isPaused: boolean;
 	message?: string;
 	messageType?: 'error' | 'info' | 'success';
 }
 
-interface KeyHandlers {
+export interface KeyHandlers {
 	killExploration: () => Promise<void>;
 	onExit: () => void;
 	pauseExploration: () => Promise<void>;
 	resumeExploration: () => Promise<void>;
 	stopExploration: () => Promise<void>;
+}
+
+interface ControlsProps {
+	exploration: Exploration;
+	onExit: () => void;
+	onExplorationUpdate: (exploration: Exploration) => void;
 }
 
 /**
@@ -201,7 +201,12 @@ function useExplorationControls(
 /**
  * Handle keyboard input for dashboard controls
  */
-function handleKeyboardInput(input: string, key: { ctrl?: boolean }, state: ControlState, handlers: KeyHandlers): void {
+export function handleKeyboardInput(
+	input: string,
+	key: { ctrl?: boolean },
+	state: ControlState,
+	handlers: KeyHandlers
+): void {
 	if (input === 'q' || (key.ctrl === true && input === 'c')) {
 		handlers.onExit();
 		return;

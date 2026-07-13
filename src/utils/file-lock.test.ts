@@ -91,6 +91,25 @@ describe('FileLockManager', () => {
 			expect(lock.lock_id).not.toBe('stale-lock-id');
 		});
 
+		it('allows exactly one winner when many concurrent attempts race for the same lock', async () => {
+			// Fires all attempts together (no sequential awaiting) so this
+			// actually exercises the atomic-create race, not just two calls that
+			// happen to run one after the other — a broken, non-atomic
+			// (existsSync-then-writeFileSync) reimplementation would let more
+			// than one attempt observe "no lock yet" and both "succeed".
+			const attemptCount = 20;
+			const attempts = Array.from({ length: attemptCount }, (_, i) =>
+				manager.acquireLock(filePath, `worktree-${i}`, { retries: 0 })
+			);
+
+			const results = await Promise.allSettled(attempts);
+
+			const fulfilled = results.filter((r) => r.status === 'fulfilled');
+			const rejected = results.filter((r) => r.status === 'rejected');
+			expect(fulfilled).toHaveLength(1);
+			expect(rejected).toHaveLength(attemptCount - 1);
+		});
+
 		it('reclaims a lock that expires while the second acquirer is retrying', async () => {
 			await manager.acquireLock(filePath, 'worktree-a', { timeout_ms: 50 });
 

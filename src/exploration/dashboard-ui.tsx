@@ -153,6 +153,21 @@ const InsightsFeed: React.FC<{ insights: Insight[]; maxItems?: number }> = ({ in
 };
 
 /**
+ * Average worktree progress across the expected branch count, floored to a
+ * whole percentage. Falls back to 0 rather than `NaN` (0 worktrees) or
+ * `Infinity` (branches is 0 but worktree progress is non-zero — a
+ * data-inconsistency edge case rather than a normal 0/0 division).
+ */
+export function calculateOverallProgress(worktrees: WorktreeExploration[], branches: number): number {
+	if (branches === 0) {
+		return 0;
+	}
+
+	const totalPercentage = worktrees.reduce((sum, wt) => sum + wt.progress.percentage, 0);
+	return Math.floor(totalPercentage / branches);
+}
+
+/**
  * Main dashboard component
  */
 
@@ -326,9 +341,7 @@ export const ExplorationDashboard: React.FC<DashboardProps> = ({ explorationId, 
 					? 'red'
 					: 'yellow';
 
-	const overallProgress = Math.floor(
-		exploration.worktrees.reduce((sum, wt) => sum + wt.progress.percentage, 0) / exploration.branches || 0
-	);
+	const overallProgress = calculateOverallProgress(exploration.worktrees, exploration.branches);
 
 	return (
 		<Box flexDirection="column" padding={1}>

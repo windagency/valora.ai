@@ -110,9 +110,14 @@ function generateSparklines(sampledData: number[], height: number, width: number
 }
 
 /**
- * Calculate min, max, and range for data normalization
+ * Calculate min, max, and range for data normalization.
+ *
+ * `max`/`min` always include 1/0 respectively as candidates, and `range`
+ * falls back to 1 — both guard against a zero-width range (which would
+ * otherwise divide-by-zero when normalising chart heights), even for
+ * degenerate input like an all-zero or single-value data series.
  */
-function calculateDataRange(data: number[]): { max: number; min: number; range: number } {
+export function calculateDataRange(data: number[]): { max: number; min: number; range: number } {
 	const max = Math.max(...data, 1);
 	const min = Math.min(...data, 0);
 	const range = max - min || 1;
@@ -224,12 +229,20 @@ export const ContainerMetricsPanel: React.FC<{
  * Exploration summary statistics
  */
 
-export const ExplorationStats: React.FC<{
-	decisionsCount: number;
-	duration?: number;
-	insightsCount: number;
-	worktrees: WorktreeExploration[];
-}> = ({ decisionsCount, duration, insightsCount, worktrees }) => {
+/**
+ * Aggregate per-worktree counters into the summary figures the stats panel
+ * displays. `avgProgress` falls back to 0 (rather than NaN from a 0/0
+ * division) when `worktrees` is empty.
+ */
+export function computeExplorationStats(worktrees: WorktreeExploration[]): {
+	avgProgress: number;
+	completed: number;
+	failed: number;
+	pending: number;
+	running: number;
+	totalErrors: number;
+	totalInsightsPublished: number;
+} {
 	const completed = worktrees.filter((wt) => wt.status === 'completed').length;
 	const running = worktrees.filter((wt) => wt.status === 'running').length;
 	const failed = worktrees.filter((wt) => wt.status === 'failed').length;
@@ -239,6 +252,18 @@ export const ExplorationStats: React.FC<{
 	const totalInsightsPublished = worktrees.reduce((sum, wt) => sum + wt.progress.insights_published, 0);
 
 	const avgProgress = worktrees.reduce((sum, wt) => sum + wt.progress.percentage, 0) / worktrees.length || 0;
+
+	return { avgProgress, completed, failed, pending, running, totalErrors, totalInsightsPublished };
+}
+
+export const ExplorationStats: React.FC<{
+	decisionsCount: number;
+	duration?: number;
+	insightsCount: number;
+	worktrees: WorktreeExploration[];
+}> = ({ decisionsCount, duration, insightsCount, worktrees }) => {
+	const { avgProgress, completed, failed, pending, running, totalErrors, totalInsightsPublished } =
+		computeExplorationStats(worktrees);
 
 	return (
 		<Box borderColor="green" borderStyle="round" flexDirection="column" padding={1}>
