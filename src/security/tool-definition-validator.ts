@@ -258,63 +258,124 @@ export class ToolDefinitionValidator {
 		const suspicious: string[] = [];
 		const sanitized: Record<string, unknown> = { ...schema };
 
-		// Named-parameter containers: `properties` entries are real invocation
-		// parameters (checked against SUSPICIOUS_PARAM_NAMES and stripped);
-		// `definitions`/`$defs` are reusable type definitions (recursed into for
-		// nested suspicious properties, but the definition's own name is not a
-		// parameter name so it is never itself flagged/stripped).
+		const containers = this.processNamedContainers(schema, path);
+		suspicious.push(...containers.suspicious);
+		Object.assign(sanitized, containers.sanitized);
+
+		const required = schema['required'];
+		if (Array.isArray(required)) {
+			sanitized['required'] = this.sanitizeRequired(required);
+		}
+
+		const items = this.processItems(schema['items'], path);
+		if (items) {
+			suspicious.push(...items.suspicious);
+			sanitized['items'] = items.sanitized;
+		}
+
+		const combinators = this.processCombinators(schema, path);
+		suspicious.push(...combinators.suspicious);
+		Object.assign(sanitized, combinators.sanitized);
+
+		return { sanitized, suspicious };
+	}
+
+	/**
+	 * Named-parameter containers: `properties` entries are real invocation
+	 * parameters (checked against SUSPICIOUS_PARAM_NAMES and stripped);
+	 * `definitions`/`$defs` are reusable type definitions (recursed into for
+	 * nested suspicious properties, but the definition's own name is not a
+	 * parameter name so it is never itself flagged/stripped).
+	 */
+	private processDictEntries(
+		dict: Record<string, unknown>,
+		isParams: boolean,
+		path: string
+	): { sanitized: Record<string, unknown>; suspicious: string[] } {
+		const suspicious: string[] = [];
+		const sanitizedDict: Record<string, unknown> = {};
+
+		for (const [name, subSchema] of Object.entries(dict)) {
+			const fullPath = path ? `${path}.${name}` : name;
+			if (isParams && SUSPICIOUS_PARAM_NAMES.has(name.toLowerCase())) {
+				suspicious.push(fullPath);
+				continue;
+			}
+			if (typeof subSchema === 'object' && subSchema !== null) {
+				const child = this.processSchema(subSchema as Record<string, unknown>, fullPath);
+				suspicious.push(...child.suspicious);
+				sanitizedDict[name] = child.sanitized;
+			} else {
+				sanitizedDict[name] = subSchema;
+			}
+		}
+
+		return { sanitized: sanitizedDict, suspicious };
+	}
+
+	private processNamedContainers(
+		schema: Record<string, unknown>,
+		path: string
+	): { sanitized: Record<string, unknown>; suspicious: string[] } {
+		const suspicious: string[] = [];
+		const sanitized: Record<string, unknown> = {};
+
 		for (const dictKey of ['properties', 'definitions', '$defs'] as const) {
 			const dict = schema[dictKey];
 			if (!dict || typeof dict !== 'object' || Array.isArray(dict)) continue;
 
-			const isParams = dictKey === 'properties';
-			const sanitizedDict: Record<string, unknown> = {};
-			for (const [name, subSchema] of Object.entries(dict as Record<string, unknown>)) {
-				const fullPath = path ? `${path}.${name}` : name;
-				if (isParams && SUSPICIOUS_PARAM_NAMES.has(name.toLowerCase())) {
-					suspicious.push(fullPath);
-					continue;
-				}
-				if (typeof subSchema === 'object' && subSchema !== null) {
-					const child = this.processSchema(subSchema as Record<string, unknown>, fullPath);
-					suspicious.push(...child.suspicious);
-					sanitizedDict[name] = child.sanitized;
-				} else {
-					sanitizedDict[name] = subSchema;
-				}
-			}
-			sanitized[dictKey] = sanitizedDict;
+			const entries = this.processDictEntries(dict as Record<string, unknown>, dictKey === 'properties', path);
+			suspicious.push(...entries.suspicious);
+			sanitized[dictKey] = entries.sanitized;
 		}
 
-		if (Array.isArray(schema['required'])) {
-			sanitized['required'] = (schema['required'] as unknown[]).filter(
-				(name) => !(typeof name === 'string' && SUSPICIOUS_PARAM_NAMES.has(name.toLowerCase()))
-			);
-		}
+		return { sanitized, suspicious };
+	}
 
-		// `items`: either a single schema (list validation) or an array of
-		// per-position schemas (tuple validation).
-		const items = schema['items'];
+	private sanitizeRequired(required: unknown[]): unknown[] {
+		return required.filter((name) => !(typeof name === 'string' && SUSPICIOUS_PARAM_NAMES.has(name.toLowerCase())));
+	}
+
+	/**
+	 * `items`: either a single schema (list validation) or an array of
+	 * per-position schemas (tuple validation).
+	 */
+	private processItems(items: unknown, path: string): null | { sanitized: unknown; suspicious: string[] } {
 		if (Array.isArray(items)) {
-			sanitized['items'] = items.map((sub, index) => {
+			const suspicious: string[] = [];
+			const sanitized = items.map((sub: unknown, index) => {
 				if (typeof sub !== 'object' || sub === null) return sub;
 				const child = this.processSchema(sub as Record<string, unknown>, `${path}[${index}]`);
 				suspicious.push(...child.suspicious);
 				return child.sanitized;
 			});
-		} else if (items && typeof items === 'object') {
-			const child = this.processSchema(items as Record<string, unknown>, `${path}[]`);
-			suspicious.push(...child.suspicious);
-			sanitized['items'] = child.sanitized;
+			return { sanitized, suspicious };
 		}
 
-		// `anyOf`/`oneOf`/`allOf`: arrays of alternative or combined schemas —
-		// a suspicious parameter under any of them is just as reachable by the
-		// caller as one under `properties` directly.
+		if (items && typeof items === 'object') {
+			const child = this.processSchema(items as Record<string, unknown>, `${path}[]`);
+			return { sanitized: child.sanitized, suspicious: child.suspicious };
+		}
+
+		return null;
+	}
+
+	/**
+	 * `anyOf`/`oneOf`/`allOf`: arrays of alternative or combined schemas —
+	 * a suspicious parameter under any of them is just as reachable by the
+	 * caller as one under `properties` directly.
+	 */
+	private processCombinators(
+		schema: Record<string, unknown>,
+		path: string
+	): { sanitized: Record<string, unknown>; suspicious: string[] } {
+		const suspicious: string[] = [];
+		const sanitized: Record<string, unknown> = {};
+
 		for (const key of ['anyOf', 'oneOf', 'allOf'] as const) {
 			const alternatives = schema[key];
 			if (!Array.isArray(alternatives)) continue;
-			sanitized[key] = alternatives.map((sub) => {
+			sanitized[key] = alternatives.map((sub: unknown) => {
 				if (typeof sub !== 'object' || sub === null) return sub;
 				const child = this.processSchema(sub as Record<string, unknown>, path);
 				suspicious.push(...child.suspicious);
