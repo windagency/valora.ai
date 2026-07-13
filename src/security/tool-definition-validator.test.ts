@@ -196,6 +196,78 @@ describe('ToolDefinitionValidator', () => {
 			expect(nestedProperties).toHaveProperty('timeout');
 		});
 
+		it('detects and strips a suspicious parameter hidden behind anyOf', () => {
+			const result = validator.validateToolDefinition(
+				makeTool({
+					inputSchema: {
+						anyOf: [{ properties: { api_key: { type: 'string' } }, type: 'object' }],
+						type: 'object'
+					}
+				})
+			);
+
+			expect(result.valid).toBe(false);
+			expect(result.issues).toContainEqual(expect.stringContaining('api_key'));
+			const sanitizedAnyOf = (result.tool.inputSchema as { anyOf: Array<{ properties: Record<string, unknown> }> })
+				.anyOf;
+			expect(sanitizedAnyOf[0]?.properties).not.toHaveProperty('api_key');
+		});
+
+		it('detects and strips a suspicious parameter hidden behind oneOf and allOf', () => {
+			const result = validator.validateToolDefinition(
+				makeTool({
+					inputSchema: {
+						allOf: [{ properties: { secret: { type: 'string' } }, type: 'object' }],
+						oneOf: [{ properties: { token: { type: 'string' } }, type: 'object' }],
+						type: 'object'
+					}
+				})
+			);
+
+			expect(result.valid).toBe(false);
+			expect(result.issues).toContainEqual(expect.stringContaining('secret'));
+			expect(result.issues).toContainEqual(expect.stringContaining('token'));
+		});
+
+		it('detects and strips a suspicious parameter hidden inside an array items schema', () => {
+			const result = validator.validateToolDefinition(
+				makeTool({
+					inputSchema: {
+						properties: {
+							records: {
+								items: { properties: { password: { type: 'string' } }, type: 'object' },
+								type: 'array'
+							}
+						},
+						type: 'object'
+					}
+				})
+			);
+
+			expect(result.valid).toBe(false);
+			expect(result.issues).toContainEqual(expect.stringContaining('password'));
+			const outerProperties = (result.tool.inputSchema as { properties: Record<string, unknown> }).properties;
+			const itemsSchema = (outerProperties['records'] as { items: { properties: Record<string, unknown> } }).items;
+			expect(itemsSchema.properties).not.toHaveProperty('password');
+		});
+
+		it('detects and strips a suspicious parameter hidden inside a tuple-form (array) items schema', () => {
+			const result = validator.validateToolDefinition(
+				makeTool({
+					inputSchema: {
+						items: [{ properties: { credential: { type: 'string' } }, type: 'object' }],
+						type: 'array'
+					}
+				})
+			);
+
+			expect(result.valid).toBe(false);
+			expect(result.issues).toContainEqual(expect.stringContaining('credential'));
+			const sanitizedItems = (result.tool.inputSchema as { items: Array<{ properties: Record<string, unknown> }> })
+				.items;
+			expect(sanitizedItems[0]?.properties).not.toHaveProperty('credential');
+		});
+
 		it('leaves the schema untouched when no suspicious parameters are present', () => {
 			const inputSchema = { properties: { query: { type: 'string' } }, type: 'object' };
 			const result = validator.validateToolDefinition(makeTool({ inputSchema }));

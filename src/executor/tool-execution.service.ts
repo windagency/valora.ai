@@ -1186,7 +1186,7 @@ export class ToolExecutionService {
 
 		// Enforce effective permission constraints: block writes to forbidden paths
 		const permSvc = getPermissionPropagationService();
-		if (permSvc.isForbidden(fullPath, this.effectiveConstraints.forbidden_paths)) {
+		if (permSvc.isForbidden(fullPath, this.effectiveConstraints.forbidden_paths, this.workingDir)) {
 			return `Cannot write to forbidden path: ${path}. This path is restricted by the active permission constraints.`;
 		}
 
@@ -1447,7 +1447,7 @@ export class ToolExecutionService {
 		// Same guard as `write` and `delete_file`; a child agent's narrowed
 		// forbidden_paths must apply to all mutating tools.
 		const permSvc = getPermissionPropagationService();
-		if (permSvc.isForbidden(fullPath, this.effectiveConstraints.forbidden_paths)) {
+		if (permSvc.isForbidden(fullPath, this.effectiveConstraints.forbidden_paths, this.workingDir)) {
 			return `Cannot modify forbidden path: ${path}. This path is restricted by the active permission constraints.`;
 		}
 
@@ -1493,7 +1493,7 @@ export class ToolExecutionService {
 
 			// Enforce effective permission constraints: block deletes to forbidden paths
 			const permSvc = getPermissionPropagationService();
-			if (permSvc.isForbidden(fullPath, this.effectiveConstraints.forbidden_paths)) {
+			if (permSvc.isForbidden(fullPath, this.effectiveConstraints.forbidden_paths, this.workingDir)) {
 				return Promise.resolve(
 					`Cannot delete forbidden path: ${path}. This path is restricted by the active permission constraints.`
 				);

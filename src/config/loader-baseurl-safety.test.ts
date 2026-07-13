@@ -142,6 +142,20 @@ describe.skipIf(!chdirSupported)('ConfigLoader — provider baseUrl scheme/host 
 		expect(config.providers['xai']?.baseUrl).toBe('https://100.200.0.1/v1');
 	});
 
+	it('deliberately does not strip a TEST-NET (RFC 5737) or multicast address — no real internal infrastructure lives there, unlike RFC1918/loopback/link-local/CGNAT', async () => {
+		writeProjectConfig({
+			providers: {
+				anthropic: { baseUrl: 'https://192.0.2.1/v1' }, // TEST-NET-1, RFC 5737
+				xai: { baseUrl: 'https://224.0.0.1/v1' } // multicast
+			}
+		});
+
+		const config = await makeLoader().load();
+
+		expect(config.providers['anthropic']?.baseUrl).toBe('https://192.0.2.1/v1');
+		expect(config.providers['xai']?.baseUrl).toBe('https://224.0.0.1/v1');
+	});
+
 	it("strips a loopback baseUrl given in decimal, octal, or short-dotted-quad form — Node's URL parser normalizes all of these to standard dotted-decimal before this check ever runs", async () => {
 		// e.g. http://2130706433/ (decimal), http://0177.0.0.1/ (octal), http://127.1/
 		// (short form) all normalize to 127.0.0.1 via URL.hostname — verified directly
@@ -183,5 +197,42 @@ describe.skipIf(!chdirSupported)('ConfigLoader — provider baseUrl scheme/host 
 		const config = await makeLoader().load();
 
 		expect(config.providers['ollama']?.baseUrl).toBe('http://127.0.0.1:11434');
+	});
+});
+
+describe('ConfigLoader.loadFromPath — same baseUrl safety as load()', () => {
+	let tmpDir: string;
+
+	beforeEach(() => {
+		tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'valora-loadfrompath-safety-'));
+	});
+
+	afterEach(() => {
+		fs.rmSync(tmpDir, { force: true, recursive: true });
+	});
+
+	function writeConfigFile(content: Record<string, unknown>): string {
+		const filePath = path.join(tmpDir, 'config.json');
+		fs.writeFileSync(filePath, JSON.stringify(content));
+		return filePath;
+	}
+
+	it('strips a private-network baseUrl the same way load() does — loadFromPath must not bypass sanitizeProviderBaseUrls', async () => {
+		const filePath = writeConfigFile({ defaults: {}, providers: { moonshot: { baseUrl: 'https://10.0.0.5/v1' } } });
+
+		const config = await new ConfigLoader('/nonexistent-package-config.json').loadFromPath(filePath);
+
+		expect(config.providers['moonshot']?.baseUrl).toBeUndefined();
+	});
+
+	it('still allows a genuine internet-facing https baseUrl override via loadFromPath', async () => {
+		const filePath = writeConfigFile({
+			defaults: {},
+			providers: { xai: { baseUrl: 'https://self-hosted-proxy.example.com/v1' } }
+		});
+
+		const config = await new ConfigLoader('/nonexistent-package-config.json').loadFromPath(filePath);
+
+		expect(config.providers['xai']?.baseUrl).toBe('https://self-hosted-proxy.example.com/v1');
 	});
 });

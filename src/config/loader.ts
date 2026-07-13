@@ -103,7 +103,7 @@ export class ConfigLoader {
 
 		try {
 			this.config = CONFIG_SCHEMA.parse(mergedConfig);
-			this.sanitizeProviderBaseUrls();
+			this.sanitizeProviderBaseUrls(this.config);
 			this.autoMigrateDefaultProvider();
 			return this.config;
 		} catch (error) {
@@ -121,10 +121,10 @@ export class ConfigLoader {
 	 * whatever `baseUrl` names. Strips (doesn't throw on) an unsafe value so a
 	 * single bad provider entry can't crash config load for the whole run.
 	 */
-	private sanitizeProviderBaseUrls(): void {
-		if (!this.config?.providers) return;
+	private sanitizeProviderBaseUrls(config: Config): void {
+		if (!config.providers) return;
 
-		for (const [providerKey, providerConfig] of Object.entries(this.config.providers)) {
+		for (const [providerKey, providerConfig] of Object.entries(config.providers)) {
 			this.sanitizeSingleProviderBaseUrl(providerKey, providerConfig);
 		}
 	}
@@ -663,7 +663,9 @@ export class ConfigLoader {
 			const mergedConfig = this.mergeConfigs(DEFAULT_CONFIG, fileConfig, envConfig);
 
 			// Validate
-			return CONFIG_SCHEMA.parse(mergedConfig);
+			const parsed = CONFIG_SCHEMA.parse(mergedConfig);
+			this.sanitizeProviderBaseUrls(parsed);
+			return parsed;
 		} catch (error) {
 			throw new ConfigurationError(`Failed to parse config file: ${filePath}`, {
 				error: (error as Error).message
@@ -704,6 +706,18 @@ function isPrivateOrLinkLocalHost(hostname: string): boolean {
 
 const IPV4_SINGLE_OCTET_PRIVATE_FIRSTS = new Set([0, 10, 127]);
 
+/**
+ * Deliberately NOT blocked here, despite being reserved by other RFCs: TEST-NET
+ * (192.0.2.0/24, 198.51.100.0/24, 203.0.113.0/24, RFC 5737), benchmarking
+ * (198.18.0.0/15, RFC 2544), IETF protocol assignments (192.0.0.0/24, RFC 6890),
+ * 6to4 relay anycast (192.88.99.0/24, RFC 3068), multicast (224.0.0.0/4) and
+ * reserved/broadcast (240.0.0.0/4, 255.255.255.255/32). None of these host real
+ * internal infrastructure the way RFC1918/loopback/link-local/CGNAT do — no
+ * legitimate *or* attacker-controlled service listens on a documentation or
+ * benchmarking address — so blocking them would guard against a copy-pasted
+ * example config at best, not an actual SSRF target. Not worth the added
+ * surface for this function's actual threat model.
+ */
 function isPrivateOrLoopbackIpv4(first: number, second: number): boolean {
 	if (IPV4_SINGLE_OCTET_PRIVATE_FIRSTS.has(first)) return true;
 	if (first === 172) return second >= 16 && second <= 31;

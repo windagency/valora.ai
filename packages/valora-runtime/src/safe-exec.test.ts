@@ -80,18 +80,31 @@ describe('SafeExecutor.execute', () => {
 			await expect(SafeExecutor.execute('sleep', ['5'], { timeout: 200 })).rejects.toThrow(/timed out after 200ms/);
 		});
 
-		it('escalates to SIGKILL when the process ignores SIGTERM', async () => {
-			// A real process that traps SIGTERM and keeps running — proves the
-			// force-kill escalation actually fires rather than leaving an
-			// orphaned, unresponsive child around forever.
-			const trapScript = 'trap "" TERM; sleep 10';
+		it('escalates to SIGKILL when the process ignores SIGTERM, killing it well before it would exit naturally', async () => {
+			// A single-process target (no forked grandchildren, unlike a shell
+			// `sleep` subprocess — a forked grandchild would keep the stdio
+			// pipes open independently of its parent's death, muddying what
+			// this test is trying to isolate) that installs a real SIGTERM
+			// handler doing nothing, so the process itself ignores SIGTERM and
+			// keeps running via a repeating interval. `child.killed` becomes
+			// true as soon as `.kill()` successfully *sends* a signal — not
+			// when the process actually dies — so checking `!child.killed`
+			// before force-killing is a no-op once SIGTERM has already been
+			// sent. Bounding elapsed wall-clock time proves the process was
+			// actually force-killed via SIGKILL, not that the promise merely
+			// resolved once it eventually exited on its own.
+			const ignoreTermScript = 'process.on("SIGTERM", () => {}); setInterval(() => {}, 1000);';
+			const start = Date.now();
 
-			await expect(SafeExecutor.execute('sh', ['-c', trapScript], { timeout: 100 })).rejects.toThrow(
+			await expect(SafeExecutor.execute(process.execPath, ['-e', ignoreTermScript], { timeout: 100 })).rejects.toThrow(
 				/timed out after 100ms/
 			);
-			// The escalation setTimeout fires HEALTH_CHECK_INTERVAL_MS (5s) after
-			// SIGTERM; give the SIGKILL a moment to actually land before the test
-			// process exits, otherwise Node may warn about a lingering handle.
+
+			const elapsedMs = Date.now() - start;
+			// SIGKILL fires HEALTH_CHECK_INTERVAL_MS (5s) after SIGTERM; allow
+			// generous scheduling slack while still proving this isn't running
+			// indefinitely (the process would otherwise never exit on its own).
+			expect(elapsedMs).toBeLessThan(8000);
 		}, 12000);
 	});
 

@@ -155,6 +155,52 @@ describe('PermissionPropagationService', () => {
 				expect(svc.isForbidden(resolvedWriteTarget, [realSecretsDir])).toBe(true);
 			});
 		});
+
+		describe('relative forbidden_paths entries', () => {
+			let tmpDir: string;
+			let projectDir: string;
+			let otherDir: string;
+
+			beforeEach(() => {
+				tmpDir = mkdtempSync(join(tmpdir(), 'valora-permission-propagation-relative-test-'));
+				projectDir = join(tmpDir, 'project');
+				otherDir = join(tmpDir, 'elsewhere');
+				mkdirSync(join(projectDir, 'secrets'), { recursive: true });
+				mkdirSync(otherDir, { recursive: true });
+			});
+
+			afterEach(() => {
+				rmSync(tmpDir, { force: true, recursive: true });
+			});
+
+			it('resolves a relative forbidden_paths entry against the given baseDir, not process.cwd()', () => {
+				// Real agent personas write forbidden_paths as relative entries
+				// (e.g. `.valora/`, `data/`) — see valora-plugin-secops's agent
+				// definitions. ToolExecutionService's workingDir can legitimately
+				// differ from process.cwd() (its own docs say so, e.g. exploration
+				// contexts), so a relative entry must resolve against the caller's
+				// actual working directory, not wherever the host process happens
+				// to be running from.
+				const svc = new PermissionPropagationService();
+				const resolvedWriteTarget = join(projectDir, 'secrets', 'api-key.txt');
+
+				expect(svc.isForbidden(resolvedWriteTarget, ['secrets'], projectDir)).toBe(true);
+				// Same relative entry, resolved against an unrelated baseDir, must NOT match.
+				expect(svc.isForbidden(resolvedWriteTarget, ['secrets'], otherDir)).toBe(false);
+			});
+
+			it('still resolves a relative forbidden_paths entry sensibly when no baseDir is given', () => {
+				const svc = new PermissionPropagationService();
+				expect(svc.isForbidden(join(process.cwd(), 'secrets', 'x.txt'), ['secrets'])).toBe(true);
+			});
+
+			it('does not change behaviour for an already-absolute forbidden_paths entry when baseDir is given', () => {
+				const svc = new PermissionPropagationService();
+				const resolvedWriteTarget = join(projectDir, 'secrets', 'api-key.txt');
+
+				expect(svc.isForbidden(resolvedWriteTarget, [join(projectDir, 'secrets')], otherDir)).toBe(true);
+			});
+		});
 	});
 
 	describe('requiresApproval', () => {

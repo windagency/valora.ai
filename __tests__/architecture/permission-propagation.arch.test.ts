@@ -38,13 +38,18 @@ describe('Permission propagation architecture', () => {
 
 	it('ToolExecutionService enforces forbidden_paths before write', () => {
 		const src = read('executor/tool-execution.service.ts');
-		expect(src).toContain('isForbidden(fullPath, this.effectiveConstraints.forbidden_paths)');
+		// isForbidden's third argument (this.workingDir) is required so a relative
+		// forbidden_paths entry resolves against the caller's actual working
+		// directory rather than process.cwd() — see PermissionPropagationService.
+		expect(src).toContain('isForbidden(fullPath, this.effectiveConstraints.forbidden_paths, this.workingDir)');
 	});
 
 	it('ToolExecutionService enforces forbidden_paths before delete', () => {
 		const src = read('executor/tool-execution.service.ts');
-		// There are two isForbidden calls — one in executeWrite and one in executeDeleteFile
-		const matches = src.match(/isForbidden\(fullPath,\s*this\.effectiveConstraints\.forbidden_paths\)/g);
+		// There are multiple isForbidden calls — in executeWrite, executeDeleteFile, and search_replace
+		const matches = src.match(
+			/isForbidden\(fullPath,\s*this\.effectiveConstraints\.forbidden_paths,\s*this\.workingDir\)/g
+		);
 		expect(matches).not.toBeNull();
 		expect(matches!.length).toBeGreaterThanOrEqual(2);
 	});

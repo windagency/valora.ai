@@ -190,7 +190,7 @@ export class ToolDefinitionValidator {
 		}
 
 		// Check for suspicious parameter names
-		const suspiciousParams = this.findSuspiciousParams(schema);
+		const suspiciousParams = this.processSchema(schema).suspicious;
 		if (suspiciousParams.length > 0) {
 			issues.push(`Suspicious parameter names: ${suspiciousParams.join(', ')}`);
 		}
@@ -201,6 +201,19 @@ export class ToolDefinitionValidator {
 	/**
 	 * Measure the nesting depth of an object.
 	 */
+	private logEvent(tool: ExternalMCPTool, issues: string[]): void {
+		const event = createSecurityEvent('tool_definition_suspicious', 'high', {
+			issues,
+			serverId: tool.serverId,
+			toolName: tool.name
+		});
+		this.events.push(event);
+		getAuditSink().append(event);
+
+		const logger = getLogger();
+		logger.warn(`[Security] Suspicious tool definition: ${tool.name}`, { issues, serverId: tool.serverId });
+	}
+
 	private measureDepth(obj: unknown, current = 0): number {
 		if (current > MAX_SCHEMA_DEPTH + 1) return current; // Short-circuit
 
@@ -216,44 +229,6 @@ export class ToolDefinitionValidator {
 	}
 
 	/**
-	 * Find parameter names that look like credential extraction.
-	 */
-	private findSuspiciousParams(schema: Record<string, unknown>, path = ''): string[] {
-		const suspicious: string[] = [];
-
-		const properties = schema['properties'] as Record<string, unknown> | undefined;
-		if (properties && typeof properties === 'object') {
-			for (const [name, propSchema] of Object.entries(properties)) {
-				const fullPath = path ? `${path}.${name}` : name;
-
-				if (SUSPICIOUS_PARAM_NAMES.has(name.toLowerCase())) {
-					suspicious.push(fullPath);
-				}
-
-				// Recurse into nested schemas
-				if (typeof propSchema === 'object' && propSchema !== null) {
-					suspicious.push(...this.findSuspiciousParams(propSchema as Record<string, unknown>, fullPath));
-				}
-			}
-		}
-
-		return suspicious;
-	}
-
-	private logEvent(tool: ExternalMCPTool, issues: string[]): void {
-		const event = createSecurityEvent('tool_definition_suspicious', 'high', {
-			issues,
-			serverId: tool.serverId,
-			toolName: tool.name
-		});
-		this.events.push(event);
-		getAuditSink().append(event);
-
-		const logger = getLogger();
-		logger.warn(`[Security] Suspicious tool definition: ${tool.name}`, { issues, serverId: tool.serverId });
-	}
-
-	/**
 	 * Return a copy of the schema with any suspicious-named parameter (and its
 	 * entry in "required", if present) removed — mirrors sanitizeDescription's
 	 * strip-on-flag behaviour, so a caller that only reads `result.tool` (not
@@ -261,26 +236,93 @@ export class ToolDefinitionValidator {
 	 * credential-extraction parameter actually removed, not just logged.
 	 */
 	private sanitizeSchema(schema: Record<string, unknown>): Record<string, unknown> {
-		const properties = schema['properties'];
-		if (!properties || typeof properties !== 'object') return schema;
+		return this.processSchema(schema).sanitized;
+	}
 
-		const sanitizedProperties: Record<string, unknown> = {};
-		for (const [name, propSchema] of Object.entries(properties as Record<string, unknown>)) {
-			if (SUSPICIOUS_PARAM_NAMES.has(name.toLowerCase())) continue;
-			sanitizedProperties[name] =
-				typeof propSchema === 'object' && propSchema !== null
-					? this.sanitizeSchema(propSchema as Record<string, unknown>)
-					: propSchema;
+	/**
+	 * Single traversal that both detects suspicious parameter names and builds
+	 * a sanitised copy with them removed — detection and stripping used to be
+	 * two separate recursive methods that only walked `properties`, so a
+	 * suspicious parameter hidden behind a JSON Schema composition keyword
+	 * (`anyOf`/`oneOf`/`allOf`, an array `items` schema, or a `definitions`/
+	 * `$defs` entry) was neither flagged nor stripped. Keeping detection and
+	 * sanitisation in one method makes that class of divergence structurally
+	 * impossible. Does not follow `$ref` pointers (that requires resolving
+	 * against the whole schema document, not just the local subtree) — a
+	 * suspicious parameter reachable only via `$ref` is a known limitation.
+	 */
+	private processSchema(
+		schema: Record<string, unknown>,
+		path = ''
+	): { sanitized: Record<string, unknown>; suspicious: string[] } {
+		const suspicious: string[] = [];
+		const sanitized: Record<string, unknown> = { ...schema };
+
+		// Named-parameter containers: `properties` entries are real invocation
+		// parameters (checked against SUSPICIOUS_PARAM_NAMES and stripped);
+		// `definitions`/`$defs` are reusable type definitions (recursed into for
+		// nested suspicious properties, but the definition's own name is not a
+		// parameter name so it is never itself flagged/stripped).
+		for (const dictKey of ['properties', 'definitions', '$defs'] as const) {
+			const dict = schema[dictKey];
+			if (!dict || typeof dict !== 'object' || Array.isArray(dict)) continue;
+
+			const isParams = dictKey === 'properties';
+			const sanitizedDict: Record<string, unknown> = {};
+			for (const [name, subSchema] of Object.entries(dict as Record<string, unknown>)) {
+				const fullPath = path ? `${path}.${name}` : name;
+				if (isParams && SUSPICIOUS_PARAM_NAMES.has(name.toLowerCase())) {
+					suspicious.push(fullPath);
+					continue;
+				}
+				if (typeof subSchema === 'object' && subSchema !== null) {
+					const child = this.processSchema(subSchema as Record<string, unknown>, fullPath);
+					suspicious.push(...child.suspicious);
+					sanitizedDict[name] = child.sanitized;
+				} else {
+					sanitizedDict[name] = subSchema;
+				}
+			}
+			sanitized[dictKey] = sanitizedDict;
 		}
 
-		const sanitized: Record<string, unknown> = { ...schema, properties: sanitizedProperties };
 		if (Array.isArray(schema['required'])) {
 			sanitized['required'] = (schema['required'] as unknown[]).filter(
 				(name) => !(typeof name === 'string' && SUSPICIOUS_PARAM_NAMES.has(name.toLowerCase()))
 			);
 		}
 
-		return sanitized;
+		// `items`: either a single schema (list validation) or an array of
+		// per-position schemas (tuple validation).
+		const items = schema['items'];
+		if (Array.isArray(items)) {
+			sanitized['items'] = items.map((sub, index) => {
+				if (typeof sub !== 'object' || sub === null) return sub;
+				const child = this.processSchema(sub as Record<string, unknown>, `${path}[${index}]`);
+				suspicious.push(...child.suspicious);
+				return child.sanitized;
+			});
+		} else if (items && typeof items === 'object') {
+			const child = this.processSchema(items as Record<string, unknown>, `${path}[]`);
+			suspicious.push(...child.suspicious);
+			sanitized['items'] = child.sanitized;
+		}
+
+		// `anyOf`/`oneOf`/`allOf`: arrays of alternative or combined schemas —
+		// a suspicious parameter under any of them is just as reachable by the
+		// caller as one under `properties` directly.
+		for (const key of ['anyOf', 'oneOf', 'allOf'] as const) {
+			const alternatives = schema[key];
+			if (!Array.isArray(alternatives)) continue;
+			sanitized[key] = alternatives.map((sub) => {
+				if (typeof sub !== 'object' || sub === null) return sub;
+				const child = this.processSchema(sub as Record<string, unknown>, path);
+				suspicious.push(...child.suspicious);
+				return child.sanitized;
+			});
+		}
+
+		return { sanitized, suspicious };
 	}
 }
 

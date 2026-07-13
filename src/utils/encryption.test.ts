@@ -1,4 +1,13 @@
+import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
+
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+let fallbackKeyRuntimeDataDir = '';
+vi.mock('utils/paths', () => ({
+	getRuntimeDataDir: () => fallbackKeyRuntimeDataDir
+}));
 
 import {
 	decryptSessionData,
@@ -237,12 +246,14 @@ describe('EncryptionUtil — fallback master key derivation (no explicit key con
 
 	beforeEach(() => {
 		delete process.env['AI_ENCRYPTION_KEY'];
+		fallbackKeyRuntimeDataDir = mkdtempSync(join(tmpdir(), 'valora-encryption-fallback-key-test-'));
 	});
 
 	afterEach(() => {
 		vi.useRealTimers();
 		if (originalEnv === undefined) delete process.env['AI_ENCRYPTION_KEY'];
 		else process.env['AI_ENCRYPTION_KEY'] = originalEnv;
+		rmSync(fallbackKeyRuntimeDataDir, { force: true, recursive: true });
 	});
 
 	it('is stable across calls within the same instance/process', () => {
@@ -255,19 +266,15 @@ describe('EncryptionUtil — fallback master key derivation (no explicit key con
 		expect(result).toEqual({ data: 'secret value', success: true });
 	});
 
-	it('KNOWN GAP: data encrypted by one process cannot be decrypted by a later process using the same fallback (no AI_ENCRYPTION_KEY set)', () => {
-		// getMasterKey()'s fallback path derives the key from
-		// `${machineId}:${appId}:${Date.now()}` — mixing the current timestamp
-		// into what the surrounding comment ("derive a consistent key from
-		// machine data") implies should be a *stable* machine-specific key.
-		// Session data encrypted under this fallback in one CLI invocation can
-		// never be decrypted in a later invocation (a fresh EncryptionUtil
-		// instance derives a different key, since Date.now() differs), unless
-		// AI_ENCRYPTION_KEY is explicitly configured. Flagged rather than fixed:
-		// removing Date.now() would make the fallback key deterministic and
-		// derivable from just hostname — a different, not obviously-safer,
-		// security trade-off that needs a product decision, not a unilateral
-		// one-line fix.
+	it('is stable across separate process instances, at different times, via a persisted key file', () => {
+		// Regression test: getMasterKey()'s fallback used to derive the key from
+		// `${machineId}:${appId}:${Date.now()}` — mixing the current timestamp in
+		// meant a fresh EncryptionUtil instance in a later CLI invocation derived
+		// a different key and could never decrypt data encrypted by an earlier
+		// one. The fallback now persists a randomly-generated key to disk (under
+		// getRuntimeDataDir()) and reads it back on later instantiation instead
+		// of re-deriving from the current time, without the fix's rejected
+		// alternative of making the key hostname-derivable.
 		vi.useFakeTimers();
 		vi.setSystemTime(1_000_000);
 		const processA = new EncryptionUtil();
@@ -277,7 +284,32 @@ describe('EncryptionUtil — fallback master key derivation (no explicit key con
 		const processB = new EncryptionUtil();
 		const result = processB.decrypt(encrypted);
 
-		expect(result.success).toBe(false);
+		expect(result).toEqual({ data: 'secret value', success: true });
+	});
+
+	it('persists the generated fallback key to disk with restrictive (owner-only) permissions', () => {
+		const util = new EncryptionUtil();
+		util.encrypt('secret value'); // triggers fallback-key generation
+
+		const keyPath = join(fallbackKeyRuntimeDataDir, 'encryption-fallback-key');
+		const persistedKey = readFileSync(keyPath, 'utf8');
+		expect(persistedKey.length).toBeGreaterThanOrEqual(32);
+		// 0o600: readable/writable by owner only.
+		expect(statSync(keyPath).mode & 0o777).toBe(0o600);
+	});
+
+	it('still encrypts/decrypts within the same instance when persisting the fallback key fails', () => {
+		// Point the "directory" at a path that is actually a file, so mkdir/write
+		// fail — the fallback must degrade to an in-memory-only random key for
+		// this instance's lifetime rather than throwing.
+		rmSync(fallbackKeyRuntimeDataDir, { force: true, recursive: true });
+		writeFileSync(fallbackKeyRuntimeDataDir, 'blocking file, not a directory');
+
+		const util = new EncryptionUtil();
+		const encrypted = util.encrypt('secret value');
+		const result = util.decrypt(encrypted);
+
+		expect(result).toEqual({ data: 'secret value', success: true });
 	});
 });
 
