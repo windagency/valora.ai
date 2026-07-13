@@ -153,7 +153,7 @@ describe('fetchPluginRegistry', () => {
 		const { fetchPluginRegistry } = await import('./plugin-registry.service');
 		await fetchPluginRegistry();
 
-		expect(warn).toHaveBeenCalled();
+		expect(warn).toHaveBeenCalledTimes(1);
 		const messages = warn.mock.calls.map((c) => String(c[0]));
 		expect(messages.some((m) => m.includes('VALORA_PLUGIN_REGISTRY_URL'))).toBe(true);
 	});
@@ -196,5 +196,109 @@ describe('fetchPluginRegistry', () => {
 		const result = await fetchPluginRegistry();
 
 		expect(result).toBeNull();
+	});
+
+	describe('response validation edge cases', () => {
+		beforeEach(() => {
+			delete process.env['VALORA_PLUGIN_REGISTRY'];
+			process.env['VALORA_PLUGIN_REGISTRY_URL'] = 'https://example.com/registry.json';
+			vi.mocked(fs.readFileSync).mockImplementation(((filePath: unknown) => {
+				if (String(filePath).endsWith('registry.json')) return JSON.stringify(sampleEntries);
+				throw new Error(`Unexpected readFileSync: ${String(filePath)}`);
+			}) as typeof fs.readFileSync);
+		});
+
+		it('falls back to the bundled registry when the remote response exceeds the 64KB size cap', async () => {
+			const oversizedText = JSON.stringify([{ ...sampleEntries[0], description: 'x'.repeat(70 * 1024) }]);
+			vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, text: vi.fn().mockResolvedValue(oversizedText) }));
+
+			const { fetchPluginRegistry } = await import('./plugin-registry.service');
+			const result = await fetchPluginRegistry();
+
+			expect(result).toEqual(sampleEntries);
+		});
+
+		it('falls back to the bundled registry when the remote response is valid JSON but not an array', async () => {
+			vi.stubGlobal(
+				'fetch',
+				vi.fn().mockResolvedValue({ ok: true, text: vi.fn().mockResolvedValue(JSON.stringify({ not: 'an array' })) })
+			);
+
+			const { fetchPluginRegistry } = await import('./plugin-registry.service');
+			const result = await fetchPluginRegistry();
+
+			expect(result).toEqual(sampleEntries);
+		});
+
+		it('falls back to the bundled registry when the remote response is malformed JSON', async () => {
+			vi.stubGlobal(
+				'fetch',
+				vi.fn().mockResolvedValue({ ok: true, text: vi.fn().mockResolvedValue('{ not valid json') })
+			);
+
+			const { fetchPluginRegistry } = await import('./plugin-registry.service');
+			const result = await fetchPluginRegistry();
+
+			expect(result).toEqual(sampleEntries);
+		});
+
+		it('filters out entries that fail schema validation while keeping valid ones', async () => {
+			const validEntry = sampleEntries[0]!;
+			const invalidVersionEntry = { ...validEntry, name: 'bad-version-plugin', version: 'not-a-semver' };
+			const missingNameEntry = { ...validEntry, name: '' };
+			vi.stubGlobal(
+				'fetch',
+				vi.fn().mockResolvedValue({
+					ok: true,
+					text: vi.fn().mockResolvedValue(JSON.stringify([validEntry, invalidVersionEntry, missingNameEntry]))
+				})
+			);
+
+			const { fetchPluginRegistry } = await import('./plugin-registry.service');
+			const result = await fetchPluginRegistry();
+
+			expect(result).toEqual([validEntry]);
+		});
+
+		it('rejects an entry with a malformed integrity string but keeps entries without one', async () => {
+			const validEntry = sampleEntries[0]!;
+			const badIntegrityEntry = {
+				...validEntry,
+				integrity: 'not-a-valid-integrity-hash',
+				name: 'bad-integrity-plugin'
+			};
+			vi.stubGlobal(
+				'fetch',
+				vi.fn().mockResolvedValue({
+					ok: true,
+					text: vi.fn().mockResolvedValue(JSON.stringify([validEntry, badIntegrityEntry]))
+				})
+			);
+
+			const { fetchPluginRegistry } = await import('./plugin-registry.service');
+			const result = await fetchPluginRegistry();
+
+			expect(result).toEqual([validEntry]);
+		});
+	});
+
+	describe('remote URL resolution', () => {
+		it('falls back to the bundled registry (without ever calling fetch) when package.json has no repository url', async () => {
+			delete process.env['VALORA_PLUGIN_REGISTRY'];
+			delete process.env['VALORA_PLUGIN_REGISTRY_URL'];
+			const fetchSpy = vi.fn();
+			vi.stubGlobal('fetch', fetchSpy);
+			vi.mocked(fs.readFileSync).mockImplementation(((filePath: unknown) => {
+				if (String(filePath).endsWith('package.json')) return JSON.stringify({ name: 'valora' });
+				if (String(filePath).endsWith('registry.json')) return JSON.stringify(sampleEntries);
+				throw new Error(`Unexpected readFileSync: ${String(filePath)}`);
+			}) as typeof fs.readFileSync);
+
+			const { fetchPluginRegistry } = await import('./plugin-registry.service');
+			const result = await fetchPluginRegistry();
+
+			expect(fetchSpy).not.toHaveBeenCalled();
+			expect(result).toEqual(sampleEntries);
+		});
 	});
 });

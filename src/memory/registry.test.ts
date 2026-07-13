@@ -209,7 +209,7 @@ describe('MemoryProviderRegistry', () => {
 			registry.setActive('test-mem', { foo: 'bar' });
 
 			expect(factory).toHaveBeenCalledWith({ foo: 'bar' });
-			expect(registry.getActive()).toBeDefined();
+			expect(registry.getActive()).toBe(factory.mock.results[0]?.value);
 		});
 	});
 

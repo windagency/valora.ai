@@ -9,6 +9,7 @@ import * as fsSync from 'fs';
 import * as fs from 'fs/promises';
 import * as os from 'os';
 import * as path from 'path';
+import { fileURLToPath } from 'url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
 	DirectoryNotFoundError,
@@ -382,9 +383,11 @@ describe('getAIRoot', () => {
 	it('should find the package root with package.json and data directory', () => {
 		const result = getAIRoot();
 
-		// Should return the package root directory (containing package.json with name "valora")
-		expect(result).toBeTruthy();
-		expect(typeof result).toBe('string');
+		// With existsSync mocked to only recognise paths under tempDir, getAIRoot()
+		// cannot find a matching package.json and falls back to two directories
+		// above this file's own location (i.e. the repository root).
+		const expectedRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+		expect(result).toBe(expectedRoot);
 	});
 
 	it('should return a directory path', () => {

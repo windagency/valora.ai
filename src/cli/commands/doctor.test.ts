@@ -10,12 +10,13 @@ vi.mock('di/container', () => ({
 	getLoadedPlugins: () => []
 }));
 
+const mockRunAllChecks = vi.fn(async () => [{ message: 'ok', status: 'pass' }]);
+const mockAutoFix = vi.fn(() => false);
 vi.mock('services/diagnostics.service', () => ({
-	DiagnosticsService: class {
-		async runAllChecks() {
-			return [{ message: 'ok', status: 'pass' }];
-		}
-	}
+	DiagnosticsService: vi.fn().mockImplementation(() => ({
+		autoFix: mockAutoFix,
+		runAllChecks: mockRunAllChecks
+	}))
 }));
 
 vi.mock('output/diagnostic-formatter', () => ({
@@ -194,5 +195,80 @@ describe.skipIf(!chdirSupported)('doctor --export', () => {
 
 		const written = await fs.readFile(target, 'utf-8');
 		expect(JSON.parse(written)).toEqual({ report: 'ok' });
+	});
+});
+
+describe('doctor — running checks', () => {
+	let logSpy: ReturnType<typeof vi.spyOn>;
+	let exitSpy: ReturnType<typeof vi.spyOn>;
+
+	beforeEach(() => {
+		logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+		exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never);
+	});
+
+	afterEach(() => {
+		logSpy.mockRestore();
+		exitSpy.mockRestore();
+		mockRunAllChecks.mockReset();
+		mockRunAllChecks.mockResolvedValue([{ message: 'ok', status: 'pass' }]);
+		mockAutoFix.mockReset();
+		mockAutoFix.mockReturnValue(false);
+	});
+
+	function loggedOutput(): string {
+		return logSpy.mock.calls.map((c) => c.join(' ')).join('\n');
+	}
+
+	it('exits 0 when every diagnostic check passes', async () => {
+		await runCommand(makeProgram(), ['doctor']);
+
+		expect(exitSpy).toHaveBeenCalledWith(0);
+	});
+
+	it('exits 1 when any diagnostic check fails', async () => {
+		mockRunAllChecks.mockResolvedValue([
+			{ message: 'ok', status: 'pass' },
+			{ autoFixable: false, message: 'missing config', status: 'fail' }
+		]);
+
+		await runCommand(makeProgram(), ['doctor']);
+
+		expect(exitSpy).toHaveBeenCalledWith(1);
+	});
+
+	it('prints the formatted diagnostics report', async () => {
+		await runCommand(makeProgram(), ['doctor']);
+
+		expect(loggedOutput()).toContain('ok');
+	});
+
+	describe('--fix', () => {
+		it('auto-fixes fixable failing checks and reports how many were fixed', async () => {
+			mockRunAllChecks.mockResolvedValue([{ autoFixable: true, message: 'fixable issue', status: 'fail' }]);
+			mockAutoFix.mockReturnValue(true);
+
+			await runCommand(makeProgram(), ['doctor', '--fix']);
+
+			const out = loggedOutput();
+			expect(out).toContain('Fixed: Configuration file');
+			expect(out).toContain('Fixed 1 issue(s)');
+		});
+
+		it('reports that no issues were auto-fixable when none can be fixed', async () => {
+			mockRunAllChecks.mockResolvedValue([{ autoFixable: false, message: 'not fixable', status: 'fail' }]);
+
+			await runCommand(makeProgram(), ['doctor', '--fix']);
+
+			expect(loggedOutput()).toContain('No issues were auto-fixable');
+		});
+
+		it('does not attempt to auto-fix checks that are not marked autoFixable', async () => {
+			mockRunAllChecks.mockResolvedValue([{ autoFixable: false, message: 'not fixable', status: 'fail' }]);
+
+			await runCommand(makeProgram(), ['doctor', '--fix']);
+
+			expect(mockAutoFix).not.toHaveBeenCalled();
+		});
 	});
 });

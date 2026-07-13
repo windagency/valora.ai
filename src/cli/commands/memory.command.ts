@@ -1,5 +1,7 @@
 import type * as ValoraMemoryVaultModule from '@windagency/valora-plugin-memory-vault';
 
+import { createContainer, initializePlugins } from 'di/container';
+import { getProviderRegistry } from 'llm/registry';
 import { getMemoryRegistry } from 'memory/registry';
 import { createSecurityEvent } from 'security/security-event.types';
 
@@ -369,11 +371,21 @@ async function resolveReembedConfig(
 	const model = options.model ?? config.model;
 	const dim = options.dim ? parseInt(options.dim, 10) : config.dim;
 	const batchSize = config.batchSize;
+
+	// resolveEmbedder() needs a ProviderLookup to pick a real, embed-capable
+	// LLM provider (e.g. Ollama) — without loading plugins first, the host's
+	// provider registry is empty and no provider can ever be selected.
+	const container = createContainer();
+	await initializePlugins(container);
+
 	const { resolveEmbedder } = await requireVault();
-	const embedder = await resolveEmbedder({
-		...(config.memoryConfig ?? {}),
-		embedding: { batch_size: batchSize, dim, model, provider: 'auto' }
-	} as Parameters<typeof resolveEmbedder>[0]);
+	const embedder = await resolveEmbedder(
+		{
+			...(config.memoryConfig ?? {}),
+			embedding: { batch_size: batchSize, dim, model, provider: 'auto' }
+		} as Parameters<typeof resolveEmbedder>[0],
+		getProviderRegistry()
+	);
 
 	if (!embedder) {
 		console.error(

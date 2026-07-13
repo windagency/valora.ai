@@ -97,4 +97,45 @@ describe('Performance Validation Tests', () => {
 		const p95 = durations[Math.floor(durations.length * 0.95)]!;
 		expect(p95).toBeLessThan(400);
 	});
+
+	it('agent-selection duration should not grow more than 5x when affected-file count grows 20x', async () => {
+		const sizes = [10, 200];
+		const durationsBySize: number[] = [];
+
+		for (const size of sizes) {
+			const task: TaskContext = {
+				affectedFiles: Array.from({ length: size }, (_, i) => `src/file${i}.ts`),
+				dependencies: ['typescript'],
+				description: 'Scalability test'
+			};
+
+			const start = Date.now();
+			await resolver.resolveAgent(task);
+			durationsBySize.push(Date.now() - start);
+		}
+
+		const [smallDuration, largeDuration] = durationsBySize;
+		if (smallDuration! > 0) {
+			expect(largeDuration! / smallDuration!).toBeLessThan(5);
+		} else {
+			// Sub-millisecond resolution for the small case — just verify the large case is still fast
+			expect(largeDuration).toBeLessThan(500);
+		}
+	});
+
+	it('agent-selection should not leak memory across 100 sequential resolutions', async () => {
+		const initialHeap = process.memoryUsage().heapUsed;
+
+		for (let i = 0; i < 100; i++) {
+			const task: TaskContext = {
+				affectedFiles: [`src/memtest${i}.ts`],
+				dependencies: ['typescript'],
+				description: `Memory test task ${i}`
+			};
+			await resolver.resolveAgent(task);
+		}
+
+		const heapGrowth = process.memoryUsage().heapUsed - initialHeap;
+		expect(heapGrowth).toBeLessThan(50 * 1024 * 1024); // Less than 50MB increase
+	});
 });

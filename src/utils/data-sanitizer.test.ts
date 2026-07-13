@@ -32,7 +32,7 @@ describe('DataSanitizer', () => {
 		it('should create sanitizer with default options', () => {
 			const sanitizer = new DataSanitizer();
 
-			expect(sanitizer).toBeDefined();
+			expect(sanitizer).toBeInstanceOf(DataSanitizer);
 			expect(sanitizer.getRules()).toHaveLength(10); // Default rules
 		});
 
@@ -434,7 +434,7 @@ describe('Global sanitizer functions', () => {
 				rules: []
 			});
 
-			expect(sanitizer).toBeDefined();
+			expect(sanitizer).toBeInstanceOf(DataSanitizer);
 		});
 	});
 

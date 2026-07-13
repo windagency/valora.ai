@@ -3,6 +3,14 @@
  *
  * Validates complete user journeys and business requirements
  * using the real compiled CLI binary.
+ *
+ * Scope note: this file owns the business-workflow scenarios (data security,
+ * concurrency, resource management) that aren't duplicated in
+ * __tests__/e2e/cli-commands.e2e.test.ts. General CLI-surface checks
+ * (--version, --log-level, --output <format>, --no-interactive, missing
+ * required arguments) live in the e2e file instead — see that file's own
+ * scope note. Each CLI behavior below is asserted in exactly one of the two
+ * files, not both.
  */
 
 import * as fs from 'fs/promises';
@@ -130,10 +138,10 @@ describe.skipIf(!cliBuilt)('User Workflow Acceptance Tests', () => {
 			});
 
 			expect(exitCode).toBe(0);
-			expect(stdout).toBeDefined();
+			expect(stdout.trim().length).toBeGreaterThan(0);
 		}, 30000);
 
-		it('should reject unknown exec commands with a clear error', async () => {
+		it('should reject unknown exec commands with a clear error and non-zero exit', async () => {
 			const { exitCode, stderr } = await execa('node', [aiBinaryPath, 'exec', 'nonexistent-command', '--dry-run'], {
 				cwd: tempDir,
 				env: cliEnv({ AI_DRY_RUN: 'true' }),
@@ -157,17 +165,6 @@ describe.skipIf(!cliBuilt)('User Workflow Acceptance Tests', () => {
 			expect(showExit).toBe(0);
 			expect(showOutput).toContain('Configuration');
 		}, 25000);
-
-		it('should report the configuration file path', async () => {
-			const { exitCode, stdout } = await execa('node', [aiBinaryPath, 'config', 'path'], {
-				cwd: tempDir,
-				env: cliEnv(),
-				input: ''
-			});
-
-			expect(exitCode).toBe(0);
-			expect(stdout.trim().length).toBeGreaterThan(0);
-		}, 30000);
 	});
 
 	describe('Error Recovery and Resilience', () => {
@@ -192,17 +189,6 @@ describe.skipIf(!cliBuilt)('User Workflow Acceptance Tests', () => {
 			expect(helpExit).toBe(0);
 			expect(helpOutput).toContain('valora');
 		}, 45000);
-
-		it('should fail with a non-zero exit code for unknown exec commands', async () => {
-			const { exitCode } = await execa('node', [aiBinaryPath, 'exec', 'unknown-command'], {
-				cwd: tempDir,
-				env: cliEnv({ AI_NETWORK_TIMEOUT: '5000' }),
-				input: '',
-				reject: false
-			});
-
-			expect(exitCode).toBe(1);
-		}, 30000);
 	});
 
 	describe('Performance Requirements', () => {

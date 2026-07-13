@@ -120,7 +120,7 @@ describe('Docker Integration Tests', () => {
 			const resources = await validator.getResourceAvailability();
 
 			expect(resources.docker_running).toBe(true);
-			expect(resources.docker_version).toBeDefined();
+			expect(resources.docker_version).toMatch(/^\d+\.\d+/);
 			console.log(`Docker version detected: ${resources.docker_version}`);
 		});
 
@@ -247,7 +247,7 @@ describe('Docker Integration Tests', () => {
 				command: ['sleep', '30'] // Keep container alive for 30 seconds
 			});
 
-			expect(containerId).toBeDefined();
+			expect(containerId).toMatch(/^[0-9a-f]{12,64}$/);
 			expect(typeof containerId).toBe('string');
 
 			console.log(`Container created: ${containerId.substring(0, 12)}`);
@@ -338,7 +338,7 @@ describe('Docker Integration Tests', () => {
 			const exploration = await stateManager.createExploration('Integration test task', config);
 
 			expect(exploration).toBeDefined();
-			expect(exploration.id).toBeDefined();
+			expect(exploration.id).toMatch(/^exp-/);
 			expect(exploration.branches).toBe(2);
 			expect(exploration.status).toBe('pending');
 

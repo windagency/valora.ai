@@ -351,7 +351,7 @@ describe('ExecutionCoordinator - Dynamic Agent Integration', () => {
 
 			expect(result.result).toEqual(mockCommandResult);
 			expect(result.sessionManager).toBe(mockSessionManager);
-			expect(result.startTime).toBeDefined();
+			expect(result.startTime).toEqual(expect.any(Number));
 		});
 	});
 
@@ -385,7 +385,7 @@ describe('ExecutionCoordinator - Dynamic Agent Integration', () => {
 
 			// Verify that the task context was created correctly
 			// This is indirectly tested through the successful execution
-			expect(mockStrategy.execute).toHaveBeenCalled();
+			expect(mockStrategy.execute).toHaveBeenCalledWith(resolvedCommand.command, expect.anything());
 		});
 
 		it('should extract affected files from session context', async () => {
@@ -419,7 +419,7 @@ describe('ExecutionCoordinator - Dynamic Agent Integration', () => {
 
 			await coordinator.executeCommand('implement', resolvedCommand, options, mockSessionManager as any);
 
-			expect(mockSessionManager.getAllContext).toHaveBeenCalled();
+			expect(mockSessionManager.getAllContext).toHaveBeenCalledTimes(1);
 		});
 
 		it('should extract dependencies from session context', async () => {

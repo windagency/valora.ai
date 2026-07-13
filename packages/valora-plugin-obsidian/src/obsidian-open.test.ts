@@ -137,7 +137,7 @@ describe('openObsidian', () => {
 			['--appimage-extract-and-run', '--no-sandbox', '--disable-gpu'],
 			expect.objectContaining({ detached: true })
 		);
-		expect(child.unref).toHaveBeenCalled();
+		expect(child.unref).toHaveBeenCalledTimes(1);
 	});
 
 	it('pre-registers the vault in Obsidian config before launching on Linux', () => {
@@ -147,7 +147,7 @@ describe('openObsidian', () => {
 		mockSpawnDetached();
 		vi.spyOn(console, 'log').mockImplementation(() => {});
 		openObsidian('/tmp/vault');
-		expect(fs.writeFileSync).toHaveBeenCalled();
+		expect(fs.writeFileSync).toHaveBeenCalledWith(expect.stringMatching(/obsidian\.json$/), expect.any(String));
 		const written = JSON.parse(vi.mocked(fs.writeFileSync).mock.calls[0]![1] as string) as {
 			vaults: Record<string, { open?: boolean; path: string }>;
 		};

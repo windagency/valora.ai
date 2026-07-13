@@ -3,9 +3,24 @@
  */
 
 import type Anthropic from '@anthropic-ai/sdk';
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+// Wrapped with vi.fn(actual) rather than fully mocked: real rate-limiting behaviour is
+// exercised for every other test, only the one dedicated rate-limit test overrides it —
+// pre-exhausting the real 60-req/min bucket would be slow and brittle.
+vi.mock('utils/rate-limiter', async (importOriginal) => {
+	const actual = await importOriginal<typeof import('utils/rate-limiter')>();
+	return {
+		...actual,
+		checkRateLimit: vi.fn(actual.checkRateLimit),
+		getRateLimitStatus: vi.fn(actual.getRateLimitStatus)
+	};
+});
+
+import type { LLMCompletionOptions } from 'types/llm.types';
 
 import { getProviderRegistry } from 'llm/registry';
+import { checkRateLimit, getRateLimitStatus } from 'utils/rate-limiter';
 
 import { AnthropicProvider } from './anthropic.provider';
 
@@ -258,5 +273,270 @@ describe('AnthropicProvider — descriptor registration', () => {
 
 	it('registers a non-empty modelModes list', () => {
 		expect(getProviderRegistry().getDescriptor('anthropic')?.modelModes.length ?? 0).toBeGreaterThan(0);
+	});
+});
+
+describe('AnthropicProvider — configuration', () => {
+	it('is configured when an API key is present', () => {
+		expect(createProvider({ apiKey: 'test-key' }).isConfigured()).toBe(true);
+	});
+
+	it('is not configured without an API key or Vertex config', () => {
+		// isConfigured() is typed to return boolean but its `hasApiKey || hasVertexConfig`
+		// expression can actually yield `undefined` when vertexAI is unset (a falsy
+		// short-circuit, not a real boolean) — assert falsy rather than a strict `false`.
+		expect(createProvider({}).isConfigured()).toBeFalsy();
+	});
+
+	it('is configured via Vertex AI project/region even without an API key', () => {
+		expect(
+			createProvider({ vertexAI: true, vertexProjectId: 'proj-1', vertexRegion: 'us-central1' }).isConfigured()
+		).toBe(true);
+	});
+});
+
+describe('AnthropicProvider — validateModel', () => {
+	const provider = createProvider({ apiKey: 'test-key' });
+
+	it('accepts models from the known catalog', async () => {
+		const [knownModel] =
+			getProviderRegistry()
+				.getDescriptor('anthropic')
+				?.modelModes.map((mm) => mm.model) ?? [];
+		expect(knownModel).toBeDefined();
+		await expect(provider.validateModel(knownModel!)).resolves.toBe(true);
+	});
+
+	it('accepts unlisted models following the claude-* naming convention', async () => {
+		await expect(provider.validateModel('claude-some-future-model')).resolves.toBe(true);
+	});
+
+	it('rejects a model matching no known convention', async () => {
+		await expect(provider.validateModel('gpt-5')).resolves.toBe(false);
+	});
+});
+
+describe('AnthropicProvider — getAlternativeModels', () => {
+	const provider = createProvider({ apiKey: 'test-key' });
+
+	it('excludes the given current model from the alternatives list', () => {
+		const all = provider.getAlternativeModels();
+		const [currentModel] = all;
+		expect(currentModel).toBeDefined();
+
+		const alternatives = provider.getAlternativeModels(currentModel);
+
+		expect(alternatives).not.toContain(currentModel);
+		expect(alternatives.length).toBe(all.length - 1);
+	});
+});
+
+describe('AnthropicProvider — sandboxed guard', () => {
+	const originalNodeEnv = process.env['NODE_ENV'];
+
+	afterEach(() => {
+		process.env['NODE_ENV'] = originalNodeEnv;
+	});
+
+	it('provides a helpful fallback error when sandboxed with no credentials configured', async () => {
+		process.env['NODE_ENV'] = 'test';
+		const provider = createProvider({});
+
+		await expect(provider.complete({ max_tokens: 100, messages: [{ content: 'hi', role: 'user' }] })).rejects.toThrow(
+			'Anthropic provider not configured. In sandboxed environments, API keys are required for LLM operations.'
+		);
+	});
+});
+
+describe('AnthropicProvider — complete()/streamComplete() against an injected client', () => {
+	let provider: AnthropicProvider;
+	let mockCreate: ReturnType<typeof vi.fn>;
+	const options: LLMCompletionOptions = {
+		max_tokens: 100,
+		messages: [{ content: 'Hello', role: 'user' }],
+		model: 'claude-sonnet-4.6'
+	};
+
+	beforeEach(() => {
+		provider = createProvider({ apiKey: 'test-key' });
+		mockCreate = vi.fn();
+		(provider as unknown as { client: unknown }).client = { messages: { create: mockCreate } };
+		vi.mocked(checkRateLimit).mockClear();
+		vi.mocked(getRateLimitStatus).mockClear();
+	});
+
+	describe('complete()', () => {
+		it('returns content, finish_reason, model, and usage from a successful response', async () => {
+			mockCreate.mockResolvedValueOnce({
+				content: [{ text: 'Hi there!', type: 'text' }],
+				model: 'claude-sonnet-4-6-20260101',
+				stop_reason: 'end_turn',
+				usage: { input_tokens: 10, output_tokens: 5 }
+			});
+
+			const result = await provider.complete(options);
+
+			expect(result).toEqual({
+				content: 'Hi there!',
+				finish_reason: 'end_turn',
+				model: 'claude-sonnet-4-6-20260101',
+				role: 'assistant',
+				tool_calls: undefined,
+				usage: { completion_tokens: 5, prompt_tokens: 10, total_tokens: 15 }
+			});
+		});
+
+		it('extracts tool_use blocks as tool_calls', async () => {
+			mockCreate.mockResolvedValueOnce({
+				content: [{ id: 'call_1', input: { city: 'Paris' }, name: 'get_weather', type: 'tool_use' }],
+				model: 'claude-sonnet-4-6-20260101',
+				stop_reason: 'tool_use',
+				usage: { input_tokens: 10, output_tokens: 5 }
+			});
+
+			const result = await provider.complete(options);
+
+			expect(result.tool_calls).toEqual([{ arguments: { city: 'Paris' }, id: 'call_1', name: 'get_weather' }]);
+		});
+
+		it('extracts prompt-cache usage fields when present', async () => {
+			mockCreate.mockResolvedValueOnce({
+				content: [{ text: 'Hi', type: 'text' }],
+				model: 'claude-sonnet-4-6-20260101',
+				stop_reason: 'end_turn',
+				usage: { cache_creation_input_tokens: 200, cache_read_input_tokens: 40, input_tokens: 10, output_tokens: 5 }
+			});
+
+			const result = await provider.complete(options);
+
+			expect(result.usage).toEqual({
+				cache_creation_input_tokens: 200,
+				cache_read_input_tokens: 40,
+				completion_tokens: 5,
+				prompt_tokens: 10,
+				total_tokens: 15
+			});
+		});
+
+		it('throws a rate-limit error and never calls the API when rate limited', async () => {
+			vi.mocked(checkRateLimit).mockReturnValueOnce(false);
+			vi.mocked(getRateLimitStatus).mockReturnValueOnce({
+				allowed: false,
+				remaining: 0,
+				resetTime: Date.now() + 5000
+			});
+
+			await expect(provider.complete(options)).rejects.toThrow(/Anthropic API rate limit exceeded/);
+			expect(mockCreate).not.toHaveBeenCalled();
+		});
+
+		it('retries a transient failure and returns the result from a later successful attempt', async () => {
+			vi.useFakeTimers();
+			try {
+				mockCreate.mockRejectedValueOnce(new Error('ETIMEDOUT')).mockResolvedValueOnce({
+					content: [{ text: 'Recovered', type: 'text' }],
+					model: 'claude-sonnet-4-6-20260101',
+					stop_reason: 'end_turn',
+					usage: { input_tokens: 10, output_tokens: 5 }
+				});
+
+				const pending = provider.complete(options);
+				pending.catch(() => {});
+				await vi.runAllTimersAsync();
+
+				await expect(pending).resolves.toMatchObject({ content: 'Recovered' });
+				expect(mockCreate).toHaveBeenCalledTimes(2);
+			} finally {
+				vi.useRealTimers();
+			}
+		});
+
+		it('routes requests above the streaming threshold through the streaming path', async () => {
+			async function* fakeStream() {
+				yield {
+					message: { model: 'claude-sonnet-4-6-20260101', usage: { input_tokens: 10 } },
+					type: 'message_start'
+				};
+				yield { delta: { text: 'Streamed content', type: 'text_delta' }, index: 0, type: 'content_block_delta' };
+				yield { type: 'message_delta', usage: { output_tokens: 3 } };
+			}
+			mockCreate.mockResolvedValueOnce(fakeStream());
+
+			const result = await provider.complete({ ...options, max_tokens: 20000 });
+
+			expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({ stream: true }));
+			expect(result.content).toBe('Streamed content');
+		});
+	});
+
+	describe('streamComplete()', () => {
+		async function* fakeStream(events: Array<Record<string, unknown>>) {
+			for (const event of events) yield event as unknown as Anthropic.MessageStreamEvent;
+		}
+
+		it('accumulates streamed text, calls onChunk for each piece, and returns model/usage', async () => {
+			mockCreate.mockResolvedValueOnce(
+				fakeStream([
+					{ message: { model: 'claude-sonnet-4-6-20260101', usage: { input_tokens: 10 } }, type: 'message_start' },
+					{ delta: { text: 'Hel', type: 'text_delta' }, index: 0, type: 'content_block_delta' },
+					{ delta: { text: 'lo!', type: 'text_delta' }, index: 0, type: 'content_block_delta' },
+					{ type: 'message_delta', usage: { output_tokens: 2 } }
+				])
+			);
+			const chunks: string[] = [];
+
+			const result = await provider.streamComplete(options, (chunk) => chunks.push(chunk));
+
+			expect(chunks).toEqual(['Hel', 'lo!']);
+			expect(result).toMatchObject({
+				content: 'Hello!',
+				model: 'claude-sonnet-4-6-20260101',
+				role: 'assistant',
+				usage: { completion_tokens: 2, prompt_tokens: 10, total_tokens: 12 }
+			});
+		});
+
+		it('accumulates tool_use input across content_block_start/delta events into tool_calls', async () => {
+			mockCreate.mockResolvedValueOnce(
+				fakeStream([
+					{ message: { model: 'claude-sonnet-4-6-20260101', usage: { input_tokens: 10 } }, type: 'message_start' },
+					{
+						content_block: { id: 'call_1', name: 'get_weather', type: 'tool_use' },
+						index: 0,
+						type: 'content_block_start'
+					},
+					{
+						delta: { partial_json: '{"city":"Paris"}', type: 'input_json_delta' },
+						index: 0,
+						type: 'content_block_delta'
+					},
+					{ type: 'message_delta', usage: { output_tokens: 4 } }
+				])
+			);
+
+			const result = await provider.streamComplete(options, () => {});
+
+			expect(result.tool_calls).toEqual([{ arguments: { city: 'Paris' }, id: 'call_1', name: 'get_weather' }]);
+		});
+
+		it('captures cache usage fields from the message_start event', async () => {
+			mockCreate.mockResolvedValueOnce(
+				fakeStream([
+					{
+						message: {
+							model: 'claude-sonnet-4-6-20260101',
+							usage: { cache_creation_input_tokens: 200, cache_read_input_tokens: 40, input_tokens: 10 }
+						},
+						type: 'message_start'
+					},
+					{ delta: { text: 'Hi', type: 'text_delta' }, index: 0, type: 'content_block_delta' },
+					{ type: 'message_delta', usage: { output_tokens: 1 } }
+				])
+			);
+
+			const result = await provider.streamComplete(options, () => {});
+
+			expect(result.usage).toMatchObject({ cache_creation_input_tokens: 200, cache_read_input_tokens: 40 });
+		});
 	});
 });

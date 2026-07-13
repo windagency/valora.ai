@@ -406,7 +406,14 @@ describe('DynamicAgentResolverService', () => {
 			expect(analysis.taskClassification).toEqual(mockTaskClassification);
 			expect(analysis.codebaseContext).toEqual(mockCodebaseContext);
 			expect(analysis.agentScores).toEqual(mockAgentScores);
-			expect(analysis.selection).toBeDefined();
+			expect(analysis.selection).toEqual({
+				alternatives: [],
+				confidence: 0.8,
+				fallback: false,
+				fallbackAgent: 'software-engineer-typescript-backend',
+				reasons: ['Good match'],
+				selectedAgent: 'software-engineer-typescript-backend'
+			});
 			expect(analysis.selection.selectedAgent).toBe('software-engineer-typescript-backend');
 		});
 	});
@@ -419,8 +426,13 @@ describe('DynamicAgentResolverService', () => {
 
 			expect(validation.valid).toBe(true);
 			expect(validation.issues).toEqual([]);
-			expect(validation.stats).toBeDefined();
-			expect(validation.stats.registryAgents).toBeDefined();
+			expect(validation.stats).toEqual({
+				analyzerCacheSize: 0,
+				classifierCacheSize: 0,
+				registryAgents: 5,
+				registryDomains: 7
+			});
+			expect(validation.stats.registryAgents).toBe(5);
 		});
 
 		it('should report registry initialization failures', async () => {
@@ -442,9 +454,12 @@ describe('DynamicAgentResolverService', () => {
 		it('should provide cache statistics', () => {
 			const stats = resolver.getStats();
 
-			expect(stats).toBeDefined();
-			expect(stats.cacheSizes).toBeDefined();
-			expect(stats.thresholds).toBeDefined();
+			expect(stats).toEqual({
+				cacheSizes: { contextAnalyzer: 0 },
+				thresholds: { highConfidence: 0.75, minConfidence: 0.3 }
+			});
+			expect(stats.cacheSizes).toEqual({ contextAnalyzer: 0 });
+			expect(stats.thresholds).toEqual({ highConfidence: 0.75, minConfidence: 0.3 });
 			expect(stats.thresholds.minConfidence).toBe(0.3);
 			expect(stats.thresholds.highConfidence).toBe(0.75);
 		});
@@ -534,9 +549,9 @@ describe('DynamicAgentResolverService', () => {
 
 			const result = await resolver.resolveAgent(minimalContext);
 
-			expect(result).toBeDefined();
-			expect(result.selectedAgent).toBeDefined();
-			expect(typeof result.confidence).toBe('number');
+			expect(result.selectedAgent).toBe('platform-engineer');
+			expect(result.confidence).toBe(0.1);
+			expect(result.fallback).toBe(true);
 		});
 
 		it('should handle very long task descriptions', async () => {
@@ -551,7 +566,9 @@ describe('DynamicAgentResolverService', () => {
 
 			const result = await resolver.resolveAgent(longContext);
 
-			expect(result).toBeDefined();
+			expect(result.selectedAgent).toBe('platform-engineer');
+			expect(result.confidence).toBe(0.1);
+			expect(result.fallback).toBe(true);
 		});
 
 		it('should handle special characters in task descriptions', async () => {
@@ -565,7 +582,9 @@ describe('DynamicAgentResolverService', () => {
 
 			const result = await resolver.resolveAgent(specialContext);
 
-			expect(result).toBeDefined();
+			expect(result.selectedAgent).toBe('platform-engineer');
+			expect(result.confidence).toBe(0.1);
+			expect(result.fallback).toBe(true);
 		});
 
 		it('should handle empty service responses gracefully', async () => {

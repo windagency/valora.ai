@@ -915,7 +915,10 @@ describe('plugin add — autoInstall binary requirement', () => {
 		});
 		await runCommand(program, ['plugin', 'add', 'ollama']);
 
-		expect(mockPromptInstall).toHaveBeenCalled();
+		expect(mockPromptInstall).toHaveBeenCalledWith(
+			'ollama',
+			'curl -fsSL https://example.com/ollama.tgz | sudo tar -xz -C /usr/local/'
+		);
 		expect(mockBinaryInstaller).not.toHaveBeenCalled();
 	});
 
@@ -948,7 +951,10 @@ describe('plugin add — autoInstall binary requirement', () => {
 		});
 		await runCommand(program, ['plugin', 'add', 'ollama']);
 
-		expect(mockPromptInstall).toHaveBeenCalled();
+		expect(mockPromptInstall).toHaveBeenCalledWith(
+			'ollama',
+			'curl -fsSL https://example.com/ollama.tgz | sudo tar -xz -C /usr/local/'
+		);
 	});
 });
 

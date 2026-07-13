@@ -1,56 +1,138 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('config/loader', () => ({
-	getConfigLoader: vi.fn(() => ({ get: () => ({ budgets: undefined }) }))
+	getConfigLoader: vi.fn(() => ({ get: () => ({ budgets: undefined }), getRaw: () => ({}) }))
 }));
 
-import { getLogger } from 'output/logger';
+vi.mock('executor/project-guidance-loader', () => ({
+	loadAvailableAgents: vi.fn(async () => null),
+	loadProjectGuidance: vi.fn(async () => null),
+	loadProjectKnowledge: vi.fn(async () => null)
+}));
+
+vi.mock('ast/ast-index.service', () => ({
+	getASTIndexService: vi.fn(() => ({
+		buildIndex: vi.fn(async () => ({})),
+		isBuilding: () => false,
+		isBuilt: () => false,
+		loadIndex: () => false
+	}))
+}));
+
+const mockEscalationDetectionService = {
+	getConfig: vi.fn(),
+	getMissingSignalEscalation: vi.fn(),
+	parseResponse: vi.fn(),
+	shouldTriggerEscalation: vi.fn()
+};
+vi.mock('executor/escalation-detection.service', () => ({
+	getEscalationDetectionService: vi.fn(() => mockEscalationDetectionService)
+}));
+
+const mockEscalationHandlerService = {
+	displayEscalationSummary: vi.fn(),
+	handleEscalation: vi.fn()
+};
+vi.mock('executor/escalation-handler.service', () => ({
+	getEscalationHandlerService: vi.fn(() => mockEscalationHandlerService)
+}));
+
+const mockSelfConsistencySamplerService = { checkAgreement: vi.fn() };
+vi.mock('executor/self-consistency-sampler.service', () => ({
+	getSelfConsistencySamplerService: vi.fn(() => mockSelfConsistencySamplerService)
+}));
+
+const mockSessionBudgetService = {
+	getSessionTotal: vi.fn().mockReturnValue({ totalCostUsd: 0 }),
+	wouldExceed: vi.fn().mockReturnValue(false)
+};
+vi.mock('executor/session-budget.service', () => ({
+	getSessionBudgetService: vi.fn(() => mockSessionBudgetService)
+}));
+
+import type { AgentDefinition } from 'types/agent.types';
 import type { PipelineStage } from 'types/command.types';
 import type { EscalationConfig, EscalationResult, EscalationSignal } from 'types/escalation.types';
+import type { LLMCompletionResult, LLMProvider } from 'types/llm.types';
+import type { PromptDefinition } from 'types/prompt.types';
 
-import { StageExecutor } from './stage-executor';
+import { ExecutionContext } from './execution-context';
+import { PipelineExecutionContext, StageExecutor } from './stage-executor';
 
 /**
- * Exercises `maybeApplySelfConsistencyCheck`, reached via `processEscalation` whenever the
- * model reports "no escalation needed" with confidence just above the threshold. This is the
- * one place in the pipeline that verifies a self-reported confidence against something other
- * than the model's own words (see stage-executor.escalation.test.ts for the rest of the
- * escalation decision logic, which this file does not duplicate).
+ * Exercises the self-consistency check (`maybeApplySelfConsistencyCheck`, reached via
+ * `processEscalation`) end-to-end through `executeStage()` — the model reports confidence
+ * just above the escalation threshold, and this is the one place in the pipeline that
+ * verifies that self-report against something other than the model's own words. See
+ * stage-executor.escalation.test.ts for the rest of the escalation decision logic (not
+ * duplicated here).
+ *
+ * As in that file, `promptLoader`/`agentLoader` are supplied as real constructor
+ * arguments (StageExecutor's actual DI seam); the escalation/self-consistency/session-budget
+ * services are module-level singletons replaced via `vi.mock()`, not private-field overrides.
  */
 
-interface ExecutorInternals {
-	escalationDetectionService: {
-		getConfig: ReturnType<typeof vi.fn>;
-		getMissingSignalEscalation: ReturnType<typeof vi.fn>;
-		parseResponse: ReturnType<typeof vi.fn>;
-		shouldTriggerEscalation: ReturnType<typeof vi.fn>;
-	};
-	escalationHandlerService: {
-		displayEscalationSummary: ReturnType<typeof vi.fn>;
-		handleEscalation: ReturnType<typeof vi.fn>;
-	};
-	processEscalation(
-		responseContent: string,
-		stage: PipelineStage,
-		agentRole: string,
-		escalationCriteria: string[],
-		duration: number,
-		resolvedInputs: Record<string, unknown>,
-		logger: ReturnType<typeof getLogger>,
-		allowRetry: boolean,
-		selfConsistencyContext: {
-			completionOptions: { messages: unknown[] };
-			model: string;
-			originalUsage: undefined;
-			provider: { complete: ReturnType<typeof vi.fn> };
-			sessionId: string | undefined;
-		}
-	): Promise<{ guidance?: string; kind: string; output?: unknown }>;
-	selfConsistencySamplerService: { checkAgreement: ReturnType<typeof vi.fn> };
-	sessionBudgetService: { wouldExceed: ReturnType<typeof vi.fn> };
+const makeStage = (): PipelineStage => ({ prompt: 'assess-risks', required: true, stage: 'plan' });
+
+const makePrompt = (): PromptDefinition => ({
+	agents: [],
+	category: 'plan',
+	content: 'Assess risks for this change.',
+	description: 'Assess risks',
+	id: 'plan.assess-risks',
+	name: 'assess-risks',
+	version: '1.0.0'
+});
+
+const makeAgent = (escalationCriteria: string[]): AgentDefinition => ({
+	capabilities: { can_review_code: true, can_run_tests: false, can_write_code: false, can_write_knowledge: false },
+	content: 'You are a technical lead.',
+	decision_making: { escalation_criteria: escalationCriteria },
+	description: 'Technical lead',
+	role: 'lead',
+	specialization: 'leadership',
+	tone: 'concise-technical',
+	version: '1.0.0'
+});
+
+function makePromptLoader(): { loadPrompt: ReturnType<typeof vi.fn> } {
+	return { loadPrompt: vi.fn().mockResolvedValue(makePrompt()) };
 }
 
-const makeStage = (): PipelineStage => ({ prompt: 'assess-risks', required: true, stage: 'plan' });
+function makeAgentLoader(escalationCriteria: string[] = ['Confidence < 70%']): { loadAgent: ReturnType<typeof vi.fn> } {
+	return { loadAgent: vi.fn().mockResolvedValue(makeAgent(escalationCriteria)) };
+}
+
+function makeCompletion(content: string): LLMCompletionResult {
+	return { content, model: 'test-model', role: 'assistant' };
+}
+
+function makeExecutionContext(
+	providerComplete: ReturnType<typeof vi.fn>,
+	sessionId: string | undefined
+): ExecutionContext {
+	return new ExecutionContext({
+		agentRole: 'lead',
+		args: [],
+		commandName: 'test-command',
+		flags: {},
+		provider: { complete: providerComplete } as unknown as LLMProvider,
+		sessionInfo: sessionId ? { isResumed: false, sessionId } : undefined
+	});
+}
+
+function makeExecutor(): StageExecutor {
+	return new StageExecutor(makePromptLoader() as never, makeAgentLoader() as never);
+}
+
+async function runStage(
+	executor: StageExecutor,
+	providerComplete: ReturnType<typeof vi.fn>,
+	sessionId: string | undefined = 'session-1'
+): Promise<Awaited<ReturnType<StageExecutor['executeStage']>>> {
+	const context: PipelineExecutionContext = { executionContext: makeExecutionContext(providerComplete, sessionId) };
+	return executor.executeStage(makeStage(), context, 0);
+}
 
 const makeSignal = (overrides: Partial<EscalationSignal> = {}): EscalationSignal => ({
 	confidence: 74,
@@ -77,58 +159,26 @@ const DEFAULT_CONFIG: EscalationConfig = {
 	selfConsistency: { borderlineBand: 10, enabled: true, sampleCount: 2 }
 };
 
-function makeExecutor(configOverrides: Partial<EscalationConfig> = {}): ExecutorInternals {
-	const executor = new StageExecutor({} as never, {} as never) as unknown as ExecutorInternals;
-
-	executor.escalationDetectionService = {
-		getConfig: vi.fn().mockReturnValue({ ...DEFAULT_CONFIG, ...configOverrides }),
-		getMissingSignalEscalation: vi.fn(),
-		parseResponse: vi.fn(),
-		shouldTriggerEscalation: vi.fn()
-	};
-	executor.escalationHandlerService = {
-		displayEscalationSummary: vi.fn(),
-		handleEscalation: vi.fn()
-	};
-	executor.selfConsistencySamplerService = { checkAgreement: vi.fn() };
-	executor.sessionBudgetService = { wouldExceed: vi.fn().mockReturnValue(false) };
-
-	return executor;
-}
-
-const makeReplay = (sessionId: string | undefined = 'session-1') => ({
-	completionOptions: { messages: [] },
-	model: 'test-model',
-	originalUsage: undefined,
-	provider: { complete: vi.fn() },
-	sessionId
-});
-
 describe('StageExecutor self-consistency check', () => {
-	const logger = getLogger();
+	beforeEach(() => {
+		vi.clearAllMocks();
+		mockEscalationDetectionService.getConfig.mockReturnValue(DEFAULT_CONFIG);
+		mockSessionBudgetService.wouldExceed.mockReturnValue(false);
+		mockSessionBudgetService.getSessionTotal.mockReturnValue({ totalCostUsd: 0 });
+	});
 
 	it('samples and forces escalation when a majority of samples disagree with the original "no escalation needed" report', async () => {
-		const executor = makeExecutor();
 		const signal = makeSignal({ confidence: 74 });
-		executor.escalationDetectionService.parseResponse.mockReturnValue({ cleanedContent: 'x', signal });
-		executor.escalationDetectionService.shouldTriggerEscalation.mockReturnValue(false);
-		executor.selfConsistencySamplerService.checkAgreement.mockResolvedValue({ agreementRatio: 0.0, disagrees: true });
-		executor.escalationHandlerService.handleEscalation.mockResolvedValue(makeEscalationResult());
+		mockEscalationDetectionService.parseResponse.mockReturnValue({ cleanedContent: 'x', signal });
+		mockEscalationDetectionService.shouldTriggerEscalation.mockReturnValue(false);
+		mockSelfConsistencySamplerService.checkAgreement.mockResolvedValue({ agreementRatio: 0.0, disagrees: true });
+		mockEscalationHandlerService.handleEscalation.mockResolvedValue(makeEscalationResult());
+		const providerComplete = vi.fn().mockResolvedValue(makeCompletion('...'));
 
-		const outcome = await executor.processEscalation(
-			'...',
-			makeStage(),
-			'lead',
-			['Confidence < 70%'],
-			100,
-			{},
-			logger,
-			true,
-			makeReplay()
-		);
+		const output = await runStage(makeExecutor(), providerComplete);
 
-		expect(executor.selfConsistencySamplerService.checkAgreement).toHaveBeenCalledTimes(1);
-		expect(executor.escalationHandlerService.handleEscalation).toHaveBeenCalledWith(
+		expect(mockSelfConsistencySamplerService.checkAgreement).toHaveBeenCalledTimes(1);
+		expect(mockEscalationHandlerService.handleEscalation).toHaveBeenCalledWith(
 			expect.objectContaining({
 				signal: expect.objectContaining({
 					requires_escalation: true,
@@ -136,141 +186,88 @@ describe('StageExecutor self-consistency check', () => {
 				})
 			})
 		);
-		expect(outcome.kind).toBe('continue');
+		expect(output.success).toBe(true);
 	});
 
 	it('trusts the original report when samples agree, without escalating', async () => {
-		const executor = makeExecutor();
 		const signal = makeSignal({ confidence: 74 });
-		executor.escalationDetectionService.parseResponse.mockReturnValue({ cleanedContent: 'x', signal });
-		executor.escalationDetectionService.shouldTriggerEscalation.mockReturnValue(false);
-		executor.selfConsistencySamplerService.checkAgreement.mockResolvedValue({ agreementRatio: 1.0, disagrees: false });
+		mockEscalationDetectionService.parseResponse.mockReturnValue({ cleanedContent: 'x', signal });
+		mockEscalationDetectionService.shouldTriggerEscalation.mockReturnValue(false);
+		mockSelfConsistencySamplerService.checkAgreement.mockResolvedValue({ agreementRatio: 1.0, disagrees: false });
+		const providerComplete = vi.fn().mockResolvedValue(makeCompletion('...'));
 
-		const outcome = await executor.processEscalation(
-			'...',
-			makeStage(),
-			'lead',
-			['Confidence < 70%'],
-			100,
-			{},
-			logger,
-			true,
-			makeReplay()
-		);
+		const output = await runStage(makeExecutor(), providerComplete);
 
-		expect(executor.selfConsistencySamplerService.checkAgreement).toHaveBeenCalledTimes(1);
-		expect(executor.escalationHandlerService.handleEscalation).not.toHaveBeenCalled();
-		expect(outcome.kind).toBe('continue');
+		expect(mockSelfConsistencySamplerService.checkAgreement).toHaveBeenCalledTimes(1);
+		expect(mockEscalationHandlerService.handleEscalation).not.toHaveBeenCalled();
+		expect(output.success).toBe(true);
 	});
 
 	it('skips sampling and proceeds with the original report when it would exceed the session budget', async () => {
-		const executor = makeExecutor();
-		executor.sessionBudgetService.wouldExceed.mockReturnValue(true);
+		// First call is the stage-level pre-LLM-call budget circuit-breaker (must stay under
+		// budget so the LLM call actually happens); the second is the self-consistency
+		// sampling gate this test targets.
+		mockSessionBudgetService.wouldExceed.mockReturnValueOnce(false).mockReturnValueOnce(true);
 		const signal = makeSignal({ confidence: 74 });
-		executor.escalationDetectionService.parseResponse.mockReturnValue({ cleanedContent: 'x', signal });
-		executor.escalationDetectionService.shouldTriggerEscalation.mockReturnValue(false);
+		mockEscalationDetectionService.parseResponse.mockReturnValue({ cleanedContent: 'x', signal });
+		mockEscalationDetectionService.shouldTriggerEscalation.mockReturnValue(false);
+		const providerComplete = vi.fn().mockResolvedValue(makeCompletion('...'));
 
-		const outcome = await executor.processEscalation(
-			'...',
-			makeStage(),
-			'lead',
-			['Confidence < 70%'],
-			100,
-			{},
-			logger,
-			true,
-			makeReplay()
-		);
+		const output = await runStage(makeExecutor(), providerComplete);
 
-		expect(executor.selfConsistencySamplerService.checkAgreement).not.toHaveBeenCalled();
-		expect(outcome.kind).toBe('continue');
+		expect(mockSelfConsistencySamplerService.checkAgreement).not.toHaveBeenCalled();
+		expect(output.success).toBe(true);
 	});
 
 	it('never samples when confidence is far above the borderline band', async () => {
-		const executor = makeExecutor();
 		const signal = makeSignal({ confidence: 95 });
-		executor.escalationDetectionService.parseResponse.mockReturnValue({ cleanedContent: 'x', signal });
-		executor.escalationDetectionService.shouldTriggerEscalation.mockReturnValue(false);
+		mockEscalationDetectionService.parseResponse.mockReturnValue({ cleanedContent: 'x', signal });
+		mockEscalationDetectionService.shouldTriggerEscalation.mockReturnValue(false);
+		const providerComplete = vi.fn().mockResolvedValue(makeCompletion('...'));
 
-		await executor.processEscalation(
-			'...',
-			makeStage(),
-			'lead',
-			['Confidence < 70%'],
-			100,
-			{},
-			logger,
-			true,
-			makeReplay()
-		);
+		await runStage(makeExecutor(), providerComplete);
 
-		expect(executor.selfConsistencySamplerService.checkAgreement).not.toHaveBeenCalled();
+		expect(mockSelfConsistencySamplerService.checkAgreement).not.toHaveBeenCalled();
 	});
 
 	it('never samples when the signal already triggers escalation for another reason', async () => {
-		const executor = makeExecutor();
 		const signal = makeSignal({ confidence: 40 });
-		executor.escalationDetectionService.parseResponse.mockReturnValue({ cleanedContent: 'x', signal });
-		executor.escalationDetectionService.shouldTriggerEscalation.mockReturnValue(true);
-		executor.escalationHandlerService.handleEscalation.mockResolvedValue(makeEscalationResult());
+		mockEscalationDetectionService.parseResponse.mockReturnValue({ cleanedContent: 'x', signal });
+		mockEscalationDetectionService.shouldTriggerEscalation.mockReturnValue(true);
+		mockEscalationHandlerService.handleEscalation.mockResolvedValue(makeEscalationResult());
+		const providerComplete = vi.fn().mockResolvedValue(makeCompletion('...'));
 
-		await executor.processEscalation(
-			'...',
-			makeStage(),
-			'lead',
-			['Confidence < 70%'],
-			100,
-			{},
-			logger,
-			true,
-			makeReplay()
-		);
+		await runStage(makeExecutor(), providerComplete);
 
-		expect(executor.selfConsistencySamplerService.checkAgreement).not.toHaveBeenCalled();
+		expect(mockSelfConsistencySamplerService.checkAgreement).not.toHaveBeenCalled();
 	});
 
 	it('never samples when self-consistency is disabled in config', async () => {
-		const executor = makeExecutor({ selfConsistency: { borderlineBand: 10, enabled: false, sampleCount: 2 } });
+		mockEscalationDetectionService.getConfig.mockReturnValue({
+			...DEFAULT_CONFIG,
+			selfConsistency: { borderlineBand: 10, enabled: false, sampleCount: 2 }
+		});
 		const signal = makeSignal({ confidence: 74 });
-		executor.escalationDetectionService.parseResponse.mockReturnValue({ cleanedContent: 'x', signal });
-		executor.escalationDetectionService.shouldTriggerEscalation.mockReturnValue(false);
+		mockEscalationDetectionService.parseResponse.mockReturnValue({ cleanedContent: 'x', signal });
+		mockEscalationDetectionService.shouldTriggerEscalation.mockReturnValue(false);
+		const providerComplete = vi.fn().mockResolvedValue(makeCompletion('...'));
 
-		const outcome = await executor.processEscalation(
-			'...',
-			makeStage(),
-			'lead',
-			['Confidence < 70%'],
-			100,
-			{},
-			logger,
-			true,
-			makeReplay()
-		);
+		const output = await runStage(makeExecutor(), providerComplete);
 
-		expect(executor.selfConsistencySamplerService.checkAgreement).not.toHaveBeenCalled();
-		expect(outcome.kind).toBe('continue');
+		expect(mockSelfConsistencySamplerService.checkAgreement).not.toHaveBeenCalled();
+		expect(output.success).toBe(true);
 	});
 
 	it('never samples when confidence was defaulted rather than actually reported by the model', async () => {
-		const executor = makeExecutor();
 		const signal = makeSignal({ confidence: 74, confidenceSource: 'defaulted' });
-		executor.escalationDetectionService.parseResponse.mockReturnValue({ cleanedContent: 'x', signal });
+		mockEscalationDetectionService.parseResponse.mockReturnValue({ cleanedContent: 'x', signal });
 		// A defaulted confidence already escalates unconditionally in shouldTriggerEscalation — simulate that here.
-		executor.escalationDetectionService.shouldTriggerEscalation.mockReturnValue(true);
-		executor.escalationHandlerService.handleEscalation.mockResolvedValue(makeEscalationResult());
+		mockEscalationDetectionService.shouldTriggerEscalation.mockReturnValue(true);
+		mockEscalationHandlerService.handleEscalation.mockResolvedValue(makeEscalationResult());
+		const providerComplete = vi.fn().mockResolvedValue(makeCompletion('...'));
 
-		await executor.processEscalation(
-			'...',
-			makeStage(),
-			'lead',
-			['Confidence < 70%'],
-			100,
-			{},
-			logger,
-			true,
-			makeReplay()
-		);
+		await runStage(makeExecutor(), providerComplete);
 
-		expect(executor.selfConsistencySamplerService.checkAgreement).not.toHaveBeenCalled();
+		expect(mockSelfConsistencySamplerService.checkAgreement).not.toHaveBeenCalled();
 	});
 });

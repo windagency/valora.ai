@@ -128,8 +128,13 @@ describe('ContextAnalyzerService', () => {
 
 			const context = await analyzer.analyzeContext(affectedFiles);
 
-			expect(context).toBeDefined();
-			expect(context.affectedFileTypes).toContain('.tsx');
+			expect(context).toEqual({
+				affectedFileTypes: ['.tsx'],
+				architecturalPatterns: [],
+				importPatterns: [],
+				infrastructureComponents: [],
+				technologyStack: ['typescript']
+			});
 		});
 
 		it('should cache analysis results', async () => {
@@ -438,9 +443,13 @@ describe('ContextAnalyzerService', () => {
 
 			const context = await analyzer.analyzeContext(files);
 
-			expect(context).toBeDefined();
-			expect(context.affectedFileTypes).toContain('.tsx');
-			expect(context.importPatterns).toEqual([]);
+			expect(context).toEqual({
+				affectedFileTypes: ['.tsx'],
+				architecturalPatterns: [],
+				importPatterns: [],
+				infrastructureComponents: [],
+				technologyStack: ['typescript']
+			});
 		});
 
 		it('should handle empty file list', async () => {

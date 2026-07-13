@@ -91,11 +91,11 @@ describe('AgentCapabilityMatcherService', () => {
 			const scores = await matcher.scoreAgents(taskClassification, context);
 
 			expect(scores).toHaveLength(3);
-			expect(scores[0].role).toBeDefined();
+			expect([...mockCapabilities.keys()]).toContain(scores[0].role);
 			expect(scores[0].score).toBeGreaterThanOrEqual(0);
 			expect(scores[0].score).toBeLessThanOrEqual(1);
 			expect(scores[0].reasons).toBeInstanceOf(Array);
-			expect(scores[0].capability).toBeDefined();
+			expect(scores[0].capability).toBe(mockCapabilities.get(scores[0].role));
 
 			// Should be sorted by score descending
 			expect(scores.length).toBeGreaterThan(0);
@@ -476,7 +476,7 @@ describe('AgentCapabilityMatcherService', () => {
 			const result = await matcher.findBestAgent(taskClassification, context);
 
 			expect(result).toBeDefined();
-			expect(result!.agent).toBeDefined();
+			expect(result!.agent).toBe('platform-engineer');
 			expect(result!.score.score).toBeGreaterThan(0);
 			expect(result!.score.role).toBe(result!.agent);
 		});

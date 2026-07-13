@@ -208,7 +208,6 @@ describe('content_hash drift detection', () => {
 	it('serialiseMemoryFile always emits a content_hash matching the current body', () => {
 		const md = serialiseMemoryFile({ ...FIXTURE_ENTRY, content: 'hello' }, []);
 		const parsed = parseMemoryFile(md, FIXTURE_ENTRY.id);
-		expect(parsed.entry.contentHash).toBeDefined();
 		expect(parsed.entry.contentHash).toMatch(/^[0-9a-f]{64}$/);
 		expect(parsed.entry.embeddingStale).toBeFalsy();
 	});

@@ -38,7 +38,7 @@ describe('Infrastructure Smoke Test', () => {
 	describe('SafetyValidator', () => {
 		it('should instantiate without errors', () => {
 			const validator = new SafetyValidator(testDir);
-			expect(validator).toBeDefined();
+			expect(validator).toBeInstanceOf(SafetyValidator);
 		});
 
 		it('should get git state', async () => {
@@ -108,7 +108,7 @@ describe('Infrastructure Smoke Test', () => {
 			const exploration = await stateManager.createExploration('Test task', config);
 
 			expect(exploration).toBeDefined();
-			expect(exploration.id).toBeDefined();
+			expect(exploration.id).toMatch(/^exp-/);
 			expect(exploration.task).toBe('Test task');
 			expect(exploration.config.branches).toBe(2);
 			expect(exploration.status).toBe('pending');
@@ -147,8 +147,11 @@ describe('Infrastructure Smoke Test', () => {
 				memory_limit: '2g'
 			});
 
-			expect(resources).toBeDefined();
-			expect(resources.port).toBeDefined();
+			expect(resources).toMatchObject({
+				container_name: 'exploration-test-exploration-1',
+				cpu_limit: '1.5',
+				memory_limit: '2g'
+			});
 			expect(resources.port).toBeGreaterThanOrEqual(3000);
 			expect(resources.port).toBeLessThan(4000);
 			console.log('Allocated resources:', resources);
@@ -255,7 +258,7 @@ describe('Infrastructure Smoke Test', () => {
 			});
 
 			expect(updated.updated).toBe(true);
-			expect(updated.updateTimestamp).toBeDefined();
+			expect(typeof updated.updateTimestamp).toBe('number');
 		});
 
 		it('should handle concurrent updates with locking', async () => {

@@ -1160,12 +1160,8 @@ export class StageExecutor {
 				return {
 					completion: patchedCompletion,
 					summary: {
-						executedToolCalls: [],
-						fatalFailureCount: 0,
-						recoverableFailureCount: 0,
-						toolFailureCount: 0,
+						...this.extractExecutionSummary(messages),
 						totalToolIterations: totalIterations,
-						verifiedModifiedFiles: [],
 						wasLoopExhausted: false
 					}
 				};

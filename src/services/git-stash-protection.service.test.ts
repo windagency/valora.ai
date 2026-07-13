@@ -187,7 +187,7 @@ describe('GitStashProtectionService', () => {
 
 			const result = await service.promptAndStash(true);
 
-			expect(mockConfirmFn).toHaveBeenCalled();
+			expect(mockConfirmFn).toHaveBeenCalledWith(expect.stringContaining('Stash them'));
 			expect(result.stashCreated).toBe(false);
 		});
 

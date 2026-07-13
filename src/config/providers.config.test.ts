@@ -60,7 +60,8 @@ describe('providers.config', () => {
 
 		it('should have cursor provider without API key requirement', () => {
 			expect(PROVIDER_REGISTRY[BuiltinProviders.CURSOR].requiresApiKey).toBe(false);
-			expect(PROVIDER_REGISTRY[BuiltinProviders.CURSOR].helpText).toBeDefined();
+			expect(typeof PROVIDER_REGISTRY[BuiltinProviders.CURSOR].helpText).toBe('string');
+			expect(PROVIDER_REGISTRY[BuiltinProviders.CURSOR].helpText?.length).toBeGreaterThan(0);
 		});
 
 		it('should have other providers requiring API keys', () => {
@@ -102,7 +103,7 @@ describe('providers.config', () => {
 	describe('getProviderMetadata', () => {
 		it('should return metadata for valid provider', () => {
 			const metadata = getProviderMetadata(BuiltinProviders.ANTHROPIC);
-			expect(metadata).toBeDefined();
+			expect(metadata).toBe(PROVIDER_REGISTRY[BuiltinProviders.ANTHROPIC]);
 			expect(metadata?.key).toBe(BuiltinProviders.ANTHROPIC);
 			expect(metadata?.label).toBe('Anthropic');
 		});
@@ -114,7 +115,7 @@ describe('providers.config', () => {
 
 		it('should return cursor metadata correctly', () => {
 			const metadata = getProviderMetadata(BuiltinProviders.CURSOR);
-			expect(metadata).toBeDefined();
+			expect(metadata).toBe(PROVIDER_REGISTRY[BuiltinProviders.CURSOR]);
 			expect(metadata?.requiresApiKey).toBe(false);
 			expect(metadata?.defaultModel).toBe('cursor-sonnet-4.6');
 		});

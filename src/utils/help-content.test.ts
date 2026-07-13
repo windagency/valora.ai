@@ -4,7 +4,14 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { getAllCommandNames, getCommandHelp, getCommandsByPhase, hasCommandHelp, searchCommands } from './help-content';
+import {
+	WORKFLOW_PHASES,
+	getAllCommandNames,
+	getCommandHelp,
+	getCommandsByPhase,
+	hasCommandHelp,
+	searchCommands
+} from './help-content';
 
 describe('Help Content', () => {
 	describe('getCommandHelp', () => {
@@ -118,7 +125,7 @@ describe('Help Content', () => {
 				expect(help?.name).toBe(name);
 				expect(help?.description).toBeTruthy();
 				expect(help?.agent).toBeTruthy();
-				expect(help?.workflowPhase).toBeTruthy();
+				expect(Object.keys(WORKFLOW_PHASES)).toContain(help?.workflowPhase);
 				expect(help?.examples).toBeInstanceOf(Array);
 				expect(help?.options).toBeInstanceOf(Array);
 				expect(help?.relatedCommands).toBeInstanceOf(Array);

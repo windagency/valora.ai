@@ -1587,4 +1587,67 @@ describe('Agent Selection Test Suite', () => {
 			});
 		});
 	});
+
+	// Ported from the now-deleted src/services/dynamic-agent-selection.test.ts — these covered
+	// resolver API surface (getDetailedAnalysis/validateServices) and edge cases (determinism,
+	// large-scale file sets) that this file's own scenario-by-domain coverage above didn't touch.
+	describe('Detailed Analysis and Additional Edge Cases', () => {
+		it('should provide a comprehensive analysis breakdown via getDetailedAnalysis()', async () => {
+			const taskContext: TaskContext = {
+				affectedFiles: ['src/graphql/schema.ts', 'src/auth/jwt.ts'],
+				dependencies: ['graphql', 'jsonwebtoken'],
+				description: 'Implement GraphQL API with authentication'
+			};
+
+			const analysis = await resolver.getDetailedAnalysis(taskContext);
+
+			expect(analysis.taskClassification).toBeDefined();
+			expect(analysis.taskClassification.primaryDomain).toBeDefined();
+			expect(analysis.taskClassification.confidence).toBeGreaterThan(0);
+
+			expect(analysis.codebaseContext).toBeDefined();
+			expect(analysis.codebaseContext.affectedFileTypes).toBeInstanceOf(Array);
+
+			expect(analysis.agentScores).toBeInstanceOf(Array);
+			expect(analysis.agentScores.length).toBeGreaterThan(0);
+
+			expect(analysis.selection).toBeDefined();
+			expect(analysis.selection.selectedAgent).toBeDefined();
+		});
+
+		it('should report all services as healthy via validateServices()', async () => {
+			const health = await resolver.validateServices();
+
+			expect(health.valid).toBe(true);
+			expect(health.issues).toEqual([]);
+			expect(health.stats.registryAgents).toBeGreaterThan(0);
+			expect(health.stats.registryDomains).toBeGreaterThan(0);
+		});
+
+		it('should select the same agent with the same confidence for identical repeated input', async () => {
+			const taskContext: TaskContext = {
+				affectedFiles: ['src/controllers/product.controller.ts'],
+				dependencies: ['express'],
+				description: 'Build REST API for products'
+			};
+
+			const result1 = await resolver.resolveAgent(taskContext);
+			const result2 = await resolver.resolveAgent(taskContext);
+
+			expect(result1.selectedAgent).toBe(result2.selectedAgent);
+			expect(result1.confidence).toBe(result2.confidence);
+		});
+
+		it('should resolve an agent for a very large file set (500 files) without error', async () => {
+			const taskContext: TaskContext = {
+				affectedFiles: Array.from({ length: 500 }, (_, i) => `src/file${i}.ts`),
+				dependencies: ['typescript', 'react', 'express'],
+				description: 'Refactor entire codebase'
+			};
+
+			const result = await resolver.resolveAgent(taskContext);
+
+			expect(result.selectedAgent).toBeDefined();
+		});
+	});
 });

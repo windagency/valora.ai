@@ -104,7 +104,7 @@ describe('ConfigLoader - File Integration', () => {
 			// No config file exists
 			const config = await configLoader.load();
 
-			expect(config).toBeDefined();
+			expect(config.defaults?.log_level).toBe(DEFAULT_CONFIG.defaults?.log_level);
 			expect(config.providers).toEqual({});
 		});
 
@@ -266,7 +266,7 @@ describe('ConfigLoader - File Integration', () => {
 
 			// Reload should handle missing file
 			const config = await configLoader.reload();
-			expect(config).toBeDefined();
+			expect(config.defaults?.log_level).toBe(DEFAULT_CONFIG.defaults?.log_level);
 		});
 	});
 
@@ -345,25 +345,6 @@ describe('ConfigLoader - File Integration', () => {
 			await fs.writeFile(configPath, Buffer.from([0x00, 0x01, 0x02, 0x03]));
 
 			await expect(configLoader.load()).rejects.toThrow();
-		});
-
-		it('should recover from temporary file access issues', async () => {
-			const configPath = path.join(tempDir, 'config.json');
-			const validConfig = { defaults: { log_level: 'debug' } };
-
-			// Create valid config file
-			await fs.writeFile(configPath, JSON.stringify(validConfig, null, 2));
-
-			// First load should succeed
-			const config1 = await configLoader.load();
-			expect(config1.defaults?.log_level).toBe('debug');
-
-			// Simulate temporary permission issue
-			const originalContent = await fs.readFile(configPath, 'utf-8');
-
-			// Reload should still work (uses cached config)
-			const config2 = await configLoader.reload();
-			expect(config2.defaults?.log_level).toBe('debug');
 		});
 	});
 

@@ -1,14 +1,83 @@
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('config/loader', () => ({
-	getConfigLoader: vi.fn(() => ({ get: () => ({ budgets: undefined }) }))
+	getConfigLoader: vi.fn(() => ({ get: () => ({ budgets: undefined }), getRaw: () => ({}) }))
 }));
 
-import { getLogger } from 'output/logger';
-import type { PipelineStage } from 'types/command.types';
-import type { EscalationConfig, EscalationResult, EscalationSignal } from 'types/escalation.types';
+vi.mock('executor/project-guidance-loader', () => ({
+	loadAvailableAgents: vi.fn(async () => null),
+	loadProjectGuidance: vi.fn(async () => null),
+	loadProjectKnowledge: vi.fn(async () => null)
+}));
 
-import { StageExecutor } from './stage-executor';
+vi.mock('ast/ast-index.service', () => ({
+	getASTIndexService: vi.fn(() => ({
+		buildIndex: vi.fn(async () => ({})),
+		isBuilding: () => false,
+		isBuilt: () => false,
+		loadIndex: () => false
+	}))
+}));
+
+const mockEscalationDetectionService = {
+	getConfig: vi.fn().mockReturnValue({
+		confidenceThreshold: 70,
+		requireExplicitBlock: true,
+		// Confidence is 95 in these tests — outside the self-consistency borderline band — so
+		// self-consistency sampling is disabled here to isolate the telemetry check under test.
+		selfConsistency: { borderlineBand: 10, enabled: false, sampleCount: 2 }
+	}),
+	getMissingSignalEscalation: vi.fn(),
+	parseResponse: vi.fn(),
+	shouldTriggerEscalation: vi.fn()
+};
+vi.mock('executor/escalation-detection.service', () => ({
+	getEscalationDetectionService: vi.fn(() => mockEscalationDetectionService)
+}));
+
+const mockEscalationHandlerService = {
+	displayEscalationSummary: vi.fn(),
+	handleEscalation: vi.fn()
+};
+vi.mock('executor/escalation-handler.service', () => ({
+	getEscalationHandlerService: vi.fn(() => mockEscalationHandlerService)
+}));
+
+const mockSelfConsistencySamplerService = { checkAgreement: vi.fn() };
+vi.mock('executor/self-consistency-sampler.service', () => ({
+	getSelfConsistencySamplerService: vi.fn(() => mockSelfConsistencySamplerService)
+}));
+
+vi.mock('executor/session-budget.service', () => ({
+	getSessionBudgetService: vi.fn(() => ({
+		getSessionTotal: vi.fn().mockReturnValue({ totalCostUsd: 0 }),
+		wouldExceed: vi.fn().mockReturnValue(false)
+	}))
+}));
+
+const mockToolExecutionService = {
+	executeTools: vi.fn().mockResolvedValue([]),
+	flushPendingWrites: vi.fn(async () => ({ skipped: 0, written: 0 })),
+	getToolDefinitions: vi.fn(() => []),
+	hasPendingWrites: vi.fn(() => false),
+	resetForNewCommand: vi.fn(),
+	setDryRunMode: vi.fn(),
+	setEffectiveConstraints: vi.fn(),
+	setMCPClientManager: vi.fn(),
+	setMCPToolHandler: vi.fn()
+};
+vi.mock('executor/tool-execution.service', () => ({
+	getToolExecutionService: vi.fn(() => mockToolExecutionService)
+}));
+
+import type { AgentDefinition } from 'types/agent.types';
+import type { PipelineStage } from 'types/command.types';
+import type { EscalationResult, EscalationSignal } from 'types/escalation.types';
+import type { LLMCompletionResult, LLMProvider, LLMToolCall } from 'types/llm.types';
+import type { PromptDefinition } from 'types/prompt.types';
+
+import { ExecutionContext } from './execution-context';
+import { PipelineExecutionContext, StageExecutor } from './stage-executor';
 
 /**
  * Exercises the execution-telemetry cross-check reached via `processEscalation`: when the
@@ -18,51 +87,76 @@ import { StageExecutor } from './stage-executor';
  * compared against the confidence claim. Unlike self-consistency sampling, this check is
  * free (no extra LLM calls) and applies to every escalation-gated stage, not just a
  * borderline confidence band.
+ *
+ * Driven end-to-end through `executeStage()`: the "exhausted" and "fatal failure" telemetry
+ * are produced by the REAL tool loop (`callLLMWithToolLoop`/`extractExecutionSummary`)
+ * reacting to a fake LLM provider and a fake tool-execution service, rather than by
+ * hand-constructing an ExecutionSummary and injecting it directly — this exercises the real
+ * summary-derivation logic too, not just the branch that consumes it.
  */
 
-interface ExecutionSummaryStub {
-	fatalFailureCount: number;
-	recoverableFailureCount: number;
-	toolFailureCount: number;
-	totalToolIterations: number;
-	verifiedModifiedFiles: string[];
-	wasLoopExhausted: boolean;
+const makeStage = (maxToolIterations?: number): PipelineStage => ({
+	max_tool_iterations: maxToolIterations,
+	prompt: 'assess-risks',
+	required: true,
+	stage: 'plan'
+});
+
+const makePrompt = (): PromptDefinition => ({
+	agents: [],
+	category: 'plan',
+	content: 'Assess risks for this change.',
+	description: 'Assess risks',
+	id: 'plan.assess-risks',
+	name: 'assess-risks',
+	version: '1.0.0'
+});
+
+const makeAgent = (escalationCriteria: string[]): AgentDefinition => ({
+	capabilities: { can_review_code: true, can_run_tests: false, can_write_code: false, can_write_knowledge: false },
+	content: 'You are a technical lead.',
+	decision_making: { escalation_criteria: escalationCriteria },
+	description: 'Technical lead',
+	role: 'lead',
+	specialization: 'leadership',
+	tone: 'concise-technical',
+	version: '1.0.0'
+});
+
+function makePromptLoader(): { loadPrompt: ReturnType<typeof vi.fn> } {
+	return { loadPrompt: vi.fn().mockResolvedValue(makePrompt()) };
 }
 
-interface ExecutorInternals {
-	escalationDetectionService: {
-		getConfig: ReturnType<typeof vi.fn>;
-		getMissingSignalEscalation: ReturnType<typeof vi.fn>;
-		parseResponse: ReturnType<typeof vi.fn>;
-		shouldTriggerEscalation: ReturnType<typeof vi.fn>;
-	};
-	escalationHandlerService: {
-		displayEscalationSummary: ReturnType<typeof vi.fn>;
-		handleEscalation: ReturnType<typeof vi.fn>;
-	};
-	processEscalation(
-		responseContent: string,
-		stage: PipelineStage,
-		agentRole: string,
-		escalationCriteria: string[],
-		duration: number,
-		resolvedInputs: Record<string, unknown>,
-		logger: ReturnType<typeof getLogger>,
-		allowRetry: boolean,
-		selfConsistencyContext: {
-			completionOptions: { messages: unknown[] };
-			model: string;
-			originalUsage: undefined;
-			provider: { complete: ReturnType<typeof vi.fn> };
-			sessionId: string | undefined;
-		},
-		executionSummary: ExecutionSummaryStub | undefined
-	): Promise<{ guidance?: string; kind: string; output?: unknown }>;
-	selfConsistencySamplerService: { checkAgreement: ReturnType<typeof vi.fn> };
-	sessionBudgetService: { wouldExceed: ReturnType<typeof vi.fn> };
+function makeAgentLoader(escalationCriteria: string[] = ['Confidence < 70%']): { loadAgent: ReturnType<typeof vi.fn> } {
+	return { loadAgent: vi.fn().mockResolvedValue(makeAgent(escalationCriteria)) };
 }
 
-const makeStage = (): PipelineStage => ({ prompt: 'assess-risks', required: true, stage: 'plan' });
+function makeCompletion(content: string, toolCalls?: LLMToolCall[]): LLMCompletionResult {
+	return { content, model: 'test-model', role: 'assistant', tool_calls: toolCalls };
+}
+
+function makeExecutionContext(providerComplete: ReturnType<typeof vi.fn>): ExecutionContext {
+	return new ExecutionContext({
+		agentRole: 'lead',
+		args: [],
+		commandName: 'test-command',
+		flags: {},
+		provider: { complete: providerComplete } as unknown as LLMProvider
+	});
+}
+
+function makeExecutor(): StageExecutor {
+	return new StageExecutor(makePromptLoader() as never, makeAgentLoader() as never);
+}
+
+async function runStage(
+	executor: StageExecutor,
+	providerComplete: ReturnType<typeof vi.fn>,
+	maxToolIterations?: number
+): Promise<Awaited<ReturnType<StageExecutor['executeStage']>>> {
+	const context: PipelineExecutionContext = { executionContext: makeExecutionContext(providerComplete) };
+	return executor.executeStage(makeStage(maxToolIterations), context, 0);
+}
 
 const makeSignal = (overrides: Partial<EscalationSignal> = {}): EscalationSignal => ({
 	confidence: 95,
@@ -83,74 +177,23 @@ const makeEscalationResult = (overrides: Partial<EscalationResult> = {}): Escala
 	...overrides
 });
 
-const cleanSummary: ExecutionSummaryStub = {
-	fatalFailureCount: 0,
-	recoverableFailureCount: 0,
-	toolFailureCount: 0,
-	totalToolIterations: 1,
-	verifiedModifiedFiles: [],
-	wasLoopExhausted: false
-};
-
-const DEFAULT_CONFIG: EscalationConfig = {
-	confidenceThreshold: 70,
-	requireExplicitBlock: true,
-	// Confidence is 95 in these tests — outside the self-consistency borderline band — so
-	// self-consistency sampling is disabled here to isolate the telemetry check under test.
-	selfConsistency: { borderlineBand: 10, enabled: false, sampleCount: 2 }
-};
-
-function makeExecutor(): ExecutorInternals {
-	const executor = new StageExecutor({} as never, {} as never) as unknown as ExecutorInternals;
-
-	executor.escalationDetectionService = {
-		getConfig: vi.fn().mockReturnValue(DEFAULT_CONFIG),
-		getMissingSignalEscalation: vi.fn(),
-		parseResponse: vi.fn(),
-		shouldTriggerEscalation: vi.fn()
-	};
-	executor.escalationHandlerService = {
-		displayEscalationSummary: vi.fn(),
-		handleEscalation: vi.fn()
-	};
-	executor.selfConsistencySamplerService = { checkAgreement: vi.fn() };
-	executor.sessionBudgetService = { wouldExceed: vi.fn().mockReturnValue(false) };
-
-	return executor;
-}
-
-const makeReplay = () => ({
-	completionOptions: { messages: [] },
-	model: 'test-model',
-	originalUsage: undefined,
-	provider: { complete: vi.fn() },
-	sessionId: undefined
-});
-
 describe('StageExecutor execution-telemetry mismatch check', () => {
-	const logger = getLogger();
-
 	it('forces escalation when the tool loop was exhausted despite a confident "no escalation needed" report', async () => {
-		const executor = makeExecutor();
 		const signal = makeSignal();
-		executor.escalationDetectionService.parseResponse.mockReturnValue({ cleanedContent: 'x', signal });
-		executor.escalationDetectionService.shouldTriggerEscalation.mockReturnValue(false);
-		executor.escalationHandlerService.handleEscalation.mockResolvedValue(makeEscalationResult());
+		mockEscalationDetectionService.parseResponse.mockReturnValue({ cleanedContent: 'x', signal });
+		mockEscalationDetectionService.shouldTriggerEscalation.mockReturnValue(false);
+		mockEscalationHandlerService.handleEscalation.mockResolvedValue(makeEscalationResult());
+		mockToolExecutionService.executeTools.mockResolvedValueOnce([{ output: 'file contents', tool_call_id: 'call_1' }]);
+		// max_tool_iterations: 1 — one tool-call iteration exhausts the budget immediately,
+		// forcing handleMaxIterationsExceeded's forced-final-output call (2nd provider.complete).
+		const providerComplete = vi
+			.fn()
+			.mockResolvedValueOnce(makeCompletion('', [{ arguments: { path: 'x.txt' }, id: 'call_1', name: 'read_file' }]))
+			.mockResolvedValueOnce(makeCompletion('{}'));
 
-		const outcome = await executor.processEscalation(
-			'...',
-			makeStage(),
-			'lead',
-			['Confidence < 70%'],
-			100,
-			{},
-			logger,
-			true,
-			makeReplay(),
-			{ ...cleanSummary, wasLoopExhausted: true }
-		);
+		const output = await runStage(makeExecutor(), providerComplete, 1);
 
-		expect(executor.escalationHandlerService.handleEscalation).toHaveBeenCalledWith(
+		expect(mockEscalationHandlerService.handleEscalation).toHaveBeenCalledWith(
 			expect.objectContaining({
 				signal: expect.objectContaining({
 					requires_escalation: true,
@@ -158,30 +201,27 @@ describe('StageExecutor execution-telemetry mismatch check', () => {
 				})
 			})
 		);
-		expect(outcome.kind).toBe('continue');
+		expect(output.success).toBe(true);
 	});
 
 	it('forces escalation when a mutating tool call actually failed despite the report', async () => {
-		const executor = makeExecutor();
 		const signal = makeSignal();
-		executor.escalationDetectionService.parseResponse.mockReturnValue({ cleanedContent: 'x', signal });
-		executor.escalationDetectionService.shouldTriggerEscalation.mockReturnValue(false);
-		executor.escalationHandlerService.handleEscalation.mockResolvedValue(makeEscalationResult());
+		mockEscalationDetectionService.parseResponse.mockReturnValue({ cleanedContent: 'x', signal });
+		mockEscalationDetectionService.shouldTriggerEscalation.mockReturnValue(false);
+		mockEscalationHandlerService.handleEscalation.mockResolvedValue(makeEscalationResult());
+		mockToolExecutionService.executeTools.mockResolvedValueOnce([
+			{ output: 'Error: disk full', tool_call_id: 'call_1' }
+		]);
+		const providerComplete = vi
+			.fn()
+			.mockResolvedValueOnce(
+				makeCompletion('', [{ arguments: { content: 'x', path: 'foo.txt' }, id: 'call_1', name: 'write' }])
+			)
+			.mockResolvedValueOnce(makeCompletion('{}'));
 
-		await executor.processEscalation(
-			'...',
-			makeStage(),
-			'lead',
-			['Confidence < 70%'],
-			100,
-			{},
-			logger,
-			true,
-			makeReplay(),
-			{ ...cleanSummary, fatalFailureCount: 2 }
-		);
+		await runStage(makeExecutor(), providerComplete, 1);
 
-		expect(executor.escalationHandlerService.handleEscalation).toHaveBeenCalledWith(
+		expect(mockEscalationHandlerService.handleEscalation).toHaveBeenCalledWith(
 			expect.objectContaining({
 				signal: expect.objectContaining({ triggered_criteria: ['execution_telemetry_mismatch'] })
 			})
@@ -189,77 +229,77 @@ describe('StageExecutor execution-telemetry mismatch check', () => {
 	});
 
 	it('does not escalate when telemetry is clean', async () => {
-		const executor = makeExecutor();
 		const signal = makeSignal();
-		executor.escalationDetectionService.parseResponse.mockReturnValue({ cleanedContent: 'x', signal });
-		executor.escalationDetectionService.shouldTriggerEscalation.mockReturnValue(false);
+		mockEscalationDetectionService.parseResponse.mockReturnValue({ cleanedContent: 'x', signal });
+		mockEscalationDetectionService.shouldTriggerEscalation.mockReturnValue(false);
+		const providerComplete = vi.fn().mockResolvedValue(makeCompletion('all clear'));
 
-		const outcome = await executor.processEscalation(
-			'...',
-			makeStage(),
-			'lead',
-			['Confidence < 70%'],
-			100,
-			{},
-			logger,
-			true,
-			makeReplay(),
-			cleanSummary
-		);
+		const output = await runStage(makeExecutor(), providerComplete);
 
-		expect(executor.escalationHandlerService.handleEscalation).not.toHaveBeenCalled();
-		expect(outcome.kind).toBe('continue');
-	});
-
-	it('does not throw when executionSummary is undefined (e.g. a guided-completion path that never ran a tool loop)', async () => {
-		const executor = makeExecutor();
-		const signal = makeSignal();
-		executor.escalationDetectionService.parseResponse.mockReturnValue({ cleanedContent: 'x', signal });
-		executor.escalationDetectionService.shouldTriggerEscalation.mockReturnValue(false);
-
-		const outcome = await executor.processEscalation(
-			'...',
-			makeStage(),
-			'lead',
-			['Confidence < 70%'],
-			100,
-			{},
-			logger,
-			true,
-			makeReplay(),
-			undefined
-		);
-
-		expect(outcome.kind).toBe('continue');
+		expect(mockEscalationHandlerService.handleEscalation).not.toHaveBeenCalled();
+		expect(output.success).toBe(true);
 	});
 
 	it('still escalates on a telemetry mismatch even when confidence is well outside the self-consistency band', async () => {
 		// Confidence 95 is far outside the default [70, 80) borderline band — self-consistency
 		// would never fire here, but the telemetry check is unconditional.
-		const executor = makeExecutor();
 		const signal = makeSignal({ confidence: 95 });
-		executor.escalationDetectionService.parseResponse.mockReturnValue({ cleanedContent: 'x', signal });
-		executor.escalationDetectionService.shouldTriggerEscalation.mockReturnValue(false);
-		executor.escalationHandlerService.handleEscalation.mockResolvedValue(makeEscalationResult());
+		mockEscalationDetectionService.parseResponse.mockReturnValue({ cleanedContent: 'x', signal });
+		mockEscalationDetectionService.shouldTriggerEscalation.mockReturnValue(false);
+		mockEscalationHandlerService.handleEscalation.mockResolvedValue(makeEscalationResult());
+		mockToolExecutionService.executeTools.mockResolvedValueOnce([{ output: 'file contents', tool_call_id: 'call_1' }]);
+		const providerComplete = vi
+			.fn()
+			.mockResolvedValueOnce(makeCompletion('', [{ arguments: { path: 'x.txt' }, id: 'call_1', name: 'read_file' }]))
+			.mockResolvedValueOnce(makeCompletion('{}'));
 
-		await executor.processEscalation(
-			'...',
-			makeStage(),
-			'lead',
-			['Confidence < 70%'],
-			100,
-			{},
-			logger,
-			true,
-			makeReplay(),
-			{ ...cleanSummary, wasLoopExhausted: true }
-		);
+		await runStage(makeExecutor(), providerComplete, 1);
 
-		expect(executor.selfConsistencySamplerService.checkAgreement).not.toHaveBeenCalled();
-		expect(executor.escalationHandlerService.handleEscalation).toHaveBeenCalledWith(
+		expect(mockSelfConsistencySamplerService.checkAgreement).not.toHaveBeenCalled();
+		expect(mockEscalationHandlerService.handleEscalation).toHaveBeenCalledWith(
 			expect.objectContaining({
 				signal: expect.objectContaining({ triggered_criteria: ['execution_telemetry_mismatch'] })
 			})
 		);
 	});
+
+	it('forces escalation when a fatal tool failure is followed by a normal (non-exhausted) completion', async () => {
+		// Regression test for a bug found while rewriting this suite: the tool loop's
+		// "completed without tool calls" exit path used to return a hardcoded zero-valued
+		// summary instead of scanning message history via extractExecutionSummary() — so a
+		// fatal failure only ever surfaced here when it happened to coincide with loop
+		// exhaustion. With a generous max_tool_iterations, the loop never exhausts, isolating
+		// this exit path specifically.
+		const signal = makeSignal();
+		mockEscalationDetectionService.parseResponse.mockReturnValue({ cleanedContent: 'x', signal });
+		mockEscalationDetectionService.shouldTriggerEscalation.mockReturnValue(false);
+		mockEscalationHandlerService.handleEscalation.mockResolvedValue(makeEscalationResult());
+		mockToolExecutionService.executeTools.mockResolvedValueOnce([
+			{ output: 'Error: disk full', tool_call_id: 'call_1' }
+		]);
+		const providerComplete = vi
+			.fn()
+			.mockResolvedValueOnce(
+				makeCompletion('', [{ arguments: { content: 'x', path: 'foo.txt' }, id: 'call_1', name: 'write' }])
+			)
+			.mockResolvedValueOnce(makeCompletion('{}'));
+
+		await runStage(makeExecutor(), providerComplete, 20);
+
+		expect(mockEscalationHandlerService.handleEscalation).toHaveBeenCalledWith(
+			expect.objectContaining({
+				signal: expect.objectContaining({ triggered_criteria: ['execution_telemetry_mismatch'] })
+			})
+		);
+	});
+
+	// NOTE: the original version of this suite also covered `executionSummary === undefined`
+	// (framed as "a guided-completion path that never ran a tool loop"). That branch is only
+	// reachable by calling the private `processEscalation` directly with a hand-constructed
+	// `undefined` — `processEscalation` has exactly one real call site (`handleStageCompletion`),
+	// which always passes the real summary `callLLMWithToolLoop` returns, and a guided completion
+	// short-circuits before escalation is even considered (see `handleStageCompletion`'s
+	// `completion.guidedCompletion` check). So `executionSummary` is never actually undefined on
+	// any path reachable through the public API — this was defensive-typing coverage for
+	// currently-dead code, not a real observable behaviour, and is intentionally not ported.
 });

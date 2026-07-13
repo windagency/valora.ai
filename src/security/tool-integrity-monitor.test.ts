@@ -67,7 +67,7 @@ describe('ToolIntegrityMonitor', () => {
 			const tools = makeTools('tool_a', 'tool_b');
 			const result = monitor.checkIntegrity('server-1', tools);
 			expect(result.changed).toBe(false);
-			expect(result.currentFingerprint).toBeTruthy();
+			expect(result.currentFingerprint).toBe(monitor.computeFingerprint(tools));
 		});
 
 		it('reports no change for identical tools', () => {

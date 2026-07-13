@@ -37,7 +37,7 @@ describe('JsonlAuditSink', () => {
 		expect(persisted).toHaveLength(1);
 		expect(persisted[0]?.type).toBe('credential_redacted');
 		expect(persisted[0]?.details).toEqual({ source: 'test-1' });
-		expect(persisted[0]?.id).toBeDefined();
+		expect(persisted[0]?.id).toBe(event.id);
 	});
 
 	it('survives a process restart without loss (simulated by recreating the sink)', () => {

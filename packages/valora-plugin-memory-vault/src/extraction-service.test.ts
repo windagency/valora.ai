@@ -150,11 +150,11 @@ describe('MemoryExtractionService', () => {
 			);
 
 			expect(result.length).toBeGreaterThanOrEqual(1);
-			const verifiedCall = mockManagerInstance.create.mock.calls.find(
+			const verifiedCalls = mockManagerInstance.create.mock.calls.filter(
 				([, opts]: [string, Record<string, unknown>]) => opts['confidence'] === 'verified'
 			);
-			expect(verifiedCall).toBeDefined();
-			const [, opts] = verifiedCall as [string, Record<string, unknown>];
+			expect(verifiedCalls).toHaveLength(1);
+			const [, opts] = verifiedCalls[0] as [string, Record<string, unknown>];
 			expect(opts['tags']).toContain('user-feedback');
 			expect(opts['tags']).toContain('satisfaction');
 			expect(opts['isError']).toBe(false);
@@ -175,10 +175,10 @@ describe('MemoryExtractionService', () => {
 				'product-manager'
 			);
 
-			const verifiedCall = mockManagerInstance.create.mock.calls.find(
+			const verifiedCalls = mockManagerInstance.create.mock.calls.filter(
 				([, opts]: [string, Record<string, unknown>]) => opts['confidence'] === 'verified'
 			);
-			expect(verifiedCall).toBeDefined();
+			expect(verifiedCalls).toHaveLength(1);
 		});
 	});
 
@@ -199,11 +199,11 @@ describe('MemoryExtractionService', () => {
 				'product-manager'
 			);
 
-			const painPointCall = mockManagerInstance.create.mock.calls.find(([, opts]: [string, Record<string, unknown>]) =>
-				(opts['tags'] as string[]).includes('pain-point')
+			const painPointCalls = mockManagerInstance.create.mock.calls.filter(
+				([, opts]: [string, Record<string, unknown>]) => (opts['tags'] as string[]).includes('pain-point')
 			);
-			expect(painPointCall).toBeDefined();
-			const [, opts] = painPointCall as [string, Record<string, unknown>];
+			expect(painPointCalls).toHaveLength(1);
+			const [, opts] = painPointCalls[0] as [string, Record<string, unknown>];
 			expect(opts['confidence']).toBe('observed');
 			expect(opts['isError']).toBe(false);
 		});
@@ -249,12 +249,12 @@ describe('MemoryExtractionService', () => {
 				'product-manager'
 			);
 
-			const improvementCall = mockManagerInstance.create.mock.calls.find(
+			const improvementCalls = mockManagerInstance.create.mock.calls.filter(
 				([, opts]: [string, Record<string, unknown>]) =>
 					(opts['tags'] as string[]).includes('improvement') && (opts['tags'] as string[]).includes('agent')
 			);
-			expect(improvementCall).toBeDefined();
-			const [, opts] = improvementCall as [string, Record<string, unknown>];
+			expect(improvementCalls).toHaveLength(1);
+			const [, opts] = improvementCalls[0] as [string, Record<string, unknown>];
 			expect(opts['confidence']).toBe('inferred');
 		});
 	});
@@ -277,12 +277,12 @@ describe('MemoryExtractionService', () => {
 				'product-manager'
 			);
 
-			const optimisationCall = mockManagerInstance.create.mock.calls.find(
+			const optimisationCalls = mockManagerInstance.create.mock.calls.filter(
 				([, opts]: [string, Record<string, unknown>]) =>
 					(opts['tags'] as string[]).includes('optimization') && (opts['tags'] as string[]).includes('workflow')
 			);
-			expect(optimisationCall).toBeDefined();
-			const [, opts] = optimisationCall as [string, Record<string, unknown>];
+			expect(optimisationCalls).toHaveLength(1);
+			const [, opts] = optimisationCalls[0] as [string, Record<string, unknown>];
 			expect(opts['confidence']).toBe('inferred');
 		});
 	});

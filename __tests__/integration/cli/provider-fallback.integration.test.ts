@@ -154,7 +154,7 @@ describe('Provider Fallback Integration Tests', () => {
 
 			expect(result.providerName).toBe('cursor-guided');
 			expect(result.resolutionPath).toBe(ResolutionPath.GUIDED);
-			expect(result.provider).toBeDefined();
+			expect(result.provider.name).toBe(BuiltinProviders.CURSOR);
 		});
 
 		it('should load and return the real command definition', async () => {
@@ -192,7 +192,7 @@ describe('Provider Fallback Integration Tests', () => {
 
 			expect(result.providerName).toBe(BuiltinProviders.ANTHROPIC);
 			expect(result.resolutionPath).toBe(ResolutionPath.API_FALLBACK);
-			expect(result.provider).toBeDefined();
+			expect(result.provider.name).toBe(BuiltinProviders.ANTHROPIC);
 		});
 	});
 

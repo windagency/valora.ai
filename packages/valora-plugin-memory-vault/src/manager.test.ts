@@ -149,7 +149,7 @@ describe('MemoryManager', () => {
 				sessionId: 'sess-1'
 			});
 
-			expect(entry.provenanceSignature).toBeDefined();
+			expect(entry.provenanceSignature).toMatch(/^[0-9a-f]{64}$/);
 			expect(verifyProvenance(entry.content, entry.agentRole, entry.createdAt, entry.provenanceSignature)).toBe(true);
 		});
 

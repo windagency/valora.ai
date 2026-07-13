@@ -143,7 +143,7 @@ describe('LSP Language Registry', () => {
 			const servers = getAllServers(projectRoot);
 
 			expect(servers['evil-server']).toBeUndefined();
-			expect(servers['typescript-language-server']).toBeDefined();
+			expect(servers['typescript-language-server']?.command).toBe('typescript-language-server');
 		});
 
 		it('applies the override once the project directory is explicitly trusted', () => {

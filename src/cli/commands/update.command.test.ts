@@ -138,7 +138,10 @@ describe('valora update command', () => {
 		await program.parseAsync(['node', 'valora', 'update', '--force']);
 
 		expect(logged()).toContain('Updated to');
-		expect(writeUpdateStateMock).toHaveBeenCalled();
+		expect(writeUpdateStateMock).toHaveBeenCalledWith(
+			'/tmp/valora-test-state',
+			expect.objectContaining({ latestVersion: '0.0.1', remindedForVersion: '0.0.1' })
+		);
 	});
 
 	it('--check --force shows "already up to date" when no update exists', async () => {
@@ -178,7 +181,11 @@ describe('valora update command', () => {
 		expect(stateDir).toBe('/tmp/valora-test-state');
 		expect(state.latestVersion).toBe('99.0.0');
 		expect(state.remindedForVersion).toBe('99.0.0');
-		expect(state.lastSuccessAt).toBeTruthy();
+		// lastSuccessAt is `new Date().toISOString()` (real clock, not mocked) — assert the ISO shape
+		expect(state.lastSuccessAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+		// installedVersionAtCheck is the real installed package.json version — not controlled by
+		// this test, so only presence (not an exact value) can be asserted without hardcoding a
+		// brittle version string.
 		expect(state.installedVersionAtCheck).toBeDefined();
 
 		expect(logged()).toContain('Updated to v99.0.0');

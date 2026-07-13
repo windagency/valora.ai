@@ -121,7 +121,7 @@ describe('IdempotencyStoreService', () => {
 			const result = await service.check(toolCall);
 
 			expect(result.found).toBe(false);
-			expect(result.key).toBeTruthy();
+			expect(result.key).toBe(service.generateKey(toolCall));
 		});
 
 		it('should return found=false for non-idempotent tools', async () => {

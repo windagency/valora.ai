@@ -381,7 +381,7 @@ describe('HookExecutionService', () => {
 
 			const result = await service.executePreToolUseHooks(makeToolCall('write'));
 			expect(result.allowed).toBe(false);
-			expect(result.blockReason).toBeDefined();
+			expect(result.blockReason).toBe('Blocked by PreToolUse hook');
 			expect(result.hooksExecuted).toBe(1);
 		});
 

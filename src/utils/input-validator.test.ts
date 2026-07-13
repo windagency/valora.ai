@@ -31,7 +31,7 @@ describe('InputValidator', () => {
 		it('should use default limits when none provided', () => {
 			const validator = new InputValidator();
 
-			expect(validator).toBeDefined();
+			expect(validator).toBeInstanceOf(InputValidator);
 		});
 
 		it('should merge custom limits with defaults', () => {
@@ -42,7 +42,7 @@ describe('InputValidator', () => {
 
 			const validator = new InputValidator(customLimits);
 
-			expect(validator).toBeDefined();
+			expect(validator).toBeInstanceOf(InputValidator);
 		});
 	});
 

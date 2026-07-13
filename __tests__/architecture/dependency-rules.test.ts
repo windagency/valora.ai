@@ -14,30 +14,10 @@ const srcProject = new TypeScriptProject(RelativePath.of('src'), '**/*.test.ts',
 
 describe('Dependency Rules', () => {
 	describe('Acyclic Dependencies Principle', () => {
-		it('types should not have circular dependencies', () => {
-			noClasses()
-				.that()
-				.resideInAPackage('types..')
-				.should()
-				.dependOnClassesThat()
-				.resideInAnyPackage(
-					'cli..',
-					'services..',
-					'executor..',
-					'session..',
-					'mcp..',
-					'di..',
-					'llm..',
-					'config..',
-					'output..',
-					'utils..',
-					'ui..',
-					'exploration..',
-					'cleanup..'
-				)
-				.because('Types must be leaf nodes in the dependency graph to prevent circular dependencies')
-				.check(srcProject.allClasses());
-		});
+		// "types should not have circular dependencies" lives in
+		// circular-dependencies.test.ts ("types should not create circular
+		// dependencies") — that was a byte-for-byte duplicate of this rule,
+		// consolidated to one canonical copy.
 
 		it('utils should not depend on application layers', () => {
 			noClasses()
