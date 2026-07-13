@@ -442,7 +442,7 @@ describe('AnthropicProvider — complete()/streamComplete() against an injected 
 
 				const pending = provider.complete(options);
 				pending.catch(() => {});
-				await vi.runAllTimersAsync();
+				await vi.advanceTimersByTimeAsync(1000);
 
 				await expect(pending).resolves.toMatchObject({ content: 'Recovered' });
 				expect(mockCreate).toHaveBeenCalledTimes(2);

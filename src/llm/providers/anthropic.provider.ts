@@ -31,6 +31,7 @@ import { DEFAULT_MAX_TOKENS } from 'config/constants';
 import { BuiltinProviders, getProviderModels, resolveApiModelId } from 'config/providers.config';
 import { BaseLLMProvider } from 'llm/provider.interface';
 import { getProviderRegistry } from 'llm/registry';
+import { getLogger } from 'output/logger';
 import { createErrorContext, ProviderError, withCircuitBreaker, withRetry } from 'utils/error-handler';
 import { checkRateLimit, getRateLimitStatus } from 'utils/rate-limiter';
 import { estimateTokensFromText } from 'utils/token-estimator';
@@ -117,7 +118,7 @@ export class AnthropicProvider extends BaseLLMProvider implements BatchableProvi
 			}));
 
 			// Diagnostic logging for tool configuration
-			const logger = await import('output/logger').then((m) => m.getLogger());
+			const logger = getLogger();
 			logger.info('Anthropic API call configuration', {
 				hasTools: !!formattedTools,
 				model: resolvedModel,
