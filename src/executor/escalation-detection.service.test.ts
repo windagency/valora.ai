@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { EscalationDetectionService } from './escalation-detection.service';
+import { EscalationDetectionService, getEscalationDetectionService } from './escalation-detection.service';
 
 const buildResponse = (escalation: Record<string, unknown>): string =>
 	`Some analysis text.\n\n\`\`\`json\n{"_escalation": ${JSON.stringify(escalation)}}\n\`\`\``;
@@ -49,6 +49,84 @@ describe('EscalationDetectionService', () => {
 		it('returns a null signal when no _escalation block is present', () => {
 			const service = new EscalationDetectionService();
 			const { signal } = service.parseResponse('Just some plain response with no escalation block.');
+			expect(signal).toBeNull();
+		});
+
+		it('strips the fenced _escalation block from cleanedContent, leaving the surrounding prose intact', () => {
+			const service = new EscalationDetectionService();
+			const { cleanedContent } = service.parseResponse(
+				`Here is my analysis of the change.\n\n${buildResponse({
+					confidence: 90,
+					requires_escalation: false,
+					risk_level: 'low',
+					triggered_criteria: []
+				})}`
+			);
+
+			expect(cleanedContent).toContain('Here is my analysis of the change.');
+			expect(cleanedContent).not.toContain('_escalation');
+			expect(cleanedContent).not.toContain('```');
+		});
+
+		it('collapses runs of 3+ blank lines left behind after stripping the escalation block down to at most one', () => {
+			const service = new EscalationDetectionService();
+			const escalationBlock = buildResponse({
+				confidence: 90,
+				requires_escalation: false,
+				risk_level: 'low',
+				triggered_criteria: []
+			}).replace('Some analysis text.\n\n', '');
+			const { cleanedContent } = service.parseResponse(`Line one.\n\n\n\n${escalationBlock}`);
+
+			expect(cleanedContent).toBe('Line one.');
+		});
+
+		it('returns the original content unchanged as cleanedContent when no signal is found', () => {
+			const service = new EscalationDetectionService();
+			const original = 'Just some plain response with no escalation block.';
+			const { cleanedContent } = service.parseResponse(original);
+			expect(cleanedContent).toBe(original);
+		});
+
+		it('falls back to the standalone (non-fenced) "_escalation": {...} pattern when there is no wrapping object or code fence', () => {
+			const service = new EscalationDetectionService();
+			const content =
+				'Some analysis text without any braces before this point.\n\n' +
+				'"_escalation": {"requires_escalation": false, "confidence": 88, "triggered_criteria": [], ' +
+				'"reasoning": "ok", "proposed_action": "proceed", "risk_level": "low"}';
+
+			const { signal } = service.parseResponse(content);
+
+			expect(signal?.confidence).toBe(88);
+			expect(signal?.risk_level).toBe('low');
+		});
+
+		it('defaults an invalid or missing risk_level to "medium" rather than throwing or leaving it undefined', () => {
+			const service = new EscalationDetectionService();
+			const { signal } = service.parseResponse(
+				buildResponse({
+					confidence: 90,
+					requires_escalation: false,
+					risk_level: 'not-a-real-level',
+					triggered_criteria: []
+				})
+			);
+
+			expect(signal?.risk_level).toBe('medium');
+		});
+
+		it('KNOWN GAP: the third-tier findJsonBlocks() fallback is effectively unreachable for a realistic nested _escalation payload — a fenced block with an unexpected preamble line still falls through to the primary pattern\'s raw (non-fenced) alternative, which truncates on the first "}" it meets (the nested object\'s own close) and produces unparseable JSON, returning null before findJsonBlocks() is ever tried', () => {
+			const content =
+				'Explanation without any braces here.\n\n' +
+				'```json\n' +
+				'Some unexpected preamble line\n' +
+				'{"_escalation": {"requires_escalation": true, "confidence": 40, "triggered_criteria": [], ' +
+				'"reasoning": "risk", "proposed_action": "stop", "risk_level": "high"}}\n' +
+				'```\n';
+
+			const service = new EscalationDetectionService();
+			const { signal } = service.parseResponse(content);
+
 			expect(signal).toBeNull();
 		});
 	});
@@ -183,6 +261,21 @@ describe('EscalationDetectionService', () => {
 		it('returns null when requireExplicitBlock is disabled', () => {
 			const service = new EscalationDetectionService({ requireExplicitBlock: false });
 			expect(service.getMissingSignalEscalation('review.assess-risks')).toBeNull();
+		});
+	});
+
+	describe('getEscalationDetectionService (singleton)', () => {
+		it('returns the same instance across calls when no config override is given', () => {
+			const first = getEscalationDetectionService();
+			const second = getEscalationDetectionService();
+			expect(second).toBe(first);
+		});
+
+		it('constructs a fresh instance carrying the new config when a config override is passed', () => {
+			const first = getEscalationDetectionService();
+			const second = getEscalationDetectionService({ confidenceThreshold: 42 });
+			expect(second).not.toBe(first);
+			expect(second.getConfig().confidenceThreshold).toBe(42);
 		});
 	});
 });

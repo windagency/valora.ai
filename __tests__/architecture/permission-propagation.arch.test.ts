@@ -1,13 +1,21 @@
-import { readFileSync } from 'fs';
-import { resolve } from 'path';
-import { describe, it, expect } from 'vitest';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs';
+import { tmpdir } from 'os';
+import { join, resolve } from 'path';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+
+import { ToolExecutionService } from 'executor/tool-execution.service';
 
 /**
  * Architecture test: permission propagation invariants.
  *
  * Ensures that the execution layer enforces the intersection rule — a child
- * context can never gain scope that its parent forbids.  These checks are
- * static source reads so they remain fast and free of runtime side-effects.
+ * context can never gain scope that its parent forbids. Most checks here are
+ * static source reads (fast, no runtime side-effects) — but a source-text
+ * match alone can't prove the guard actually blocks anything at runtime (a
+ * refactor that inverts the condition, or moves the call into unreachable
+ * code, would keep the literal string present while the real protection is
+ * broken) — so the "actually blocks a write" test below drives a real
+ * ToolExecutionService end-to-end instead.
  */
 
 const SRC = resolve(import.meta.dirname, '../../src');
@@ -61,5 +69,74 @@ describe('Permission propagation architecture', () => {
 		const src = read('cli/execution-coordinator.ts');
 		expect(src).toContain('this.agentLoader.loadAgent(');
 		expect(src).toContain('agentConstraints: agent.constraints');
+	});
+
+	describe('runtime enforcement (not just source-text presence)', () => {
+		let workingDir: string;
+		let svc: ToolExecutionService;
+
+		beforeEach(() => {
+			workingDir = mkdtempSync(join(tmpdir(), 'valora-permission-arch-'));
+			svc = new ToolExecutionService(workingDir);
+			svc.disableIdempotency();
+		});
+
+		afterEach(() => {
+			rmSync(workingDir, { force: true, recursive: true });
+		});
+
+		it('actually refuses a write to a path under an effective forbidden_paths entry', async () => {
+			svc.setEffectiveConstraints({
+				delegationDepth: 1,
+				forbidden_paths: [join(workingDir, 'secrets')],
+				requires_approval_for: []
+			});
+
+			const result = await svc.executeTool({
+				arguments: { content: 'leaked', path: 'secrets/api-key.txt' },
+				id: 'perm-arch-write-1',
+				name: 'write'
+			});
+
+			expect(result.output).toMatch(/forbidden/i);
+		});
+
+		it('actually refuses a delete_file to a path under an effective forbidden_paths entry, and leaves the file intact', async () => {
+			const target = join(workingDir, 'secrets', 'api-key.txt');
+			mkdirSync(join(workingDir, 'secrets'), { recursive: true });
+			writeFileSync(target, 'top-secret', 'utf8');
+
+			svc.setEffectiveConstraints({
+				delegationDepth: 1,
+				forbidden_paths: [join(workingDir, 'secrets')],
+				requires_approval_for: []
+			});
+
+			const result = await svc.executeTool({
+				arguments: { path: 'secrets/api-key.txt' },
+				id: 'perm-arch-delete-1',
+				name: 'delete_file'
+			});
+
+			expect(result.output).toMatch(/forbidden/i);
+			expect(readFileSync(target, 'utf8')).toBe('top-secret');
+		});
+
+		it('still allows a write outside any forbidden_paths entry', async () => {
+			svc.setEffectiveConstraints({
+				delegationDepth: 1,
+				forbidden_paths: [join(workingDir, 'secrets')],
+				requires_approval_for: []
+			});
+
+			const result = await svc.executeTool({
+				arguments: { content: 'fine', path: 'normal.txt' },
+				id: 'perm-arch-write-2',
+				name: 'write'
+			});
+
+			expect(result.output).not.toMatch(/forbidden/i);
+			expect(readFileSync(join(workingDir, 'normal.txt'), 'utf8')).toBe('fine');
+		});
 	});
 });

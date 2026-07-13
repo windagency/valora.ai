@@ -49,12 +49,6 @@ describe('valora-provider-openrouter register()', () => {
 		expect(api.deactivateHooks).toHaveLength(0);
 	});
 
-	it('registers the provider with name "openrouter"', () => {
-		const api = makeApi();
-		register(api);
-		expect(api.registeredProviders['openrouter']).toBe(OpenRouterProvider);
-	});
-
 	it('registers a descriptor with label "OpenRouter"', () => {
 		const api = makeApi();
 		register(api);

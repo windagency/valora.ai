@@ -3,8 +3,16 @@
  * Tests actual template file loading from filesystem
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 
+// Wraps the real readFile (still hits the real filesystem) so the caching
+// test can assert call count instead of a wall-clock timing comparison.
+vi.mock('utils/file-utils', async (importOriginal) => {
+	const actual = await importOriginal<typeof import('utils/file-utils')>();
+	return { ...actual, readFile: vi.fn(actual.readFile) };
+});
+
+import { readFile } from 'utils/file-utils';
 import { getTemplateLoader, resetTemplateLoader } from 'utils/template-loader';
 
 describe('TemplateLoader Integration Tests', () => {
@@ -34,25 +42,19 @@ describe('TemplateLoader Integration Tests', () => {
 
 		it('should cache template on subsequent loads', async () => {
 			resetTemplateLoader(); // Start fresh
+			vi.mocked(readFile).mockClear();
 
 			const loader = getTemplateLoader();
 
-			// First load
-			const start1 = Date.now();
 			const template1 = await loader.loadTemplate('GUIDED_COMPLETION');
-			const duration1 = Date.now() - start1;
-
-			// Second load (from cache, should be faster)
-			const start2 = Date.now();
 			const template2 = await loader.loadTemplate('GUIDED_COMPLETION');
-			const duration2 = Date.now() - start2;
 
 			// Both should be identical
 			expect(template1).toBe(template2);
 
-			// Cached load should be significantly faster (or at least not slower)
-			// Note: This might be flaky in CI, but it demonstrates caching
-			expect(duration2).toBeLessThanOrEqual(duration1 + 5); // Allow 5ms tolerance
+			// The second load must be served from the cache — the real file-read
+			// call happens exactly once, not once per loadTemplate() call.
+			expect(readFile).toHaveBeenCalledTimes(1);
 		});
 
 		it('should throw error for non-existent template', async () => {

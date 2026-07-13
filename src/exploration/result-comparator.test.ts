@@ -103,4 +103,202 @@ describe('ResultComparator', () => {
 
 		expect(report.metrics[0]?.files_changed).toBeUndefined();
 	});
+
+	describe('scoring and ranking', () => {
+		beforeEach(() => {
+			mockExecute.mockRejectedValue(new Error('not a git repository'));
+		});
+
+		it('scores a completed worktree with full progress higher than a failed one with no progress', async () => {
+			const completed = buildWorktree({
+				index: 1,
+				progress: {
+					current_stage: 'done',
+					errors: [],
+					insights_published: 0,
+					last_update: '',
+					percentage: 100,
+					stages_completed: []
+				},
+				status: 'completed'
+			});
+			const failed = buildWorktree({
+				index: 2,
+				progress: {
+					current_stage: '',
+					errors: [],
+					insights_published: 0,
+					last_update: '',
+					percentage: 0,
+					stages_completed: []
+				},
+				status: 'failed'
+			});
+			const exploration = buildExploration(completed);
+			exploration.worktrees.push(failed);
+			exploration.branches = 2;
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			const comparator = new ResultComparator(exploration, fakeStateManager() as any);
+
+			const report = await comparator.generateComparisonReport();
+
+			const completedMetric = report.metrics.find((m) => m.worktree_index === 1);
+			const failedMetric = report.metrics.find((m) => m.worktree_index === 2);
+			expect(completedMetric?.overall_score).toBe(60); // 40 (completed) + 20 (100% progress)
+			expect(failedMetric?.overall_score).toBe(0);
+		});
+
+		it('ranks worktrees by overall score, descending', async () => {
+			const low = buildWorktree({
+				index: 1,
+				progress: {
+					current_stage: '',
+					errors: [],
+					insights_published: 0,
+					last_update: '',
+					percentage: 0,
+					stages_completed: []
+				},
+				status: 'running'
+			});
+			const high = buildWorktree({
+				index: 2,
+				progress: {
+					current_stage: '',
+					errors: [],
+					insights_published: 0,
+					last_update: '',
+					percentage: 100,
+					stages_completed: []
+				},
+				status: 'completed'
+			});
+			const exploration = buildExploration(low);
+			exploration.worktrees.push(high);
+			exploration.branches = 2;
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			const comparator = new ResultComparator(exploration, fakeStateManager() as any);
+
+			const report = await comparator.generateComparisonReport();
+
+			expect(report.metrics.map((m) => m.worktree_index)).toEqual([2, 1]);
+		});
+
+		it('deducts an error penalty, capped at 10 points, from the overall score', async () => {
+			const manyErrors = buildWorktree({
+				index: 1,
+				progress: {
+					current_stage: '',
+					errors: Array.from({ length: 20 }, (_, i) => `error ${i}`),
+					insights_published: 0,
+					last_update: '',
+					percentage: 100,
+					stages_completed: []
+				},
+				status: 'completed'
+			});
+			const exploration = buildExploration(manyErrors);
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			const comparator = new ResultComparator(exploration, fakeStateManager() as any);
+
+			const report = await comparator.generateComparisonReport();
+
+			// 40 (completed) + 20 (100% progress) - 10 (capped error penalty) = 50
+			expect(report.metrics[0]?.overall_score).toBe(50);
+			expect(report.metrics[0]?.errors_count).toBe(20);
+		});
+
+		it('selects the first completed worktree (by rank) as the winner, skipping non-completed higher scorers', async () => {
+			const timedOut = buildWorktree({
+				index: 1,
+				progress: {
+					current_stage: '',
+					errors: [],
+					insights_published: 0,
+					last_update: '',
+					percentage: 90,
+					stages_completed: []
+				},
+				status: 'timed_out'
+			});
+			const completed = buildWorktree({
+				index: 2,
+				progress: {
+					current_stage: '',
+					errors: [],
+					insights_published: 0,
+					last_update: '',
+					percentage: 50,
+					stages_completed: []
+				},
+				status: 'completed'
+			});
+			const exploration = buildExploration(timedOut);
+			exploration.worktrees.push(completed);
+			exploration.branches = 2;
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			const comparator = new ResultComparator(exploration, fakeStateManager() as any);
+
+			const report = await comparator.generateComparisonReport();
+
+			expect(report.winner_index).toBe(2);
+			expect(report.summary).toContain('Winner: Worktree 2');
+		});
+
+		it('reports no winner and a generic recommendation when every worktree failed', async () => {
+			const failed = buildWorktree({ status: 'failed' });
+			const exploration = buildExploration(failed);
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			const comparator = new ResultComparator(exploration, fakeStateManager() as any);
+
+			const report = await comparator.generateComparisonReport();
+
+			expect(report.winner_index).toBeUndefined();
+			expect(report.recommendation).toContain('No successful exploration found');
+		});
+
+		it('recommends merging the winner and grades the recommendation by score tier', async () => {
+			const excellent = buildWorktree({
+				progress: {
+					current_stage: '',
+					errors: [],
+					insights_published: 0,
+					last_update: '',
+					percentage: 100,
+					stages_completed: []
+				},
+				status: 'completed'
+			});
+			const exploration = buildExploration(excellent);
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			const comparator = new ResultComparator(exploration, fakeStateManager() as any);
+
+			const report = await comparator.generateComparisonReport();
+
+			expect(report.recommendation).toContain('Recommend merging Worktree 1');
+			// Score is 60 (40 completed + 20 progress) — falls in the 60-75 "Acceptable" tier.
+			expect(report.recommendation).toContain('Acceptable implementation');
+		});
+
+		it('appends a warning note when the winner has more than 5 errors', async () => {
+			const worktree = buildWorktree({
+				progress: {
+					current_stage: '',
+					errors: Array.from({ length: 6 }, (_, i) => `error ${i}`),
+					insights_published: 0,
+					last_update: '',
+					percentage: 100,
+					stages_completed: []
+				},
+				status: 'completed'
+			});
+			const exploration = buildExploration(worktree);
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			const comparator = new ResultComparator(exploration, fakeStateManager() as any);
+
+			const report = await comparator.generateComparisonReport();
+
+			expect(report.recommendation).toContain('6 errors encountered');
+		});
+	});
 });

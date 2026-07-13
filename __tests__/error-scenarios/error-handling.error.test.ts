@@ -88,24 +88,29 @@ describe('Error Handling and Recovery Tests', () => {
 
 	describe('Recovery and Self-Healing', () => {
 		it('circuit breaker closes again after a successful operation following the recovery window', async () => {
-			const { CircuitBreaker } = await import('utils/error-handler');
-			const breaker = new CircuitBreaker(5, 500); // 5 failures, 500ms recovery
+			vi.useFakeTimers();
+			try {
+				const { CircuitBreaker } = await import('utils/error-handler');
+				const breaker = new CircuitBreaker(5, 500); // 5 failures, 500ms recovery
 
-			for (let i = 0; i < 5; i++) {
-				await expect(
-					breaker.execute(async () => {
-						throw new Error('Persistent failure');
-					})
-				).rejects.toThrow();
+				for (let i = 0; i < 5; i++) {
+					await expect(
+						breaker.execute(async () => {
+							throw new Error('Persistent failure');
+						})
+					).rejects.toThrow();
+				}
+
+				expect(breaker.getState()).toBe('open');
+
+				await vi.advanceTimersByTimeAsync(600);
+
+				const result = await breaker.execute(async () => 'success');
+				expect(result).toBe('success');
+				expect(breaker.getState()).toBe('closed');
+			} finally {
+				vi.useRealTimers();
 			}
-
-			expect(breaker.getState()).toBe('open');
-
-			await new Promise((resolve) => setTimeout(resolve, 600));
-
-			const result = await breaker.execute(async () => 'success');
-			expect(result).toBe('success');
-			expect(breaker.getState()).toBe('closed');
 		});
 
 		it('retries a database operation that initially fails with connection errors', async () => {

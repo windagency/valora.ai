@@ -99,8 +99,7 @@ export interface Config {
 	describe('executeFindReferences', () => {
 		it('should find references to a symbol', async () => {
 			const result = await service.executeFindReferences({ symbol: 'Calculator' });
-			// Calculator is referenced in its own body
-			expect(typeof result).toBe('string');
+			expect(result).toBe('Found 1 reference(s) to "Calculator":\nexample.ts:6 — Calculator');
 		});
 
 		it('should return guidance when symbol is missing', async () => {
@@ -138,7 +137,9 @@ export interface Config {
 				level: 'signatures',
 				target: 'example.ts'
 			});
-			expect(typeof result).toBe('string');
+			expect(result).toBe(
+				'export function greet(name: string): string {\nexport class Calculator {\nexport interface Config {'
+			);
 		});
 
 		it('should return guidance when target is missing', async () => {

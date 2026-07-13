@@ -2,27 +2,24 @@
 
 A comprehensive, multi-layered test suite designed by combining the expertise of Lead Platform Engineer, Security Operations Engineer, QA Engineer, and TypeScript Software Engineer roles to ensure robust, secure, and performant AI-assisted workflow orchestration.
 
-## 📊 Current Test Results (2026-04-23)
+## 📊 Test Suite Coverage
 
-### **OVERALL STATUS: ✅ ALL TESTS PASSING (1 skipped)**
+This suite is organised into the categories below, each with a distinct purpose. Exact
+pass/fail counts are deliberately not tracked here — this table has drifted out of date
+after every prior count-based revision as new test files were added, so treat `pnpm test`
+(or the individual `pnpm test:suite:*` commands in [Running Tests](#-running-tests)) as the
+source of truth for current counts, not this document.
 
-- **Total Tests**: 1942/1943
-- **Pass Rate**: 99.9% (1 skipped in E2E)
-- **Test Categories**: 8 suites
-- **Coverage Focus**: Behavior validation over arbitrary percentages
-
-### 📈 Detailed Test Results
-
-| **Test Suite**            | **Status**       | **Tests** | **Coverage Focus**                         |
-| ------------------------- | ---------------- | --------- | ------------------------------------------ |
-| **🔧 Unit Tests**         | ✅ **1672/1672** | 100%      | Core utilities, error handling, validation |
-| **🔗 Integration Tests**  | ✅ **75/75**     | 100%      | Component interactions, data flow          |
-| **🌐 E2E Tests**          | ⚠️ **14/15**     | 93%       | Complete CLI workflows, user experience    |
-| **✅ Acceptance Tests**   | ✅ **13/13**     | 100%      | Business requirements, user journeys       |
-| **🔒 Security Tests**     | ✅ **49/49**     | 100%      | Vulnerability prevention, data protection  |
-| **⚡ Performance Tests**  | ✅ **19/19**     | 100%      | Resource usage, scalability, timing        |
-| **🚨 Error Scenarios**    | ✅ **7/7**       | 100%      | Failure recovery, resilience               |
-| **🏛️ Architecture Tests** | ✅ **93/93**     | 100%      | Module boundaries, dependency rules        |
+| **Test Suite**            | **Coverage Focus**                         |
+| ------------------------- | ------------------------------------------ |
+| **🔧 Unit Tests**         | Core utilities, error handling, validation |
+| **🔗 Integration Tests**  | Component interactions, data flow          |
+| **🌐 E2E Tests**          | Complete CLI workflows, user experience    |
+| **✅ Acceptance Tests**   | Business requirements, user journeys       |
+| **🔒 Security Tests**     | Vulnerability prevention, data protection  |
+| **⚡ Performance Tests**  | Resource usage, scalability, timing        |
+| **🚨 Error Scenarios**    | Failure recovery, resilience               |
+| **🏛️ Architecture Tests** | Module boundaries, dependency rules        |
 
 ---
 
@@ -46,22 +43,22 @@ The suite combines the expertise of multiple engineering disciplines to create a
 ## 🏗️ Test Suite Architecture
 
 ```plaintext
-┌─────────────────┐  E2E Tests (14/15 ⚠️)
+┌─────────────────┐  E2E Tests
 │   End-to-End    │  Business Requirements
 │    Acceptance   │  User Journeys
 └─────────────────┘
 
-┌─────────────────┐  Integration Tests (75/75 ✅)
+┌─────────────────┐  Integration Tests
 │  Integration    │  Module Interactions
 │   Tests         │  Data Flow
 └─────────────────┘
 
-┌─────────────────┐  Unit Tests (1672/1672 ✅)
+┌─────────────────┐  Unit Tests
 │   Unit Tests    │  Functions, Classes
 │                 │  Error Handling
 └─────────────────┘
 
-┌─────────────────┐  Architecture Tests (93/93 ✅)
+┌─────────────────┐  Architecture Tests
 │  Architecture   │  Module Boundaries
 │   Tests         │  Dependency Rules
 └─────────────────┘
@@ -470,7 +467,7 @@ pnpm test --reporter=junit --outputFile=test-results.xml
 
 ## 🎊 Summary
 
-The VALORA test suite represents a **monumental achievement** in software testing and reliability engineering. With **1942 tests passing across 8 suites**, the system is validated across:
+The VALORA test suite represents a **monumental achievement** in software testing and reliability engineering. Spanning 8 test suites (unit, integration, E2E, acceptance, security, performance, error-scenario, and architecture), the system is validated across:
 
 - **Enterprise-grade error handling** with circuit breakers and retry logic
 - **Comprehensive security controls** preventing vulnerabilities and data leaks
@@ -534,3 +531,16 @@ test must exercise for real — and was rewritten to use a real temp config file
 file on disk instead. This section, the Directory Layout, Technology Stack, and the per-category
 Tools/Coverage descriptions above were corrected accordingly. The broader test counts in the
 2026-04-23 summary were not re-verified in this pass and should be treated as stale.
+
+### Correction pass (2026-07-13)
+
+The 2026-04-23 per-suite pass/fail count table and its ASCII-diagram/summary-paragraph echoes
+(`1942 tests`, `93/93`, `49/49`, etc.) had drifted stale again, as flagged (but not yet re-verified)
+in the 2026-07-11 pass — a rough count taken during this pass found architecture at ~170 actual
+tests against the table's stated 93/93, performance at 5 against 19/19, e2e at 7 against 14/15, and
+acceptance at 11 against 13/13. Rather than hand-verify and re-state a new set of counts that will
+just drift again on the next added test file, the "Current Test Results" table was replaced with a
+qualitative, count-free version, and the ASCII diagram/summary paragraph had their embedded counts
+removed. The historical counts inside the 2026-04-23/2026-07-11 correction-pass entries above are
+left as-is — they're a record of what changed at that time, not a claim about the current suite.
+Treat `pnpm test` / `pnpm test:suite:*` as the source of truth for current pass/fail counts.

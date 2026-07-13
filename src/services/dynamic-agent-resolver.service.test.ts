@@ -1,23 +1,44 @@
 /**
  * Unit tests for DynamicAgentResolverService service
  *
- * Tests the main agent selection orchestration, including:
- * - End-to-end agent resolution workflow
- * - Fallback mechanisms
- * - Confidence threshold handling
- * - Error handling and recovery
- * - Service integration
+ * Tests the resolver's OWN orchestration/decision logic in isolation from its
+ * collaborators — confidence-threshold math, close-score discounting, and
+ * fallback-agent determination — by driving the classifier/matcher with
+ * controlled, exact score values. This is deliberate isolation, not
+ * over-mocking: TaskClassifierService and AgentCapabilityMatcherService each
+ * have their own dedicated real-implementation test files
+ * (task-classifier.service.test.ts, agent-capability-matcher.service.test.ts),
+ * and end-to-end integration through the real collaborators is covered by
+ * dynamic-agent-selection-workflow.test.ts and
+ * execution-coordinator-dynamic-agent.test.ts. The "real collaborators"
+ * describe block below adds a sanity check that the resolver still produces
+ * a sensible result when wired to its real dependencies, so this file isn't
+ * exclusively mock-driven.
  */
 
+import { AgentCapabilityMatcherService } from './agent-capability-matcher.service';
+import { AgentCapabilityRegistryService } from './agent-capability-registry.service';
+import { ContextAnalyzerService } from './context-analyzer.service';
 import { DynamicAgentResolverService } from './dynamic-agent-resolver.service';
+import { TaskClassifierService } from './task-classifier.service';
 import { AgentScore, CodebaseContext, TaskClassification, TaskContext } from 'types/agent.types';
+import { readFile } from 'utils/file-utils';
+import { getPackageDataDir } from 'utils/paths';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-// Mock all dependencies
-vi.mock('./task-classifier.service');
-vi.mock('./context-analyzer.service');
-vi.mock('./agent-capability-matcher.service');
-vi.mock('./agent-capability-registry.service');
+// Note: no module-level vi.mock() for task-classifier/context-analyzer/
+// capability-matcher/registry — the tests below either pass hand-built mock
+// objects directly into the constructor (dependency injection, no module
+// mocking needed) or, in the "real collaborators" block, construct the real
+// classes. Only the true I/O boundary (utils/file-utils) is mocked.
+vi.mock('utils/file-utils', async (importOriginal) => {
+	const actual = await importOriginal<typeof import('utils/file-utils')>();
+	return { ...actual, readFile: vi.fn() };
+});
+vi.mock('utils/paths', async (importOriginal) => {
+	const actual = await importOriginal<typeof import('utils/paths')>();
+	return { ...actual, getPackageDataDir: vi.fn() };
+});
 
 const mockTaskClassifier = {
 	classifyTask: vi.fn()
@@ -666,6 +687,58 @@ describe('DynamicAgentResolverService', () => {
 			const result = await resolver.resolveAgent(highComplexityContext);
 
 			expect(result.selectedAgent).toBe('lead'); // Highest scorer at 0.8 confidence
+		});
+	});
+
+	describe('real collaborators (end-to-end sanity check)', () => {
+		const realRegistryData = {
+			capabilities: {
+				'platform-engineer': {
+					domains: ['infrastructure', 'security'],
+					expertise: ['kubernetes', 'terraform'],
+					priority: 90,
+					role: 'platform-engineer',
+					selectionCriteria: ['terraform-files']
+				},
+				'software-engineer-typescript-backend': {
+					domains: ['backend-api'],
+					expertise: ['nodejs', 'express', 'graphql'],
+					priority: 85,
+					role: 'software-engineer-typescript-backend',
+					selectionCriteria: ['code-files', 'api-files']
+				}
+			},
+			selectionCriteria: {
+				'api-files': 'API-related files',
+				'code-files': 'General code files',
+				'terraform-files': 'Terraform configuration files'
+			},
+			taskDomains: {
+				'backend-api': 'Backend TypeScript development',
+				infrastructure: 'Infrastructure and DevOps tasks'
+			}
+		};
+
+		it('selects the backend agent for a real backend-flavoured task, wired to real classifier/matcher/registry', async () => {
+			vi.mocked(getPackageDataDir).mockReturnValue('/mock/path');
+			vi.mocked(readFile).mockResolvedValue(JSON.stringify(realRegistryData));
+
+			const realRegistry = new AgentCapabilityRegistryService();
+			const realResolver = new DynamicAgentResolverService(
+				new TaskClassifierService(),
+				new ContextAnalyzerService(),
+				new AgentCapabilityMatcherService(realRegistry),
+				realRegistry
+			);
+
+			const result = await realResolver.resolveAgent({
+				affectedFiles: ['src/api/auth-controller.ts', 'src/api/auth-service.ts'],
+				dependencies: ['express', 'graphql'],
+				description: 'Implement a GraphQL API endpoint with an Express backend controller'
+			});
+
+			expect(result.selectedAgent).toBe('software-engineer-typescript-backend');
+			expect(result.fallback).toBe(false);
 		});
 	});
 });

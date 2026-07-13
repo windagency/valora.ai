@@ -220,4 +220,158 @@ describe('MergeOrchestrator', () => {
 			expect(mockExecute).toHaveBeenCalledWith('git', ['add', '--', maliciousPath], expect.anything());
 		});
 	});
+
+	describe('validateMerge (via mergeExploration)', () => {
+		it('fails when the worktree status is not "completed"', async () => {
+			// validateMerge() collects every check's errors rather than short-circuiting
+			// on the first — the branch-existence and working-tree-clean checks below
+			// still run (and pass, per the default responder) even though this one fails.
+			worktree.status = 'running';
+			const orchestrator = new MergeOrchestrator('/repo');
+
+			const result = await orchestrator.mergeExploration('exp-1', 1, { strategy: 'direct' });
+
+			expect(result.success).toBe(false);
+			expect(result.error).toContain("Worktree status is running, expected 'completed'");
+			expect(mockExecute).not.toHaveBeenCalledWith(
+				'git',
+				['merge', '--no-ff', worktree.branch_name],
+				expect.anything()
+			);
+		});
+
+		it('fails when the worktree no longer exists on disk', async () => {
+			mockWorktreeExists.mockResolvedValue(false);
+			const orchestrator = new MergeOrchestrator('/repo');
+
+			const result = await orchestrator.mergeExploration('exp-1', 1, { strategy: 'direct' });
+
+			expect(result.success).toBe(false);
+			expect(result.error).toContain('Worktree does not exist');
+		});
+
+		it('fails when the main repo working tree has uncommitted changes', async () => {
+			mockExecute.mockImplementation(async (command: string, args: string[]) => {
+				const [first, second] = args;
+				if (first === 'status' && second === '--porcelain') return gitOk(' M dirty-file.txt\n');
+				return defaultResponder(command, args);
+			});
+			const orchestrator = new MergeOrchestrator('/repo');
+
+			const result = await orchestrator.mergeExploration('exp-1', 1, { strategy: 'direct' });
+
+			expect(result.success).toBe(false);
+			expect(result.error).toContain('uncommitted changes');
+		});
+
+		it('fails when an explicit target_branch does not exist', async () => {
+			mockExecute.mockImplementation(async (command: string, args: string[]) => {
+				const [first, second] = args;
+				if (first === 'rev-parse' && second === '--verify' && args[2] === 'nonexistent-branch') {
+					throw new Error('Command failed with exit code 128: unknown revision');
+				}
+				return defaultResponder(command, args);
+			});
+			const orchestrator = new MergeOrchestrator('/repo');
+
+			const result = await orchestrator.mergeExploration('exp-1', 1, {
+				strategy: 'direct',
+				target_branch: 'nonexistent-branch'
+			});
+
+			expect(result.success).toBe(false);
+			expect(result.error).toContain('Target branch does not exist: nonexistent-branch');
+		});
+	});
+
+	describe('conflict-abort path', () => {
+		it('aborts the merge and reports failure when conflicts are detected and auto-resolve is disabled', async () => {
+			mockExecute.mockImplementation(async (command: string, args: string[]) => {
+				const [first, second] = args;
+				if (first === 'merge' && second === '--no-ff') {
+					throw new Error('Command failed with exit code 1: CONFLICT (content): Merge conflict in src/index.ts');
+				}
+				return defaultResponder(command, args);
+			});
+			const orchestrator = new MergeOrchestrator('/repo');
+
+			const result = await orchestrator.mergeExploration('exp-1', 1, {
+				auto_resolve_conflicts: false,
+				strategy: 'direct'
+			});
+
+			expect(result.success).toBe(false);
+			expect(result.conflicts_detected).toBe(true);
+			expect(result.error).toBe('Conflicts detected and auto_resolve_conflicts is disabled');
+			expect(mockExecute).toHaveBeenCalledWith('git', ['merge', '--abort'], expect.anything());
+		});
+
+		it('aborts and reports failure when auto-resolution itself fails', async () => {
+			let mergeAttempted = false;
+			mockExecute.mockImplementation(async (command: string, args: string[]) => {
+				const [first, second] = args;
+				if (first === 'merge' && second === '--no-ff') {
+					mergeAttempted = true;
+					throw new Error('Command failed with exit code 1: CONFLICT (content): Merge conflict in src/index.ts');
+				}
+				if (first === 'status' && second === '--porcelain' && mergeAttempted) return gitOk('UU src/index.ts\n');
+				// The specific checkout --ours attempt for the conflicted file fails —
+				// e.g. a filesystem permission error — leaving the conflict unresolved.
+				if (first === 'checkout' && second === '--ours') {
+					throw new Error('permission denied');
+				}
+				return defaultResponder(command, args);
+			});
+			const orchestrator = new MergeOrchestrator('/repo');
+
+			const result = await orchestrator.mergeExploration('exp-1', 1, {
+				auto_resolve_conflicts: true,
+				strategy: 'direct'
+			});
+
+			expect(result.success).toBe(false);
+			expect(result.error).toBe('Failed to auto-resolve conflicts');
+			expect(mockExecute).toHaveBeenCalledWith('git', ['merge', '--abort'], expect.anything());
+		});
+	});
+
+	describe('previewMerge', () => {
+		it('reports can_merge: true with the commit count when no conflicts arise', async () => {
+			const orchestrator = new MergeOrchestrator('/repo');
+
+			const preview = await orchestrator.previewMerge('exp-1', 1);
+
+			expect(preview).toEqual({ can_merge: true, commits_to_merge: 3, conflicts: [], files_changed: 0 });
+			expect(mockExecute).toHaveBeenCalledWith(
+				'git',
+				['merge', '--no-commit', '--no-ff', worktree.branch_name],
+				expect.anything()
+			);
+			expect(mockExecute).toHaveBeenCalledWith('git', ['merge', '--abort'], expect.anything());
+		});
+
+		it('reports can_merge: false with the detected conflicts when the preview merge fails', async () => {
+			mockExecute.mockImplementation(async (command: string, args: string[]) => {
+				const [first, second] = args;
+				if (first === 'merge' && second === '--no-commit') {
+					throw new Error('Command failed with exit code 1: CONFLICT (content): Merge conflict in src/index.ts');
+				}
+				if (first === 'status' && second === '--porcelain') return gitOk('UU src/index.ts\n');
+				return defaultResponder(command, args);
+			});
+			const orchestrator = new MergeOrchestrator('/repo');
+
+			const preview = await orchestrator.previewMerge('exp-1', 1);
+
+			expect(preview.can_merge).toBe(false);
+			expect(preview.conflicts).toEqual([{ conflict_type: 'content', file_path: 'src/index.ts', resolved: false }]);
+			expect(mockExecute).toHaveBeenCalledWith('git', ['merge', '--abort'], expect.anything());
+		});
+
+		it('throws when the requested worktree index does not exist', async () => {
+			const orchestrator = new MergeOrchestrator('/repo');
+
+			await expect(orchestrator.previewMerge('exp-1', 99)).rejects.toThrow('Worktree 99 not found');
+		});
+	});
 });
