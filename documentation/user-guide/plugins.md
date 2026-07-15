@@ -436,10 +436,10 @@ The legacy `autoInstall: true` flag in the manifest is now informational only â€
 
 **`valora plugin add` fails**
 
-1. Confirm you have network access and that npm can reach the registry (`npm ping`)
+1. Confirm you have network access to `registry.npmjs.org` â€” Valora talks to it directly over HTTPS and does not use the `npm` CLI or any local `.npmrc`, so npm-specific configuration in your project cannot be the cause
 2. Check the package name is correct: `@windagency/valora-plugin-<name>`
 3. For `--scope project`, confirm you are inside a directory that has (or is a child of) a `.valora/` folder
-4. Run manually to see the full npm error: `npm pack @windagency/valora-plugin-<name>`
+4. Run manually to see the registry's response: `curl -i https://registry.npmjs.org/@windagency/valora-plugin-<name>/latest`
 
 **Plugin not loading**
 

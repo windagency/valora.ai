@@ -7,6 +7,7 @@ import * as path from 'node:path';
 import { getLogger } from 'output/logger';
 import { getGlobalPluginsDir, getProjectPluginsDir, getSystemPluginsDir } from 'utils/paths';
 
+import { fetchPackageTarball } from './npm-registry-client';
 import { PluginLoaderService } from './plugin-loader.service';
 import { assertValidPluginName, PLUGIN_MANIFEST_FILE } from './plugin-manifest.schema';
 
@@ -25,8 +26,8 @@ export class PluginInstallerService {
 		private readonly isPluginInstalled: InstalledPluginsLookup = defaultIsPluginInstalled
 	) {}
 
-	async install(pluginRef: string, scope: InstallScope, integrity?: string): Promise<void> {
-		await this.installWithVisited(pluginRef, scope, new Set<string>(), integrity);
+	async install(pluginRef: string, scope: InstallScope, integrity?: string, version?: string): Promise<void> {
+		await this.installWithVisited(pluginRef, scope, new Set<string>(), integrity, version);
 	}
 
 	async installFromTarball(tgzPath: string, scope: InstallScope): Promise<void> {
@@ -103,18 +104,32 @@ export class PluginInstallerService {
 		}
 	}
 
-	private async fetchTarball(packageName: string, destDir: string): Promise<void> {
-		const code = await this.runner.run(['npm', 'pack', packageName, '--pack-destination', destDir]);
+	private async packLocalDirectory(dirPath: string, destDir: string): Promise<void> {
+		const code = await this.runner.run(['npm', 'pack', dirPath, '--pack-destination', destDir]);
 		if (code !== 0) {
-			throw new Error(`Failed to download ${packageName} (npm pack exited ${code.toString()})`);
+			throw new Error(`Failed to pack local plugin directory ${dirPath} (npm pack exited ${code.toString()})`);
 		}
+	}
+
+	private async downloadRegistryTarball(packageName: string, version: string, destDir: string): Promise<void> {
+		let buffer: Buffer;
+		try {
+			buffer = await fetchPackageTarball(packageName, version);
+		} catch (err) {
+			const message = err instanceof Error ? err.message : String(err);
+			throw new Error(`Failed to download ${packageName}: ${message}`);
+		}
+		fs.mkdirSync(destDir, { recursive: true });
+		const fileName = `${shortNameFromPackage(packageName)}-${version}.tgz`;
+		fs.writeFileSync(path.join(destDir, fileName), buffer);
 	}
 
 	private async installWithVisited(
 		pluginRef: string,
 		scope: InstallScope,
 		visited: Set<string>,
-		integrity?: string
+		integrity?: string,
+		version?: string
 	): Promise<void> {
 		const packageName = resolvePackageName(pluginRef);
 		const shortName = shortNameFromPackage(packageName);
@@ -125,12 +140,11 @@ export class PluginInstallerService {
 		if (this.isPluginInstalled(shortName)) return;
 
 		const localPath = resolveLocalPluginDir(shortName);
-		const packSource = localPath ?? packageName;
 		const targetDir = resolveTargetDir(scope, shortName);
 		const expectedIntegrity = resolveExpectedIntegrity(shortName, localPath, integrity);
 
 		try {
-			await this.materialize(packSource, targetDir, expectedIntegrity);
+			await this.materialize(packageName, localPath, version ?? 'latest', targetDir, expectedIntegrity);
 			const manifest = readPluginManifest(targetDir);
 			for (const dep of manifest.requires ?? []) {
 				await this.installWithVisited(dep, scope, visited);
@@ -140,13 +154,23 @@ export class PluginInstallerService {
 		}
 	}
 
-	private async materialize(packSource: string, targetDir: string, expectedIntegrity?: string): Promise<void> {
+	private async materialize(
+		packageName: string,
+		localPath: string | null,
+		version: string,
+		targetDir: string,
+		expectedIntegrity?: string
+	): Promise<void> {
 		const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'valora-plugin-install-'));
 		try {
-			await this.fetchTarball(packSource, tmpDir);
+			if (localPath) {
+				await this.packLocalDirectory(localPath, tmpDir);
+			} else {
+				await this.downloadRegistryTarball(packageName, version, tmpDir);
+			}
 			if (expectedIntegrity) {
 				const tarball = fs.readdirSync(tmpDir).find((f) => f.endsWith('.tgz'));
-				if (!tarball) throw new Error('npm pack produced no tarball');
+				if (!tarball) throw new Error('Pack step produced no tarball');
 				verifyTarballIntegrity(path.join(tmpDir, tarball), expectedIntegrity);
 			}
 			await this.extractTarball(tmpDir, targetDir);

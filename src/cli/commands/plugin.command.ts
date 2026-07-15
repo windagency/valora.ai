@@ -145,11 +145,11 @@ export function configurePluginCommand(program: CommandAdapter, hooks: PluginCom
 			}
 
 			const shortName = shortNameFromPackage(resolvePackageName(name));
-			const integrity = await fetchIntegrityForPlugin(shortName);
+			const { integrity, version } = await fetchRegistryMetadataForPlugin(shortName);
 
 			console.log(`Installing ${name} (scope: ${scope})…`);
 			try {
-				await pluginInstaller.install(name, scope as InstallScope, integrity);
+				await pluginInstaller.install(name, scope as InstallScope, integrity, version);
 				console.log(`✓ Plugin installed. Restart Valora to activate.`);
 				await checkBinaryRequirements(shortName, checker, installer, promptFn);
 			} catch (error) {
@@ -315,13 +315,18 @@ async function buildNpmLatestMap(plugins: Array<{ name: string; packageName: str
 	return new Map(results.filter((r) => r.version !== null).map((r) => [r.name, r.version as string]));
 }
 
-async function fetchIntegrityForPlugin(shortName: string): Promise<string | undefined> {
+interface RegistryPluginMetadata {
+	integrity?: string;
+	version?: string;
+}
+
+async function fetchRegistryMetadataForPlugin(shortName: string): Promise<RegistryPluginMetadata> {
 	try {
 		const registry = await fetchPluginRegistry();
 		const entry = registry?.find((e) => e.name === shortName);
-		return entry?.integrity;
+		return { integrity: entry?.integrity, version: entry?.version };
 	} catch {
-		return undefined;
+		return {};
 	}
 }
 
@@ -371,7 +376,7 @@ async function installOutdatedPlugins(
 		}
 		console.log(`Updating ${p.name} (${p.currentVersion} → ${p.latestVersion})…`);
 		try {
-			await installer.install(p.name, p.location as InstallScope, p.integrity);
+			await installer.install(p.name, p.location as InstallScope, p.integrity, p.latestVersion);
 			console.log(`  ${color.green('✓')} ${p.name} updated.`);
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);

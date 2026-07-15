@@ -268,7 +268,7 @@ A plugin that omits `engines.valora` is treated as universally compatible. Use t
 }
 ```
 
-When `valora plugin add <name>` (or the auto-update flow) installs a registry-listed plugin, the host fetches the tarball via `npm pack`, recomputes the SHA256, and refuses to extract on mismatch. Plugins resolved from a local source path (`VALORA_PLUGIN_REGISTRY` developer override) skip this check, since `npm pack` of a local directory is non-reproducible. If a registry entry has no `integrity` field, installation proceeds with a warning.
+When `valora plugin add <name>` (or the auto-update flow) installs a registry-listed plugin, the host fetches the tarball directly from the npm registry (`https://registry.npmjs.org` by default, no `npm` CLI or local `.npmrc` involved), recomputes the SHA256, and refuses to extract on mismatch. Plugins resolved from a local source path (`VALORA_PLUGIN_REGISTRY` developer override) still use `npm pack <local-dir>` to produce a tarball from the working tree, and skip the SHA256 check entirely, since packing a local directory is non-reproducible. If a registry entry has no `integrity` field, installation proceeds with a warning.
 
 ### Unenforced permissions audit
 

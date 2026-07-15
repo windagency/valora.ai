@@ -59,7 +59,7 @@ export async function autoInstallPlugin(
 
 	process.stderr.write(`Updating plugin ${plugin.name} to v${plugin.latestVersion}…\n`);
 	try {
-		await installer.install(plugin.name, plugin.location as InstallScope, plugin.integrity);
+		await installer.install(plugin.name, plugin.location as InstallScope, plugin.integrity, plugin.latestVersion);
 		process.stderr.write(`✓ Plugin ${plugin.name} updated.\n`);
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);

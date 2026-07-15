@@ -38,7 +38,7 @@ Accepted
 - **`plugins.enabled` allowlist** — plugins are opt-in, not opt-out. A newly installed plugin directory is inert until added to the list.
 - **Synchronous discovery** — `discoverPluginDirs` is synchronous to avoid async complexity at startup. Suitable for the current number of plugin roots; reconsider if roots number in the hundreds.
 - **`engines.valora` is enforced (since 2026-05)** — the loader compares `manifest.engines.valora` against the running host version using a minimal subset of node-semver (exact, comparators, caret, tilde, AND-joined ranges). Plugins outside the declared range are skipped with a warn and surfaced as `status: 'invalid'` in the catalogue.
-- **Tarball integrity (since 2026-05)** — `data/plugins/registry.json` carries a per-entry `integrity` field (sha256 SRI) computed at registry-generation time. The installer recomputes the SHA256 after `npm pack` and aborts on mismatch. Plugins resolved from a local source path skip integrity verification (developer workflow).
+- **Tarball integrity (since 2026-05)** — `data/plugins/registry.json` carries a per-entry `integrity` field (sha256 SRI) computed at registry-generation time. For a registry-listed package, the tarball is downloaded directly from the npm registry (since 2026-07, no `npm` CLI or `.npmrc` required); the installer recomputes the SHA256 and aborts on mismatch. Plugins resolved from a local source path (developer workflow, via `npm pack <local-dir>`) skip this check entirely, since packing a local directory is non-reproducible.
 - **Auto-update is opt-in and consent-gated (since 2026-05)** — when global auto-update mode is `auto`, plugin updates are gated by `plugins.autoUpdate`. Default is `prompt` (confirm interactively per plugin, fall back to `check-only` on non-TTY). Set `install` to restore the legacy silent behaviour.
 - **Binary-install consent (since 2026-05)** — `requiresBinary.installCommand` always prompts the user with the command preview, even when `autoInstall: true` is set. The flag is preserved in the schema for backwards compatibility but does not change behaviour.
 - **Tarslip + ownership hardening (since 2026-05)** — extraction is preceded by a `tar -tf` listing pass; tarballs whose entries are absolute or contain `..` segments are refused. Extraction passes `--no-same-owner --no-same-permissions`.
@@ -146,7 +146,7 @@ A plugin directory can optionally contain a compiled module at `codeEntrypoint` 
 
 1. **Discovery containment** — `fs.realpathSync` ensures only directories whose real path is inside one of the four search roots are loaded.
 2. **Manifest validation** — Zod schema validates every manifest; mismatched `engines.valora` skips the plugin with a warn.
-3. **Tarball integrity** — `npm pack` output is sha256-verified against `registry.json` before extraction.
+3. **Tarball integrity** — for a registry-listed package, the tarball (fetched directly from the npm registry) is sha256-verified against `registry.json` before extraction; a local development source (via `npm pack`) skips this check.
 4. **Tar safety** — `tar -tf` listing pass rejects entries with absolute paths or `..` segments; extract uses `--no-same-owner --no-same-permissions`.
 5. **Consent-by-default** — auto-updates prompt per plugin (configurable via `plugins.autoUpdate`); binary install commands always prompt.
 6. **Provider conflict protocol** — duplicate provider keys are surfaced via TTY prompt with persisted resolution, or `ProviderConflictError` on non-TTY.

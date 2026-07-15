@@ -283,6 +283,7 @@ describe('plugin add', () => {
 	});
 
 	it('calls install and prints a success message', async () => {
+		vi.mocked(fetchPluginRegistry).mockResolvedValue(null);
 		const mockInstall = vi.fn().mockResolvedValue(undefined);
 		(PluginInstallerService as ReturnType<typeof vi.fn>).mockImplementationOnce(() => ({
 			install: mockInstall
@@ -291,7 +292,7 @@ describe('plugin add', () => {
 		const program = makeProgram();
 		await runCommand(program, ['plugin', 'add', 'rtk']);
 
-		expect(mockInstall).toHaveBeenCalledWith('rtk', 'user', undefined);
+		expect(mockInstall).toHaveBeenCalledWith('rtk', 'user', undefined, undefined);
 		expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('installed'));
 	});
 
@@ -441,8 +442,8 @@ describe('plugin update (install)', () => {
 		await runCommand(program, ['plugin', 'update']);
 
 		expect(mockInstall).toHaveBeenCalledTimes(2);
-		expect(mockInstall).toHaveBeenCalledWith('valora-plugin-rtk', 'user', undefined);
-		expect(mockInstall).toHaveBeenCalledWith('valora-plugin-eng', 'project', undefined);
+		expect(mockInstall).toHaveBeenCalledWith('valora-plugin-rtk', 'user', undefined, '1.1.0');
+		expect(mockInstall).toHaveBeenCalledWith('valora-plugin-eng', 'project', undefined, '2.1.0');
 	});
 
 	it('installs only the named plugin when a name is provided', async () => {
@@ -483,7 +484,7 @@ describe('plugin update (install)', () => {
 		await runCommand(program, ['plugin', 'update', 'rtk']);
 
 		expect(mockInstall).toHaveBeenCalledTimes(1);
-		expect(mockInstall).toHaveBeenCalledWith('valora-plugin-rtk', 'user', undefined);
+		expect(mockInstall).toHaveBeenCalledWith('valora-plugin-rtk', 'user', undefined, '1.1.0');
 	});
 
 	it('matches a plugin when the name uses the valora- package prefix', async () => {
@@ -524,7 +525,7 @@ describe('plugin update (install)', () => {
 		await runCommand(program, ['plugin', 'update', 'valora-plugin-product']);
 
 		expect(mockInstall).toHaveBeenCalledTimes(1);
-		expect(mockInstall).toHaveBeenCalledWith('valora-plugin-product', 'user', undefined);
+		expect(mockInstall).toHaveBeenCalledWith('valora-plugin-product', 'user', undefined, '2.1.0');
 	});
 
 	it('warns and skips npm-scope plugins without installing', async () => {
@@ -1284,6 +1285,7 @@ describe('plugin add (local tgz)', () => {
 	});
 
 	it('falls through to the npm flow when the argument does not end in .tgz', async () => {
+		vi.mocked(fetchPluginRegistry).mockResolvedValue(null);
 		const mockInstall = vi.fn().mockResolvedValue(undefined);
 		(PluginInstallerService as ReturnType<typeof vi.fn>).mockImplementationOnce(() => ({
 			install: mockInstall,
@@ -1293,7 +1295,7 @@ describe('plugin add (local tgz)', () => {
 		const program = makeProgram();
 		await runCommand(program, ['plugin', 'add', 'rtk']);
 
-		expect(mockInstall).toHaveBeenCalledWith('rtk', 'user', undefined);
+		expect(mockInstall).toHaveBeenCalledWith('rtk', 'user', undefined, undefined);
 		expect(vi.mocked(peekTarballManifest)).not.toHaveBeenCalled();
 	});
 });

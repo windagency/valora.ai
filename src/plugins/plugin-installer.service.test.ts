@@ -5,6 +5,7 @@ import * as path from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { fetchPackageTarball } from './npm-registry-client';
 import {
 	type ProcessRunner,
 	assertSafeTarball,
@@ -30,28 +31,22 @@ vi.mock('utils/paths', async (importOriginal) => {
 	};
 });
 
+vi.mock('./npm-registry-client', () => ({
+	fetchPackageTarball: vi.fn()
+}));
+
 interface MockRunnerOptions {
-	packCode?: number;
-	packCodeByShortName?: Record<string, number>;
 	tarCode?: number;
 	manifests?: Record<string, object>;
 	tgzManifest?: object;
 }
 
-function makeMockRunner(overrides?: MockRunnerOptions): ProcessRunner & { packCalls: string[] } {
-	const packCalls: string[] = [];
+function makeMockRunner(overrides?: MockRunnerOptions): ProcessRunner {
 	return {
-		packCalls,
 		run: vi.fn(async (argv: string[]) => {
 			if (argv[0] === 'npm' && argv[1] === 'pack') {
 				const pkgArg = argv[2] as string;
 				const shortName = pkgArg.startsWith('@') ? (pkgArg.split('/')[1] ?? pkgArg) : path.basename(pkgArg);
-				packCalls.push(shortName);
-
-				if (overrides?.packCodeByShortName?.[shortName] !== undefined) {
-					return overrides.packCodeByShortName[shortName];
-				}
-				if ((overrides?.packCode ?? 0) !== 0) return overrides!.packCode!;
 
 				const destIdx = argv.indexOf('--pack-destination');
 				const destDir = argv[destIdx + 1];
@@ -95,6 +90,27 @@ function makeMockRunner(overrides?: MockRunnerOptions): ProcessRunner & { packCa
 		})
 	};
 }
+
+function makeTarballBuffer(manifest: object): Buffer {
+	const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'valora-fetch-tarball-'));
+	try {
+		const pkgDir = path.join(dir, 'package');
+		fs.mkdirSync(pkgDir);
+		fs.writeFileSync(path.join(pkgDir, 'valora-plugin.json'), JSON.stringify(manifest));
+		const tgzPath = path.join(dir, 'plugin.tgz');
+		child_process.spawnSync('tar', ['-czf', tgzPath, '-C', dir, 'package']);
+		return fs.readFileSync(tgzPath);
+	} finally {
+		fs.rmSync(dir, { recursive: true, force: true });
+	}
+}
+
+const DEFAULT_TARBALL_BUFFER = makeTarballBuffer({});
+
+beforeEach(() => {
+	vi.mocked(fetchPackageTarball).mockReset();
+	vi.mocked(fetchPackageTarball).mockResolvedValue(DEFAULT_TARBALL_BUFFER);
+});
 
 describe('assertSafeTarball', () => {
 	let tmpDir: string;
@@ -295,14 +311,13 @@ describe('PluginInstallerService', () => {
 	});
 
 	describe('user scope', () => {
-		it('invokes npm pack with the resolved package name', async () => {
+		it('downloads the tarball for the resolved package name', async () => {
 			const { getGlobalPluginsDir } = await import('utils/paths');
 			vi.mocked(getGlobalPluginsDir).mockReturnValue(tmpTarget);
 
-			const runner = makeMockRunner();
-			await new PluginInstallerService(runner).install('rtk', 'user');
+			await new PluginInstallerService(makeMockRunner()).install('rtk', 'user');
 
-			expect(runner.run).toHaveBeenCalledWith(expect.arrayContaining(['npm', 'pack', '@windagency/valora-plugin-rtk']));
+			expect(vi.mocked(fetchPackageTarball)).toHaveBeenCalledWith('@windagency/valora-plugin-rtk', 'latest');
 		});
 
 		it('extracts the tarball into a subdirectory of the global plugins root', async () => {
@@ -327,21 +342,14 @@ describe('PluginInstallerService', () => {
 			expect(fs.existsSync(path.join(targetRoot, 'valora-plugin-rtk'))).toBe(true);
 		});
 
-		it('throws when npm pack exits non-zero', async () => {
+		it('throws when the tarball download fails', async () => {
 			const { getGlobalPluginsDir } = await import('utils/paths');
 			vi.mocked(getGlobalPluginsDir).mockReturnValue(tmpTarget);
+			vi.mocked(fetchPackageTarball).mockRejectedValueOnce(new Error('HTTP 403'));
 
-			await expect(new PluginInstallerService(makeMockRunner({ packCode: 1 })).install('rtk', 'user')).rejects.toThrow(
+			await expect(new PluginInstallerService(makeMockRunner()).install('rtk', 'user')).rejects.toThrow(
 				'Failed to download'
 			);
-		});
-
-		it('throws when npm pack produces no tarball', async () => {
-			const { getGlobalPluginsDir } = await import('utils/paths');
-			vi.mocked(getGlobalPluginsDir).mockReturnValue(tmpTarget);
-
-			const noTarballRunner: ProcessRunner = { run: vi.fn(async () => 0) };
-			await expect(new PluginInstallerService(noTarballRunner).install('rtk', 'user')).rejects.toThrow('no tarball');
 		});
 
 		it('throws when tar extraction exits non-zero', async () => {
@@ -442,7 +450,16 @@ describe('PluginInstallerService', () => {
 			expect(runner.run).toHaveBeenCalledWith(expect.arrayContaining(['npm', 'pack', localPath]));
 		});
 
-		it('falls back to npm pack when the registry entry has no path field', async () => {
+		it('throws when npm pack succeeds but produces no tarball for a local directory source', async () => {
+			process.env['VALORA_PLUGIN_REGISTRY'] = registryFile;
+			const { getGlobalPluginsDir } = await import('utils/paths');
+			vi.mocked(getGlobalPluginsDir).mockReturnValue(tmpTarget);
+
+			const noTarballRunner: ProcessRunner = { run: vi.fn(async () => 0) };
+			await expect(new PluginInstallerService(noTarballRunner).install('rtk', 'user')).rejects.toThrow('no tarball');
+		});
+
+		it('falls back to the registry download when the registry entry has no path field', async () => {
 			const noPathRegistry = path.join(localPackagesDir, 'no-path-registry.json');
 			fs.writeFileSync(
 				noPathRegistry,
@@ -452,13 +469,12 @@ describe('PluginInstallerService', () => {
 			const { getGlobalPluginsDir } = await import('utils/paths');
 			vi.mocked(getGlobalPluginsDir).mockReturnValue(tmpTarget);
 
-			const runner = makeMockRunner();
-			await new PluginInstallerService(runner).install('rtk', 'user');
+			await new PluginInstallerService(makeMockRunner()).install('rtk', 'user');
 
-			expect(runner.run).toHaveBeenCalledWith(expect.arrayContaining(['npm', 'pack', '@windagency/valora-plugin-rtk']));
+			expect(vi.mocked(fetchPackageTarball)).toHaveBeenCalledWith('@windagency/valora-plugin-rtk', 'latest');
 		});
 
-		it('falls back to npm pack when the path in the registry entry does not exist on disk', async () => {
+		it('falls back to the registry download when the path in the registry entry does not exist on disk', async () => {
 			const missingPathRegistry = path.join(localPackagesDir, 'missing-path-registry.json');
 			fs.writeFileSync(
 				missingPathRegistry,
@@ -475,10 +491,9 @@ describe('PluginInstallerService', () => {
 			const { getGlobalPluginsDir } = await import('utils/paths');
 			vi.mocked(getGlobalPluginsDir).mockReturnValue(tmpTarget);
 
-			const runner = makeMockRunner();
-			await new PluginInstallerService(runner).install('rtk', 'user');
+			await new PluginInstallerService(makeMockRunner()).install('rtk', 'user');
 
-			expect(runner.run).toHaveBeenCalledWith(expect.arrayContaining(['npm', 'pack', '@windagency/valora-plugin-rtk']));
+			expect(vi.mocked(fetchPackageTarball)).toHaveBeenCalledWith('@windagency/valora-plugin-rtk', 'latest');
 		});
 	});
 
@@ -576,7 +591,10 @@ describe('PluginInstallerService', () => {
 			const isInstalled = (name: string) => name === 'valora-plugin-b';
 			await new PluginInstallerService(runner, isInstalled).install('valora-plugin-a', 'user');
 
-			expect(runner.packCalls).not.toContain('valora-plugin-b');
+			expect(vi.mocked(fetchPackageTarball)).not.toHaveBeenCalledWith(
+				expect.stringContaining('valora-plugin-b'),
+				expect.anything()
+			);
 			expect(fs.existsSync(path.join(tmpDepTarget, 'valora-plugin-a'))).toBe(true);
 		});
 
@@ -587,8 +605,11 @@ describe('PluginInstallerService', () => {
 			const runner = makeMockRunner({
 				manifests: {
 					'valora-plugin-a': { name: 'valora-plugin-a', version: '1.0.0', requires: ['valora-plugin-b'] }
-				},
-				packCodeByShortName: { 'valora-plugin-b': 1 }
+				}
+			});
+			vi.mocked(fetchPackageTarball).mockImplementation((packageName: string) => {
+				if (packageName === '@windagency/valora-plugin-b') return Promise.reject(new Error('HTTP 403'));
+				return Promise.resolve(DEFAULT_TARBALL_BUFFER);
 			});
 
 			await expect(new PluginInstallerService(runner, () => false).install('valora-plugin-a', 'user')).rejects.toThrow(
@@ -634,41 +655,14 @@ describe('PluginInstallerService', () => {
 			const { getGlobalPluginsDir } = await import('utils/paths');
 			vi.mocked(getGlobalPluginsDir).mockReturnValue(tmpTarget);
 
-			// Build the tarball once, outside the per-install temp dirs (the service
-			// deletes those after each install), so every `npm pack` invocation copies
-			// the exact same bytes instead of re-running `tar -czf`. gzip embeds a
-			// compression timestamp in its header, so two independently-created
-			// tarballs of identical content still hash differently — re-packing on
-			// each call made this test's SHA256 comparison flaky.
-			const stableSrcDir = fs.mkdtempSync(path.join(tmpTarget, 'stable-src-'));
-			const pkgDir = path.join(stableSrcDir, 'package');
-			fs.mkdirSync(pkgDir);
-			fs.writeFileSync(path.join(pkgDir, 'valora-plugin.json'), '{}');
-			const stableTgz = path.join(stableSrcDir, 'valora-plugin-rtk-1.0.0.tgz');
-			child_process.spawnSync('tar', ['-czf', stableTgz, '-C', stableSrcDir, 'package']);
+			const stableBuffer = makeTarballBuffer({});
+			const stableTgzPath = path.join(tmpTarget, 'stable-reference.tgz');
+			fs.writeFileSync(stableTgzPath, stableBuffer);
+			const expectedIntegrity = computeTarballIntegrity(stableTgzPath);
+			vi.mocked(fetchPackageTarball).mockResolvedValue(stableBuffer);
 
-			let capturedIntegrity = '';
-			const runner: ProcessRunner & { packCalls: string[] } = {
-				packCalls: [],
-				run: vi.fn(async (argv: string[]) => {
-					if (argv[0] === 'npm' && argv[1] === 'pack') {
-						const destIdx = argv.indexOf('--pack-destination');
-						const destDir = argv[destIdx + 1];
-						const tgz = path.join(destDir, 'valora-plugin-rtk-1.0.0.tgz');
-						fs.copyFileSync(stableTgz, tgz);
-						capturedIntegrity = computeTarballIntegrity(tgz);
-					}
-					return 0;
-				})
-			};
-
-			// First call to compute the integrity that the runner will produce
-			await new PluginInstallerService(runner).install('rtk', 'user');
-			fs.rmSync(path.join(tmpTarget, 'valora-plugin-rtk'), { force: true, recursive: true });
-
-			// Second call: pass the captured integrity — should succeed without throwing
 			await expect(
-				new PluginInstallerService(runner, () => false).install('rtk', 'user', capturedIntegrity)
+				new PluginInstallerService(makeMockRunner()).install('rtk', 'user', expectedIntegrity)
 			).resolves.toBeUndefined();
 		});
 
@@ -788,7 +782,7 @@ describe('PluginInstallerService.installFromTarball', () => {
 		});
 		await new PluginInstallerService(runner, () => false).installFromTarball(tgzPath, 'user');
 
-		expect(runner.packCalls).toContain('valora-plugin-rtk');
+		expect(vi.mocked(fetchPackageTarball)).toHaveBeenCalledWith('@windagency/valora-plugin-rtk', 'latest');
 		expect(fs.existsSync(path.join(tmpTarget, 'valora-plugin-rtk'))).toBe(true);
 	});
 
@@ -830,8 +824,7 @@ describe('PluginInstallerService.installFromTarball', () => {
 		const tgzPath = makeRealTgz(tmpTarget, { name: 'valora-plugin-docs', version: '1.0.0' });
 
 		// Mock runner: extract writes a malicious manifest into the staging dir
-		const runner: ProcessRunner & { packCalls: string[] } = {
-			packCalls: [],
+		const runner: ProcessRunner = {
 			run: vi.fn(async (argv: string[]) => {
 				if (argv[0] === 'tar' && argv[1] === '-xf') {
 					const cIdx = argv.indexOf('-C');

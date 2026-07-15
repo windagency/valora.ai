@@ -42,7 +42,7 @@ describe('autoInstallPlugin', () => {
 
 		await autoInstallPlugin(installer, outdated());
 
-		expect(mockInstall).toHaveBeenCalledWith('valora-plugin-rtk', 'user', undefined);
+		expect(mockInstall).toHaveBeenCalledWith('valora-plugin-rtk', 'user', undefined, '1.1.0');
 		const output = stderrSpy.mock.calls.map((c) => String(c[0])).join('');
 		expect(output).toContain('Updating plugin valora-plugin-rtk');
 		expect(output).toContain('✓ Plugin valora-plugin-rtk updated');
@@ -106,7 +106,7 @@ describe('autoInstallOutdatedPlugins', () => {
 		await autoInstallOutdatedPlugins(installer, plugins, { policy: 'prompt', confirm });
 
 		expect(vi.mocked(installer.install)).toHaveBeenCalledTimes(1);
-		expect(vi.mocked(installer.install)).toHaveBeenCalledWith('valora-plugin-rtk', 'user', undefined);
+		expect(vi.mocked(installer.install)).toHaveBeenCalledWith('valora-plugin-rtk', 'user', undefined, '1.1.0');
 		const output = stderrSpy.mock.calls.map((c) => String(c[0])).join('');
 		expect(output).toContain('Skipped valora-plugin-eng');
 	});
@@ -121,8 +121,8 @@ describe('autoInstallOutdatedPlugins', () => {
 		await autoInstallOutdatedPlugins(installer, plugins, { policy: 'install' });
 
 		expect(vi.mocked(installer.install)).toHaveBeenCalledTimes(2);
-		expect(vi.mocked(installer.install)).toHaveBeenNthCalledWith(1, 'valora-plugin-rtk', 'user', undefined);
-		expect(vi.mocked(installer.install)).toHaveBeenNthCalledWith(2, 'valora-plugin-eng', 'project', undefined);
+		expect(vi.mocked(installer.install)).toHaveBeenNthCalledWith(1, 'valora-plugin-rtk', 'user', undefined, '1.1.0');
+		expect(vi.mocked(installer.install)).toHaveBeenNthCalledWith(2, 'valora-plugin-eng', 'project', undefined, '1.1.0');
 	});
 
 	it('skips npm-scoped plugins and continues with others', async () => {
@@ -135,6 +135,6 @@ describe('autoInstallOutdatedPlugins', () => {
 		await autoInstallOutdatedPlugins(installer, plugins, { policy: 'install' });
 
 		expect(vi.mocked(installer.install)).toHaveBeenCalledTimes(1);
-		expect(vi.mocked(installer.install)).toHaveBeenCalledWith('valora-plugin-eng', 'user', undefined);
+		expect(vi.mocked(installer.install)).toHaveBeenCalledWith('valora-plugin-eng', 'user', undefined, '1.1.0');
 	});
 });
