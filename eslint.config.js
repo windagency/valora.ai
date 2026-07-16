@@ -111,6 +111,7 @@ export default [
 				process: 'readonly',
 				AbortSignal: 'readonly',
 				fetch: 'readonly',
+				ReadableStreamDefaultReader: 'readonly',
 				Response: 'readonly',
 				require: 'readonly',
 				setInterval: 'readonly',

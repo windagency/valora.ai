@@ -51,7 +51,7 @@ async function fetchTarballBytes(tarballUrl: string, packageName: string, versio
 		throw new Error(`Failed to download tarball for ${packageName}@${version}: response has no body.`);
 	}
 
-	const reader = response.body.getReader();
+	const reader: ReadableStreamDefaultReader<Uint8Array> = response.body.getReader();
 	const chunks: Uint8Array[] = [];
 	let total = 0;
 	for (;;) {
