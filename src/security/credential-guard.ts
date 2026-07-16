@@ -135,20 +135,7 @@ export class CredentialGuard {
 
 		// Check resolved path against sensitive directories
 		const resolvedPath = resolve(filePath).replace(/\\/g, '/');
-		const homedir = process.env['HOME'] ?? process.env['USERPROFILE'] ?? '';
-		const normalisedHome = homedir.replace(/\\/g, '/');
-
-		for (const dir of SENSITIVE_DIRECTORIES) {
-			if (resolvedPath.includes(`${normalisedHome}${dir}`)) {
-				return true;
-			}
-			// Also match the directory pattern without home prefix
-			if (resolvedPath.includes(dir)) {
-				return true;
-			}
-		}
-
-		return false;
+		return SENSITIVE_DIRECTORIES.some((dir) => resolvedPath.includes(dir));
 	}
 
 	/**

@@ -135,8 +135,6 @@ export class PromptInjectionDetector {
 	 * Sanitise tool result content based on injection risk.
 	 */
 	sanitizeToolResult(toolName: string, content: string): string {
-		if (!content || typeof content !== 'string') return content;
-
 		const { markers, score } = this.scan(content);
 
 		if (score > 0.9) {
@@ -260,22 +258,9 @@ export class PromptInjectionDetector {
 	}
 
 	private scanDecoded(content: string): InjectionScanResult {
-		let score = 0;
 		const markers: string[] = [];
-
-		for (const { pattern, weight } of INSTRUCTION_OVERRIDE_PATTERNS) {
-			if (pattern.test(content)) {
-				score += weight;
-				markers.push(`base64:${pattern.source}`);
-			}
-		}
-
-		for (const { pattern, weight } of ROLE_IMPERSONATION_PATTERNS) {
-			if (pattern.test(content)) {
-				score += weight;
-				markers.push(`base64:${pattern.source}`);
-			}
-		}
+		let score = this.matchPatterns(content, INSTRUCTION_OVERRIDE_PATTERNS, 'base64', markers);
+		score += this.matchPatterns(content, ROLE_IMPERSONATION_PATTERNS, 'base64', markers);
 
 		return { markers, score: Math.min(1, score) };
 	}
