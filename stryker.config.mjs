@@ -7,6 +7,13 @@ export default {
 	// Explicitly load plugins (required for pnpm symlinked node_modules)
 	plugins: ['@stryker-mutator/vitest-runner'],
 
+	// .pnpm-store isn't in Stryker's default-ignored list (node_modules, .git,
+	// /reports, *.tsbuildinfo, /stryker.log, .stryker-tmp) and churns during
+	// normal pnpm operations — a file present when Stryker scans the directory
+	// can be pruned before the copy step actually runs, failing the whole run
+	// with an ENOENT race. It's never needed inside the sandbox anyway.
+	ignorePatterns: ['.pnpm-store'],
+
 	testRunner: 'vitest',
 	vitest: {
 		// Use a focused config that only runs co-located unit tests (not integration/e2e)

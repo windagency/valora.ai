@@ -144,6 +144,11 @@ interface PluginInstallOptions extends Record<string, unknown> {
 	scope?: string;
 }
 
+interface RegistryPluginMetadata {
+	integrity?: string;
+	version?: string;
+}
+
 export function configurePluginCommand(program: CommandAdapter, hooks: PluginCommandHooks = {}): void {
 	const checker = hooks.binaryChecker ?? isBinaryOnPath;
 	const installer = hooks.binaryInstaller ?? runShellCommand;
@@ -346,11 +351,6 @@ async function buildNpmLatestMap(plugins: Array<{ name: string; packageName: str
 		}))
 	);
 	return new Map(results.filter((r) => r.version !== null).map((r) => [r.name, r.version as string]));
-}
-
-interface RegistryPluginMetadata {
-	integrity?: string;
-	version?: string;
 }
 
 async function fetchRegistryMetadataForPlugin(shortName: string): Promise<RegistryPluginMetadata> {

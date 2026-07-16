@@ -91,6 +91,19 @@ export class PluginInstallerService {
 		getToolIntegrityMonitor().clearFingerprint(`plugin:${shortName}`);
 	}
 
+	private async downloadRegistryTarball(packageName: string, version: string, destDir: string): Promise<void> {
+		let buffer: Buffer;
+		try {
+			buffer = await fetchPackageTarball(packageName, version);
+		} catch (err) {
+			const message = err instanceof Error ? err.message : String(err);
+			throw new Error(`Failed to download ${packageName}: ${message}`);
+		}
+		fs.mkdirSync(destDir, { recursive: true });
+		const fileName = `${shortNameFromPackage(packageName)}-${version}.tgz`;
+		fs.writeFileSync(path.join(destDir, fileName), buffer);
+	}
+
 	private async extractTarball(tmpDir: string, targetDir: string): Promise<void> {
 		const tarball = fs.readdirSync(tmpDir).find((f) => f.endsWith('.tgz'));
 		if (!tarball) throw new Error('npm pack produced no tarball');
@@ -117,26 +130,6 @@ export class PluginInstallerService {
 		if (code !== 0) {
 			throw new Error(`Failed to extract plugin to ${targetDir}`);
 		}
-	}
-
-	private async packLocalDirectory(dirPath: string, destDir: string): Promise<void> {
-		const code = await this.runner.run(['npm', 'pack', dirPath, '--pack-destination', destDir]);
-		if (code !== 0) {
-			throw new Error(`Failed to pack local plugin directory ${dirPath} (npm pack exited ${code.toString()})`);
-		}
-	}
-
-	private async downloadRegistryTarball(packageName: string, version: string, destDir: string): Promise<void> {
-		let buffer: Buffer;
-		try {
-			buffer = await fetchPackageTarball(packageName, version);
-		} catch (err) {
-			const message = err instanceof Error ? err.message : String(err);
-			throw new Error(`Failed to download ${packageName}: ${message}`);
-		}
-		fs.mkdirSync(destDir, { recursive: true });
-		const fileName = `${shortNameFromPackage(packageName)}-${version}.tgz`;
-		fs.writeFileSync(path.join(destDir, fileName), buffer);
 	}
 
 	private async installWithVisited(
@@ -172,7 +165,7 @@ export class PluginInstallerService {
 
 	private async materialize(
 		packageName: string,
-		localPath: string | null,
+		localPath: null | string,
 		version: string,
 		targetDir: string,
 		expectedIntegrity?: string
@@ -192,6 +185,13 @@ export class PluginInstallerService {
 			await this.extractTarball(tmpDir, targetDir);
 		} finally {
 			fs.rmSync(tmpDir, { force: true, recursive: true });
+		}
+	}
+
+	private async packLocalDirectory(dirPath: string, destDir: string): Promise<void> {
+		const code = await this.runner.run(['npm', 'pack', dirPath, '--pack-destination', destDir]);
+		if (code !== 0) {
+			throw new Error(`Failed to pack local plugin directory ${dirPath} (npm pack exited ${code.toString()})`);
 		}
 	}
 }
