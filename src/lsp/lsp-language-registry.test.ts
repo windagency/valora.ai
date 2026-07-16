@@ -2,13 +2,33 @@
  * LSP Language Registry Tests
  */
 
-import { describe, expect, it, afterEach } from 'vitest';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
+
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+const mockIsWorkspaceTrusted = vi.fn(() => false);
+vi.mock('security/workspace-trust.service', () => ({
+	isWorkspaceTrusted: (...args: unknown[]) => mockIsWorkspaceTrusted(...args)
+}));
+
+vi.mock('output/logger', () => ({
+	getLogger: () => ({
+		debug: vi.fn(),
+		error: vi.fn(),
+		info: vi.fn(),
+		warn: vi.fn()
+	})
+}));
 
 import { getAllServers, getServerForFile, getServerForLanguage, resetLanguageRegistry } from './lsp-language-registry';
 
 describe('LSP Language Registry', () => {
 	afterEach(() => {
 		resetLanguageRegistry();
+		mockIsWorkspaceTrusted.mockReset();
+		mockIsWorkspaceTrusted.mockReturnValue(false);
 	});
 
 	describe('getServerForFile', () => {
@@ -90,6 +110,51 @@ describe('LSP Language Registry', () => {
 			expect(servers['pyright-langserver']).toBeDefined();
 			expect(servers['gopls']).toBeDefined();
 			expect(servers['rust-analyzer']).toBeDefined();
+		});
+	});
+
+	describe('project-level overrides (.valora/lsp-servers.json) are workspace-trust gated', () => {
+		let projectRoot: string;
+
+		function writeOverride(): void {
+			mkdirSync(join(projectRoot, '.valora'), { recursive: true });
+			writeFileSync(
+				join(projectRoot, '.valora', 'lsp-servers.json'),
+				JSON.stringify({
+					'evil-server': {
+						args: ['--evil'],
+						command: '/tmp/evil-language-server',
+						extensions: ['.evil'],
+						languages: ['evil']
+					}
+				})
+			);
+		}
+
+		afterEach(() => {
+			rmSync(projectRoot, { force: true, recursive: true });
+		});
+
+		it('ignores the override for an untrusted project directory, falling back to defaults', () => {
+			projectRoot = mkdtempSync(join(tmpdir(), 'valora-lsp-untrusted-'));
+			writeOverride();
+			mockIsWorkspaceTrusted.mockReturnValue(false);
+
+			const servers = getAllServers(projectRoot);
+
+			expect(servers['evil-server']).toBeUndefined();
+			expect(servers['typescript-language-server']?.command).toBe('typescript-language-server');
+		});
+
+		it('applies the override once the project directory is explicitly trusted', () => {
+			projectRoot = mkdtempSync(join(tmpdir(), 'valora-lsp-trusted-'));
+			writeOverride();
+			mockIsWorkspaceTrusted.mockReturnValue(true);
+
+			const servers = getAllServers(projectRoot);
+
+			expect(servers['evil-server']).toBeDefined();
+			expect(servers['evil-server']?.command).toBe('/tmp/evil-language-server');
 		});
 	});
 });

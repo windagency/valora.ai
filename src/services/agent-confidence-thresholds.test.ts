@@ -406,9 +406,10 @@ describe('Confidence Threshold Testing - Edge Cases and Fallback Behavior', () =
 
 			const result = await resolver.resolveAgent(taskContext);
 
-			expect(result).toBeDefined();
-			expect(result.selectedAgent).toBeDefined();
-			expect(result.confidence).toBeGreaterThan(0);
+			// 1000 unnamed .ts files carry no domain signal beyond the extension,
+			// so this collapses to the lead fallback at low confidence.
+			expect(result.selectedAgent).toBe('lead');
+			expect(result.confidence).toBeCloseTo(0.20955633802816903, 5);
 		});
 
 		it('should handle extremely long descriptions', async () => {
@@ -421,8 +422,8 @@ describe('Confidence Threshold Testing - Edge Cases and Fallback Behavior', () =
 
 			const result = await resolver.resolveAgent(taskContext);
 
-			expect(result).toBeDefined();
-			expect(result.selectedAgent).toBeDefined();
+			expect(result.selectedAgent).toBe('lead');
+			expect(result.confidence).toBeCloseTo(0.20850000000000005, 5);
 		});
 
 		it('should handle special characters in descriptions', async () => {
@@ -449,7 +450,8 @@ describe('Confidence Threshold Testing - Edge Cases and Fallback Behavior', () =
 
 			const result = await resolver.resolveAgent(taskContext);
 
-			expect(result).toBeDefined();
+			expect(result.selectedAgent).toBe('lead');
+			expect(result.confidence).toBeCloseTo(0.1335, 5);
 			expect(result.fallback).toBe(true);
 		});
 	});
@@ -466,9 +468,8 @@ describe('Confidence Threshold Testing - Edge Cases and Fallback Behavior', () =
 
 			const result = await resolver.resolveAgent(taskContext);
 
-			expect(result).toBeDefined();
-			expect(result.selectedAgent).toBeDefined();
-			expect(result.confidence).toBeGreaterThan(0);
+			expect(result.selectedAgent).toBe('lead');
+			expect(result.confidence).toBeCloseTo(0.1335, 5);
 			// Note: fallback may or may not be triggered depending on actual scoring
 		});
 
@@ -481,9 +482,13 @@ describe('Confidence Threshold Testing - Edge Cases and Fallback Behavior', () =
 
 			const result = await resolver.resolveAgent(taskContext);
 
-			expect(result).toBeDefined();
-			expect(result.reasons).toBeDefined();
-			expect(result.reasons.length).toBeGreaterThan(0);
+			expect(result.selectedAgent).toBe('lead');
+			expect(result.reasons).toEqual([
+				'Primary domain match: typescript-core',
+				'Priority level: 90',
+				'Low confidence - using as fallback selection',
+				'Low confidence in agent selection'
+			]);
 		});
 
 		it('should maintain service stability with ambiguous contexts', async () => {
@@ -495,9 +500,10 @@ describe('Confidence Threshold Testing - Edge Cases and Fallback Behavior', () =
 
 			for (const context of ambiguousContexts) {
 				const result = await resolver.resolveAgent(context);
-				expect(result).toBeDefined();
-				expect(result.selectedAgent).toBeDefined();
-				expect(result.confidence).toBeGreaterThan(0);
+				// All three ambiguous inputs carry equally little domain signal,
+				// so they all collapse to the same lead fallback at the same confidence.
+				expect(result.selectedAgent).toBe('lead');
+				expect(result.confidence).toBeCloseTo(0.1335, 5);
 			}
 		});
 	});

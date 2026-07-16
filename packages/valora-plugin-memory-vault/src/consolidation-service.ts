@@ -188,7 +188,7 @@ export class MemoryConsolidationService {
 	}
 
 	private async autoPromoteEntries(dryRun: boolean): Promise<number> {
-		const entries = await this.store.getEntries('episodic');
+		const entries = excludeUntrusted(await this.store.getEntries('episodic'));
 		let promotedCount = 0;
 
 		for (const entry of entries) {
@@ -325,7 +325,7 @@ export class MemoryConsolidationService {
 		const meta = readVectorStoreMeta(vaultDir);
 		if (meta === null) return 0;
 
-		const entries = await vaultStore.getEntries('episodic');
+		const entries = excludeUntrusted(await vaultStore.getEntries('episodic'));
 		const vs = openVectorStore(vaultDir, meta.model, meta.dim);
 		const clusters = cosineClusters(entries, vs, COSINE_CLUSTER_THRESHOLD);
 		let mergedCount = 0;
@@ -352,7 +352,7 @@ export class MemoryConsolidationService {
 	}
 
 	private async mergeJaccard(dryRun: boolean): Promise<number> {
-		const entries = await this.store.getEntries('episodic');
+		const entries = excludeUntrusted(await this.store.getEntries('episodic'));
 		const groups = this.buildTagGroups(entries);
 		let mergedCount = 0;
 
@@ -445,6 +445,19 @@ function buildDefaultVaultStore(): VaultStore {
 	const vaultDir = getDefaultVaultDir();
 	runAutoMigrationIfNeeded(getLegacyJsonDir(), vaultDir);
 	return new VaultStore(vaultDir);
+}
+
+/**
+ * Exclude entries whose provenance signature failed verification from
+ * consolidation. Without this, an untrusted entry (rejected from direct
+ * recall — see `manager.ts`'s `matchesQueryOptions`) could be laundered into
+ * a freshly-signed, trusted-looking semantic entry simply by being clustered
+ * or auto-promoted alongside legitimate ones — `promote()`/`create()` stamps
+ * a valid signature on whatever content it's given. `trusted === undefined`
+ * (legacy/JSON-store entries, never signed) is intentionally NOT excluded.
+ */
+function excludeUntrusted(entries: MemoryEntry[]): MemoryEntry[] {
+	return entries.filter((entry) => entry.trusted !== false);
 }
 
 const CONFIDENCE_RANK: Record<MemoryEntry['confidence'], number> = {

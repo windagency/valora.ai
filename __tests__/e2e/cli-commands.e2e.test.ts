@@ -1,21 +1,22 @@
 /**
- * End-to-End tests for CLI commands
+ * End-to-End tests for CLI commands.
  *
- * Tests the complete CLI workflow using Playwright for browser automation.
+ * Scope note: this file owns CLI-surface scenarios not covered by
+ * __tests__/acceptance/user-workflows.acceptance.test.ts — flags and argument
+ * handling (--version, --log-level, --output, --no-interactive, missing
+ * required arguments) rather than that file's business-workflow scenarios
+ * (data security, concurrency, resource management). Each CLI behavior is
+ * asserted in exactly one of the two files, not both.
  */
 
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { execa } from 'execa';
-import { Browser, Page, chromium } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 describe('CLI Commands E2E', () => {
-	let browser: Browser | null = null;
-	let page: Page | null = null;
 	let tempDir: string;
 	let aiBinaryPath: string;
-	let playwrightAvailable = false;
 
 	/**
 	 * Helper to run CLI commands via the built binary.
@@ -44,23 +45,9 @@ describe('CLI Commands E2E', () => {
 
 		// Use the built CLI (requires `pnpm build` to have been run)
 		aiBinaryPath = path.join(process.cwd(), 'dist', 'cli', 'index.js');
-
-		// Try to launch browser (optional - may not be available in all environments)
-		try {
-			browser = await chromium.launch();
-			page = await browser.newPage();
-			playwrightAvailable = true;
-		} catch {
-			// Playwright browsers not installed - skip browser tests
-			playwrightAvailable = false;
-		}
 	}, 30000);
 
 	afterAll(async () => {
-		// Clean up
-		if (page) await page.close();
-		if (browser) await browser.close();
-
 		try {
 			await fs.rm(tempDir, { force: true, recursive: true });
 		} catch {
@@ -68,19 +55,7 @@ describe('CLI Commands E2E', () => {
 		}
 	}, 30000);
 
-	describe('CLI Help and Version', () => {
-		it('should display help information', async () => {
-			const { exitCode, stdout } = await execa('node', cli('--help'), {
-				cwd: tempDir,
-				env: cliEnv(),
-				input: ''
-			});
-
-			expect(exitCode).toBe(0);
-			expect(stdout).toContain('VALORA');
-			expect(stdout).toContain('AI-Assisted Development Workflow Orchestration');
-		}, 30000);
-
+	describe('CLI Version', () => {
 		it('should display version information', async () => {
 			const { exitCode, stdout } = await execa('node', cli('--version'), {
 				cwd: tempDir,
@@ -93,100 +68,22 @@ describe('CLI Commands E2E', () => {
 		}, 30000);
 	});
 
-	describe('Configuration Management', () => {
-		it('should report the configuration file path', async () => {
-			const { exitCode, stdout } = await execa('node', cli('config', 'path'), {
-				cwd: tempDir,
-				env: cliEnv(),
-				input: ''
-			});
-
-			expect(exitCode).toBe(0);
-			expect(stdout.trim().length).toBeGreaterThan(0);
-		}, 30000);
-
-		it('should show configuration status', async () => {
-			const { exitCode, stdout } = await execa('node', cli('config', 'show'), {
-				cwd: tempDir,
-				env: cliEnv(),
-				input: ''
-			});
-
-			expect(exitCode).toBe(0);
-			expect(stdout).toContain('Configuration');
-		}, 30000);
-	});
-
-	describe('Session Management', () => {
-		it('should list and manage sessions', async () => {
-			// List sessions (should work even if empty)
-			const { exitCode: listExit, stdout: listOutput } = await execa('node', cli('session', 'list'), {
-				cwd: tempDir,
-				env: cliEnv(),
-				input: ''
-			});
-
-			expect(listExit).toBe(0);
-			// Should either show "No sessions found" or list sessions
-			expect(listOutput).toMatch(/No sessions found|ACTIVE SESSIONS/);
-
-			// Test session clear command
-			const { exitCode: clearExit, stdout: clearOutput } = await execa('node', cli('session', 'clear'), {
-				cwd: tempDir,
-				env: cliEnv(),
-				input: ''
-			});
-
-			expect(clearExit).toBe(0);
-			expect(clearOutput).toContain('Cleared');
-		}, 30000);
-	});
-
 	describe('Command Execution', () => {
-		it('should execute orchestration commands', async () => {
-			// Test with a simple command that should work
-			const { exitCode, stdout } = await execa(
-				'node',
-				cli('list'), // List available commands
-				{
-					cwd: tempDir,
-					env: cliEnv({ AI_SESSION_ID: 'test-session' }),
-					input: ''
-				}
-			);
-
-			expect(exitCode).toBe(0);
-			expect(stdout).toBeDefined();
-		}, 30000);
-
-		it('should handle command execution with options', async () => {
-			// Test exec with a nonexistent command - should fail gracefully
-			const { exitCode, stderr, stdout } = await execa('node', cli('exec', 'nonexistent-command', '--verbose'), {
+		it('should surface --verbose output on an exec failure without changing the failure itself', async () => {
+			const { exitCode, stderr } = await execa('node', cli('exec', 'nonexistent-command', '--verbose'), {
 				cwd: tempDir,
 				env: cliEnv({ AI_VERBOSE: 'true' }),
 				reject: false,
 				input: ''
 			});
 
-			// Should fail because command doesn't exist
+			// Should fail because command doesn't exist, regardless of --verbose
 			expect(exitCode).toBe(1);
 			expect(stderr).toContain('Failed to load command');
 		}, 30000);
 	});
 
 	describe('Error Handling', () => {
-		it('should handle invalid commands gracefully', async () => {
-			const { exitCode, stderr, stdout } = await execa('node', cli('invalid-command'), {
-				cwd: tempDir,
-				env: cliEnv(),
-				reject: false, // Don't throw on non-zero exit
-				input: ''
-			});
-
-			expect(exitCode).not.toBe(0);
-			expect(stderr || stdout).toMatch(/error|invalid|unknown/i);
-		}, 30000);
-
 		it('should handle missing required arguments', async () => {
 			const { exitCode, stderr, stdout } = await execa(
 				'node',
@@ -225,27 +122,24 @@ describe('CLI Commands E2E', () => {
 			expect(errorOutput.length).toBeLessThanOrEqual(debugOutput.length);
 		}, 30000);
 
-		it('should support different output formats', async () => {
-			const { exitCode: jsonExit, stdout: jsonOutput } = await execa(
-				'node',
-				cli('--output', 'json', 'session', 'list'),
-				{
-					cwd: tempDir,
-					env: cliEnv(),
-					input: ''
-				}
-			);
+		it('should exit cleanly with --output json, though the flag does not yet produce parseable JSON', async () => {
+			// KNOWN GAP (found while tightening this test's original try/catch-swallowed
+			// assertion): `--output json` does not actually change `session list`'s output to
+			// JSON — verified directly (`node dist/cli/index.js --output json session list`),
+			// stdout is the same box-drawing UI plus an unrelated "Auto-migrated config..."
+			// info line, not JSON. Spot-checking `config show`/`list` shows the same gap across
+			// commands. This is a real, pre-existing product gap (the flag exists but isn't
+			// wired to any command's actual output formatting) — out of scope for a test
+			// consolidation to fix, since it would mean auditing every command's output path.
+			// This test only asserts what's actually true today (clean exit); do not tighten it
+			// to assert valid JSON until the underlying --output json support is implemented.
+			const { exitCode: jsonExit } = await execa('node', cli('--output', 'json', 'session', 'list'), {
+				cwd: tempDir,
+				env: cliEnv(),
+				input: ''
+			});
 
 			expect(jsonExit).toBe(0);
-
-			// Try to parse as JSON (may fail if command doesn't support JSON output)
-			try {
-				const parsed = JSON.parse(jsonOutput);
-				expect(parsed).toBeDefined();
-			} catch (error) {
-				// Command may not support JSON output, which is acceptable
-				expect(jsonOutput).toBeDefined();
-			}
 		}, 30000);
 	});
 
@@ -263,26 +157,8 @@ describe('CLI Commands E2E', () => {
 		}, 30000);
 	});
 
-	describe('Performance and Resource Usage', () => {
-		it('should execute commands within reasonable time', async () => {
-			const startTime = Date.now();
-
-			const { exitCode } = await execa('node', cli('--quiet', 'list'), {
-				cwd: tempDir,
-				env: cliEnv(),
-				timeout: 15000, // 15 second timeout
-				input: ''
-			});
-
-			const endTime = Date.now();
-			const duration = endTime - startTime;
-
-			expect(exitCode).toBe(0);
-			expect(duration).toBeLessThan(15000); // Should complete within 15 seconds
-		}, 20000);
-
-		it('should handle memory-intensive operations', async () => {
-			// Test with a command that might use more memory
+	describe('Resource Usage', () => {
+		it('should handle memory-intensive operations within a bounded output buffer', async () => {
 			const { exitCode, stdout } = await execa('node', cli('config', 'show'), {
 				cwd: tempDir,
 				env: cliEnv(),
@@ -291,18 +167,8 @@ describe('CLI Commands E2E', () => {
 			});
 
 			expect(exitCode).toBe(0);
+			expect(stdout.length).toBeGreaterThan(0);
 			expect(stdout.length).toBeLessThan(1024 * 1024); // Should not exceed buffer
 		}, 30000);
-	});
-
-	describe('Browser-based Features (if applicable)', () => {
-		it.skipIf(!playwrightAvailable)('should handle browser-related commands', async () => {
-			// Navigate to a test page if the CLI has browser features
-			await page!.goto('about:blank');
-
-			// This is a placeholder test for browser integration
-			// In a real implementation, you might test CLI commands that launch browsers
-			expect(page!.url()).toContain('blank');
-		});
 	});
 });

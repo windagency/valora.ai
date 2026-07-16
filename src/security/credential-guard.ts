@@ -8,6 +8,7 @@
  * - ENV variable filtering
  */
 
+import { redactCredentials } from '@windagency/valora-runtime';
 import { resolve } from 'path';
 
 import { getLogger } from 'output/logger';
@@ -33,8 +34,8 @@ const SENSITIVE_ENV_PATTERNS: RegExp[] = [
 	/^DATABASE_URL$/i,
 	/^REDIS_URL$/i,
 	/^MONGO_URI$/i,
-	/^PRIVATE_KEY$/i,
-	/^ENCRYPTION_KEY$/i,
+	/(?:^|_)PRIVATE_KEY$/i,
+	/(?:^|_)ENCRYPTION_KEY$/i,
 	// Explicit CI/CD and infrastructure credential variable names
 	/^GITHUB_TOKEN$/i,
 	/^GH_TOKEN$/i,
@@ -76,31 +77,6 @@ const SENSITIVE_FILE_PATTERNS: RegExp[] = [
  */
 const SENSITIVE_DIRECTORIES = ['/.ssh/', '/.aws/', '/.gnupg/', '/.config/gcloud/'];
 
-/**
- * Patterns for detecting credentials in tool output text.
- * High-entropy fallback must come last so explicit patterns take precedence.
- */
-const OUTPUT_CREDENTIAL_PATTERNS: RegExp[] = [
-	// API keys with common prefixes (sk-ant-api03-..., sk-proj-..., etc.)
-	/sk-[a-zA-Z0-9_-]{20,}/g,
-	/pk-[a-zA-Z0-9_-]{20,}/g,
-	/api[_-]?key[=:]\s*["']?[a-zA-Z0-9_-]{16,}/gi,
-	// AWS access keys
-	/AKIA[0-9A-Z]{16}/g,
-	// GitHub tokens (PAT, Actions, runner, App installation)
-	/gh[psru]_[A-Za-z0-9_]{36}/g,
-	// JWT — three base64url segments starting with eyJ (header), eyJ (payload), signature
-	/eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g,
-	// Bearer tokens
-	/Bearer\s+[a-zA-Z0-9_\-.]{20,}/g,
-	// Generic long secrets (base64-ish with prefix)
-	/(?:token|secret|password|credential)[=:]\s*["']?[a-zA-Z0-9+/=_-]{20,}/gi,
-	// Private key blocks
-	/-----BEGIN\s+(?:RSA\s+)?PRIVATE\s+KEY-----/g,
-	// Connection strings with credentials
-	/(?:mongodb|postgres|mysql|redis):\/\/[^:]+:[^@]+@/gi
-];
-
 const REDACTED = '[REDACTED]';
 
 export class CredentialGuard {
@@ -136,19 +112,7 @@ export class CredentialGuard {
 	 * Scan tool output for credentials and redact them.
 	 */
 	scanOutput(content: string): string {
-		if (!content || typeof content !== 'string') return content;
-
-		let result = content;
-		let redacted = false;
-
-		for (const pattern of OUTPUT_CREDENTIAL_PATTERNS) {
-			// Reset lastIndex for global patterns
-			const regex = new RegExp(pattern.source, pattern.flags);
-			if (regex.test(result)) {
-				redacted = true;
-				result = result.replace(new RegExp(pattern.source, pattern.flags), REDACTED);
-			}
-		}
+		const { redacted, result } = redactCredentials(content);
 
 		if (redacted) {
 			this.logEvent('credential_redacted', 'high', { source: 'tool_output' });
@@ -171,20 +135,7 @@ export class CredentialGuard {
 
 		// Check resolved path against sensitive directories
 		const resolvedPath = resolve(filePath).replace(/\\/g, '/');
-		const homedir = process.env['HOME'] ?? process.env['USERPROFILE'] ?? '';
-		const normalisedHome = homedir.replace(/\\/g, '/');
-
-		for (const dir of SENSITIVE_DIRECTORIES) {
-			if (resolvedPath.includes(`${normalisedHome}${dir}`)) {
-				return true;
-			}
-			// Also match the directory pattern without home prefix
-			if (resolvedPath.includes(dir)) {
-				return true;
-			}
-		}
-
-		return false;
+		return SENSITIVE_DIRECTORIES.some((dir) => resolvedPath.includes(dir));
 	}
 
 	/**

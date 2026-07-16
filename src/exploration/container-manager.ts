@@ -1,20 +1,26 @@
 /**
  * Container Manager - Docker container lifecycle management
  *
- * Handles creating, monitoring, and destroying Docker containers for explorations
+ * Handles creating, monitoring, and destroying Docker containers for explorations.
+ * Uses SafeExecutor.execute (spawn with an argument array, no shell) throughout —
+ * container names, images, and especially exploration environment variables
+ * (which carry the user-supplied `<task>` text) are never interpolated into a
+ * shell command string, so shell metacharacters in any of them cannot inject
+ * additional commands.
  */
 
-import { exec } from 'child_process';
 import * as path from 'path';
-import { promisify } from 'util';
 
 import type { ContainerStats } from 'types/exploration.types';
 
 import { getLogger } from 'output/logger';
 import { formatErrorMessage } from 'utils/error-handler';
+import { SafeExecutor } from 'utils/safe-exec';
 
-const execAsync = promisify(exec);
 const logger = getLogger();
+
+/** Docker operations (image pull, container wait) can legitimately run far longer than SafeExecutor's 30s default. */
+const LONG_RUNNING_TIMEOUT_MS = 30 * 60 * 1000;
 
 export interface ContainerConfig {
 	command?: string[];
@@ -60,41 +66,21 @@ export class ContainerManager {
 			worktree_path: worktreePath
 		} = config;
 
-		// Build docker run command
-		const dockerArgs: string[] = [
-			'run',
-			'-d', // Detached mode
-			`--name ${containerName}`,
-			`--cpus=${cpuLimit}`,
-			`--memory=${memoryLimit}`,
-			`-v ${path.resolve(worktreePath)}:/workspace`,
-			`-v ${path.resolve(sharedVolumePath)}:/shared`,
-			'-w /workspace' // Set working directory
-		];
-
-		// Add port mapping if specified
-		if (port) {
-			dockerArgs.push(`-p ${port}:${port}`);
-		}
-
-		// Add environment variables
-		for (const [key, value] of Object.entries(environment)) {
-			dockerArgs.push(`-e ${key}="${value}"`);
-		}
-
-		// Add image
-		dockerArgs.push(image);
-
-		// Add command if specified
-		if (command && command.length > 0) {
-			dockerArgs.push(...command.map((arg) => `"${arg}"`));
-		}
-
-		const dockerCommand = `docker ${dockerArgs.join(' ')}`;
+		const dockerArgs = this.buildCreateContainerArgs({
+			command,
+			containerName,
+			cpuLimit,
+			environment,
+			image,
+			memoryLimit,
+			port,
+			sharedVolumePath,
+			worktreePath
+		});
 
 		try {
-			logger.debug(`Creating container: ${dockerCommand}`);
-			const { stderr, stdout } = await execAsync(dockerCommand);
+			logger.debug(`Creating container: docker ${dockerArgs.join(' ')}`);
+			const { stderr, stdout } = await SafeExecutor.execute('docker', dockerArgs);
 
 			if (stderr && !stderr.includes('WARNING')) {
 				logger.warn(`Docker stderr: ${stderr}`);
@@ -102,7 +88,6 @@ export class ContainerManager {
 
 			const containerId = stdout.trim();
 
-			// Store container info
 			this.containers.set(containerName, {
 				container_id: containerId,
 				container_name: containerName,
@@ -116,6 +101,50 @@ export class ContainerManager {
 			const errorMessage = formatErrorMessage(error);
 			throw new Error(`Failed to create container ${containerName}: ${errorMessage}`);
 		}
+	}
+
+	/** Build the `docker run` argument array for createContainer(). Split out to keep that method's complexity down. */
+	private buildCreateContainerArgs(options: {
+		command?: string[];
+		containerName: string;
+		cpuLimit: string;
+		environment: Record<string, string>;
+		image: string;
+		memoryLimit: string;
+		port?: number;
+		sharedVolumePath: string;
+		worktreePath: string;
+	}): string[] {
+		const dockerArgs: string[] = [
+			'run',
+			'-d',
+			'--name',
+			options.containerName,
+			`--cpus=${options.cpuLimit}`,
+			`--memory=${options.memoryLimit}`,
+			'-v',
+			`${path.resolve(options.worktreePath)}:/workspace`,
+			'-v',
+			`${path.resolve(options.sharedVolumePath)}:/shared`,
+			'-w',
+			'/workspace'
+		];
+
+		if (options.port) {
+			dockerArgs.push('-p', `${options.port}:${options.port}`);
+		}
+
+		for (const [key, value] of Object.entries(options.environment)) {
+			dockerArgs.push('-e', `${key}=${value}`);
+		}
+
+		dockerArgs.push(options.image);
+
+		if (options.command && options.command.length > 0) {
+			dockerArgs.push(...options.command);
+		}
+
+		return dockerArgs;
 	}
 
 	/**
@@ -132,9 +161,13 @@ export class ContainerManager {
 	async stopContainer(containerName: string, timeout: number = 30): Promise<void> {
 		try {
 			logger.debug(`Stopping container: ${containerName} (timeout: ${timeout}s)`);
-			await execAsync(`docker stop -t ${timeout} ${containerName}`);
+			// SafeExecutor's own process-level timeout must exceed docker's `-t`
+			// grace period — otherwise the two race and the exec call can be
+			// killed before docker's own timeout has even elapsed.
+			await SafeExecutor.execute('docker', ['stop', '-t', String(timeout), containerName], {
+				timeout: (timeout + 15) * 1000
+			});
 
-			// Update container info
 			const info = this.containers.get(containerName);
 			if (info) {
 				info.status = 'exited';
@@ -143,7 +176,6 @@ export class ContainerManager {
 
 			logger.info(`Container ${containerName} stopped`);
 		} catch (error: unknown) {
-			// If container doesn't exist or already stopped, that's okay
 			const errorMessage = formatErrorMessage(error);
 			if (!errorMessage.includes('No such container') && !errorMessage.includes('is not running')) {
 				throw new Error(`Failed to stop container ${containerName}: ${errorMessage}`);
@@ -164,16 +196,14 @@ export class ContainerManager {
 	 * Remove a container
 	 */
 	async removeContainer(containerName: string, force: boolean = false): Promise<void> {
-		const forceFlag = force ? '-f' : '';
-		const command = `docker rm ${forceFlag} ${containerName}`.trim();
+		const args = force ? ['rm', '-f', containerName] : ['rm', containerName];
 		const maxAttempts = 3;
 
 		for (let attempt = 1; attempt <= maxAttempts; attempt++) {
 			try {
 				logger.debug(`Removing container: ${containerName}`);
-				await execAsync(command);
+				await SafeExecutor.execute('docker', args);
 
-				// Remove from tracking
 				this.containers.delete(containerName);
 
 				logger.info(`Container ${containerName} removed`);
@@ -181,7 +211,6 @@ export class ContainerManager {
 			} catch (error: unknown) {
 				const errorMessage = formatErrorMessage(error);
 
-				// If container doesn't exist, that's okay
 				if (errorMessage.includes('No such container')) {
 					logger.warn(`Container ${containerName} not found`);
 					return;
@@ -213,9 +242,12 @@ export class ContainerManager {
 	 */
 	async getContainerStatus(containerName: string): Promise<ContainerInfo> {
 		try {
-			const { stdout } = await execAsync(
-				`docker inspect --format="{{.State.Status}}|{{.State.ExitCode}}|{{.State.StartedAt}}|{{.State.FinishedAt}}" ${containerName}`
-			);
+			const { stdout } = await SafeExecutor.execute('docker', [
+				'inspect',
+				'--format',
+				'{{.State.Status}}|{{.State.ExitCode}}|{{.State.StartedAt}}|{{.State.FinishedAt}}',
+				containerName
+			]);
 
 			const parts = stdout.trim().split('|');
 			const status = parts[0] ?? 'exited';
@@ -232,11 +264,14 @@ export class ContainerManager {
 				status: status as ContainerInfo['status']
 			};
 
-			// Get actual container ID
-			const { stdout: idOutput } = await execAsync(`docker inspect --format="{{.Id}}" ${containerName}`);
+			const { stdout: idOutput } = await SafeExecutor.execute('docker', [
+				'inspect',
+				'--format',
+				'{{.Id}}',
+				containerName
+			]);
 			info.container_id = idOutput.trim();
 
-			// Update cached info
 			this.containers.set(containerName, info);
 
 			return info;
@@ -251,10 +286,13 @@ export class ContainerManager {
 	 */
 	async getContainerStats(containerName: string, worktreeIndex: number): Promise<ContainerStats> {
 		try {
-			// Get container stats (no-stream for single snapshot)
-			const { stdout } = await execAsync(
-				`docker stats ${containerName} --no-stream --format "{{.Container}}|{{.CPUPerc}}|{{.MemUsage}}"`
-			);
+			const { stdout } = await SafeExecutor.execute('docker', [
+				'stats',
+				containerName,
+				'--no-stream',
+				'--format',
+				'{{.Container}}|{{.CPUPerc}}|{{.MemUsage}}'
+			]);
 
 			const parts = stdout.trim().split('|');
 			const containerId = parts[0] ?? '';
@@ -301,7 +339,7 @@ export class ContainerManager {
 	 */
 	async getContainerLogs(containerName: string, tail: number = 100): Promise<string> {
 		try {
-			const { stdout } = await execAsync(`docker logs --tail ${tail} ${containerName}`);
+			const { stdout } = await SafeExecutor.execute('docker', ['logs', '--tail', String(tail), containerName]);
 			return stdout;
 		} catch (error: unknown) {
 			const errorMessage = formatErrorMessage(error);
@@ -314,8 +352,7 @@ export class ContainerManager {
 	 */
 	async execInContainer(containerName: string, command: string[]): Promise<{ stderr: string; stdout: string }> {
 		try {
-			const dockerCommand = `docker exec ${containerName} ${command.join(' ')}`;
-			const { stderr, stdout } = await execAsync(dockerCommand);
+			const { stderr, stdout } = await SafeExecutor.execute('docker', ['exec', containerName, ...command]);
 			return { stderr, stdout };
 		} catch (error: unknown) {
 			const errorMessage = formatErrorMessage(error);
@@ -328,7 +365,7 @@ export class ContainerManager {
 	 */
 	async containerExists(containerName: string): Promise<boolean> {
 		try {
-			await execAsync(`docker inspect ${containerName}`);
+			await SafeExecutor.execute('docker', ['inspect', containerName]);
 			return true;
 		} catch {
 			return false;
@@ -340,8 +377,8 @@ export class ContainerManager {
 	 */
 	async waitForContainer(containerName: string, timeout?: number): Promise<number> {
 		try {
-			const timeoutArg = timeout ? `-t ${timeout}` : '';
-			const { stdout } = await execAsync(`docker wait ${timeoutArg} ${containerName}`.trim());
+			const args = timeout ? ['wait', '-t', String(timeout), containerName] : ['wait', containerName];
+			const { stdout } = await SafeExecutor.execute('docker', args, { timeout: LONG_RUNNING_TIMEOUT_MS });
 			return parseInt(stdout.trim());
 		} catch (error: unknown) {
 			const errorMessage = formatErrorMessage(error);
@@ -355,14 +392,14 @@ export class ContainerManager {
 	async pullImageIfNeeded(image: string): Promise<boolean> {
 		try {
 			// Check if image exists locally
-			await execAsync(`docker image inspect ${image}`);
+			await SafeExecutor.execute('docker', ['image', 'inspect', image]);
 			logger.debug(`Image ${image} already exists locally`);
 			return false;
 		} catch {
 			// Image doesn't exist, pull it
 			logger.info(`Pulling Docker image: ${image}`);
 			try {
-				await execAsync(`docker pull ${image}`);
+				await SafeExecutor.execute('docker', ['pull', image], { timeout: LONG_RUNNING_TIMEOUT_MS });
 				logger.info(`Successfully pulled image: ${image}`);
 				return true;
 			} catch (error: unknown) {
@@ -377,7 +414,7 @@ export class ContainerManager {
 	 */
 	async pauseContainer(containerName: string): Promise<void> {
 		try {
-			await execAsync(`docker pause ${containerName}`);
+			await SafeExecutor.execute('docker', ['pause', containerName]);
 			const info = this.containers.get(containerName);
 			if (info) {
 				info.status = 'paused';
@@ -394,7 +431,7 @@ export class ContainerManager {
 	 */
 	async unpauseContainer(containerName: string): Promise<void> {
 		try {
-			await execAsync(`docker unpause ${containerName}`);
+			await SafeExecutor.execute('docker', ['unpause', containerName]);
 			const info = this.containers.get(containerName);
 			if (info) {
 				info.status = 'running';
@@ -411,7 +448,7 @@ export class ContainerManager {
 	 */
 	async killContainer(containerName: string, signal: string = 'SIGKILL'): Promise<void> {
 		try {
-			await execAsync(`docker kill -s ${signal} ${containerName}`);
+			await SafeExecutor.execute('docker', ['kill', '-s', signal, containerName]);
 			const info = this.containers.get(containerName);
 			if (info) {
 				info.status = 'exited';

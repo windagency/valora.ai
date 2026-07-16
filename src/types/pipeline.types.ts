@@ -53,6 +53,8 @@ export interface EscalationResolvedData {
 export interface EscalationTriggeredData {
 	agentRole: string;
 	confidence: number;
+	/** Whether `confidence` was actually reported by the model or synthesized (e.g. a forced/defaulted signal). */
+	confidenceSource: 'defaulted' | 'reported';
 	riskLevel: string;
 	stage: string;
 	triggeredCriteria: string[];

@@ -35,13 +35,20 @@ export interface CommandExecutionStrategy {
 	execute(command: CommandDefinition, context: ExecutionContext): Promise<CommandResult>;
 }
 
+export async function registerPluginAgentDirs(agentLoader: { registerPluginDir(dir: string): void }): Promise<void> {
+	const { getLoadedPlugins } = await import('di/container');
+	for (const plugin of getLoadedPlugins()) {
+		if (plugin.agentsDir) agentLoader.registerPluginDir(plugin.agentsDir);
+	}
+}
+
 export async function registerPluginDirsOnLoaders(
 	agentLoader: { registerPluginDir(dir: string): void },
 	promptLoader: { registerPluginPromptsDir(dir: string): void }
 ): Promise<void> {
+	await registerPluginAgentDirs(agentLoader);
 	const { getLoadedPlugins } = await import('di/container');
 	for (const plugin of getLoadedPlugins()) {
-		if (plugin.agentsDir) agentLoader.registerPluginDir(plugin.agentsDir);
 		if (plugin.promptsDir) promptLoader.registerPluginPromptsDir(plugin.promptsDir);
 	}
 }

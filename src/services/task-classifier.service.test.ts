@@ -142,9 +142,9 @@ describe('TaskClassifierService', () => {
 
 			const result = await classifier.classifyTask(taskContext);
 
-			expect(result.primaryDomain).toBeDefined();
-			expect(result.confidence).toBeGreaterThan(0);
-			expect(result.suggestedAgents).toBeInstanceOf(Array);
+			expect(result.primaryDomain).toBe('typescript-core');
+			expect(result.confidence).toBe(0.3);
+			expect(result.suggestedAgents).toEqual(['software-engineer-typescript']);
 		});
 	});
 
@@ -309,8 +309,8 @@ describe('TaskClassifierService', () => {
 
 			const result = await classifier.classifyTask(taskContext);
 
-			expect(result.primaryDomain).toBeDefined();
-			expect(result.confidence).toBeGreaterThan(0);
+			expect(result.primaryDomain).toBe('backend-api');
+			expect(result.confidence).toBe(0.3);
 		});
 
 		it('should handle descriptions with special characters', async () => {
@@ -334,7 +334,13 @@ describe('TaskClassifierService', () => {
 
 			const result = await classifier.classifyTask(taskContext);
 
-			expect(result).toBeDefined();
+			expect(result).toEqual({
+				complexity: 'low',
+				confidence: 0.3,
+				primaryDomain: 'testing',
+				reasons: ['Found 1 domain-specific keywords'],
+				suggestedAgents: ['qa']
+			});
 		});
 	});
 });

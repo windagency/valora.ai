@@ -69,6 +69,9 @@ const MALICIOUS_PATTERNS = [
 	// Dangerous options
 	{ name: 'dangerous_exec', pattern: /--exec\s+(?:rm|cat|wget|curl|bash|sh)/ },
 
+	// Code injection
+	{ name: 'code_injection_eval', pattern: /\beval\s*\(/ },
+
 	// Script injection
 	{ name: 'xss_script', pattern: /<script[^>]*>/i },
 	{ name: 'javascript_url', pattern: /javascript:/i },
@@ -127,7 +130,7 @@ export class InputValidator {
 					errors.push(`String length ${value.length} exceeds limit of ${this.config.maxStringLength}`);
 				}
 				// Check for malicious patterns
-				this.checkMaliciousPatterns(value, warnings);
+				this.checkMaliciousPatterns(value, errors);
 			} else if (Array.isArray(value)) {
 				if (value.length > maxArrayLen) {
 					maxArrayLen = value.length;
@@ -175,12 +178,14 @@ export class InputValidator {
 	}
 
 	/**
-	 * Check for malicious patterns in a string
+	 * Check for malicious patterns in a string. These are hard rejections (pushed
+	 * to `errors`, not `warnings`) — a matched pattern makes the input invalid,
+	 * consistent with `validateToolCallArgs`'s treatment of the same pattern list.
 	 */
-	private checkMaliciousPatterns(value: string, warnings: string[]): void {
+	private checkMaliciousPatterns(value: string, errors: string[]): void {
 		for (const { name, pattern } of MALICIOUS_PATTERNS) {
 			if (pattern.test(value)) {
-				warnings.push(`Potentially malicious pattern detected: ${name}`);
+				errors.push(`Potentially malicious pattern detected: ${name}`);
 			}
 		}
 	}
@@ -190,7 +195,7 @@ export class InputValidator {
 	 *
 	 * Git branch names must:
 	 * - Not contain special shell characters
-	 * - Not start with . or /
+	 * - Not start with ., /, or -
 	 * - Not contain ..
 	 * - Only contain alphanumeric, -, _, /
 	 * - Not end with .lock
@@ -225,8 +230,8 @@ export class InputValidator {
 	}
 
 	private static checkBranchNameGitRules(name: string): void {
-		if (name.startsWith('.') || name.startsWith('/')) {
-			throw new InputValidationError('Branch name cannot start with . or /', 'branch', name);
+		if (name.startsWith('.') || name.startsWith('/') || name.startsWith('-')) {
+			throw new InputValidationError('Branch name cannot start with ., /, or -', 'branch', name);
 		}
 
 		if (name.endsWith('.lock')) {
@@ -278,8 +283,12 @@ export class InputValidator {
 		const absolutePath = this.resolveExistingSymlinks(targetPath);
 		const absoluteRoot = this.resolveExistingSymlinks(allowedRoot);
 
-		// Check if path is within allowed root
-		if (!absolutePath.startsWith(absoluteRoot)) {
+		// Check if path is within allowed root. A bare `startsWith` would wrongly
+		// admit a sibling directory whose name happens to be prefixed by the
+		// root (e.g. root "/a/b" admitting "/a/b-evil/...") — require an exact
+		// match or a path separator immediately after the root.
+		const isWithinRoot = absolutePath === absoluteRoot || absolutePath.startsWith(absoluteRoot + path.sep);
+		if (!isWithinRoot) {
 			throw new InputValidationError('Path is outside allowed directory', 'path', targetPath);
 		}
 
@@ -396,6 +405,51 @@ export class InputValidator {
 
 		if (id.length > 50) {
 			throw new InputValidationError('Exploration ID too long', 'id', id);
+		}
+	}
+
+	/**
+	 * Validate session ID format — a bare nanoid (no fixed prefix, unlike
+	 * exploration IDs), matching `generateSessionId()`'s `nanoid(12)` output.
+	 * `SessionStore.getSessionPath()` joined this into a filesystem path with
+	 * no validation at all — `sessionId` reaches it as a raw CLI argument via
+	 * `session delete <id>`/`show`/`export`, so an unvalidated `../` sequence
+	 * was a live, traversal-based arbitrary-`.json`-file-delete primitive.
+	 */
+	static validateSessionId(id: string): void {
+		if (!isNonEmptyString(id)) {
+			throw new InputValidationError('Session ID is required', 'id', id);
+		}
+
+		const validPattern = /^[a-zA-Z0-9_-]+$/;
+		if (!validPattern.test(id)) {
+			throw new InputValidationError('Invalid session ID format', 'id', id);
+		}
+
+		if (id.length > 64) {
+			throw new InputValidationError('Session ID too long', 'id', id);
+		}
+	}
+
+	/**
+	 * Validate a batch local ID — matches `generateLocalId()`'s exact output
+	 * shape (a 16-char lowercase-hex sha256 substring), stricter than
+	 * `validateSessionId`'s general charset since this ID is never
+	 * user-chosen. `batch-session.ts`'s `batchFilePath()`/`persistBatch()`
+	 * joined this into a filesystem path with no validation at all —
+	 * `localId` reaches it as a raw CLI argument via `batch status/results/
+	 * cancel <localId>`, so an unvalidated `../` sequence was a live
+	 * traversal-based arbitrary-file-read primitive, chained into an
+	 * arbitrary-file-write primitive via `updateBatch()` re-persisting a
+	 * loaded file's own (attacker-controlled) `localId` field.
+	 */
+	static validateBatchId(id: string): void {
+		if (!isNonEmptyString(id)) {
+			throw new InputValidationError('Batch ID is required', 'id', id);
+		}
+
+		if (!/^[a-f0-9]{16}$/.test(id)) {
+			throw new InputValidationError('Invalid batch ID format', 'id', id);
 		}
 	}
 

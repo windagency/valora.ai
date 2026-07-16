@@ -36,6 +36,14 @@ export class EscalationDetectionService {
 	}
 
 	/**
+	 * Read-only access to the effective configuration, for callers (e.g. the self-consistency
+	 * sampler) that need to know the confidence threshold or sampling policy.
+	 */
+	getConfig(): Readonly<EscalationConfig> {
+		return this.config;
+	}
+
+	/**
 	 * Parse LLM response content for escalation signal
 	 * Returns the extracted signal and cleaned content
 	 */
@@ -97,6 +105,12 @@ export class EscalationDetectionService {
 			return true;
 		}
 
+		// Confidence was not actually reported by the model — don't trust a synthesized default
+		if (signal.confidenceSource === 'defaulted') {
+			this.logger.debug('Escalation triggered: Confidence was not reported by the model');
+			return true;
+		}
+
 		// Confidence below threshold
 		if (signal.confidence < this.config.confidenceThreshold) {
 			this.logger.debug('Escalation triggered: Confidence below threshold', {
@@ -122,7 +136,52 @@ export class EscalationDetectionService {
 			return true;
 		}
 
+		// High confidence claimed with no supporting reasoning or proposed action is ungrounded
+		if (this.hasUnsupportedConfidenceClaim(signal)) {
+			this.logger.debug('Escalation triggered: Unsupported high-confidence claim', {
+				confidence: signal.confidence
+			});
+			return true;
+		}
+
 		return false;
+	}
+
+	/**
+	 * Build a forced escalation signal for a stage whose response omitted or malformed
+	 * the mandatory `_escalation` block, when `requireExplicitBlock` is enabled.
+	 * Returns null when `requireExplicitBlock` is disabled — the caller should then
+	 * proceed as if no escalation was required.
+	 */
+	getMissingSignalEscalation(stageName: string): EscalationSignal | null {
+		if (!this.config.requireExplicitBlock) {
+			return null;
+		}
+
+		return {
+			confidence: 0,
+			confidenceSource: 'defaulted',
+			proposed_action: '',
+			reasoning: `Stage '${stageName}' response did not include the mandatory _escalation block.`,
+			requires_escalation: true,
+			risk_level: 'high',
+			triggered_criteria: ['missing_escalation_block']
+		};
+	}
+
+	/**
+	 * A high confidence claim unaccompanied by any reasoning or proposed action is
+	 * ungrounded and should not be trusted at face value.
+	 */
+	private hasUnsupportedConfidenceClaim(signal: EscalationSignal): boolean {
+		const UNSUPPORTED_CONFIDENCE_THRESHOLD = 90;
+		const MIN_REASONING_LENGTH = 20;
+
+		return (
+			signal.confidence >= UNSUPPORTED_CONFIDENCE_THRESHOLD &&
+			signal.reasoning.trim().length < MIN_REASONING_LENGTH &&
+			signal.proposed_action.trim().length === 0
+		);
 	}
 
 	/**
@@ -176,8 +235,11 @@ export class EscalationDetectionService {
 				return null;
 			}
 
+			const confidenceReported = typeof signalData['confidence'] === 'number';
+
 			return {
-				confidence: typeof signalData['confidence'] === 'number' ? signalData['confidence'] : 50,
+				confidence: confidenceReported ? (signalData['confidence'] as number) : 50,
+				confidenceSource: confidenceReported ? 'reported' : 'defaulted',
 				proposed_action: typeof signalData['proposed_action'] === 'string' ? signalData['proposed_action'] : '',
 				reasoning: typeof signalData['reasoning'] === 'string' ? signalData['reasoning'] : '',
 				requires_escalation: signalData['requires_escalation'] as boolean,

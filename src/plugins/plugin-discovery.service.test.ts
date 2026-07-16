@@ -23,6 +23,25 @@ vi.mock('utils/paths', () => ({
 	getSystemPluginsDir: vi.fn(() => '/nonexistent/system')
 }));
 
+// Real `fs` throughout, with one narrow exception: `unreadableDir`, settable per-test, makes
+// `readdirSync` throw EACCES for that one path only — everything else (and every other test
+// in this file) passes through to the real implementation untouched. `vi.spyOn(fs, ...)`
+// can't override this directly (Node's ESM `fs` namespace properties aren't configurable),
+// so this is done via `vi.mock` with a real-passthrough factory instead.
+let unreadableDir: string | null = null;
+vi.mock('fs', async (importOriginal) => {
+	const actual = await importOriginal<typeof import('fs')>();
+	return {
+		...actual,
+		readdirSync: (dir: unknown, ...args: unknown[]) => {
+			if (unreadableDir !== null && dir === unreadableDir) {
+				throw Object.assign(new Error('EACCES: permission denied'), { code: 'EACCES' });
+			}
+			return (actual.readdirSync as (...a: unknown[]) => unknown)(dir, ...args);
+		}
+	};
+});
+
 function writeJson(filePath: string, data: unknown): void {
 	fs.mkdirSync(path.dirname(filePath), { recursive: true });
 	fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
@@ -103,6 +122,19 @@ describe('PluginDiscoveryService — npm plugin discovery', () => {
 
 		expect(dirs).toContain(pluginDirA);
 		expect(dirs).toContain(pluginDirB);
+	});
+
+	it('handles an unreadable plugin root directory gracefully instead of throwing', () => {
+		const scopeDir = path.join(tmpDir, 'node_modules', '@windagency');
+		fs.mkdirSync(scopeDir, { recursive: true });
+
+		unreadableDir = scopeDir;
+		try {
+			expect(() => discovery.discoverPluginDirs()).not.toThrow();
+			expect(discovery.discoverPluginDirs()).toEqual([]);
+		} finally {
+			unreadableDir = null;
+		}
 	});
 
 	it('returns standard root plugins before npm plugins', async () => {

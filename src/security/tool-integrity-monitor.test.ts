@@ -67,8 +67,7 @@ describe('ToolIntegrityMonitor', () => {
 			const tools = makeTools('tool_a', 'tool_b');
 			const result = monitor.checkIntegrity('server-1', tools);
 			expect(result.changed).toBe(false);
-			expect(result.currentFingerprint).toBeTruthy();
-			expect(monitor.getFingerprint('server-1')).toBe(result.currentFingerprint);
+			expect(result.currentFingerprint).toBe(monitor.computeFingerprint(tools));
 		});
 
 		it('reports no change for identical tools', () => {
@@ -144,17 +143,66 @@ describe('ToolIntegrityMonitor', () => {
 			expect(monitor.getFingerprint('server-1')).toBe('abc123');
 		});
 
-		it('allows clearing fingerprints', () => {
-			monitor.checkIntegrity('server-1', makeTools('tool_a'));
+		it('allows clearing a manually-set fingerprint', () => {
+			monitor.setFingerprint('server-1', 'abc123');
 			monitor.clearFingerprint('server-1');
 			expect(monitor.getFingerprint('server-1')).toBeUndefined();
 		});
+	});
 
-		it('treats cleared server as first connection', () => {
-			monitor.checkIntegrity('server-1', makeTools('tool_a'));
-			monitor.clearFingerprint('server-1');
-			const result = monitor.checkIntegrity('server-1', makeTools('tool_a', 'tool_b'));
-			expect(result.changed).toBe(false); // First connection after clear
+	describe('key-namespace isolation between checkIntegrity and checkContentIntegrity', () => {
+		it('does not let a tool-list fingerprint collide with an unrelated content fingerprint sharing the same effective key', () => {
+			// A server literally named "mcp-connection:real-server" (MCP server ids
+			// carry no character restriction) would, with no namespace separation,
+			// collide with checkContentIntegrity's own `mcp-connection:${serverId}`
+			// convention for a DIFFERENT server actually named "real-server".
+			monitor.checkIntegrity('mcp-connection:real-server', makeTools('tool_a'));
+			const result = monitor.checkContentIntegrity('mcp-connection:real-server', 'connection-config-fingerprint-v1');
+			expect(result.changed).toBe(false);
+		});
+	});
+
+	describe('checkContentIntegrity (plugin rug-pull detection)', () => {
+		it('does not report a change on first use — seeds the baseline', () => {
+			const result = monitor.checkContentIntegrity('plugin:secops', 'manifest+entrypoint content v1');
+			expect(result.changed).toBe(false);
+			expect(result.currentFingerprint).toMatch(/^[0-9a-f]{64}$/);
+		});
+
+		it('does not report a change when content is identical across calls', () => {
+			monitor.checkContentIntegrity('plugin:secops', 'manifest+entrypoint content v1');
+			const result = monitor.checkContentIntegrity('plugin:secops', 'manifest+entrypoint content v1');
+			expect(result.changed).toBe(false);
+		});
+
+		it('reports a change when content differs from the stored baseline', () => {
+			monitor.checkContentIntegrity('plugin:secops', 'manifest+entrypoint content v1');
+			const result = monitor.checkContentIntegrity('plugin:secops', 'manifest+entrypoint content v2 — different code');
+			expect(result.changed).toBe(true);
+			expect(result.previousFingerprint).not.toBe(result.currentFingerprint);
+		});
+
+		it('logs a plugin_code_changed security event when content drifts', () => {
+			monitor.checkContentIntegrity('plugin:secops', 'v1');
+			monitor.checkContentIntegrity('plugin:secops', 'v2');
+			const events = monitor.getEvents();
+			expect(events.some((e) => e.type === 'plugin_code_changed')).toBe(true);
+		});
+
+		it('tracks separate plugins independently', () => {
+			monitor.checkContentIntegrity('plugin:secops', 'secops-v1');
+			monitor.checkContentIntegrity('plugin:qa', 'qa-v1');
+			const secopsResult = monitor.checkContentIntegrity('plugin:secops', 'secops-v1');
+			const qaResult = monitor.checkContentIntegrity('plugin:qa', 'qa-v1');
+			expect(secopsResult.changed).toBe(false);
+			expect(qaResult.changed).toBe(false);
+		});
+
+		it('persists the baseline across monitor instances (same file)', () => {
+			monitor.checkContentIntegrity('plugin:secops', 'v1');
+			const reloaded = new ToolIntegrityMonitor({ baselineFilePath: join(dataDir, 'baselines.json') });
+			const result = reloaded.checkContentIntegrity('plugin:secops', 'v1');
+			expect(result.changed).toBe(false);
 		});
 	});
 });

@@ -76,14 +76,17 @@ describe('ResultPresenter', () => {
 
 			presenter.displayCommandStart(commandName, description);
 
+			// The mocked renderer.box(content, title) deterministically produces this string
+			const expectedBox = `┌─────────────┐\n│ ${description} │\n├─────────────┤\n│ Executing: ${commandName} │\n└─────────────┘`;
+
 			// Check that blank and print were called
 			expect(mockConsoleOutput.blank).toHaveBeenCalled();
-			expect(mockConsoleOutput.print).toHaveBeenCalled();
+			expect(mockConsoleOutput.print).toHaveBeenCalledWith(expectedBox);
 
 			// Check that print was called with a box containing the key elements
 			const printCalls = mockConsoleOutput.print.mock.calls;
 			const boxCall = printCalls.find((call: string[]) => call[0] && call[0].includes('Executing: test-command'));
-			expect(boxCall).toBeDefined();
+			expect(boxCall).toEqual([expectedBox]);
 			expect(boxCall[0]).toContain('Test command description');
 		});
 	});
@@ -372,9 +375,11 @@ describe('ResultPresenter', () => {
 			presenter.displayCommandStart('plan', 'Planning implementation');
 
 			// Check that print was called with a box containing the command name
+			// (the mocked renderer.box(content, title) deterministically produces this string)
+			const expectedStartBox = `┌─────────────┐\n│ Planning implementation │\n├─────────────┤\n│ Executing: plan │\n└─────────────┘`;
 			const printCalls = mockConsoleOutput.print.mock.calls;
 			const startBoxCall = printCalls.find((call: string[]) => call[0] && call[0].includes('Executing: plan'));
-			expect(startBoxCall).toBeDefined();
+			expect(startBoxCall).toEqual([expectedStartBox]);
 			expect(startBoxCall[0]).toContain('Planning implementation');
 
 			// Clear mocks for the next part of the flow

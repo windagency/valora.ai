@@ -3,6 +3,17 @@
  *
  * Types derived from the external-mcp.json registry file.
  * This ensures the MCPTool type stays in sync with the registry.
+ *
+ * Note: this module is intentionally NOT validated against
+ * `mcp/mcp-server-config.schema.ts` (the schema used at runtime connection
+ * time in `mcp-client-manager.service.ts`/`di/container.ts`). It runs once at
+ * module load, synchronously, over the package's own bundled
+ * `data/external-mcp.default.json` — never a plugin- or user-supplied file —
+ * and only ever reads `.id`/`.name` to build compile-time type unions and
+ * lookup tables. It never reads `command`/`args`/`env`/`url`, so there is no
+ * unvalidated security-sensitive data flowing from here into `connect()`.
+ * If this module starts reading those fields, or starts accepting
+ * non-bundled input, it must be validated the same way.
  */
 
 import { createRequire } from 'module';

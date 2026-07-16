@@ -3,6 +3,7 @@
  */
 
 import * as fs from 'fs';
+import { getCommandGuard } from 'security/command-guard';
 
 import type { CommandAdapter } from 'cli/command-adapter.interface';
 import type { LoadedPlugin } from 'types/plugin.types';
@@ -13,6 +14,7 @@ import { getDiagnosticFormatter } from 'output/diagnostic-formatter';
 import { DiagnosticsService } from 'services/diagnostics.service';
 import { formatErrorMessage } from 'utils/error-utils';
 import { writeFile } from 'utils/file-utils';
+import { InputValidator } from 'utils/input-validator';
 import { getGlobalConfigDir, getPackageDataDir, getPackageRoot, getProjectConfigDir } from 'utils/paths';
 import { getResourceResolver } from 'utils/resource-resolver';
 
@@ -64,9 +66,23 @@ export function configureDoctorCommand(program: CommandAdapter): void {
 				}
 
 				if (options.export) {
+					// --export previously wrote with zero path validation.
+					let validatedPath: string;
+					try {
+						validatedPath = InputValidator.validatePath(options.export, process.cwd());
+					} catch (error) {
+						console.error(color.red('Invalid --export path:'), (error as Error).message);
+						process.exit(1);
+						return;
+					}
+					if (getCommandGuard().isProtectedInfrastructureTarget(validatedPath)) {
+						console.error(color.red('Invalid --export path:'), 'targets a protected security-infrastructure file');
+						process.exit(1);
+						return;
+					}
 					const jsonReport = formatter.exportToJSON(pairedResults);
-					await writeFile(options.export, jsonReport);
-					console.log(color.gray(`\n  Report exported to: ${options.export}\n`));
+					await writeFile(validatedPath, jsonReport);
+					console.log(color.gray(`\n  Report exported to: ${validatedPath}\n`));
 				}
 
 				const hasErrors = pairedResults.some((r) => r.result.status === 'fail');

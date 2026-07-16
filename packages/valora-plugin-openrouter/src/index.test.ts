@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { PluginAPI, ProviderDescriptor } from '@windagency/valora-plugin-api';
 
 import { register } from './index.js';
+import { OpenRouterProvider } from './openrouter-provider.js';
 
 function makeApi(): PluginAPI & {
 	registeredProviders: Record<string, unknown>;
@@ -39,19 +40,13 @@ describe('valora-provider-openrouter register()', () => {
 	it('makes the "openrouter" provider available after registration', () => {
 		const api = makeApi();
 		register(api);
-		expect(api.registeredProviders['openrouter']).toBeDefined();
+		expect(api.registeredProviders['openrouter']).toBe(OpenRouterProvider);
 	});
 
 	it('does not register any deactivate hooks — OpenRouter has no local process to stop', () => {
 		const api = makeApi();
 		register(api);
 		expect(api.deactivateHooks).toHaveLength(0);
-	});
-
-	it('registers the provider with name "openrouter"', () => {
-		const api = makeApi();
-		register(api);
-		expect(api.registeredProviders['openrouter']).toBeDefined();
 	});
 
 	it('registers a descriptor with label "OpenRouter"', () => {

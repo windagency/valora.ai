@@ -21,12 +21,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import fs from 'fs';
 
 // Mock dependencies
+const mockLoggerWarn = vi.fn();
 vi.mock('output/logger', () => ({
 	getLogger: () => ({
 		debug: vi.fn(),
 		error: vi.fn(),
 		info: vi.fn(),
-		warn: vi.fn()
+		warn: mockLoggerWarn
 	})
 }));
 
@@ -45,6 +46,23 @@ vi.mock('config/loader', () => ({
 
 vi.mock('utils/file-utils', () => ({
 	getAIRoot: () => '/fake/ai/root'
+}));
+
+// Defaults to null so existing tests (which never touch project-level hook
+// trust) are unaffected — only the dedicated "workspace trust" tests below
+// override this to exercise the gating path.
+const mockGetProjectConfigDir = vi.fn<() => null | string>(() => null);
+vi.mock('utils/paths', async (importOriginal) => {
+	const actual = await importOriginal<typeof import('utils/paths')>();
+	return {
+		...actual,
+		getProjectConfigDir: () => mockGetProjectConfigDir()
+	};
+});
+
+const mockIsWorkspaceTrusted = vi.fn(() => false);
+vi.mock('security/workspace-trust.service', () => ({
+	isWorkspaceTrusted: (...args: unknown[]) => mockIsWorkspaceTrusted(...args)
 }));
 
 function makeToolCall(name: string, args: Record<string, unknown> = {}): LLMToolCall {
@@ -67,6 +85,8 @@ describe('HookExecutionService', () => {
 	beforeEach(() => {
 		service = new HookExecutionService();
 		vi.clearAllMocks();
+		mockGetProjectConfigDir.mockReturnValue(null);
+		mockIsWorkspaceTrusted.mockReturnValue(false);
 		// Suppress loadHooksFile() reading the real data/hooks.default.json from disk.
 		// Tests that need file-based hooks override this with their own fs mocks.
 		vi.spyOn(fs, 'statSync').mockImplementation(() => {
@@ -361,8 +381,50 @@ describe('HookExecutionService', () => {
 
 			const result = await service.executePreToolUseHooks(makeToolCall('write'));
 			expect(result.allowed).toBe(false);
-			expect(result.blockReason).toBeDefined();
+			expect(result.blockReason).toBe('Blocked by PreToolUse hook');
 			expect(result.hooksExecuted).toBe(1);
+		});
+
+		it('redacts a credential a deny (exit 2) hook echoes to stderr before it becomes the block reason', async () => {
+			// A project-declared hook is less-trusted content — if it dies (or
+			// deliberately denies) while echoing an env var to stderr, that
+			// reason string flows straight into emitToolHookBlocked/pipeline
+			// events with no redaction.
+			setupConfig({
+				PreToolUse: [
+					{ matcher: 'write', hooks: [{ type: 'command', command: 'echo AKIAABCDEFGHIJKLMNOP 1>&2; exit 2' }] }
+				]
+			});
+
+			const result = await service.executePreToolUseHooks(makeToolCall('write'));
+			expect(result.allowed).toBe(false);
+			expect(result.blockReason).not.toContain('AKIAABCDEFGHIJKLMNOP');
+		});
+
+		it('redacts a credential a fail-open (non-0/2 exit) hook echoes to stderr before it reaches the fail-open warn log', async () => {
+			// The secret is only ever present in the runtime environment, never
+			// in the hook's own configured command text — isolating "did the
+			// runtime stderr get redacted" from "the command string itself
+			// happened to be logged verbatim" (a separate, lower-risk surface).
+			mockLoggerWarn.mockClear();
+			process.env['VALORA_TEST_LEAKED_TOKEN'] = 'ghp_abcdefghijklmnopqrstuvwxyz1234567890ABCD';
+			setupConfig({
+				PreToolUse: [
+					{
+						matcher: 'write',
+						hooks: [{ type: 'command', command: 'echo $VALORA_TEST_LEAKED_TOKEN 1>&2; exit 1' }]
+					}
+				]
+			});
+
+			try {
+				await service.executePreToolUseHooks(makeToolCall('write'));
+			} finally {
+				delete process.env['VALORA_TEST_LEAKED_TOKEN'];
+			}
+
+			const loggedStderr = mockLoggerWarn.mock.calls.map((call) => JSON.stringify(call)).join(' ');
+			expect(loggedStderr).not.toContain('ghp_abcdefghijklmnopqrstuvwxyz1234567890ABCD');
 		});
 
 		it('should allow when hook exits with code 0', async () => {
@@ -626,6 +688,96 @@ describe('HookExecutionService', () => {
 			// Hooks removed from config
 			setupConfig({});
 			expect(service.hasHooks('PreToolUse')).toBe(false);
+		});
+	});
+
+	describe('project-declared hook workspace trust', () => {
+		// .valora/config.json's `hooks` field lets a PROJECT declare shell
+		// commands that run automatically with no confirmation — a crafted one
+		// in a cloned repo must not run just because the merged config happens
+		// to include it. Global-only hooks (no project config file, or one that
+		// doesn't itself declare hooks) must be unaffected by the gate.
+		function mockProjectConfigFile(content: Record<string, unknown> | null): void {
+			mockGetProjectConfigDir.mockReturnValue('/fake/project/.valora');
+			vi.spyOn(fs, 'readFileSync').mockImplementation((filePath) => {
+				if (String(filePath).endsWith('config.json') && content !== null) {
+					return JSON.stringify(content);
+				}
+				throw new Error('ENOENT: no such file or directory');
+			});
+		}
+
+		it('does not run config-sourced hooks when the project declares hooks itself and is not trusted', () => {
+			setupConfig({
+				PreToolUse: [{ matcher: 'write', hooks: [{ type: 'command', command: 'echo untrusted' }] }]
+			});
+			mockProjectConfigFile({
+				hooks: { PreToolUse: [{ matcher: 'write', hooks: [{ type: 'command', command: 'echo untrusted' }] }] }
+			});
+			mockIsWorkspaceTrusted.mockReturnValue(false);
+
+			expect(service.hasHooks('PreToolUse')).toBe(false);
+		});
+
+		it('runs config-sourced hooks when the project declares hooks itself and IS trusted', () => {
+			setupConfig({
+				PreToolUse: [{ matcher: 'write', hooks: [{ type: 'command', command: 'echo trusted' }] }]
+			});
+			mockProjectConfigFile({
+				hooks: { PreToolUse: [{ matcher: 'write', hooks: [{ type: 'command', command: 'echo trusted' }] }] }
+			});
+			mockIsWorkspaceTrusted.mockReturnValue(true);
+
+			expect(service.hasHooks('PreToolUse')).toBe(true);
+		});
+
+		it('still runs config-sourced hooks when there is no project config directory at all (global-only)', () => {
+			setupConfig({
+				PreToolUse: [{ matcher: 'write', hooks: [{ type: 'command', command: 'echo global' }] }]
+			});
+			mockGetProjectConfigDir.mockReturnValue(null);
+			mockIsWorkspaceTrusted.mockReturnValue(false);
+
+			expect(service.hasHooks('PreToolUse')).toBe(true);
+		});
+
+		it('still runs config-sourced hooks when the project config file exists but does not itself declare hooks', () => {
+			setupConfig({
+				PreToolUse: [{ matcher: 'write', hooks: [{ type: 'command', command: 'echo global-only' }] }]
+			});
+			mockProjectConfigFile({});
+			mockIsWorkspaceTrusted.mockReturnValue(false);
+
+			expect(service.hasHooks('PreToolUse')).toBe(true);
+		});
+
+		it('does not execute a gated-off config-sourced hook, while a hooks.default.json hook for a different tool still runs', async () => {
+			setupConfig({
+				PreToolUse: [{ matcher: 'delete_file', hooks: [{ type: 'command', command: 'exit 2' }] }]
+			});
+			mockGetProjectConfigDir.mockReturnValue('/fake/project/.valora');
+			mockIsWorkspaceTrusted.mockReturnValue(false);
+			vi.spyOn(fs, 'statSync').mockReturnValue({ mtimeMs: 1000 } as fs.Stats);
+			vi.spyOn(fs, 'readFileSync').mockImplementation((filePath) => {
+				if (String(filePath).endsWith('config.json')) {
+					return JSON.stringify({
+						hooks: { PreToolUse: [{ matcher: 'delete_file', hooks: [{ type: 'command', command: 'exit 2' }] }] }
+					});
+				}
+				return JSON.stringify({
+					hooks: { PreToolUse: [{ matcher: 'write', hooks: [{ type: 'command', command: 'echo ok' }] }] }
+				});
+			});
+
+			// The untrusted config-sourced hook (matcher: delete_file, exit 2) must not run.
+			const deleteResult = await service.executePreToolUseHooks(makeToolCall('delete_file'));
+			expect(deleteResult.allowed).toBe(true);
+			expect(deleteResult.hooksExecuted).toBe(0);
+
+			// hooks.default.json's own hook (matcher: write) is unaffected by the gate.
+			const writeResult = await service.executePreToolUseHooks(makeToolCall('write'));
+			expect(writeResult.allowed).toBe(true);
+			expect(writeResult.hooksExecuted).toBe(1);
 		});
 	});
 

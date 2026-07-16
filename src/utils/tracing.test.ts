@@ -144,7 +144,7 @@ describe('Tracing', () => {
 			});
 
 			expect(result).toBe(42);
-			expect(capturedSpan).toBeDefined();
+			expect(capturedSpan).toBeInstanceOf(Span);
 			expect(capturedSpan?.isRecording()).toBe(false); // Should be ended
 		});
 

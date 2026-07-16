@@ -2,6 +2,8 @@
  * @windagency/valora-runtime — pure-leaf utilities shared across Valora packages.
  */
 
+export { OUTPUT_CREDENTIAL_PATTERNS, redactCredentials, type RedactionResult } from './credential-redaction.js';
+
 export { BaseError, type ErrorContext, ProviderError, type RecoveryStrategy } from './error.js';
 
 export {

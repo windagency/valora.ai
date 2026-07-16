@@ -114,3 +114,113 @@ describe('SetupWizard ESC-to-quit', () => {
 		expect(config.providers['anthropic']).toEqual({ apiKey: 'sk-test-123' });
 	});
 });
+
+describe('SetupWizard.needsSetup', () => {
+	const originalEnv = { ...process.env };
+
+	function makeLoader(overrides: { exists?: boolean; load?: () => Promise<unknown> } = {}) {
+		return {
+			exists: () => overrides.exists ?? true,
+			getConfigPath: () => '/tmp/valora-test-config.json',
+			load: overrides.load ?? (async () => ({ defaults: {}, providers: {} })),
+			loadRaw: async () => ({ defaults: {}, providers: {} }),
+			save: async () => undefined
+		} as never;
+	}
+
+	beforeEach(() => {
+		delete process.env['AI_MCP_ENABLED'];
+		delete process.env['AI_INTERACTIVE'];
+		delete process.env['CI'];
+		delete process.env['NODE_ENV'];
+		mockGetAllProviderKeys.mockReturnValue(['anthropic']);
+		mockGetProviderMetadata.mockImplementation((key: string) =>
+			key === 'anthropic' ? { defaultModel: 'claude-fable-5', label: 'Anthropic', requiresApiKey: true } : undefined
+		);
+	});
+
+	afterEach(() => {
+		process.env = { ...originalEnv };
+	});
+
+	it('is never needed when running as an MCP server, regardless of config state', async () => {
+		process.env['AI_MCP_ENABLED'] = 'true';
+
+		await expect(SetupWizard.needsSetup(makeLoader({ exists: false }))).resolves.toBe(false);
+	});
+
+	it('is needed when interactive and no config file exists yet', async () => {
+		process.env['NODE_ENV'] = 'development';
+
+		await expect(SetupWizard.needsSetup(makeLoader({ exists: false }), true)).resolves.toBe(true);
+	});
+
+	it('is not needed in non-interactive mode (CI) even with no config file', async () => {
+		process.env['CI'] = 'true';
+
+		await expect(SetupWizard.needsSetup(makeLoader({ exists: false }))).resolves.toBe(false);
+	});
+
+	it('is not needed when forceInteractive is explicitly false, even outside CI', async () => {
+		process.env['NODE_ENV'] = 'development';
+
+		await expect(SetupWizard.needsSetup(makeLoader({ exists: false }), false)).resolves.toBe(false);
+	});
+
+	it('is not needed once a default_provider is already configured', async () => {
+		process.env['NODE_ENV'] = 'development';
+		const loader = makeLoader({ load: async () => ({ defaults: { default_provider: 'anthropic' }, providers: {} }) });
+
+		await expect(SetupWizard.needsSetup(loader, true)).resolves.toBe(false);
+	});
+
+	it('is not needed when a configured provider has a valid API key', async () => {
+		process.env['NODE_ENV'] = 'development';
+		const loader = makeLoader({
+			load: async () => ({ defaults: {}, providers: { anthropic: { apiKey: 'sk-ant-real-key' } } })
+		});
+
+		await expect(SetupWizard.needsSetup(loader, true)).resolves.toBe(false);
+	});
+
+	it('is needed (interactively) when the only configured provider lacks a valid API key', async () => {
+		process.env['NODE_ENV'] = 'development';
+		const loader = makeLoader({ load: async () => ({ defaults: {}, providers: { anthropic: {} } }) });
+
+		await expect(SetupWizard.needsSetup(loader, true)).resolves.toBe(true);
+	});
+
+	it('is not needed (non-interactively) when no provider is configured — the Cursor provider can be used instead', async () => {
+		const loader = makeLoader({ load: async () => ({ defaults: {}, providers: {} }) });
+
+		await expect(SetupWizard.needsSetup(loader, false)).resolves.toBe(false);
+	});
+
+	it('is needed (interactively) when the providers object is missing entirely from a malformed config', async () => {
+		process.env['NODE_ENV'] = 'development';
+		const loader = makeLoader({ load: async () => ({ defaults: {} }) });
+
+		await expect(SetupWizard.needsSetup(loader, true)).resolves.toBe(true);
+	});
+
+	it('falls back to "not needed" when non-interactive and config loading throws', async () => {
+		const loader = makeLoader({
+			load: async () => {
+				throw new Error('disk read failure');
+			}
+		});
+
+		await expect(SetupWizard.needsSetup(loader, false)).resolves.toBe(false);
+	});
+
+	it('falls back to "needed" when interactive and config loading throws', async () => {
+		process.env['NODE_ENV'] = 'development';
+		const loader = makeLoader({
+			load: async () => {
+				throw new Error('disk read failure');
+			}
+		});
+
+		await expect(SetupWizard.needsSetup(loader, true)).resolves.toBe(true);
+	});
+});

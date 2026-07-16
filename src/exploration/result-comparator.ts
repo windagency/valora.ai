@@ -4,20 +4,18 @@
  * Provides detailed comparison of different exploration results
  */
 
-import { exec } from 'child_process';
 import { promises as fs } from 'fs';
 import * as path from 'path';
-import { promisify } from 'util';
 
 import type { Exploration, WorktreeExploration } from 'types/exploration.types';
 
 import { getLogger } from 'output/logger';
+import { SafeExecutor } from 'utils/safe-exec';
 
 import type { ExplorationStateManager } from './exploration-state';
 
 import { CollaborationCoordinator } from './collaboration-coordinator';
 
-const execAsync = promisify(exec);
 const logger = getLogger();
 
 export interface ComparisonMetrics {
@@ -237,9 +235,14 @@ export class ResultComparator {
 	private async getCodeMetrics(worktree: WorktreeExploration): Promise<CodeMetrics | null> {
 		try {
 			// Get git diff stats
-			const { stdout } = await execAsync(
-				`git -C ${worktree.worktree_path} diff --shortstat ${worktree.branch_name}~1 ${worktree.branch_name}`
-			);
+			const { stdout } = await SafeExecutor.execute('git', [
+				'-C',
+				worktree.worktree_path,
+				'diff',
+				'--shortstat',
+				`${worktree.branch_name}~1`,
+				worktree.branch_name
+			]);
 
 			// Parse output like: "3 files changed, 45 insertions(+), 12 deletions(-)"
 			const filesMatch = stdout.match(/(\d+) file[s]? changed/);

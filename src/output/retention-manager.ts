@@ -279,8 +279,17 @@ export class RetentionManager extends BaseRetentionManager<RetentionPolicy, Clea
 		const cutoffDate = this.calculateCutoffDate(this.policy.maxAgeDays);
 		const cutoffDateStr = cutoffDate.toISOString().split('T')[0] ?? '';
 
-		// Group files by date for daily file handling
-		const filesByDate = this.groupFilesByDate(files);
+		// Partition first so a file is processed by exactly one path below —
+		// groupFilesByDate() falls back to a file's *modification-time* date for
+		// non-daily-named files, which previously let those files land in BOTH the
+		// daily-grouped set (via that fallback) and the non-daily set, causing them
+		// to be independently evaluated — and, once old enough, unlinked — twice.
+		const isDailyNamed = (file: FileInfo): boolean => Boolean(path.basename(file.path).match(/ai-\d{4}-\d{2}-\d{2}/));
+		const dailyNamedFiles = files.filter(isDailyNamed);
+		const nonDailyFiles = files.filter((file) => !isDailyNamed(file));
+
+		// Group daily-named files by date for daily file handling
+		const filesByDate = this.groupFilesByDate(dailyNamedFiles);
 
 		// Separate files to delete and keep from daily files
 		const { toDelete: dailyToDelete, toKeep: dailyToKeep } = Object.entries(filesByDate).reduce<{
@@ -300,11 +309,6 @@ export class RetentionManager extends BaseRetentionManager<RetentionPolicy, Clea
 		);
 
 		// Handle non-daily files (legacy or special files) individually
-		const nonDailyFiles = files.filter((file) => {
-			const filename = path.basename(file.path);
-			return !filename.match(/ai-\d{4}-\d{2}-\d{2}/);
-		});
-
 		const { toDelete: nonDailyToDelete, toKeep: nonDailyToKeep } = nonDailyFiles.reduce<{
 			toDelete: FileInfo[];
 			toKeep: FileInfo[];

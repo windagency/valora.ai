@@ -95,6 +95,20 @@ describe('CheckpointManager', () => {
 		expect(() => manager.clear('session-1', 'feedback')).not.toThrow();
 	});
 
+	it('rejects a traversal-shaped sessionId before building any path', () => {
+		// Defense-in-depth: sessionId/commandName are internally-controlled
+		// today (sessionId from SessionStore's own generator, commandName
+		// constrained to the resolved command registry), not raw externally-
+		// influenced input reaching this file-path-building function
+		// directly — but validating cheaply here at the choke point costs
+		// nothing and closes the risk if a future caller ever changes that.
+		expect(() => manager.read('../../../../etc/passwd', 'feedback')).toThrow();
+	});
+
+	it('rejects a traversal-shaped commandName before building any path', () => {
+		expect(() => manager.read('session-1', '../../../../etc/passwd')).toThrow();
+	});
+
 	it('returns empty array when the checkpoint file is older than the TTL', () => {
 		const expiredDate = new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString();
 		const output = makeStageOutput();

@@ -1,4 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
+
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import type { AgentConstraints } from 'types/agent.types';
 import { PermissionPropagationService } from './permission-propagation.service';
@@ -99,6 +103,103 @@ describe('PermissionPropagationService', () => {
 		it('returns true for exact match', () => {
 			const svc = new PermissionPropagationService();
 			expect(svc.isForbidden('/etc', ['/etc'])).toBe(true);
+		});
+
+		it('does not treat a sibling directory sharing a name prefix as forbidden', () => {
+			const svc = new PermissionPropagationService();
+			expect(svc.isForbidden('/etc-evil/file.txt', ['/etc'])).toBe(false);
+		});
+
+		it('blocks a raw, unnormalized ".." path reaching isForbidden directly (defense in depth)', () => {
+			// tool-execution.service.ts always pre-resolves paths via
+			// InputValidator.validatePath before calling isForbidden, but
+			// isForbidden itself should not silently trust that — a future
+			// caller that skips pre-resolution must still be blocked.
+			const svc = new PermissionPropagationService();
+			expect(svc.isForbidden('/allowed/../etc/passwd', ['/etc'])).toBe(true);
+		});
+
+		describe('symlink normalization', () => {
+			let tmpDir: string;
+			let realSecretsDir: string;
+			let symlinkedSecretsDir: string;
+
+			beforeEach(() => {
+				tmpDir = mkdtempSync(join(tmpdir(), 'valora-permission-propagation-test-'));
+				realSecretsDir = join(tmpDir, 'real-secrets');
+				symlinkedSecretsDir = join(tmpDir, 'link-to-secrets');
+				mkdirSync(realSecretsDir);
+				symlinkSync(realSecretsDir, symlinkedSecretsDir);
+			});
+
+			afterEach(() => {
+				rmSync(tmpDir, { force: true, recursive: true });
+			});
+
+			it('blocks a write to the real, symlink-resolved path when forbidden_paths names the symlink', () => {
+				// Mirrors the real call-site shape: tool-execution.service.ts's
+				// validateAndResolvePath() symlink-resolves the write target before
+				// calling isForbidden, but an agent's forbidden_paths entry may still
+				// be configured using an unresolved symlink path (e.g. a commonly
+				// documented location that happens to be a symlink on this host).
+				const svc = new PermissionPropagationService();
+				const resolvedWriteTarget = join(realSecretsDir, 'api-key.txt');
+
+				expect(svc.isForbidden(resolvedWriteTarget, [symlinkedSecretsDir])).toBe(true);
+			});
+
+			it('blocks a write to the real path when forbidden_paths already names the real target', () => {
+				const svc = new PermissionPropagationService();
+				const resolvedWriteTarget = join(realSecretsDir, 'api-key.txt');
+
+				expect(svc.isForbidden(resolvedWriteTarget, [realSecretsDir])).toBe(true);
+			});
+		});
+
+		describe('relative forbidden_paths entries', () => {
+			let tmpDir: string;
+			let projectDir: string;
+			let otherDir: string;
+
+			beforeEach(() => {
+				tmpDir = mkdtempSync(join(tmpdir(), 'valora-permission-propagation-relative-test-'));
+				projectDir = join(tmpDir, 'project');
+				otherDir = join(tmpDir, 'elsewhere');
+				mkdirSync(join(projectDir, 'secrets'), { recursive: true });
+				mkdirSync(otherDir, { recursive: true });
+			});
+
+			afterEach(() => {
+				rmSync(tmpDir, { force: true, recursive: true });
+			});
+
+			it('resolves a relative forbidden_paths entry against the given baseDir, not process.cwd()', () => {
+				// Real agent personas write forbidden_paths as relative entries
+				// (e.g. `.valora/`, `data/`) — see valora-plugin-secops's agent
+				// definitions. ToolExecutionService's workingDir can legitimately
+				// differ from process.cwd() (its own docs say so, e.g. exploration
+				// contexts), so a relative entry must resolve against the caller's
+				// actual working directory, not wherever the host process happens
+				// to be running from.
+				const svc = new PermissionPropagationService();
+				const resolvedWriteTarget = join(projectDir, 'secrets', 'api-key.txt');
+
+				expect(svc.isForbidden(resolvedWriteTarget, ['secrets'], projectDir)).toBe(true);
+				// Same relative entry, resolved against an unrelated baseDir, must NOT match.
+				expect(svc.isForbidden(resolvedWriteTarget, ['secrets'], otherDir)).toBe(false);
+			});
+
+			it('still resolves a relative forbidden_paths entry sensibly when no baseDir is given', () => {
+				const svc = new PermissionPropagationService();
+				expect(svc.isForbidden(join(process.cwd(), 'secrets', 'x.txt'), ['secrets'])).toBe(true);
+			});
+
+			it('does not change behaviour for an already-absolute forbidden_paths entry when baseDir is given', () => {
+				const svc = new PermissionPropagationService();
+				const resolvedWriteTarget = join(projectDir, 'secrets', 'api-key.txt');
+
+				expect(svc.isForbidden(resolvedWriteTarget, [join(projectDir, 'secrets')], otherDir)).toBe(true);
+			});
 		});
 	});
 

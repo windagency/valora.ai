@@ -4,7 +4,19 @@ import * as path from 'path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { getSystemPluginsDir, hasAnyValoraConfig } from './paths';
+import { getSystemPluginsDir, getWorkspaceTrustCheckRoot, hasAnyValoraConfig } from './paths';
+
+// `process.chdir()` is unsupported in Node worker threads (e.g. Stryker's dry-run test
+// execution) — probe once at module load so the chdir-dependent describe blocks below skip
+// gracefully in that environment instead of crashing the whole run, while still executing
+// normally under regular Vitest/CI (which uses forks, not worker threads).
+let chdirSupported = true;
+try {
+	const cwd = process.cwd();
+	process.chdir(cwd);
+} catch {
+	chdirSupported = false;
+}
 
 describe('getSystemPluginsDir', () => {
 	const originalPlatform = process.platform;
@@ -45,7 +57,7 @@ describe('getSystemPluginsDir', () => {
 	});
 });
 
-describe('hasAnyValoraConfig', () => {
+describe.skipIf(!chdirSupported)('hasAnyValoraConfig', () => {
 	let tmpDir: string;
 	let originalCwd: string;
 
@@ -82,5 +94,39 @@ describe('hasAnyValoraConfig', () => {
 	it('returns true when the system plugins directory exists', () => {
 		fs.mkdirSync(path.join(tmpDir, 'system-plugins'));
 		expect(hasAnyValoraConfig()).toBe(true);
+	});
+});
+
+describe.skipIf(!chdirSupported)('getWorkspaceTrustCheckRoot', () => {
+	let tmpDir: string;
+	let originalCwd: string;
+
+	beforeEach(() => {
+		tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'valora-trust-root-test-'));
+		originalCwd = process.cwd();
+		process.chdir(tmpDir);
+	});
+
+	afterEach(() => {
+		process.chdir(originalCwd);
+		fs.rmSync(tmpDir, { recursive: true, force: true });
+	});
+
+	it('falls back to process.cwd() when no .valora ancestor exists', () => {
+		expect(getWorkspaceTrustCheckRoot()).toBe(process.cwd());
+	});
+
+	it('resolves to the project directory itself when .valora exists there', () => {
+		fs.mkdirSync(path.join(tmpDir, '.valora'));
+		expect(getWorkspaceTrustCheckRoot()).toBe(tmpDir);
+	});
+
+	it('walks up to the ancestor containing .valora when invoked from a subdirectory', () => {
+		fs.mkdirSync(path.join(tmpDir, '.valora'));
+		const subDir = path.join(tmpDir, 'src', 'deep', 'nested');
+		fs.mkdirSync(subDir, { recursive: true });
+		process.chdir(subDir);
+
+		expect(getWorkspaceTrustCheckRoot()).toBe(tmpDir);
 	});
 });

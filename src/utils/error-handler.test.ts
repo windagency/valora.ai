@@ -107,7 +107,7 @@ describe('BaseError', () => {
 	it('should capture stack trace', () => {
 		const error = new BaseError('Test', 'TEST_ERROR');
 
-		expect(error.stack).toBeDefined();
+		expect(error.stack).toContain('BaseError: Test');
 		expect(error.stack).toContain('BaseError');
 	});
 });

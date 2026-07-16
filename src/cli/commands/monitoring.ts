@@ -4,17 +4,21 @@
  * Provides access to performance metrics, profiling data, and system monitoring.
  */
 
+import { getCommandGuard } from 'security/command-guard';
+
 import type { CommandAdapter } from 'cli/command-adapter.interface';
 
 import { getColorAdapter } from 'output/color-adapter.interface';
 import { formatError } from 'utils/error-handler';
 import { createHeapSnapshot } from 'utils/heap-profiler';
+import { InputValidator } from 'utils/input-validator';
 import { exportMetricsPrometheus, getMetricsCollector, getMetricsSnapshot } from 'utils/metrics-collector';
 import { formatNumber } from 'utils/number-format';
 import { generatePerformanceReport, getPerformanceProfiler } from 'utils/performance-profiler';
 import { getCurrentResourceUsage, getResourceMonitor, getResourceStats } from 'utils/resource-monitor';
 import { type GetRecordsOptions, getSpendingTracker } from 'utils/spending-tracker';
 
+import { configureConfidenceReportSubcommand } from './confidence-report';
 import { configureUsageSubcommand } from './usage';
 import { configureUsageOptimizeSubcommand } from './usage-optimize';
 
@@ -559,9 +563,28 @@ export function configureMonitoringCommand(program: CommandAdapter): void {
 		.action((options: Record<string, unknown>) => {
 			const color = getColorAdapter();
 			try {
+				// A V8 heap snapshot routinely captures in-memory secrets/API
+				// keys — --out previously wrote it to any path with zero
+				// validation.
+				let directory: string | undefined;
+				if (options['out']) {
+					try {
+						directory = InputValidator.validatePath(options['out'] as string, process.cwd());
+					} catch (error) {
+						console.error(color.red('Invalid --out path:'), (error as Error).message);
+						process.exit(1);
+						return;
+					}
+					if (getCommandGuard().isProtectedInfrastructureTarget(directory)) {
+						console.error(color.red('Invalid --out path:'), 'targets a protected security-infrastructure file');
+						process.exit(1);
+						return;
+					}
+				}
+
 				console.log(color.blue('📸 creating heap snapshot...'));
 				const path = createHeapSnapshot({
-					directory: options['out'] as string | undefined,
+					directory,
 					prefix: options['prefix'] as string | undefined
 				});
 
@@ -634,4 +657,5 @@ export function configureMonitoringCommand(program: CommandAdapter): void {
 
 	const usageCmd = configureUsageSubcommand(monitoringCmd);
 	configureUsageOptimizeSubcommand(usageCmd);
+	configureConfidenceReportSubcommand(monitoringCmd);
 }

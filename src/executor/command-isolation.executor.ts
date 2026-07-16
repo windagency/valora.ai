@@ -168,7 +168,12 @@ export class CommandIsolationExecutor {
 			baseContext.getVariableResolver().getContext().context
 		);
 
-		// Derive child permissions — child inherits all parent restrictions (never gains scope)
+		// Derive child permissions — child inherits all parent restrictions (never gains scope).
+		// `{}` is correct here today: this "child" is the same agent's own stage-scoped
+		// sub-context, not a distinct delegated agent, so there is no independent second
+		// source of constraints to union in — `derive()`'s union is idempotent against
+		// `baseContext.effectiveConstraints` regardless. If cross-role delegation is ever
+		// introduced, this should become the delegated child agent's own AgentConstraints.
 		const derivedConstraints = getPermissionPropagationService().derive(
 			baseContext.effectiveConstraints,
 			{},
@@ -212,7 +217,8 @@ export class CommandIsolationExecutor {
 			{} as Record<string, Record<string, unknown>>
 		);
 
-		// Derive child permissions — child inherits all parent restrictions (never gains scope)
+		// Derive child permissions — child inherits all parent restrictions (never gains scope).
+		// `{}` is correct here today; see the identical note in createIsolatedContext above.
 		const derivedConstraints = getPermissionPropagationService().derive(
 			baseContext.effectiveConstraints,
 			{},

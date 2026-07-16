@@ -191,11 +191,15 @@ describe('spreadActivation', () => {
 
 		const result = spreadActivation(seeds, byId, outEdges, inEdges, 3, 1.0, NOW_MS);
 
-		// Activation through c→d (1.0 × 0.9 × 0.9 = 0.81) should win over b→d
-		// (1.0 × 0.4 × 0.4 = 0.16) — d's score divided by decay/confidence is
-		// the activation, so d should be at least as large as the c-path value.
+		// Activation through c→d (1.0 × 0.9 × 0.9 = 0.81) must win over the
+		// weaker b→d path (1.0 × 0.4 × 0.4 = 0.16) — with 1-second-old records
+		// (negligible decay) and 'verified' confidence (weight 1.0), the scored
+		// value is the activation itself. A regression that locks d to whichever
+		// path arrives first in BFS order (the bug this test guards against)
+		// would score d at ≈0.16, not ≈0.81 — a threshold between the two
+		// values is required to actually distinguish them.
 		const dScore = result.get('d') ?? 0;
-		expect(dScore).toBeGreaterThan(0.16 * 0.7); // observed-tier confidence weight
+		expect(dScore).toBeCloseTo(0.81, 2);
 	});
 
 	it('takes the max activation when a node is reachable by multiple paths', () => {

@@ -233,7 +233,14 @@ describe('Complete Integration Test Suite', () => {
 			}
 
 			const fallbackRate = fallbackCount / allScenarios.length;
-			expect(fallbackRate).toBeLessThanOrEqual(1.0); // Allow high fallback rate during development
+			// NOTE: the product target is REQUIREMENTS.performance.fallbackRate (0.15), but this
+			// synthetic scenario mix currently measures ~0.92 fallback — far above that target.
+			// Enforcing the real target here would fail immediately and needs a deliberate product
+			// decision (fix the resolver/scenario mix, or revise the target) rather than a silent
+			// test change. `toBeLessThanOrEqual(1.0)` was a placeholder that can never fail
+			// regardless of implementation; `toBeLessThan(1.0)` at least catches a resolver that
+			// falls back on literally every scenario.
+			expect(fallbackRate).toBeLessThan(1.0);
 		});
 	});
 

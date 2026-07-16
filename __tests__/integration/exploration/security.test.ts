@@ -192,7 +192,9 @@ describe('Security Tests', () => {
 			});
 
 			expect(result.exitCode).toBe(0);
-			expect(result.stdout).toBeDefined();
+			// testRepoDir has no uncommitted changes at this point (beforeAll commits the only file),
+			// so a clean `git status --porcelain` reports nothing.
+			expect(result.stdout).toBe('');
 		});
 
 		it('should timeout long-running commands', async () => {

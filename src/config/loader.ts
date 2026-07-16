@@ -3,13 +3,16 @@
  */
 
 import * as path from 'path';
+import { isWorkspaceTrusted } from 'security/workspace-trust.service';
+import { URL } from 'url';
 
 import { getProviderRegistry } from 'llm/registry';
 import { getLogger } from 'output/logger';
+import { BuiltinProviders } from 'types/provider-names.types';
 import { ConfigurationError } from 'utils/error-handler';
 import { formatErrorMessage } from 'utils/error-utils';
 import { ensureDir, fileExists, readJSON, writeJSON } from 'utils/file-utils';
-import { getGlobalConfigDir, getPackageDataDir, getProjectConfigDir } from 'utils/paths';
+import { getGlobalConfigDir, getPackageDataDir, getProjectConfigDir, getWorkspaceTrustCheckRoot } from 'utils/paths';
 
 import {
 	DEFAULT_DAILY_FILE_MAX_SIZE_MB,
@@ -31,6 +34,17 @@ const ENV_PARSERS = {
 	integer: (v: string) => parseInt(v, 10),
 	string: (v: string) => v
 } as const;
+
+/**
+ * Providers whose whole purpose is talking to a local/self-hosted endpoint —
+ * `localhost`/`127.0.0.1`/`host.docker.internal`-shaped baseUrls are their
+ * expected default, not a suspicious override. Every other provider is a
+ * cloud API with no legitimate reason to point at a private/link-local
+ * address at all.
+ */
+const LOCAL_FIRST_PROVIDERS = new Set<string>([BuiltinProviders.LOCAL, 'ollama']);
+
+const CLOUD_METADATA_HOSTNAMES = new Set(['metadata', 'metadata.google.internal']);
 
 export class ConfigLoader {
 	private config: Config | null = null;
@@ -89,6 +103,7 @@ export class ConfigLoader {
 
 		try {
 			this.config = CONFIG_SCHEMA.parse(mergedConfig);
+			this.sanitizeProviderBaseUrls(this.config);
 			this.autoMigrateDefaultProvider();
 			return this.config;
 		} catch (error) {
@@ -96,6 +111,44 @@ export class ConfigLoader {
 				errors: error
 			});
 		}
+	}
+
+	/**
+	 * Applies regardless of trust level — a trusted-but-compromised config, a
+	 * malicious plugin, or a misconfigured env var can set a provider's
+	 * `baseUrl` just as easily as an untrusted project config can, and every
+	 * provider sends the real API key as a plaintext Authorization header to
+	 * whatever `baseUrl` names. Strips (doesn't throw on) an unsafe value so a
+	 * single bad provider entry can't crash config load for the whole run.
+	 */
+	private sanitizeProviderBaseUrls(config: Config): void {
+		if (!config.providers) return;
+
+		for (const [providerKey, providerConfig] of Object.entries(config.providers)) {
+			this.sanitizeSingleProviderBaseUrl(providerKey, providerConfig);
+		}
+	}
+
+	private sanitizeSingleProviderBaseUrl(providerKey: string, providerConfig: undefined | { baseUrl?: string }): void {
+		if (!providerConfig?.baseUrl) return;
+
+		let parsed: URL;
+		try {
+			parsed = new URL(providerConfig.baseUrl);
+		} catch {
+			delete providerConfig.baseUrl;
+			return;
+		}
+
+		const isSafeScheme = parsed.protocol === 'http:' || parsed.protocol === 'https:';
+		const isLocalFirstProvider = LOCAL_FIRST_PROVIDERS.has(providerKey);
+		const isUnsafeHost = !isLocalFirstProvider && isPrivateOrLinkLocalHost(parsed.hostname);
+		if (isSafeScheme && !isUnsafeHost) return;
+
+		getLogger().warn(
+			`[Security] Provider "${providerKey}" declares an unsafe baseUrl (${isSafeScheme ? 'private/link-local/metadata host' : 'non-http(s) scheme'}) — ignored. The real API key would otherwise be sent to this endpoint.`
+		);
+		delete providerConfig.baseUrl;
 	}
 
 	/**
@@ -143,11 +196,46 @@ export class ConfigLoader {
 			return {};
 		}
 		try {
-			return await readJSON<Partial<Config>>(projectConfigPath);
+			const projectConfig = await readJSON<Partial<Config>>(projectConfigPath);
+			return this.stripUntrustedProviderOverrides(projectConfig);
 		} catch {
 			// Non-fatal: skip invalid project config
 			return {};
 		}
+	}
+
+	/**
+	 * An untrusted project's config.json can override just a provider's
+	 * `baseUrl` (or `defaults.default_provider`) with no trust gate at all —
+	 * silently redirecting the real API key, resolved separately from a
+	 * trusted global config/env var, to an attacker-controlled endpoint on
+	 * the very next LLM call. Strip these two specific fields when the
+	 * project isn't trusted; every other project-config field still applies
+	 * normally. Deletes the keys outright rather than setting them to
+	 * `undefined` — `mergeSingleConfig` spreads `config.defaults` directly
+	 * (`{...result.defaults, ...config.defaults}`), so an explicit
+	 * `default_provider: undefined` would overwrite a legitimate value from
+	 * an earlier (trusted) layer instead of just not contributing one.
+	 */
+	private stripUntrustedProviderOverrides(projectConfig: Partial<Config>): Partial<Config> {
+		const hasProviderOverride = projectConfig.providers !== undefined;
+		const hasDefaultProviderOverride = projectConfig.defaults?.default_provider !== undefined;
+		if (!hasProviderOverride && !hasDefaultProviderOverride) return projectConfig;
+
+		const trustRoot = getWorkspaceTrustCheckRoot();
+		if (isWorkspaceTrusted(trustRoot)) return projectConfig;
+
+		getLogger().warn(
+			'Untrusted project .valora/config.json declares a provider/default_provider override — ignored until the project is trusted (see `valora config trust`)'
+		);
+
+		const stripped: Partial<Config> = { ...projectConfig };
+		delete stripped.providers;
+		if (stripped.defaults) {
+			stripped.defaults = { ...stripped.defaults };
+			delete stripped.defaults.default_provider;
+		}
+		return stripped;
 	}
 
 	/**
@@ -251,14 +339,24 @@ export class ConfigLoader {
 	 */
 	private loadDefaultsFromEnv(config: Partial<Config>): void {
 		const interactive = process.env['VALORA_INTERACTIVE'] ?? process.env['AI_INTERACTIVE'];
+		const logLevel = process.env['VALORA_LOG_LEVEL'] ?? process.env['AI_LOG_LEVEL'];
+		if (interactive === undefined && !logLevel) return;
+
+		// DEFAULT_CONFIG.defaults carries an explicit own-property
+		// `default_provider: undefined` — spreading it to seed this layer's
+		// `defaults` object would otherwise silently reset an already-resolved
+		// default_provider from an earlier, trusted layer back to undefined
+		// once mergeSingleConfig shallow-spreads this layer on top (the same
+		// clobbering class stripUntrustedProviderOverrides guards against for a
+		// different, untrusted-layer cause — this function has no business
+		// touching default_provider at all, so drop it immediately).
+		config.defaults ??= { ...DEFAULT_CONFIG.defaults };
+		delete config.defaults.default_provider;
+
 		if (interactive !== undefined) {
-			config.defaults ??= { ...DEFAULT_CONFIG.defaults };
 			config.defaults.interactive = interactive === 'true';
 		}
-
-		const logLevel = process.env['VALORA_LOG_LEVEL'] ?? process.env['AI_LOG_LEVEL'];
 		if (logLevel) {
-			config.defaults ??= { ...DEFAULT_CONFIG.defaults };
 			config.defaults.log_level = logLevel as 'debug' | 'error' | 'info' | 'warn';
 		}
 	}
@@ -565,7 +663,9 @@ export class ConfigLoader {
 			const mergedConfig = this.mergeConfigs(DEFAULT_CONFIG, fileConfig, envConfig);
 
 			// Validate
-			return CONFIG_SCHEMA.parse(mergedConfig);
+			const parsed = CONFIG_SCHEMA.parse(mergedConfig);
+			this.sanitizeProviderBaseUrls(parsed);
+			return parsed;
 		} catch (error) {
 			throw new ConfigurationError(`Failed to parse config file: ${filePath}`, {
 				error: (error as Error).message
@@ -581,6 +681,86 @@ export class ConfigLoader {
 		this.rawConfig = null;
 		return this.load();
 	}
+}
+
+/**
+ * Best-effort check for a literal private/link-local/loopback host — string-
+ * level only (no DNS resolution), so an arbitrary hostname that happens to
+ * *resolve* to a private address isn't caught here. Still closes the primary
+ * threat: a baseUrl override naming a private IP, `localhost`, or a
+ * cloud-metadata hostname directly (exactly the shape a config override would
+ * use), for any provider not in `LOCAL_FIRST_PROVIDERS`.
+ */
+function isPrivateOrLinkLocalHost(hostname: string): boolean {
+	// URL.hostname keeps the brackets on an IPv6 literal (e.g. "[::1]").
+	const host = hostname.toLowerCase().replace(/^\[|\]$/g, '');
+
+	if (host === 'localhost' || host.endsWith('.localhost')) return true;
+	if (CLOUD_METADATA_HOSTNAMES.has(host)) return true;
+
+	const ipv4Match = /^(\d{1,3})\.(\d{1,3})\.\d{1,3}\.\d{1,3}$/.exec(host);
+	if (ipv4Match) return isPrivateOrLoopbackIpv4(Number(ipv4Match[1]), Number(ipv4Match[2]));
+
+	return isPrivateOrLoopbackIpv6(host);
+}
+
+const IPV4_SINGLE_OCTET_PRIVATE_FIRSTS = new Set([0, 10, 127]);
+
+/**
+ * Deliberately NOT blocked here, despite being reserved by other RFCs: TEST-NET
+ * (192.0.2.0/24, 198.51.100.0/24, 203.0.113.0/24, RFC 5737), benchmarking
+ * (198.18.0.0/15, RFC 2544), IETF protocol assignments (192.0.0.0/24, RFC 6890),
+ * 6to4 relay anycast (192.88.99.0/24, RFC 3068), multicast (224.0.0.0/4) and
+ * reserved/broadcast (240.0.0.0/4, 255.255.255.255/32). None of these host real
+ * internal infrastructure the way RFC1918/loopback/link-local/CGNAT do — no
+ * legitimate *or* attacker-controlled service listens on a documentation or
+ * benchmarking address — so blocking them would guard against a copy-pasted
+ * example config at best, not an actual SSRF target. Not worth the added
+ * surface for this function's actual threat model.
+ */
+function isPrivateOrLoopbackIpv4(first: number, second: number): boolean {
+	if (IPV4_SINGLE_OCTET_PRIVATE_FIRSTS.has(first)) return true;
+	if (first === 172) return second >= 16 && second <= 31;
+	if (first === 192) return second === 168;
+	if (first === 169) return second === 254; // link-local, incl. cloud metadata
+	if (first === 100) return second >= 64 && second <= 127; // RFC 6598 CGNAT, 100.64.0.0/10
+	return false;
+}
+
+function isPrivateOrLoopbackIpv6(host: string): boolean {
+	if (host === '::1' || host === '::') return true;
+	if (/^fe[89ab][0-9a-f]:/.test(host)) return true; // IPv6 link-local, fe80::/10
+	if (/^f[cd][0-9a-f]{2}:/.test(host)) return true; // IPv6 unique local, fc00::/7
+
+	// Node's URL parser always normalises an IPv4-mapped IPv6 literal to
+	// hex-group form (::ffff:169.254.169.254 -> ::ffff:a9fe:a9fe), never
+	// dotted-decimal — a regex matching only the dotted form never fires
+	// against real URL.hostname output. Only the first hex group is needed:
+	// it encodes the address's first two octets, which is all
+	// isPrivateOrLoopbackIpv4 checks.
+	const hexMappedMatch = /^::ffff:([0-9a-f]{1,4}):[0-9a-f]{1,4}$/.exec(host);
+	if (hexMappedMatch) {
+		const highBits = parseInt(hexMappedMatch[1]!, 16);
+		return isPrivateOrLoopbackIpv4((highBits >>> 8) & 0xff, highBits & 0xff);
+	}
+
+	// RFC 6052 NAT64/SIIT well-known prefix (64:ff9b::/96) embeds an IPv4
+	// address in its low 32 bits — the identical embedding technique as the
+	// ::ffff: IPv4-mapped form above, just a different prefix. Node
+	// normalises this to hex-group form too, so the same first-hex-group
+	// extraction applies.
+	const nat64Match = /^64:ff9b::([0-9a-f]{1,4}):[0-9a-f]{1,4}$/.exec(host);
+	if (nat64Match) {
+		const highBits = parseInt(nat64Match[1]!, 16);
+		return isPrivateOrLoopbackIpv4((highBits >>> 8) & 0xff, highBits & 0xff);
+	}
+
+	// Belt-and-suspenders for a dotted-decimal form, in case some other
+	// caller ever passes one directly rather than through URL.hostname.
+	const dottedMappedMatch = /^::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/.exec(host);
+	if (dottedMappedMatch) return isPrivateOrLinkLocalHost(dottedMappedMatch[1]!);
+
+	return false;
 }
 
 // Tracks provider keys that have already been warned about in this process run

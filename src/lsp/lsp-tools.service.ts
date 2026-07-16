@@ -7,6 +7,7 @@
 
 import { readFile } from 'fs/promises';
 import { join } from 'path';
+import { getCredentialGuard } from 'security/credential-guard';
 
 import type { getLogger } from 'output/logger';
 
@@ -59,6 +60,8 @@ export class LSPToolsService {
 	async executeGotoDefinition(args: Record<string, unknown>): Promise<string> {
 		const filePath = args['file_path'] as string;
 		if (!filePath) return 'goto_definition requires a file_path argument';
+		const sensitiveError = this.checkSensitiveFile(filePath);
+		if (sensitiveError) return sensitiveError;
 
 		const position = await this.resolvePosition(filePath, args);
 		if (!position) return 'Could not resolve position. Provide either symbol name or line/character.';
@@ -108,6 +111,8 @@ export class LSPToolsService {
 	async executeGetTypeInfo(args: Record<string, unknown>): Promise<string> {
 		const filePath = args['file_path'] as string;
 		if (!filePath) return 'get_type_info requires a file_path argument';
+		const sensitiveError = this.checkSensitiveFile(filePath);
+		if (sensitiveError) return sensitiveError;
 
 		const position = await this.resolvePosition(filePath, args);
 		if (!position) return 'Could not resolve position.';
@@ -121,6 +126,8 @@ export class LSPToolsService {
 	async executeGetDiagnostics(args: Record<string, unknown>): Promise<string> {
 		const filePath = args['file_path'] as string;
 		if (!filePath) return 'get_diagnostics requires a file_path argument';
+		const sensitiveError = this.checkSensitiveFile(filePath);
+		if (sensitiveError) return sensitiveError;
 
 		const manager = getLSPClientManager(this.projectRoot);
 		const client = await manager.getClientForFile(filePath);
@@ -164,6 +171,8 @@ export class LSPToolsService {
 	async executeHoverInfo(args: Record<string, unknown>): Promise<string> {
 		const filePath = args['file_path'] as string;
 		if (!filePath) return 'hover_info requires a file_path argument';
+		const sensitiveError = this.checkSensitiveFile(filePath);
+		if (sensitiveError) return sensitiveError;
 
 		const position = await this.resolvePosition(filePath, args);
 		if (!position) return 'Could not resolve position.';
@@ -210,9 +219,13 @@ export class LSPToolsService {
 					? result.contents
 					: (result.contents?.value ?? 'No hover information available');
 
-			const hoverResult: HoverResult = { contents: hoverContents };
+			// e.g. a `const x = "sk-..."` declaration's hover tooltip can echo
+			// the literal secret value — redact before caching (so a cache hit
+			// never re-leaks it) and before returning to the LLM caller.
+			const scannedContents = getCredentialGuard().scanOutput(hoverContents);
+			const hoverResult: HoverResult = { contents: scannedContents };
 			this.cache.set(cacheKey, hoverResult);
-			return hoverContents;
+			return scannedContents;
 		} catch {
 			return 'Language server unavailable. Use grep or read_file as fallback.';
 		}
@@ -242,6 +255,23 @@ export class LSPToolsService {
 		if (lineIdx === -1) return null;
 
 		return { character: lines[lineIdx]!.indexOf(symbol), line: lineIdx };
+	}
+
+	/**
+	 * `read_file`/`run_terminal_cmd` both refuse to read/return credential-
+	 * shaped content — these four tool handlers took the same `file_path`
+	 * argument but bypassed CredentialGuard entirely, an inconsistent trust
+	 * boundary (the same argument refused by `read_file` was accepted
+	 * verbatim by `goto_definition`/`get_type_info`/`get_diagnostics`/
+	 * `hover_info`). Checked once per public entry point, before any
+	 * position resolution or LSP request that would otherwise read the file.
+	 */
+	private checkSensitiveFile(filePath: string): null | string {
+		const absPath = filePath.startsWith('/') ? filePath : join(this.projectRoot, filePath);
+		if (getCredentialGuard().isSensitiveFile(absPath)) {
+			return `Cannot read sensitive file: ${filePath} — this file may contain credentials or private keys`;
+		}
+		return null;
 	}
 
 	/**
@@ -298,7 +328,7 @@ export class LSPToolsService {
 	 * Format a definition result for display
 	 */
 	private formatDefinitionResult(result: DefinitionResult): string {
-		return `Definition found at: ${result.display}`;
+		return getCredentialGuard().scanOutput(`Definition found at: ${result.display}`);
 	}
 
 	/**
@@ -321,7 +351,7 @@ export class LSPToolsService {
 			return `${filePath}:${line} [${severity}] ${d.message ?? ''}`;
 		});
 
-		return formatted.join('\n');
+		return getCredentialGuard().scanOutput(formatted.join('\n'));
 	}
 }
 

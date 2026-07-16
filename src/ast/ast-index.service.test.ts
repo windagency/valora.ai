@@ -72,7 +72,7 @@ export const MAX_SIZE = 100;
 
 		expect(service.isBuilt()).toBe(true);
 		expect(service.getStats().fileCount).toBeGreaterThanOrEqual(1);
-		expect(index.files['test.ts']).toBeDefined();
+		expect(index.files['test.ts']?.filePath).toBe('test.ts');
 		expect(index.files['test.ts']!.language).toBe('typescript');
 	});
 
@@ -165,7 +165,7 @@ export function added() { return 2; }
 		gitAdd(testDir, 'todelete.ts');
 
 		await service.buildIndex();
-		expect(service.getFile('todelete.ts')).toBeDefined();
+		expect(service.getFile('todelete.ts')?.filePath).toBe('todelete.ts');
 
 		// Delete the file
 		rmSync(join(testDir, 'todelete.ts'));

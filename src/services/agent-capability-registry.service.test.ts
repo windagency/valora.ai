@@ -89,7 +89,7 @@ describe('AgentCapabilityRegistryService', () => {
 		it('should initialize registry successfully', async () => {
 			await registry.initialize();
 
-			expect(mockGetPackageDataDir).toHaveBeenCalled();
+			expect(mockGetPackageDataDir).toHaveBeenCalledWith();
 			expect(mockReadFile).toHaveBeenCalledWith('/mock/path/agents/registry.json');
 		});
 
@@ -411,7 +411,7 @@ describe('AgentCapabilityRegistryService', () => {
 
 			await registry.reload();
 
-			expect(registry.getCapability('new-agent')).toBeDefined();
+			expect(registry.getCapability('new-agent')).toEqual(newData.capabilities['new-agent']);
 		});
 	});
 

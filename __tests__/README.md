@@ -2,27 +2,24 @@
 
 A comprehensive, multi-layered test suite designed by combining the expertise of Lead Platform Engineer, Security Operations Engineer, QA Engineer, and TypeScript Software Engineer roles to ensure robust, secure, and performant AI-assisted workflow orchestration.
 
-## 📊 Current Test Results (2026-04-23)
+## 📊 Test Suite Coverage
 
-### **OVERALL STATUS: ✅ ALL TESTS PASSING (1 skipped)**
+This suite is organised into the categories below, each with a distinct purpose. Exact
+pass/fail counts are deliberately not tracked here — this table has drifted out of date
+after every prior count-based revision as new test files were added, so treat `pnpm test`
+(or the individual `pnpm test:suite:*` commands in [Running Tests](#-running-tests)) as the
+source of truth for current counts, not this document.
 
-- **Total Tests**: 1942/1943
-- **Pass Rate**: 99.9% (1 skipped in E2E)
-- **Test Categories**: 8 suites
-- **Coverage Focus**: Behavior validation over arbitrary percentages
-
-### 📈 Detailed Test Results
-
-| **Test Suite**            | **Status**       | **Tests** | **Coverage Focus**                         |
-| ------------------------- | ---------------- | --------- | ------------------------------------------ |
-| **🔧 Unit Tests**         | ✅ **1672/1672** | 100%      | Core utilities, error handling, validation |
-| **🔗 Integration Tests**  | ✅ **75/75**     | 100%      | Component interactions, data flow          |
-| **🌐 E2E Tests**          | ⚠️ **14/15**     | 93%       | Complete CLI workflows, user experience    |
-| **✅ Acceptance Tests**   | ✅ **13/13**     | 100%      | Business requirements, user journeys       |
-| **🔒 Security Tests**     | ✅ **49/49**     | 100%      | Vulnerability prevention, data protection  |
-| **⚡ Performance Tests**  | ✅ **19/19**     | 100%      | Resource usage, scalability, timing        |
-| **🚨 Error Scenarios**    | ✅ **7/7**       | 100%      | Failure recovery, resilience               |
-| **🏛️ Architecture Tests** | ✅ **93/93**     | 100%      | Module boundaries, dependency rules        |
+| **Test Suite**            | **Coverage Focus**                         |
+| ------------------------- | ------------------------------------------ |
+| **🔧 Unit Tests**         | Core utilities, error handling, validation |
+| **🔗 Integration Tests**  | Component interactions, data flow          |
+| **🌐 E2E Tests**          | Complete CLI workflows, user experience    |
+| **✅ Acceptance Tests**   | Business requirements, user journeys       |
+| **🔒 Security Tests**     | Vulnerability prevention, data protection  |
+| **⚡ Performance Tests**  | Resource usage, scalability, timing        |
+| **🚨 Error Scenarios**    | Failure recovery, resilience               |
+| **🏛️ Architecture Tests** | Module boundaries, dependency rules        |
 
 ---
 
@@ -46,22 +43,22 @@ The suite combines the expertise of multiple engineering disciplines to create a
 ## 🏗️ Test Suite Architecture
 
 ```plaintext
-┌─────────────────┐  E2E Tests (14/15 ⚠️)
+┌─────────────────┐  E2E Tests
 │   End-to-End    │  Business Requirements
 │    Acceptance   │  User Journeys
 └─────────────────┘
 
-┌─────────────────┐  Integration Tests (75/75 ✅)
+┌─────────────────┐  Integration Tests
 │  Integration    │  Module Interactions
 │   Tests         │  Data Flow
 └─────────────────┘
 
-┌─────────────────┐  Unit Tests (1672/1672 ✅)
+┌─────────────────┐  Unit Tests
 │   Unit Tests    │  Functions, Classes
 │                 │  Error Handling
 └─────────────────┘
 
-┌─────────────────┐  Architecture Tests (93/93 ✅)
+┌─────────────────┐  Architecture Tests
 │  Architecture   │  Module Boundaries
 │   Tests         │  Dependency Rules
 └─────────────────┘
@@ -73,8 +70,7 @@ The suite combines the expertise of multiple engineering disciplines to create a
 __tests__/
 ├── utils/                          # Shared test utilities
 │   ├── agent-selection-test-helpers.ts
-│   ├── setup.ts                   # Global test setup
-│   └── testcontainers-helper.ts   # Container management
+│   └── setup.ts                   # Global test setup
 ├── integration/                   # Integration tests
 │   ├── analysis/
 │   ├── cli/
@@ -128,22 +124,24 @@ Examples:
 #### 🔗 **Integration Tests** (`__tests__/integration/`)
 
 - **Purpose**: Validate interactions between modules and external dependencies
-- **Scope**: Database operations, file I/O, API calls, service communication
-- **Tools**: Testcontainers, Vitest, isolated environments
+- **Scope**: File I/O, subprocess execution, API calls, service communication
+- **Tools**: Vitest with real temp-directory filesystem/git/subprocess I/O; Testcontainers for tests
+  that need a genuine external service (e.g. `packages/valora-plugin-ollama`'s Ollama container test).
+  Mocking the boundary a test claims to integrate is not permitted here — see CLAUDE.md.
 - **Coverage Focus**: Data flow, contract testing, dependency management
 
 #### 🌐 **E2E Tests** (`__tests__/e2e/`)
 
 - **Purpose**: Validate complete user workflows from start to finish
-- **Scope**: CLI commands, MCP server interactions, browser automation
-- **Tools**: Playwright, Testcontainers, headless browsers
+- **Scope**: CLI commands, MCP server interactions
+- **Tools**: Vitest, real built-binary invocation
 - **Coverage Focus**: User experience, system integration, cross-platform compatibility
 
 #### ✅ **Acceptance Tests** (`__tests__/acceptance/`)
 
 - **Purpose**: Validate business requirements and user stories
 - **Scope**: Complete features, user workflows, business rules
-- **Tools**: Testcontainers, Vitest, behavioral scenarios
+- **Tools**: Vitest, real built-binary invocation, behavioral scenarios
 - **Coverage Focus**: Business value, user satisfaction, functional completeness
 
 #### 🔒 **Security Tests** (`__tests__/security/`)
@@ -181,8 +179,11 @@ Examples:
 ### Testing Framework
 
 - **Vitest**: Modern, fast testing framework with TypeScript support
-- **Playwright**: Browser automation and E2E testing
-- **Testcontainers**: Isolated integration testing environments
+- **Testcontainers**: Isolated environments for the small subset of integration tests that need a
+  genuine external service (e.g. `packages/valora-plugin-ollama`); most integration/E2E/acceptance
+  tests use real temp-directory filesystem, git, and subprocess I/O directly, without a container
+- **Playwright**: a dependency, but only exercised by one narrowly-scoped browser check in the E2E
+  suite — not a general E2E/browser-automation tool for this CLI project
 
 ### Quality Assurance
 
@@ -328,7 +329,8 @@ _Note: Focus on valuable tests validating behavior rather than arbitrary coverag
 
 #### ✅ **Integration Tests**
 
-- [ ] Uses real dependencies via Testcontainers
+- [ ] Uses real dependencies (filesystem, git, subprocess) or Testcontainers for a genuine external
+      service — never mocks the boundary the test claims to integrate
 - [ ] Tests data flow between components
 - [ ] Validates error propagation
 - [ ] Tests resource cleanup
@@ -465,7 +467,7 @@ pnpm test --reporter=junit --outputFile=test-results.xml
 
 ## 🎊 Summary
 
-The VALORA test suite represents a **monumental achievement** in software testing and reliability engineering. With **1942 tests passing across 8 suites**, the system is validated across:
+The VALORA test suite represents a **monumental achievement** in software testing and reliability engineering. Spanning 8 test suites (unit, integration, E2E, acceptance, security, performance, error-scenario, and architecture), the system is validated across:
 
 - **Enterprise-grade error handling** with circuit breakers and retry logic
 - **Comprehensive security controls** preventing vulnerabilities and data leaks
@@ -493,8 +495,8 @@ The VALORA test suite represents a **monumental achievement** in software testin
 Verified against codebase on **2026-04-23** by running all test suites and inspecting the file system.
 
 - **Total claims checked**: 28
-- **Confirmed**: 8 (file paths for `utils/setup.ts`, `utils/testcontainers-helper.ts`; test command scripts; tool dependencies for Vitest, Playwright, Testcontainers; naming convention examples for E2E/acceptance/security/performance/error test files)
-- **Corrections made**: 20
+- **Confirmed**: 8 (file path for `utils/setup.ts`; test command scripts; tool dependency for Vitest; naming convention examples for E2E/acceptance/security/performance/error test files)
+- **Corrections made (2026-04-23)**: 20
   - Date updated from `2025-01-21` to `2026-04-23`
   - Total test count: `263/263` → `1942/1943`
   - Pass rate: `100%` → `99.9% (1 skipped in E2E)`
@@ -516,3 +518,29 @@ Verified against codebase on **2026-04-23** by running all test suites and inspe
   - `pnpm test:watch` corrected to `pnpm test:dev:watch`
   - Summary paragraph count: `263` → `1942`
 - **Unverifiable**: 0
+
+### Correction pass (2026-07-11)
+
+The 2026-04-23 pass above incorrectly confirmed `utils/testcontainers-helper.ts` as an existing file
+and claimed integration/E2E/acceptance tests broadly use Testcontainers. Neither was true: the file
+does not exist anywhere in the repo, and — apart from one Testcontainers-based test in
+`packages/valora-plugin-ollama` — every integration/E2E/acceptance test uses real filesystem/git/
+subprocess I/O directly, with no container involved. `__tests__/integration/cli/provider-fallback.integration.test.ts`
+had also been mocking `config/loader` and `utils/file-utils` — the exact boundaries an integration
+test must exercise for real — and was rewritten to use a real temp config file and command markdown
+file on disk instead. This section, the Directory Layout, Technology Stack, and the per-category
+Tools/Coverage descriptions above were corrected accordingly. The broader test counts in the
+2026-04-23 summary were not re-verified in this pass and should be treated as stale.
+
+### Correction pass (2026-07-13)
+
+The 2026-04-23 per-suite pass/fail count table and its ASCII-diagram/summary-paragraph echoes
+(`1942 tests`, `93/93`, `49/49`, etc.) had drifted stale again, as flagged (but not yet re-verified)
+in the 2026-07-11 pass — a rough count taken during this pass found architecture at ~170 actual
+tests against the table's stated 93/93, performance at 5 against 19/19, e2e at 7 against 14/15, and
+acceptance at 11 against 13/13. Rather than hand-verify and re-state a new set of counts that will
+just drift again on the next added test file, the "Current Test Results" table was replaced with a
+qualitative, count-free version, and the ASCII diagram/summary paragraph had their embedded counts
+removed. The historical counts inside the 2026-04-23/2026-07-11 correction-pass entries above are
+left as-is — they're a record of what changed at that time, not a claim about the current suite.
+Treat `pnpm test` / `pnpm test:suite:*` as the source of truth for current pass/fail counts.

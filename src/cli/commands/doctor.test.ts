@@ -1,8 +1,56 @@
+import { Command } from 'commander';
+import * as fs from 'node:fs/promises';
+import * as os from 'node:os';
+import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { LoadedPlugin } from 'types/plugin.types';
 
-import { printPluginsSection } from './doctor';
+vi.mock('di/container', () => ({
+	getLoadedPlugins: () => []
+}));
+
+const mockRunAllChecks = vi.fn(async () => [{ message: 'ok', status: 'pass' }]);
+const mockAutoFix = vi.fn(() => false);
+vi.mock('services/diagnostics.service', () => ({
+	DiagnosticsService: vi.fn().mockImplementation(() => ({
+		autoFix: mockAutoFix,
+		runAllChecks: mockRunAllChecks
+	}))
+}));
+
+vi.mock('output/diagnostic-formatter', () => ({
+	getDiagnosticFormatter: () => ({
+		exportToJSON: () => JSON.stringify({ report: 'ok' }),
+		formatReport: () => 'ok'
+	})
+}));
+
+vi.mock('output/color-adapter.interface', () => ({
+	getColorAdapter: () => ({
+		bold: (s: string) => s,
+		cyan: (s: string) => s,
+		dim: (s: string) => s,
+		gray: (s: string) => s,
+		green: (s: string) => s,
+		red: (s: string) => s,
+		yellow: (s: string) => s
+	})
+}));
+
+import { configureDoctorCommand, printPluginsSection } from './doctor';
+
+// `process.chdir()` is unsupported in Node worker threads (e.g. Stryker's dry-run test
+// execution) — probe once at module load so the chdir-dependent describe block below skips
+// gracefully in that environment instead of crashing the whole run, while still executing
+// normally under regular Vitest/CI (which uses forks, not worker threads).
+let chdirSupported = true;
+try {
+	const cwd = process.cwd();
+	process.chdir(cwd);
+} catch {
+	chdirSupported = false;
+}
 
 const noopColor = {
 	bold: (s: string) => s,
@@ -79,5 +127,148 @@ describe('doctor — printPluginsSection', () => {
 	it('omits the informational line when the plugin declares no unenforced permissions', () => {
 		printPluginsSection(noopColor, [plugin()]);
 		expect(captured()).not.toContain('informational:');
+	});
+});
+
+function makeProgram(): Command {
+	const program = new Command();
+	program.exitOverride();
+	configureDoctorCommand(program as never);
+	return program;
+}
+
+async function runCommand(program: Command, args: string[]): Promise<void> {
+	await program.parseAsync(['node', 'valora', ...args]);
+}
+
+describe.skipIf(!chdirSupported)('doctor --export', () => {
+	let tmpDir: string;
+	let originalCwd: string;
+	let logSpy: ReturnType<typeof vi.spyOn>;
+	let exitSpy: ReturnType<typeof vi.spyOn>;
+
+	beforeEach(async () => {
+		originalCwd = process.cwd();
+		tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'valora-doctor-cmd-'));
+		process.chdir(tmpDir);
+		logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+		exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never);
+	});
+
+	afterEach(async () => {
+		process.chdir(originalCwd);
+		await fs.rm(tmpDir, { force: true, recursive: true });
+		logSpy.mockRestore();
+		exitSpy.mockRestore();
+	});
+
+	it('blocks --export pointing outside the working directory', async () => {
+		const outsideDir = await fs.mkdtemp(path.join(os.tmpdir(), 'valora-doctor-cmd-outside-'));
+		const outsideTarget = path.join(outsideDir, 'report.json');
+		const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+		await runCommand(makeProgram(), ['doctor', '--export', outsideTarget]);
+
+		expect(exitSpy).toHaveBeenCalledWith(1);
+		await expect(fs.access(outsideTarget)).rejects.toThrow();
+
+		errorSpy.mockRestore();
+		await fs.rm(outsideDir, { force: true, recursive: true });
+	});
+
+	it('blocks --export pointing at a protected security-infrastructure basename even when it sits inside the working directory', async () => {
+		const target = path.join(tmpDir, '.valora', 'security-audit.jsonl');
+		const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+		await runCommand(makeProgram(), ['doctor', '--export', target]);
+
+		expect(exitSpy).toHaveBeenCalledWith(1);
+		await expect(fs.access(target)).rejects.toThrow();
+
+		errorSpy.mockRestore();
+	});
+
+	it('still allows --export pointing inside the working directory', async () => {
+		const target = path.join(tmpDir, 'nested', 'report.json');
+
+		await runCommand(makeProgram(), ['doctor', '--export', target]);
+
+		const written = await fs.readFile(target, 'utf-8');
+		expect(JSON.parse(written)).toEqual({ report: 'ok' });
+	});
+});
+
+describe('doctor — running checks', () => {
+	let logSpy: ReturnType<typeof vi.spyOn>;
+	let exitSpy: ReturnType<typeof vi.spyOn>;
+
+	beforeEach(() => {
+		logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+		exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never);
+	});
+
+	afterEach(() => {
+		logSpy.mockRestore();
+		exitSpy.mockRestore();
+		mockRunAllChecks.mockReset();
+		mockRunAllChecks.mockResolvedValue([{ message: 'ok', status: 'pass' }]);
+		mockAutoFix.mockReset();
+		mockAutoFix.mockReturnValue(false);
+	});
+
+	function loggedOutput(): string {
+		return logSpy.mock.calls.map((c) => c.join(' ')).join('\n');
+	}
+
+	it('exits 0 when every diagnostic check passes', async () => {
+		await runCommand(makeProgram(), ['doctor']);
+
+		expect(exitSpy).toHaveBeenCalledWith(0);
+	});
+
+	it('exits 1 when any diagnostic check fails', async () => {
+		mockRunAllChecks.mockResolvedValue([
+			{ message: 'ok', status: 'pass' },
+			{ autoFixable: false, message: 'missing config', status: 'fail' }
+		]);
+
+		await runCommand(makeProgram(), ['doctor']);
+
+		expect(exitSpy).toHaveBeenCalledWith(1);
+	});
+
+	it('prints the formatted diagnostics report', async () => {
+		await runCommand(makeProgram(), ['doctor']);
+
+		expect(loggedOutput()).toContain('ok');
+	});
+
+	describe('--fix', () => {
+		it('auto-fixes fixable failing checks and reports how many were fixed', async () => {
+			mockRunAllChecks.mockResolvedValue([{ autoFixable: true, message: 'fixable issue', status: 'fail' }]);
+			mockAutoFix.mockReturnValue(true);
+
+			await runCommand(makeProgram(), ['doctor', '--fix']);
+
+			const out = loggedOutput();
+			expect(out).toContain('Fixed: Configuration file');
+			expect(out).toContain('Fixed 1 issue(s)');
+		});
+
+		it('reports that no issues were auto-fixable when none can be fixed', async () => {
+			mockRunAllChecks.mockResolvedValue([{ autoFixable: false, message: 'not fixable', status: 'fail' }]);
+
+			await runCommand(makeProgram(), ['doctor', '--fix']);
+
+			expect(loggedOutput()).toContain('No issues were auto-fixable');
+		});
+
+		it('does not attempt to auto-fix checks that are not marked autoFixable', async () => {
+			mockRunAllChecks.mockResolvedValue([{ autoFixable: false, message: 'not fixable', status: 'fail' }]);
+
+			await runCommand(makeProgram(), ['doctor', '--fix']);
+
+			expect(mockAutoFix).not.toHaveBeenCalled();
+		});
 	});
 });

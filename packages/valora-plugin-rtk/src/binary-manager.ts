@@ -52,6 +52,8 @@ export class RtkBinaryManagerImpl implements RtkBinaryManager {
 		this.installUrl = options.installUrl ?? process.env['VALORA_PLUGIN_RTK_INSTALL_URL'] ?? DEFAULT_INSTALL_URL;
 		this.installSha256 =
 			options.installSha256 ?? process.env['VALORA_PLUGIN_RTK_INSTALL_SHA256'] ?? DEFAULT_INSTALL_SHA256;
+
+		warnIfInstallScriptOverridden();
 	}
 
 	async ensureInstalled(): Promise<void> {
@@ -63,11 +65,11 @@ export class RtkBinaryManagerImpl implements RtkBinaryManager {
 		try {
 			const script = await this.downloadScript(this.installUrl);
 			this.verifyIntegrity(script);
-			const tmpFile = writeScriptToTempFile(script);
+			const { tmpDir, tmpFile } = writeScriptToTempFile(script);
 			try {
 				await this.executeScript(tmpFile);
 			} finally {
-				fs.rmSync(tmpFile, { force: true });
+				fs.rmSync(tmpDir, { force: true, recursive: true });
 			}
 		} catch (err) {
 			throw new RtkInstallError(err);
@@ -115,8 +117,37 @@ async function defaultExecuteScript(scriptPath: string): Promise<unknown> {
 	return execFileAsync('sh', [scriptPath]);
 }
 
-function writeScriptToTempFile(script: string): string {
-	const tmpFile = path.join(os.tmpdir(), `rtk-install-${process.pid.toString()}-${Date.now().toString()}.sh`);
+/**
+ * Anyone who can set process env (a compromised .env, a poisoned CI
+ * environment) can point the installer at an arbitrary script with a
+ * matching hash, fully defeating the commit-pinned integrity check.
+ * Make an active override loud rather than silent.
+ */
+function warnIfInstallScriptOverridden(): void {
+	if (
+		process.env['VALORA_PLUGIN_RTK_INSTALL_URL'] === undefined &&
+		process.env['VALORA_PLUGIN_RTK_INSTALL_SHA256'] === undefined
+	) {
+		return;
+	}
+	console.warn(
+		'[valora-plugin-rtk] Install script URL/SHA256 overridden via VALORA_PLUGIN_RTK_INSTALL_URL/' +
+			'VALORA_PLUGIN_RTK_INSTALL_SHA256 — this bypasses the commit-pinned integrity check. ' +
+			'Only expected for private-mirror testing.'
+	);
+}
+
+/**
+ * A pid+timestamp filename directly in the shared `os.tmpdir()` is
+ * predictable and opened non-exclusively — on a multi-tenant filesystem,
+ * another local process can pre-plant a symlink at the guessed path before
+ * this runs, causing the write to follow it and clobber whatever it points
+ * to. `mkdtempSync` creates a fresh, cryptographically-random directory that
+ * can't be guessed in advance, closing that race.
+ */
+function writeScriptToTempFile(script: string): { tmpDir: string; tmpFile: string } {
+	const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'rtk-install-'));
+	const tmpFile = path.join(tmpDir, 'install.sh');
 	fs.writeFileSync(tmpFile, script, { mode: 0o700 });
-	return tmpFile;
+	return { tmpDir, tmpFile };
 }

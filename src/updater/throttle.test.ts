@@ -6,11 +6,12 @@ const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 function baseState(lastCheckAt: string): UpdateCheckState {
 	return {
-		schemaVersion: 1,
+		schemaVersion: 2,
 		lastCheckAt,
 		lastSuccessAt: null,
 		latestVersion: null,
 		latestVersionFetchedAt: null,
+		plugins: {},
 		remindedForVersion: null,
 		installedVersionAtCheck: null
 	};

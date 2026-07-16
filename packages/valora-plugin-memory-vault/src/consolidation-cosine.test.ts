@@ -33,6 +33,7 @@ import { resolveEmbedder } from './embeddings/resolve-embedder';
 import { openVectorStore } from './embeddings/vector-store';
 import { runAutoMigrationIfNeeded } from './migration/auto-migrate';
 import { getDefaultVaultDir } from './vault/default-vault-dir';
+import { resetSigningKeyPathForTests, setSigningKeyPathForTests, signProvenance } from './vault/provenance';
 import { VaultStore } from './vault/vault-store';
 
 function stubEmbedder(): EmbedderPort {
@@ -46,14 +47,19 @@ function stubEmbedder(): EmbedderPort {
 describe('MemoryConsolidationService — cosine clustering', () => {
 	let tmpDir: string;
 	let vaultStore: VaultStore;
+	let signingKeyDir: string;
 
 	beforeEach(() => {
 		tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'valora-consolidate-'));
 		vaultStore = new VaultStore(tmpDir);
+		signingKeyDir = fs.mkdtempSync(path.join(os.tmpdir(), 'valora-consolidate-signing-'));
+		setSigningKeyPathForTests(path.join(signingKeyDir, 'vault-signing.key'));
 	});
 
 	afterEach(() => {
 		fs.rmSync(tmpDir, { force: true, recursive: true });
+		resetSigningKeyPathForTests();
+		fs.rmSync(signingKeyDir, { force: true, recursive: true });
 	});
 
 	it('falls back to Jaccard merge when no embedder is configured', async () => {
@@ -170,11 +176,19 @@ describe('MemoryConsolidationService — cosine clustering', () => {
 	});
 });
 
+/**
+ * Builds an episodic entry and signs it as `MemoryManager.create()` would.
+ * These tests write directly via `vaultStore.appendEntry`, bypassing the
+ * manager — without a valid signature, `file-format.ts` would mark the
+ * entry `trusted: false` on read-back, and consolidation now excludes
+ * untrusted entries from clustering/promotion (provenance-laundering fix).
+ */
 function makeEpisodic(id: string, content: string, tags: string[]) {
 	const now = new Date().toISOString();
+	const agentRole = 'lead';
 	return {
 		accessCount: 0,
-		agentRole: 'lead',
+		agentRole,
 		category: 'episodic' as const,
 		confidence: 'observed' as const,
 		content,
@@ -183,6 +197,7 @@ function makeEpisodic(id: string, content: string, tags: string[]) {
 		id,
 		isError: false,
 		lastAccessedAt: now,
+		provenanceSignature: signProvenance(content, agentRole, now),
 		relatedPaths: [],
 		sessionId: 'ses-1',
 		source: { command: 'test' },

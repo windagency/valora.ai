@@ -45,6 +45,26 @@ type PersistedBaselines = Record<string, PersistedBaseline>;
 
 const DEFAULT_BASELINE_FILENAME = 'mcp-baselines.json';
 
+/**
+ * `checkIntegrity`'s fingerprints share the same underlying store as
+ * `checkContentIntegrity`'s caller-chosen ids (e.g. `plugin:<name>`,
+ * `mcp-connection:<serverId>`). Since MCP server ids carry no character
+ * restriction, a server literally named e.g. `mcp-connection:foo` would
+ * otherwise collide with the content-integrity entry for a different server
+ * actually named `foo`. Namespacing this side only keeps both key spaces
+ * disjoint regardless of what a caller-chosen id or a server id contains.
+ */
+const TOOL_LIST_KEY_PREFIX = 'tool-list:';
+
+/**
+ * Every prefix `checkContentIntegrity` callers actually use today. Any
+ * persisted key matching neither this list nor `TOOL_LIST_KEY_PREFIX` must be
+ * a legacy bare-serverId key from before the tool-list namespace existed —
+ * migrated on load so pre-existing baselines keep detecting drift instead of
+ * silently vanishing and re-seeding from whatever is currently running.
+ */
+const KNOWN_CONTENT_KEY_PREFIXES = ['plugin:', 'mcp-connection:'];
+
 export class ToolIntegrityMonitor {
 	private baselineFilePath: string;
 	private events: SecurityEvent[] = [];
@@ -77,10 +97,11 @@ export class ToolIntegrityMonitor {
 	 */
 	checkIntegrity(serverId: string, currentTools: ExternalMCPTool[]): IntegrityCheckResult {
 		const currentFingerprint = this.computeFingerprint(currentTools);
-		const previousFingerprint = this.fingerprints.get(serverId);
+		const key = `${TOOL_LIST_KEY_PREFIX}${serverId}`;
+		const previousFingerprint = this.fingerprints.get(key);
 
 		if (previousFingerprint === undefined) {
-			this.fingerprints.set(serverId, currentFingerprint);
+			this.fingerprints.set(key, currentFingerprint);
 			this.storeToolSnapshot(serverId, currentTools);
 			this.persistToDisk();
 			return { changed: false, currentFingerprint };
@@ -94,11 +115,39 @@ export class ToolIntegrityMonitor {
 
 		this.logEvent(serverId, previousFingerprint, currentFingerprint, diff);
 
-		this.fingerprints.set(serverId, currentFingerprint);
+		this.fingerprints.set(key, currentFingerprint);
 		this.storeToolSnapshot(serverId, currentTools);
 		this.persistToDisk();
 
 		return { changed: true, currentFingerprint, diff, previousFingerprint };
+	}
+
+	/**
+	 * Check integrity of arbitrary content identified by a generic id — used
+	 * for plugin rug-pull detection (fingerprinting a plugin's manifest +
+	 * code entrypoint), reusing the same baseline store as MCP tool-set
+	 * fingerprinting. Unlike {@link checkIntegrity}, there is no per-item
+	 * diff — plugin content is treated as a single opaque blob.
+	 */
+	checkContentIntegrity(id: string, content: string): IntegrityCheckResult {
+		const currentFingerprint = createHash('sha256').update(content).digest('hex');
+		const previousFingerprint = this.fingerprints.get(id);
+
+		if (previousFingerprint === undefined) {
+			this.fingerprints.set(id, currentFingerprint);
+			this.persistToDisk();
+			return { changed: false, currentFingerprint };
+		}
+
+		if (currentFingerprint === previousFingerprint) {
+			return { changed: false, currentFingerprint, previousFingerprint };
+		}
+
+		this.logContentChangeEvent(id, previousFingerprint, currentFingerprint);
+		this.fingerprints.set(id, currentFingerprint);
+		this.persistToDisk();
+
+		return { changed: true, currentFingerprint, previousFingerprint };
 	}
 
 	/**
@@ -142,15 +191,36 @@ export class ToolIntegrityMonitor {
 		try {
 			const raw = readFileSync(this.baselineFilePath, 'utf8');
 			const parsed = JSON.parse(raw) as PersistedBaselines;
-			for (const [serverId, baseline] of Object.entries(parsed)) {
+			for (const [rawKey, baseline] of Object.entries(parsed)) {
 				if (typeof baseline?.fingerprint !== 'string' || typeof baseline.snapshot !== 'object') continue;
-				this.fingerprints.set(serverId, baseline.fingerprint);
-				this.toolSnapshots.set(serverId, new Map(Object.entries(baseline.snapshot)));
+				const hasNonEmptySnapshot = Object.keys(baseline.snapshot).length > 0;
+				const key = this.migrateLegacyKey(rawKey, hasNonEmptySnapshot);
+				this.fingerprints.set(key, baseline.fingerprint);
+				this.toolSnapshots.set(key, new Map(Object.entries(baseline.snapshot)));
 			}
 		} catch {
 			// Treat any read or parse failure as a missing baseline; the next
 			// successful checkIntegrity will rewrite the file.
 		}
+	}
+
+	/**
+	 * A key string alone can't always disambiguate "legacy bare serverId" from
+	 * "already-migrated content key" — MCP server ids carry no character
+	 * restriction, so a legacy key could itself literally be `plugin:foo`.
+	 * `hasNonEmptySnapshot` is a reliable structural tiebreaker:
+	 * `checkContentIntegrity` never touches `toolSnapshots` at all, so its
+	 * persisted snapshot is always `{}` — a non-empty snapshot can only have
+	 * come from `checkIntegrity`, regardless of what the key string looks
+	 * like. The remaining, unresolvable edge case (a legacy server with
+	 * literally zero tools whose id happens to be prefix-shaped) is narrow
+	 * enough to accept as a documented limitation rather than solve.
+	 */
+	private migrateLegacyKey(key: string, hasNonEmptySnapshot: boolean): string {
+		if (key.startsWith(TOOL_LIST_KEY_PREFIX)) return key;
+		const looksLikeContentKey = KNOWN_CONTENT_KEY_PREFIXES.some((prefix) => key.startsWith(prefix));
+		if (looksLikeContentKey && !hasNonEmptySnapshot) return key;
+		return `${TOOL_LIST_KEY_PREFIX}${key}`;
 	}
 
 	private persistToDisk(): void {
@@ -190,14 +260,14 @@ export class ToolIntegrityMonitor {
 				.digest('hex');
 			snapshot.set(tool.name, hash);
 		}
-		this.toolSnapshots.set(serverId, snapshot);
+		this.toolSnapshots.set(`${TOOL_LIST_KEY_PREFIX}${serverId}`, snapshot);
 	}
 
 	/**
 	 * Compute which tools were added, removed, or changed.
 	 */
 	private computeDiff(serverId: string, currentTools: ExternalMCPTool[]): ToolSetDiff {
-		const previousSnapshot = this.toolSnapshots.get(serverId) ?? new Map<string, string>();
+		const previousSnapshot = this.toolSnapshots.get(`${TOOL_LIST_KEY_PREFIX}${serverId}`) ?? new Map<string, string>();
 		const currentSnapshot = new Map<string, string>();
 
 		for (const tool of currentTools) {
@@ -226,6 +296,19 @@ export class ToolIntegrityMonitor {
 		}
 
 		return { added, changed, removed };
+	}
+
+	private logContentChangeEvent(id: string, previousFingerprint: string, currentFingerprint: string): void {
+		const event = createSecurityEvent('plugin_code_changed', 'critical', {
+			currentFingerprint,
+			id,
+			previousFingerprint
+		});
+		this.events.push(event);
+		getAuditSink().append(event);
+
+		const logger = getLogger();
+		logger.warn(`[Security] Plugin content changed for ${id}`, { currentFingerprint, previousFingerprint });
 	}
 
 	private logEvent(serverId: string, previousFingerprint: string, currentFingerprint: string, diff: ToolSetDiff): void {

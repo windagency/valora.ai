@@ -1,5 +1,5 @@
 ---
-updated: 2026-05-07
+updated: 2026-07-09
 ---
 
 # Command Reference
@@ -1181,6 +1181,12 @@ valora monitoring usage optimize
 valora monitoring usage optimize --since-days 14
 valora monitoring usage optimize --min-savings 0.01
 
+# Empirical calibration: does escalation confidence correlate with human decisions?
+valora monitoring confidence-report
+valora monitoring confidence-report --format markdown --output confidence-report.md
+valora monitoring confidence-report --since 2026-06-01
+valora monitoring confidence-report --stage plan.assess-risks
+
 # Reset all in-process metrics
 valora monitoring reset
 ```
@@ -1224,6 +1230,47 @@ valora monitoring reset
 | --------------------- | -------------------------------------------------------- | ------- |
 | `--since-days <n>`    | Analyse last N days of spending history                  | `30`    |
 | `--min-savings <usd>` | Show only findings with estimated savings above this USD | `0`     |
+
+**`monitoring confidence-report` flags:**
+
+| Flag              | Description                                   | Default |
+| ----------------- | --------------------------------------------- | ------- |
+| `--since <date>`  | Filter records on or after this ISO 8601 date | —       |
+| `--stage <name>`  | Filter to a single stage                      | —       |
+| `--format <fmt>`  | Output format: `table`, `json`, or `markdown` | `table` |
+| `--output <path>` | Write report to file instead of stdout        | —       |
+
+<details>
+<summary><strong>Confidence calibration ledger format and example output</strong></summary>
+
+The ledger is stored as append-only JSONL at `.valora/escalations.jsonl`. Each record captures the escalation's self-reported confidence, risk level, and which criteria triggered it, merged with the human's actual decision (`abort`/`modify`/`proceed`) once known. Free-text model reasoning is deliberately not persisted — only bounded, structured fields.
+
+The report buckets escalations by confidence range and shows the decision breakdown within each bucket — the empirical answer to whether confidence correlates with what a human actually decided. A well-calibrated system shows aborts/modifies concentrated in low buckets; a high-confidence bucket with a meaningful abort rate is measured evidence of overconfidence.
+
+```
+Confidence Calibration Report
+Period: 2026-06-01T00:00:00.000Z → 2026-07-09T00:00:00.000Z
+Total escalations: 42
+
+📊 By confidence bucket
+══════════════════════════════════════════════════════════════════
+  Bucket      Total   Abort  Modify  Proceed
+  ──────────────────────────────────────────────
+  <50            12       9       2        1
+  50-69           9       4       3        2
+  70-79           8       1       2        5
+  80-89           7       1       0        6
+  90-100          6       0       0        6
+
+🎯 By triggered criterion
+══════════════════════════════════════════════════════════════════
+    18  (none — plain confidence/risk threshold)
+    12  self_consistency_disagreement
+     8  execution_telemetry_mismatch
+     4  missing_escalation_block
+```
+
+</details>
 
 <details>
 <summary><strong>Spending ledger format and example output</strong></summary>

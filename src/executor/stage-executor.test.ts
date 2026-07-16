@@ -6,6 +6,7 @@ import {
 	compressMessageHistory,
 	DEFAULT_FAILURE_POLICY,
 	djb2,
+	estimateStageCallCostUsd,
 	isToolBlockedResult,
 	isToolLoopSpinning,
 	resolveModelOverride
@@ -234,6 +235,21 @@ describe('isToolLoopSpinning', () => {
 });
 
 // ── resolveModelOverride ──────────────────────────────────────────────────────
+
+// ── estimateStageCallCostUsd ──────────────────────────────────────────────────
+
+describe('estimateStageCallCostUsd', () => {
+	it("returns a non-zero estimate for a non-trivial prompt — the budget circuit-breaker must predict the imminent call's cost, not just detect spend already exceeded from prior calls", () => {
+		const cost = estimateStageCallCostUsd('a'.repeat(4000), 'b'.repeat(4000), 'unknown-model');
+		expect(cost).toBeGreaterThan(0);
+	});
+
+	it('scales with prompt length', () => {
+		const small = estimateStageCallCostUsd('short', 'short', 'unknown-model');
+		const large = estimateStageCallCostUsd('a'.repeat(40_000), 'b'.repeat(40_000), 'unknown-model');
+		expect(large).toBeGreaterThan(small);
+	});
+});
 
 describe('resolveModelOverride', () => {
 	it('returns the stage model when set, ignoring the flag model', () => {

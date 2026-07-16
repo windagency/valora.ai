@@ -27,6 +27,7 @@ export class SessionBudgetService {
 	buildBudgetEscalationSignal(spentUsd: number, limitUsd: number, stageName: string): EscalationSignal {
 		return {
 			confidence: 100,
+			confidenceSource: 'defaulted',
 			proposed_action: `Halt stage '${stageName}' — session budget exhausted (spent $${spentUsd.toFixed(4)} of $${limitUsd.toFixed(4)} limit)`,
 			reasoning: 'The configured session budget has been reached. Human review is required before proceeding.',
 			requires_escalation: true,
@@ -49,18 +50,30 @@ export class SessionBudgetService {
 	wouldExceed(sessionId: string, estimate: BudgetEstimate): boolean {
 		if (!this.budgetConfig) return false;
 
-		const { per_session_usd: perSessionUsd, per_stage_tokens: perStageTokens } = this.budgetConfig;
+		return (
+			this.exceedsStageTokenLimit(estimate) ||
+			this.exceedsPerCommandLimit(estimate) ||
+			this.exceedsPerSessionLimit(sessionId, estimate)
+		);
+	}
 
-		if (perStageTokens !== undefined && estimate.estimatedTokens !== undefined) {
-			if (estimate.estimatedTokens > perStageTokens) return true;
-		}
+	private exceedsPerCommandLimit(estimate: BudgetEstimate): boolean {
+		const perCommandUsd = this.budgetConfig?.per_command_usd;
+		if (perCommandUsd === undefined || estimate.estimatedCostUsd === undefined) return false;
+		return estimate.estimatedCostUsd > perCommandUsd;
+	}
 
-		if (perSessionUsd !== undefined && estimate.estimatedCostUsd !== undefined) {
-			const { totalCostUsd } = this.getSessionTotal(sessionId);
-			if (totalCostUsd + estimate.estimatedCostUsd > perSessionUsd) return true;
-		}
+	private exceedsPerSessionLimit(sessionId: string, estimate: BudgetEstimate): boolean {
+		const perSessionUsd = this.budgetConfig?.per_session_usd;
+		if (perSessionUsd === undefined || estimate.estimatedCostUsd === undefined) return false;
+		const { totalCostUsd } = this.getSessionTotal(sessionId);
+		return totalCostUsd + estimate.estimatedCostUsd > perSessionUsd;
+	}
 
-		return false;
+	private exceedsStageTokenLimit(estimate: BudgetEstimate): boolean {
+		const perStageTokens = this.budgetConfig?.per_stage_tokens;
+		if (perStageTokens === undefined || estimate.estimatedTokens === undefined) return false;
+		return estimate.estimatedTokens > perStageTokens;
 	}
 }
 

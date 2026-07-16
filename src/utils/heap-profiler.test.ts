@@ -50,7 +50,7 @@ describe('HeapProfiler', () => {
 		});
 
 		expect(mockExistsSync).toHaveBeenCalledWith('/tmp');
-		expect(mockWriteHeapSnapshot).toHaveBeenCalled();
+		expect(mockWriteHeapSnapshot).toHaveBeenCalledWith(expect.stringMatching(/^\/tmp\/test-.+-123456\.heapsnapshot$/));
 		expect(result).toBe('/path/to/snapshot.heapsnapshot');
 	});
 
@@ -131,6 +131,7 @@ describe('createHeapSnapshot helper', () => {
 
 		createHeapSnapshot();
 
-		expect(spy).toHaveBeenCalled();
+		expect(spy).toHaveBeenCalledTimes(1);
+		expect(spy).toHaveBeenCalledWith(undefined);
 	});
 });

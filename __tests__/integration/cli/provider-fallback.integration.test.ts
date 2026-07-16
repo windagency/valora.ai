@@ -1,15 +1,23 @@
 /**
  * Integration tests for Provider Fallback Flow
  *
- * Uses real CommandLoader, CLIProviderResolver, ProviderFallbackService, and CommandResolver.
- * Only system boundaries are mocked: file I/O (utils/file-utils), config loader, and logger.
+ * Uses real CommandLoader, CLIProviderResolver, ProviderFallbackService, CommandResolver,
+ * and ConfigLoader against real temp files on disk. Only `output/logger` (a true infra
+ * boundary with no assertable behavior) and `utils/paths`'s global/project config directory
+ * resolution (redirected to nonexistent paths, so the test never depends on or reads the
+ * real machine's/project's ambient ~/.valora or .valora config) are mocked.
  */
 
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { getConfigLoader } from 'config/loader';
 import { BuiltinProviders } from 'config/providers.config';
 import { CommandLoader } from 'executor/command-loader';
-import { fileExists, readFile } from 'utils/file-utils';
+import { getResourceResolver, resetResourceResolver } from 'utils/resource-resolver';
 
 import { CommandResolver } from 'cli/command-resolver';
 import { ResolutionPath } from 'cli/provider-fallback-service';
@@ -17,11 +25,6 @@ import { CLIProviderResolver } from 'cli/provider-resolver';
 
 // Import providers to trigger self-registration with the LLM registry
 import 'llm/providers';
-
-// --- Mutable config controlled per test ---
-let mockProviderConfig: { providers: Record<string, unknown> } = { providers: {} };
-
-// --- System boundary mocks ---
 
 vi.mock('output/logger', () => ({
 	getLogger: () => ({
@@ -33,23 +36,43 @@ vi.mock('output/logger', () => ({
 	})
 }));
 
-vi.mock('config/loader', () => ({
-	getConfigLoader: () => ({
-		get: () => mockProviderConfig,
-		load: () => Promise.resolve(mockProviderConfig)
-	})
-}));
-
-vi.mock('utils/file-utils', async (importOriginal) => {
-	const actual = await importOriginal<typeof import('utils/file-utils')>();
+// Real ConfigLoader still merges a global (~/.valora/config.json) and project (.valora/config.json)
+// layer on top of the explicit package-level path given to getConfigLoader() below — redirect both
+// to nonexistent directories so the test's provider config is exactly what each test writes, never
+// whatever happens to exist on the machine running the suite.
+vi.mock('utils/paths', async (importOriginal) => {
+	const actual = await importOriginal<typeof import('utils/paths')>();
 	return {
 		...actual,
-		fileExists: vi.fn().mockReturnValue(true),
-		readFile: vi.fn().mockResolvedValue(makeCommandMarkdown('claude-sonnet-4.5'))
+		getGlobalConfigDir: () => '/nonexistent-global-config-dir',
+		getProjectConfigDir: () => null
 	};
 });
 
-function makeCommandMarkdown(model: string): string {
+// Every env var `ConfigLoader.loadProvidersFromEnv()` reads — must be cleared per test so
+// resolution only ever depends on what each test explicitly writes to the real config file,
+// never on whatever happens to be set in the environment running the suite (e.g. this
+// devcontainer sets a real LOCAL_BASE_URL, which would otherwise silently inject a 'local'
+// provider and change which provider auto-migration selects).
+const PROVIDER_ENV_KEYS = [
+	'ANTHROPIC_API_KEY',
+	'ANTHROPIC_DEFAULT_MODEL',
+	'ANTHROPIC_VERTEX_PROJECT_ID',
+	'CLAUDE_CODE_USE_VERTEX',
+	'CLOUD_ML_REGION',
+	'GOOGLE_API_KEY',
+	'GOOGLE_DEFAULT_MODEL',
+	'LOCAL_BASE_URL',
+	'LOCAL_DEFAULT_MODEL',
+	'MOONSHOT_API_KEY',
+	'MOONSHOT_DEFAULT_MODEL',
+	'OPENAI_API_KEY',
+	'OPENAI_DEFAULT_MODEL',
+	'XAI_API_KEY',
+	'XAI_DEFAULT_MODEL'
+] as const;
+
+function commandMarkdown(model: string): string {
 	return `---
 name: test
 description: Test command for integration tests
@@ -65,28 +88,62 @@ Test command content.
 }
 
 describe('Provider Fallback Integration Tests', () => {
+	let commandsDir: string;
+	let configDir: string;
+	let configPath: string;
+	let commandFilePath: string;
 	let commandLoader: CommandLoader;
 	let providerResolver: CLIProviderResolver;
 	let commandResolver: CommandResolver;
 
-	beforeEach(() => {
-		vi.clearAllMocks();
-		mockProviderConfig = { providers: {} };
-		// Return command markdown for command .md files; throw for anything else (e.g. templates)
-		// so CursorProvider's formatGuidedPrompt activates its inline fallback format.
-		vi.mocked(readFile).mockImplementation(async (filePath: string) => {
-			if (String(filePath).endsWith('test.md')) return makeCommandMarkdown('claude-sonnet-4.5');
-			throw new Error(`readFile: unexpected path in test: ${filePath}`);
-		});
-		vi.mocked(fileExists).mockReturnValue(true);
+	beforeAll(() => {
+		commandsDir = mkdtempSync(join(tmpdir(), 'valora-provider-fallback-commands-'));
+		configDir = mkdtempSync(join(tmpdir(), 'valora-provider-fallback-config-'));
+		configPath = join(configDir, 'config.json');
+		commandFilePath = join(commandsDir, 'test.md');
 
-		commandLoader = new CommandLoader();
+		// Registers commandsDir as an allowed command-discovery root (command-discovery's
+		// validateCommandsDirectory() rejects any directory outside the package data dir,
+		// project config dir, or a registered plugin dir).
+		getResourceResolver().registerPluginDir(commandsDir);
+
+		writeFileSync(configPath, JSON.stringify({ providers: {} }), 'utf8');
+		// Establishes the ConfigLoader singleton pointed at our real temp config file — only the
+		// first call's path takes effect (getConfigLoader caches), so this must run once, here.
+		getConfigLoader(configPath);
+	});
+
+	afterAll(() => {
+		resetResourceResolver();
+		rmSync(commandsDir, { recursive: true, force: true });
+		rmSync(configDir, { recursive: true, force: true });
+	});
+
+	async function setProviderConfig(config: { providers: Record<string, unknown> }): Promise<void> {
+		writeFileSync(configPath, JSON.stringify(config), 'utf8');
+		await getConfigLoader().reload();
+	}
+
+	let savedProviderEnv: Record<string, string | undefined>;
+
+	beforeEach(async () => {
+		savedProviderEnv = Object.fromEntries(PROVIDER_ENV_KEYS.map((key) => [key, process.env[key]]));
+		for (const key of PROVIDER_ENV_KEYS) delete process.env[key];
+
+		writeFileSync(commandFilePath, commandMarkdown('claude-sonnet-4.5'), 'utf8');
+		await setProviderConfig({ providers: {} });
+
+		commandLoader = new CommandLoader(commandsDir);
 		providerResolver = new CLIProviderResolver();
 		commandResolver = new CommandResolver(commandLoader, providerResolver);
 	});
 
 	afterEach(() => {
 		delete process.env['AI_MCP_ENABLED'];
+		for (const key of PROVIDER_ENV_KEYS) {
+			if (savedProviderEnv[key] === undefined) delete process.env[key];
+			else process.env[key] = savedProviderEnv[key];
+		}
 	});
 
 	describe('MCP Context → Guided Completion (No API Keys)', () => {
@@ -97,7 +154,7 @@ describe('Provider Fallback Integration Tests', () => {
 
 			expect(result.providerName).toBe('cursor-guided');
 			expect(result.resolutionPath).toBe(ResolutionPath.GUIDED);
-			expect(result.provider).toBeDefined();
+			expect(result.provider.name).toBe(BuiltinProviders.CURSOR);
 		});
 
 		it('should load and return the real command definition', async () => {
@@ -105,7 +162,7 @@ describe('Provider Fallback Integration Tests', () => {
 
 			const result = await commandResolver.resolveCommand('test', { args: [], flags: {} });
 
-			// Proves CommandLoader parsed the real mock markdown rather than receiving a pre-built object
+			// Proves CommandLoader parsed the real command markdown file from disk
 			expect(result.command.name).toBe('test');
 			expect(result.command.description).toBe('Test command for integration tests');
 			expect(result.command.agent).toBe('tech-lead');
@@ -125,17 +182,17 @@ describe('Provider Fallback Integration Tests', () => {
 	describe('MCP Context → API Fallback (Anthropic)', () => {
 		it('should fall back to Anthropic when an API key is configured', async () => {
 			process.env['AI_MCP_ENABLED'] = 'true';
-			mockProviderConfig = {
+			await setProviderConfig({
 				providers: {
 					anthropic: { apiKey: 'sk-ant-test-key', default_model: 'claude-sonnet-4.5' }
 				}
-			};
+			});
 
 			const result = await commandResolver.resolveCommand('test', { args: [], flags: {} });
 
 			expect(result.providerName).toBe(BuiltinProviders.ANTHROPIC);
 			expect(result.resolutionPath).toBe(ResolutionPath.API_FALLBACK);
-			expect(result.provider).toBeDefined();
+			expect(result.provider.name).toBe(BuiltinProviders.ANTHROPIC);
 		});
 	});
 
@@ -143,12 +200,12 @@ describe('Provider Fallback Integration Tests', () => {
 		it('should fall back to OpenAI when only OpenAI is configured', async () => {
 			process.env['AI_MCP_ENABLED'] = 'true';
 			// Command uses a GPT model so OpenAI's validateModel accepts it
-			vi.mocked(readFile).mockResolvedValue(makeCommandMarkdown('gpt-4'));
-			mockProviderConfig = {
+			writeFileSync(commandFilePath, commandMarkdown('gpt-4'), 'utf8');
+			await setProviderConfig({
 				providers: {
 					openai: { apiKey: 'sk-openai-test-key', default_model: 'gpt-4' }
 				}
-			};
+			});
 
 			const result = await commandResolver.resolveCommand('test', { args: [], flags: {} });
 
@@ -158,12 +215,12 @@ describe('Provider Fallback Integration Tests', () => {
 
 		it('should prefer Anthropic over OpenAI when both are configured', async () => {
 			process.env['AI_MCP_ENABLED'] = 'true';
-			mockProviderConfig = {
+			await setProviderConfig({
 				providers: {
 					anthropic: { apiKey: 'sk-ant-key', default_model: 'claude-sonnet-4.5' },
 					openai: { apiKey: 'sk-openai-key', default_model: 'gpt-4' }
 				}
-			};
+			});
 
 			const result = await commandResolver.resolveCommand('test', { args: [], flags: {} });
 
@@ -175,11 +232,11 @@ describe('Provider Fallback Integration Tests', () => {
 	describe('Non-MCP Context (Traditional Provider Resolution)', () => {
 		it('should resolve provider from model name when not in MCP context', async () => {
 			process.env['AI_MCP_ENABLED'] = 'false';
-			mockProviderConfig = {
+			await setProviderConfig({
 				providers: {
 					anthropic: { apiKey: 'sk-ant-direct', default_model: 'claude-sonnet-4.5' }
 				}
-			};
+			});
 
 			const result = await commandResolver.resolveCommand('test', { args: [], flags: {} });
 
@@ -192,12 +249,12 @@ describe('Provider Fallback Integration Tests', () => {
 	describe('Explicit Provider Override', () => {
 		it('should use the explicitly requested provider over cursor auto-selection', async () => {
 			process.env['AI_MCP_ENABLED'] = 'true';
-			vi.mocked(readFile).mockResolvedValue(makeCommandMarkdown('gpt-4'));
-			mockProviderConfig = {
+			writeFileSync(commandFilePath, commandMarkdown('gpt-4'), 'utf8');
+			await setProviderConfig({
 				providers: {
 					openai: { apiKey: 'sk-openai-explicit', default_model: 'gpt-4' }
 				}
-			};
+			});
 
 			// --provider=openai bypasses cursor auto-selection in MCP context
 			const result = await commandResolver.resolveCommand('test', {
@@ -219,7 +276,7 @@ describe('Provider Fallback Integration Tests', () => {
 		});
 
 		it('should throw when the command file cannot be loaded', async () => {
-			vi.mocked(readFile).mockRejectedValue(new Error('ENOENT: file not found'));
+			rmSync(commandFilePath, { force: true });
 
 			await expect(commandResolver.resolveCommand('test', { args: [], flags: {} })).rejects.toThrow(
 				'Failed to load command: test'

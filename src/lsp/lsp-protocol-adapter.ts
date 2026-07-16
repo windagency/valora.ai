@@ -20,6 +20,8 @@ import {
 	StreamMessageWriter
 } from 'vscode-languageserver-protocol/node';
 
+import { getLogger } from 'output/logger';
+
 import type { LSPProtocolAdapter, LSPProtocolConnection } from './lsp-protocol-adapter.interface';
 
 /**
@@ -65,7 +67,24 @@ class VSCodeProtocolConnection implements LSPProtocolConnection {
 	}
 
 	sendNotification(method: string, params?: unknown): void {
-		void this.connection.sendNotification(method, params);
+		// The underlying connection can fail two different ways: reject the
+		// returned promise (e.g. the transport write fails), or throw
+		// synchronously before returning anything at all (vscode-jsonrpc does
+		// this via throwIfClosedOrDisposed when the connection is already
+		// closed/disposed — e.g. the remote process has already exited). Both
+		// must be swallowed-and-logged the same way; a `.catch()` alone only
+		// covers the first.
+		try {
+			this.connection.sendNotification(method, params).catch((error: unknown) => {
+				getLogger().warn(`LSP notification failed: ${method}`, {
+					error: error instanceof Error ? error.message : String(error)
+				});
+			});
+		} catch (error) {
+			getLogger().warn(`LSP notification failed: ${method}`, {
+				error: error instanceof Error ? error.message : String(error)
+			});
+		}
 	}
 
 	async sendRequest(method: string, params?: unknown): Promise<unknown> {

@@ -247,10 +247,28 @@ export function configureExecCommand(program: CommandAdapter): void {
 	program
 		.command('exec <command> [args...]')
 		.description('Execute a specific command')
+		.option('--session-id <id>', 'Resume or use specific session')
+		.option('--log-level <level>', 'Set log level (debug, info, warn, error)')
+		.option('--interactive', 'Run in interactive mode')
+		.option('--no-document-output', 'Disable document output to knowledge-base')
+		.option('--document-auto-approve', 'Auto-approve document creation')
+		.option('--document-category <category>', 'Document category (backend, frontend, infrastructure, root)')
+		.option('--document-path <path>', 'Custom output path for document')
+		.option('--stage <stage>', 'Execute only specific stage(s)')
+		.option('--skip-validation', 'Skip pipeline validation')
+		.option('--mock-inputs <json>', 'Provide mock inputs as JSON', (value: string) => JSON.parse(value) as unknown)
+		.option('--force-required', 'Override stage requirements')
 		.action(async (...rawArgs: Array<Record<string, unknown>>) => {
 			const commandName = rawArgs[0] as unknown as string;
 			const args = rawArgs[1] as unknown as string[];
-			const options = rawArgs[2] as unknown as ExecCommandOptions;
+			const options = rawArgs[2] as unknown as ExecCommandOptions & { documentOutput?: boolean };
+			// Commander's built-in negation convention maps --no-document-output to
+			// `documentOutput: false`, not `noDocumentOutput` — bridge it here rather
+			// than changing the ExecCommandOptions/ShortcutCommandOptions contract
+			// shared with buildDocumentOutputOptions().
+			if (options.documentOutput === false) {
+				options.noDocumentOutput = true;
+			}
 			const color = getColorAdapter();
 			try {
 				// Check if config exists, run setup if not (respecting interactive mode)
@@ -549,7 +567,7 @@ export function configureRolloutCommand(program: CommandAdapter): void {
 		.command('rollout')
 		.description('Monitor dynamic agent selection rollout status and analytics')
 		.option('--status', 'Show current rollout status and feature flags')
-		.option('--analytics <hours>', 'Show agent selection analytics for last N hours', '24')
+		.option('--analytics <hours>', 'Show agent selection analytics for the last N hours')
 		.option('--metrics', 'Show success metrics for rollout evaluation')
 		.option('--export <file>', 'Export analytics data to JSON file')
 		.action(async (options: RolloutCommandOptions) => {

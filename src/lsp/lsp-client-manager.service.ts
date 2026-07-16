@@ -45,6 +45,7 @@ export class LSPClientManagerService {
 		if (existing) {
 			this.touchClient(existing);
 			if (existing.client.getState() === 'ready') {
+				this.resetIdleTimer(existing, key);
 				return existing.client;
 			}
 			// Client exists but not ready — try to restart

@@ -160,6 +160,156 @@ describe('SessionContextManager', () => {
 		});
 	});
 
+	describe('addCommand', () => {
+		it('appends a command to history, sets last_command, and clears current_command', () => {
+			manager.setCurrentCommand('plan');
+			manager.addCommand('plan', ['arg1'], { flag: true }, { result: 'ok' }, true, 100);
+
+			expect(manager.getCommandHistory()).toHaveLength(1);
+			expect(manager.getSession().last_command).toBe('plan');
+			expect(manager.getSession().current_command).toBeUndefined();
+		});
+
+		it('records success, duration, error, and token/optimization/quality metrics on the stored command', () => {
+			manager.addCommand(
+				'implement',
+				[],
+				{},
+				{},
+				false,
+				250,
+				'boom',
+				500,
+				{ tokensSaved: 10 } as never,
+				{
+					score: 0.9
+				} as never
+			);
+
+			const [command] = manager.getCommandHistory();
+			expect(command).toMatchObject({
+				command: 'implement',
+				duration_ms: 250,
+				error: 'boom',
+				success: false,
+				tokens_used: 500
+			});
+		});
+	});
+
+	describe('setCurrentCommand / clearCurrentCommand', () => {
+		it('sets the current command and bumps updated_at', () => {
+			const before = manager.getSession().updated_at;
+			manager.setCurrentCommand('review');
+			expect(manager.getSession().current_command).toBe('review');
+			expect(manager.getSession().updated_at >= before).toBe(true);
+		});
+
+		it('clears the current command without touching updated_at', () => {
+			manager.setCurrentCommand('review');
+			manager.clearCurrentCommand();
+			expect(manager.getSession().current_command).toBeUndefined();
+		});
+	});
+
+	describe('getAllContext', () => {
+		it('returns a snapshot copy of the full context object', () => {
+			manager.updateContext('a', 1);
+			const snapshot = manager.getAllContext();
+			expect(snapshot).toEqual({ a: 1 });
+
+			// Mutating the returned snapshot must not affect the manager's own state.
+			(snapshot as Record<string, unknown>)['a'] = 999;
+			expect(manager.getContext('a')).toBe(1);
+		});
+	});
+
+	describe('getLastCommand / getCommandHistory / getCommandsByName / getSuccessfulCommands / getFailedCommands', () => {
+		beforeEach(() => {
+			manager.addCommand('plan', [], {}, {}, true, 10);
+			manager.addCommand('implement', [], {}, {}, false, 20, 'failed');
+			manager.addCommand('plan', [], {}, {}, true, 30);
+		});
+
+		it('getLastCommand returns null when no commands have run', () => {
+			const fresh = new SessionContextManager(makeSession());
+			expect(fresh.getLastCommand()).toBeNull();
+		});
+
+		it('getLastCommand returns the most recently added command', () => {
+			expect(manager.getLastCommand()?.command).toBe('plan');
+			expect(manager.getLastCommand()?.duration_ms).toBe(30);
+		});
+
+		it('getCommandHistory returns every command in order, as a copy', () => {
+			const history = manager.getCommandHistory();
+			expect(history.map((c) => c.command)).toEqual(['plan', 'implement', 'plan']);
+			history.push({} as never);
+			expect(manager.getCommandHistory()).toHaveLength(3);
+		});
+
+		it('getCommandsByName filters to only matching commands', () => {
+			expect(manager.getCommandsByName('plan')).toHaveLength(2);
+			expect(manager.getCommandsByName('implement')).toHaveLength(1);
+			expect(manager.getCommandsByName('missing')).toHaveLength(0);
+		});
+
+		it('getSuccessfulCommands returns only successful commands', () => {
+			expect(manager.getSuccessfulCommands()).toHaveLength(2);
+			expect(manager.getSuccessfulCommands().every((c) => c.success)).toBe(true);
+		});
+
+		it('getFailedCommands returns only failed commands', () => {
+			expect(manager.getFailedCommands()).toHaveLength(1);
+			expect(manager.getFailedCommands()[0]?.command).toBe('implement');
+		});
+	});
+
+	describe('getStatistics', () => {
+		it('returns all-zero stats when no commands have run', () => {
+			expect(manager.getStatistics()).toEqual({
+				average_duration_ms: 0,
+				failed_commands: 0,
+				successful_commands: 0,
+				total_commands: 0,
+				total_duration_ms: 0
+			});
+		});
+
+		it('computes totals and the average duration across commands', () => {
+			manager.addCommand('plan', [], {}, {}, true, 10);
+			manager.addCommand('implement', [], {}, {}, false, 30);
+
+			expect(manager.getStatistics()).toEqual({
+				average_duration_ms: 20,
+				failed_commands: 1,
+				successful_commands: 1,
+				total_commands: 2,
+				total_duration_ms: 40
+			});
+		});
+	});
+
+	describe('setStatus / getStatus', () => {
+		it('defaults to the session status passed at construction', () => {
+			expect(manager.getStatus()).toBe('active');
+		});
+
+		it('updates and reads back the session status', () => {
+			manager.setStatus('completed');
+			expect(manager.getStatus()).toBe('completed');
+			expect(manager.getSession().status).toBe('completed');
+		});
+	});
+
+	describe('getSession', () => {
+		it('returns the underlying session object, reflecting subsequent mutations', () => {
+			const session = manager.getSession();
+			manager.setStatus('paused');
+			expect(session.status).toBe('paused');
+		});
+	});
+
 	describe('extractContextReferences (static)', () => {
 		it('extracts $CONTEXT_* variable names from a string', () => {
 			const refs = SessionContextManager.extractContextReferences('Hello $CONTEXT_name!');

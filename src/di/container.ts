@@ -12,6 +12,7 @@ import { readFileSync } from 'fs';
 import { MemoryProviderConflictError } from 'memory/registry';
 import { preloadConflictResolutions, resolveProviderConflict } from 'plugins/conflict-resolver';
 import { createPluginAPI, type PluginLifecycleRegistry } from 'plugins/plugin-api.factory';
+import { checkPluginContentDrift } from 'plugins/plugin-installer.service';
 import { PluginLoaderService } from 'plugins/plugin-loader.service';
 import { getCommandGuard } from 'security/command-guard';
 import { getCredentialGuard } from 'security/credential-guard';
@@ -45,6 +46,7 @@ import { MCPApprovalCacheService } from 'mcp/mcp-approval-cache.service';
 import { MCPApprovalWorkflow } from 'mcp/mcp-approval-workflow';
 import { MCPAuditLoggerService } from 'mcp/mcp-audit-logger.service';
 import { MCPClientManagerService, registerGlobalPluginMcpServers } from 'mcp/mcp-client-manager.service';
+import { EXTERNAL_MCP_SERVER_CONFIG_SCHEMA } from 'mcp/mcp-server-config.schema';
 import { MCPRequestHandler } from 'mcp/request-handler';
 import { MCPSamplingServiceImpl } from 'mcp/sampling-service';
 import { MCPToolRegistry } from 'mcp/tool-registry';
@@ -67,6 +69,7 @@ import {
 } from 'services/index';
 import { SessionLifecycle } from 'session/lifecycle';
 import { SessionStore } from 'session/store';
+import { bootstrapEscalationLedger } from 'utils/escalation-ledger-subscriber';
 import { getRateLimiter } from 'utils/rate-limiter';
 
 /**
@@ -251,6 +254,7 @@ export async function initializePlugins(container: DIContainer): Promise<void> {
 	// Load LLM provider SDKs and vault lazily — keeps CLI startup fast for
 	// commands that don't need them (--help, config, session, etc.).
 	await Promise.all([import('llm/providers'), bootstrapMemoryFromConfig()]);
+	bootstrapEscalationLedger();
 
 	const pluginLoader = container.resolve<PluginLoaderService>(SERVICE_IDENTIFIERS.PLUGIN_LOADER);
 
@@ -282,6 +286,9 @@ export async function initializePlugins(container: DIContainer): Promise<void> {
 		if (plugin.agentsDir) agentLoader.registerPluginDir(plugin.agentsDir);
 		if (plugin.commandsDir) commandLoader.registerPluginDir(plugin.commandsDir, plugin.manifest.name);
 		if (plugin.promptsDir) promptLoader.registerPluginPromptsDir(plugin.promptsDir);
+
+		if (hasPluginContentDriftedSinceInstall(plugin)) return;
+
 		if (plugin.hooks) hookService.registerPluginHooks(plugin.hooks);
 		if (plugin.mcpsFile) registerPluginMcpsFile(plugin.mcpsFile);
 		if (plugin.codeEntrypoint) await loadCodePlugin(container, plugin, lifecycleRegistries);
@@ -293,6 +300,28 @@ export async function initializePlugins(container: DIContainer): Promise<void> {
 	}
 
 	await dispatchActivateHooks(lifecycleRegistries);
+}
+
+export function registerPluginMcpsFile(mcpsFile: string): void {
+	try {
+		const raw = readFileSync(mcpsFile, 'utf-8');
+		const data = JSON.parse(raw) as { servers?: unknown[] };
+		const validServers: ExternalMCPServerConfig[] = [];
+		for (const candidate of data.servers ?? []) {
+			const result = EXTERNAL_MCP_SERVER_CONFIG_SCHEMA.safeParse(candidate);
+			if (result.success) {
+				validServers.push(result.data);
+			} else {
+				getLogger().warn('Skipping invalid MCP server entry in mcps.json', {
+					issues: result.error.flatten(),
+					path: mcpsFile
+				});
+			}
+		}
+		registerGlobalPluginMcpServers(validServers);
+	} catch (error) {
+		getLogger().warn('Failed to load mcps.json from plugin', { error: (error as Error).message, path: mcpsFile });
+	}
 }
 
 async function dispatchActivateHooks(registries: Map<string, PluginLifecycleRegistry>): Promise<void> {
@@ -307,6 +336,51 @@ async function dispatchActivateHooks(registries: Map<string, PluginLifecycleRegi
 			}
 		}
 	}
+}
+
+/**
+ * Re-verify a plugin's fingerprint on every load, not just at install time —
+ * install-time-only checking (`plugin-installer.service.ts`) left a
+ * tamper-after-install window where a modified hooks.json/mcps.json/
+ * codeEntrypoint/validator module would be activated with full trust on
+ * every subsequent run, no re-verification. On drift, skip only the
+ * executable surfaces (hooks/MCP servers/code entrypoint/validators) —
+ * agent/command/prompt registration (lower-risk, non-executable content)
+ * still proceeds, so a drifted plugin doesn't silently disappear entirely.
+ *
+ * Known limitation: keyed by `plugin:${plugin.manifest.name}`, matching
+ * `checkPluginContentIntegrity`'s install-time key exactly for the tarball
+ * install path (which reads `manifest.name` before first fingerprinting).
+ * The npm-package install path (`installWithVisited`) instead keys its
+ * install-time baseline by `shortNameFromPackage(packageName)` — the
+ * npm-convention-derived name, resolved *before* the manifest is even
+ * extracted to disk. For the overwhelming majority of plugins these are
+ * identical by convention (`valora-plugin-x` packages declare `name:
+ * "valora-plugin-x"`), but a plugin whose manifest declares a `name` that
+ * diverges from its npm package name would never match its real
+ * install-time baseline here — each load would silently reseed a fresh
+ * baseline instead of comparing against history, degrading (not worsening)
+ * to pre-round-10 behaviour for that one plugin specifically. Fixing this
+ * fully requires reordering the npm install path to extract-then-read-
+ * manifest-then-key (mirroring the tarball path), which is a larger, riskier
+ * change than this fix's scope — left as a known gap rather than silently
+ * assumed away.
+ */
+function hasPluginContentDriftedSinceInstall(plugin: LoadedPlugin): boolean {
+	const result = checkPluginContentDrift(plugin.pluginDir, plugin.manifest.name);
+	if (result.changed) {
+		getLogger().warn(
+			`[Security] Plugin "${plugin.manifest.name}"'s content (hooks/mcps/code/validators) changed since it was ` +
+				`last verified — possible rug-pull. Skipping its hooks, MCP servers, code entrypoint, and validators ` +
+				`until reinstalled and re-approved.`,
+			{
+				currentFingerprint: result.currentFingerprint,
+				plugin: plugin.manifest.name,
+				previousFingerprint: result.previousFingerprint
+			}
+		);
+	}
+	return result.changed;
 }
 
 async function loadCodePlugin(
@@ -373,20 +447,6 @@ async function loadPluginValidators(plugin: LoadedPlugin): Promise<void> {
 				plugin: plugin.manifest.name
 			});
 		}
-	}
-}
-
-function registerPluginMcpsFile(mcpsFile: string): void {
-	try {
-		const raw = readFileSync(mcpsFile, 'utf-8');
-		const data = JSON.parse(raw) as { servers?: unknown[] };
-		const validServers = (data.servers ?? []).filter(
-			(s): s is ExternalMCPServerConfig =>
-				typeof s === 'object' && s !== null && typeof (s as Record<string, unknown>)['id'] === 'string'
-		);
-		registerGlobalPluginMcpServers(validServers);
-	} catch (error) {
-		getLogger().warn('Failed to load mcps.json from plugin', { error: (error as Error).message, path: mcpsFile });
 	}
 }
 

@@ -33,6 +33,22 @@ vi.mock('utils/file-utils', async (importOriginal) => {
 		resolveAIPath: vi.fn(() => '/mock/logs/path')
 	};
 });
+const mockLoadAgent = vi.fn().mockResolvedValue({
+	capabilities: { can_review_code: true, can_run_tests: true, can_write_code: true, can_write_knowledge: true },
+	content: '',
+	description: 'test agent',
+	role: 'test-agent',
+	specialization: 'test',
+	tone: 'concise-technical',
+	version: '1.0.0'
+});
+vi.mock('executor/agent-loader', () => ({
+	AgentLoader: vi.fn().mockImplementation(() => ({
+		listAgents: vi.fn().mockResolvedValue([]),
+		loadAgent: mockLoadAgent,
+		registerPluginDir: vi.fn()
+	}))
+}));
 vi.mock('ui/prompt-adapter.interface', () => ({
 	getPromptAdapter: vi.fn(() => ({
 		prompt: vi.fn().mockResolvedValue({ selectedAgent: 'software-engineer-typescript-backend' })
@@ -335,7 +351,7 @@ describe('ExecutionCoordinator - Dynamic Agent Integration', () => {
 
 			expect(result.result).toEqual(mockCommandResult);
 			expect(result.sessionManager).toBe(mockSessionManager);
-			expect(result.startTime).toBeDefined();
+			expect(result.startTime).toEqual(expect.any(Number));
 		});
 	});
 
@@ -369,7 +385,7 @@ describe('ExecutionCoordinator - Dynamic Agent Integration', () => {
 
 			// Verify that the task context was created correctly
 			// This is indirectly tested through the successful execution
-			expect(mockStrategy.execute).toHaveBeenCalled();
+			expect(mockStrategy.execute).toHaveBeenCalledWith(resolvedCommand.command, expect.anything());
 		});
 
 		it('should extract affected files from session context', async () => {
@@ -403,7 +419,7 @@ describe('ExecutionCoordinator - Dynamic Agent Integration', () => {
 
 			await coordinator.executeCommand('implement', resolvedCommand, options, mockSessionManager as any);
 
-			expect(mockSessionManager.getAllContext).toHaveBeenCalled();
+			expect(mockSessionManager.getAllContext).toHaveBeenCalledTimes(1);
 		});
 
 		it('should extract dependencies from session context', async () => {

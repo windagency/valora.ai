@@ -28,10 +28,69 @@ import { getPackageDataDir } from 'utils/paths';
 import type { MCPApprovalCacheService } from './mcp-approval-cache.service';
 import type { MCPAuditLoggerService } from './mcp-audit-logger.service';
 
+import { checkMcpConnectionConfigDrift } from './mcp-connection-integrity';
+import { EXTERNAL_MCP_SERVER_CONFIG_SCHEMA } from './mcp-server-config.schema';
+
 /**
  * Default path to the external MCP registry
  */
 const DEFAULT_REGISTRY_PATH = join(getPackageDataDir(), 'external-mcp.default.json');
+
+/**
+ * Minimal-safe-default set of inherited environment variables every spawned
+ * stdio MCP server receives regardless of its own declared `connection.env`.
+ * Previously the full `process.env` was copied wholesale — every credential
+ * the valora process holds (ANTHROPIC_API_KEY, etc.) reached every connected
+ * server even when it never declared needing it. A server that genuinely
+ * needs something beyond PATH/HOME must declare it explicitly in its own
+ * `connection.env`, matching the least-privilege precedent already applied
+ * throughout this codebase's other trust boundaries.
+ */
+const MCP_SERVER_ENV_ALLOWLIST = new Set(['HOME', 'PATH']);
+
+/**
+ * Builds the environment a spawned stdio MCP server receives: only the
+ * allowlisted inherited variables, overlaid with whatever the server's own
+ * config explicitly declares (a declared value wins over the allowlisted
+ * default for the same key).
+ */
+export function buildStdioServerEnv(
+	processEnv: NodeJS.ProcessEnv,
+	declaredEnv: Record<string, string> | undefined
+): Record<string, string> {
+	const env: Record<string, string> = {};
+	for (const key of MCP_SERVER_ENV_ALLOWLIST) {
+		const value = processEnv[key];
+		if (value !== undefined) env[key] = value;
+	}
+	if (declaredEnv) Object.assign(env, declaredEnv);
+	return env;
+}
+
+/**
+ * Validate each candidate registry entry against the MCP server config
+ * schema, skipping (and logging) any that fail — a malformed or malicious
+ * entry must not reach `connect()` with an unchecked `command`/`url`/`env`.
+ */
+function validateRegistryServers(
+	candidates: unknown[],
+	registryPath: string,
+	logger: ReturnType<typeof getLogger>
+): ExternalMCPServerConfig[] {
+	const validated: ExternalMCPServerConfig[] = [];
+	for (const candidate of candidates) {
+		const result = EXTERNAL_MCP_SERVER_CONFIG_SCHEMA.safeParse(candidate);
+		if (result.success) {
+			validated.push(result.data);
+		} else {
+			logger.warn('Skipping invalid MCP server entry in registry', {
+				issues: result.error.flatten(),
+				path: registryPath
+			});
+		}
+	}
+	return validated;
+}
 
 let pendingPluginServers: ExternalMCPServerConfig[] = [];
 
@@ -85,7 +144,9 @@ export class MCPClientManagerService {
 		} else {
 			try {
 				const content = await readFile(fullPath);
-				this.registry = JSON.parse(content) as ExternalMCPRegistry;
+				const parsed = JSON.parse(content) as { schema_version?: string; servers?: unknown[] };
+				const validatedServers = validateRegistryServers(parsed.servers ?? [], fullPath, logger);
+				this.registry = { schema_version: parsed.schema_version ?? '1.0.0', servers: validatedServers };
 				this.registryLoaded = true;
 
 				logger.debug('Loaded external MCP registry', {
@@ -196,6 +257,17 @@ export class MCPClientManagerService {
 					serverId
 				});
 				// Invalidate cached approval so user is re-prompted
+				await this.approvalCache.revokeApproval(serverId);
+			}
+
+			// Check connection-config integrity (command/args/env drift) — a
+			// stale cached approval must not survive a config swap that keeps
+			// the exposed tool names/schemas identical.
+			const connectionDrift = checkMcpConnectionConfigDrift(serverId, config.connection);
+			if (connectionDrift.changed) {
+				logger.warn('MCP server connection config changed since last approval — approval invalidated', {
+					serverId
+				});
 				await this.approvalCache.revokeApproval(serverId);
 			}
 
@@ -407,16 +479,7 @@ export class MCPClientManagerService {
 			throw new Error('Command is required for stdio connection');
 		}
 
-		// Build environment, filtering out undefined values
-		const env: Record<string, string> = {};
-		for (const [key, value] of Object.entries(process.env)) {
-			if (value !== undefined) {
-				env[key] = value;
-			}
-		}
-		if (config.connection.env) {
-			Object.assign(env, config.connection.env);
-		}
+		const env = buildStdioServerEnv(process.env, config.connection.env);
 
 		const transport = new StdioClientTransport({
 			args: config.connection.args,

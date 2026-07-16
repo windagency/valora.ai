@@ -1,8 +1,10 @@
-import type { Edge, EdgeKind, MemoryEntry } from '@windagency/valora-plugin-api';
+import type { Edge, EdgeKind, MemoryEntry, MemorySource } from '@windagency/valora-plugin-api';
 
 import { createHash } from 'node:crypto';
-import { mkdirSync, renameSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, renameSync, writeFileSync } from 'node:fs';
 import * as path from 'node:path';
+
+import { verifyProvenance } from './provenance.js';
 
 /**
  * Compute the canonical SHA-256 content hash for a memory entry's body.
@@ -81,48 +83,114 @@ export function parseMemoryFile(content: string, id: string): ParsedMemoryFile {
 function buildEntry(fm: Record<string, unknown>, id: string, bodyRaw: string): MemoryEntry {
 	const now = new Date().toISOString();
 	const content = extractContent(bodyRaw);
-	const persistedHash = fm['content_hash'] as string | undefined;
+	const persistedHash = fmOptionalStr(fm, 'content_hash');
 	const actualHash = computeContentHash(content);
 	// Drift is only meaningful when the file actually carried a hash. Legacy
 	// pre-hash files leave the entry unflagged (we cannot verify what we never
 	// stamped). Round-trips through serialiseMemoryFile always re-stamp.
 	const embeddingStale = persistedHash !== undefined && persistedHash !== actualHash ? true : undefined;
+	const agentRole = fmStr(fm, 'agent_role', '');
+	const createdAt = fmStr(fm, 'created_at', now);
+	// verifyProvenance() passes this to Buffer.from(signature, 'hex'), which
+	// throws for a non-string argument — a wrong JSON type here must degrade
+	// to untrusted, not crash parsing entirely.
+	const provenanceSignature = fmOptionalStr(fm, 'provenance_signature');
+
 	return {
 		accessCount: fmNum(fm, 'access_count', 0),
-		agentRole: fmStr(fm, 'agent_role', ''),
+		agentRole,
 		category: fmStr(fm, 'category', 'episodic') as MemoryEntry['category'],
-		coAccess: fm['co_access'] as Record<string, number> | undefined,
+		coAccess: fmNumRecord(fm, 'co_access'),
 		confidence: fmStr(fm, 'confidence', 'observed') as MemoryEntry['confidence'],
 		content,
 		contentHash: persistedHash,
-		createdAt: fmStr(fm, 'created_at', now),
-		embeddingDim: fm['embedding_dim'] as number | undefined,
-		embeddingModel: fm['embedding_model'] as string | undefined,
+		createdAt,
+		embeddingDim: fmOptionalNum(fm, 'embedding_dim'),
+		embeddingModel: fmOptionalStr(fm, 'embedding_model'),
 		embeddingStale,
 		halfLifeDays: fmNum(fm, 'half_life_days', 7),
 		id: fmStr(fm, 'id', id),
 		isError: fmBool(fm, 'is_error', false),
 		lastAccessedAt: fmStr(fm, 'last_accessed_at', now),
-		relatedPaths: (fm['related_paths'] as string[] | undefined) ?? [],
+		provenanceSignature,
+		relatedPaths: fmStrArray(fm, 'related_paths'),
 		sessionId: fmStr(fm, 'session_id', ''),
-		source: (fm['source'] as MemoryEntry['source'] | undefined) ?? { command: '' },
-		supersededBy: fm['superseded_by'] as string | undefined,
-		supersedes: fm['supersedes'] as string | undefined,
-		tags: (fm['tags'] as string[] | undefined) ?? [],
+		source: fmSource(fm, 'source'),
+		supersededBy: fmOptionalStr(fm, 'superseded_by'),
+		supersedes: fmOptionalStr(fm, 'supersedes'),
+		tags: fmStrArray(fm, 'tags'),
+		trusted: verifyProvenance(content, agentRole, createdAt, provenanceSignature),
 		updatedAt: fmStr(fm, 'updated_at', now)
 	};
 }
 
+/**
+ * `parseFrontmatter` does `JSON.parse(valueStr)` per line, so a hand-edited
+ * or externally-authored vault file can declare any JSON type where a
+ * string/number/boolean is expected (e.g. `agent_role: 42`). A type
+ * assertion alone doesn't check this at runtime, so a wrong-typed value
+ * would silently flow through as-is — `agentRole` is later used as a `Map`
+ * key for role-scoped indexing (a non-string value makes the entry
+ * unreachable from any lookup) and `createdAt` feeds `new Date(...)` for
+ * decay/strength math (a non-string/non-number value produces `NaN`). Fall
+ * back to the default for any value that isn't actually the expected type,
+ * the same way a missing value already does.
+ */
 function fmBool(fm: Record<string, unknown>, key: string, fallback: boolean): boolean {
-	return (fm[key] as boolean | undefined) ?? fallback;
+	const value = fm[key];
+	return typeof value === 'boolean' ? value : fallback;
 }
 
 function fmNum(fm: Record<string, unknown>, key: string, fallback: number): number {
-	return (fm[key] as number | undefined) ?? fallback;
+	const value = fm[key];
+	return typeof value === 'number' ? value : fallback;
 }
 
 function fmStr(fm: Record<string, unknown>, key: string, fallback: string): string {
-	return (fm[key] as string | undefined) ?? fallback;
+	const value = fm[key];
+	return typeof value === 'string' ? value : fallback;
+}
+
+/** Same wrong-JSON-type guard as `fmStr`, for fields with no sensible fallback (undefined means "not present"). */
+function fmOptionalStr(fm: Record<string, unknown>, key: string): string | undefined {
+	const value = fm[key];
+	return typeof value === 'string' ? value : undefined;
+}
+
+/** Same wrong-JSON-type guard as `fmStr`, for string-array fields (`tags`, `related_paths`) — falls back to `[]`. */
+function fmStrArray(fm: Record<string, unknown>, key: string): string[] {
+	const value = fm[key];
+	return Array.isArray(value) && value.every((v) => typeof v === 'string') ? value : [];
+}
+
+/** Same wrong-JSON-type guard as `fmOptionalStr`, for optional numeric fields (`embedding_dim`). */
+function fmOptionalNum(fm: Record<string, unknown>, key: string): number | undefined {
+	const value = fm[key];
+	return typeof value === 'number' ? value : undefined;
+}
+
+/** Same wrong-JSON-type guard as `fmStr`, for a `Record<string, number>` field (`co_access`) — falls back to `undefined`. */
+function fmNumRecord(fm: Record<string, unknown>, key: string): Record<string, number> | undefined {
+	const value = fm[key];
+	if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined;
+	const entries = Object.entries(value as Record<string, unknown>);
+	return entries.every(([, v]) => typeof v === 'number') ? (value as Record<string, number>) : undefined;
+}
+
+/**
+ * Same wrong-JSON-type guard as `fmStr`, for the `source` field (`MemorySource`
+ * — `{ command: string; label?: string; phase?: string }`). `command` must be
+ * a string or the whole field falls back to the default; `label`/`phase` are
+ * individually dropped (not the whole object) if present but wrong-typed.
+ */
+function fmSource(fm: Record<string, unknown>, key: string): MemorySource {
+	const value = fm[key];
+	if (typeof value !== 'object' || value === null || Array.isArray(value)) return { command: '' };
+	const candidate = value as Record<string, unknown>;
+	const command = typeof candidate['command'] === 'string' ? candidate['command'] : '';
+	const label = typeof candidate['label'] === 'string' ? candidate['label'] : undefined;
+	const phase = typeof candidate['phase'] === 'string' ? candidate['phase'] : undefined;
+	return { command, label, phase };
 }
 
 /** Serialise a memory entry + outgoing edges into vault Markdown format. */
@@ -145,6 +213,7 @@ export function serialiseMemoryFile(entry: MemoryEntry, links: Edge[]): string {
 		id: entry.id,
 		is_error: entry.isError,
 		last_accessed_at: entry.lastAccessedAt,
+		provenance_signature: entry.provenanceSignature,
 		related_paths: entry.relatedPaths,
 		session_id: entry.sessionId,
 		source: entry.source,
@@ -179,10 +248,18 @@ function buildTmpPath(filePath: string): string {
  * the writing process PID and a counter so concurrent writers never collide
  * on the staging file.
  */
-export function atomicWriteFile(filePath: string, content: string): void {
+/**
+ * `mode`, if given, is applied to the tmp file *before* the rename that makes
+ * it visible at `filePath` — a caller writing sensitive content (e.g. a
+ * signing key) can request restrictive permissions with no window during
+ * which the file exists at its final, well-known path with default
+ * (non-restrictive) permissions.
+ */
+export function atomicWriteFile(filePath: string, content: string, mode?: number): void {
 	mkdirSync(path.dirname(filePath), { recursive: true });
 	const tmpPath = buildTmpPath(filePath);
 	writeFileSync(tmpPath, content, 'utf-8');
+	if (mode !== undefined) chmodSync(tmpPath, mode);
 	renameSync(tmpPath, filePath);
 }
 

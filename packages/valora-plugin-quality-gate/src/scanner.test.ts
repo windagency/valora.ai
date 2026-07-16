@@ -28,7 +28,7 @@ describe('scan — violations fixture', () => {
 	it('detects a sibling group under infrastructure/', async () => {
 		const report = await scan(path.join(FIXTURES, 'violations'), baseConfig);
 		const group = report.siblingGroups.find((g) => g.parentPath.endsWith('infrastructure'));
-		expect(group).toBeDefined();
+		expect(group?.parentPath).toBe('infrastructure');
 	});
 
 	it('flags concern patterns present in N >= threshold siblings', async () => {
@@ -41,7 +41,7 @@ describe('scan — violations fixture', () => {
 		const report = await scan(path.join(FIXTURES, 'violations'), baseConfig);
 		const group = report.siblingGroups.find((g) => g.parentPath.endsWith('infrastructure'));
 		const importViolation = group?.violations.find((v) => v.concern === 'import');
-		expect(importViolation).toBeDefined();
+		expect(importViolation?.affectedSiblings.slice().sort()).toEqual(['discord', 'llm', 'telegram', 'tts']);
 		expect(importViolation!.affectedSiblings.length).toBeGreaterThanOrEqual(3);
 	});
 
@@ -108,6 +108,6 @@ describe('scan — IO resilience', () => {
 		// empty dir → no siblings → no parent groups
 		const report = await scan(tmpDir, { ...baseConfig, depth: 1 });
 		expect(report.summary.totalViolations).toBe(0);
-		expect(report.summary.note).toBeDefined();
+		expect(report.summary.note).toBe(`No sibling groups with violations found within depth 1 from ${tmpDir}`);
 	});
 });

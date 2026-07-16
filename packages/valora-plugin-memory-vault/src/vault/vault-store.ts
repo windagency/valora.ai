@@ -298,8 +298,14 @@ export class VaultStore implements MemoryStorePort {
 		if (!existsSync(metaPath)) return {};
 		try {
 			const raw = readFileSync(metaPath, 'utf-8');
-			const parsed = JSON.parse(raw) as Record<string, VaultMeta>;
-			return parsed;
+			const parsed = JSON.parse(raw) as unknown;
+			if (typeof parsed !== 'object' || parsed === null) return {};
+			const result: Record<string, VaultMeta> = {};
+			for (const [category, value] of Object.entries(parsed)) {
+				const sanitised = sanitiseVaultMeta(value);
+				if (sanitised) result[category] = sanitised;
+			}
+			return result;
 		} catch (err) {
 			getLogger().warn(`Vault: could not read meta.json: ${String(err)}`);
 			return {};
@@ -385,6 +391,16 @@ function diffSet(map: Map<string, Set<string>>, before: string[], after: string[
 	}
 }
 
+/** Wrong-JSON-type guard for a hand-edited/corrupted `meta.json` entry — a bare type assertion propagated a wrong-typed `lastWrittenAt`/`lastConsolidatedAt` straight through with no check. */
+function sanitiseVaultMeta(value: unknown): undefined | VaultMeta {
+	if (typeof value !== 'object' || value === null) return undefined;
+	const candidate = value as Record<string, unknown>;
+	if (typeof candidate['lastWrittenAt'] !== 'string') return undefined;
+	const lastConsolidatedAt =
+		typeof candidate['lastConsolidatedAt'] === 'string' ? candidate['lastConsolidatedAt'] : undefined;
+	return { lastConsolidatedAt, lastWrittenAt: candidate['lastWrittenAt'] };
+}
+
 /**
  * Rebuild an in-memory VaultStore from disk, re-parsing all `.md` files.
  * Used by the migration and info CLI commands.
@@ -405,11 +421,18 @@ export function importFileIntoStore(store: VaultStore, category: MemoryCategory,
  * here — they would over-constrain the seed set and starve spreading
  * activation; the manager applies them at lexical-recall time.
  */
-function collectVaultCandidates(index: VaultIndex, options: MemoryQueryOptions, minStrength: number): string[] {
+export function collectVaultCandidates(index: VaultIndex, options: MemoryQueryOptions, minStrength: number): string[] {
 	const candidates: string[] = [];
 	for (const [id, record] of index.byId) {
 		const { entry } = record;
 		if (entry.confidence === 'stale') continue;
+		// Entries whose provenance signature failed verification (or was never
+		// signed by MemoryManager.create()) must not seed semantic recall — this
+		// is the actual production path `injection_token_budget` draws from, so
+		// excluding them only from lexical recall (manager.ts) would leave this
+		// path unprotected. `trusted === undefined` (JSON-backed legacy store,
+		// never signed) is intentionally NOT excluded — only explicit `false`.
+		if (entry.trusted === false) continue;
 		const strength = computeStrength(entry.createdAt, entry.halfLifeDays);
 		if (strength < minStrength) continue;
 		if (options.agentRole !== undefined && entry.agentRole !== options.agentRole) continue;

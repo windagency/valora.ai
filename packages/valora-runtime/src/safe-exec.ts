@@ -81,6 +81,11 @@ export class SafeExecutor {
 			let stdout = '';
 			let stderr = '';
 			let timedOut = false;
+			// `child.killed` becomes true as soon as `.kill()` successfully
+			// *sends* a signal — not when the process actually exits — so it
+			// cannot be used to detect whether SIGTERM was ignored. Track real
+			// exit via the 'close' event instead.
+			let processExited = false;
 
 			// Spawn process without shell
 			const child = spawn(command, args, {
@@ -97,7 +102,7 @@ export class SafeExecutor {
 
 				// Force kill after interval if still running
 				setTimeout(() => {
-					if (!child.killed) {
+					if (!processExited) {
 						child.kill('SIGKILL');
 					}
 				}, HEALTH_CHECK_INTERVAL_MS);
@@ -127,6 +132,7 @@ export class SafeExecutor {
 
 			// Handle completion
 			child.on('close', (code: null | number) => {
+				processExited = true;
 				clearTimeout(timer);
 
 				if (timedOut) {

@@ -102,6 +102,52 @@ describe('VectorStore', () => {
 		});
 	});
 
+	describe('malformed index tolerance', () => {
+		it('drops an out-of-range offset instead of throwing when reading it, and still serves other valid entries', () => {
+			// A hand-crafted or corrupted embeddings.index.json with an offset
+			// that doesn't fit inside embeddings.bin previously reached
+			// Buffer.subarray unchecked, producing a zero-length slice that then
+			// crashed `new Float32Array(copy.buffer, ..., dim)` with an uncaught
+			// RangeError — propagating through semanticRecall with no try/catch
+			// anywhere in the call chain.
+			fs.writeFileSync(path.join(tmpDir, 'embeddings.bin'), Buffer.alloc(2 * Float32Array.BYTES_PER_ELEMENT));
+			fs.writeFileSync(
+				path.join(tmpDir, 'embeddings.index.json'),
+				JSON.stringify({ dim: 2, entries: { valid: 0, victim: 999999999 }, model: 'model' })
+			);
+
+			const store = openVectorStore(tmpDir, 'model', 2);
+
+			expect(() => store.read('victim')).not.toThrow();
+			expect(store.read('victim')).toBeNull();
+			expect(store.has('victim')).toBe(false);
+		});
+
+		it('drops a negative offset', () => {
+			fs.writeFileSync(path.join(tmpDir, 'embeddings.bin'), Buffer.alloc(2 * Float32Array.BYTES_PER_ELEMENT));
+			fs.writeFileSync(
+				path.join(tmpDir, 'embeddings.index.json'),
+				JSON.stringify({ dim: 2, entries: { victim: -8 }, model: 'model' })
+			);
+
+			const store = openVectorStore(tmpDir, 'model', 2);
+
+			expect(store.has('victim')).toBe(false);
+		});
+
+		it('drops a non-integer offset', () => {
+			fs.writeFileSync(path.join(tmpDir, 'embeddings.bin'), Buffer.alloc(2 * Float32Array.BYTES_PER_ELEMENT));
+			fs.writeFileSync(
+				path.join(tmpDir, 'embeddings.index.json'),
+				JSON.stringify({ dim: 2, entries: { victim: 1.5 }, model: 'model' })
+			);
+
+			const store = openVectorStore(tmpDir, 'model', 2);
+
+			expect(store.has('victim')).toBe(false);
+		});
+	});
+
 	describe('compact', () => {
 		it('removes vectors for ids not in the live set', () => {
 			const store = openVectorStore(tmpDir, 'model', 2);

@@ -4,13 +4,11 @@
  * Performs comprehensive safety checks before starting an exploration
  */
 
-import { exec } from 'child_process';
 import * as os from 'os';
-import { promisify } from 'util';
 
 import type { GitState, ResourceAvailability, SafetyCheck, SafetyValidation } from 'types/exploration.types';
 
-const execAsync = promisify(exec);
+import { SafeExecutor } from 'utils/safe-exec';
 
 export interface SafetyValidatorConfig {
 	check_docker?: boolean;
@@ -155,7 +153,7 @@ export class SafetyValidator {
 	private async checkDockerAvailability(): Promise<SafetyCheck> {
 		try {
 			// Check if Docker daemon is running
-			const { stdout } = await execAsync('docker info');
+			const { stdout } = await SafeExecutor.execute('docker', ['info']);
 
 			// Extract Docker version
 			const versionMatch = stdout.match(/Server Version: (.+)/);
@@ -245,7 +243,8 @@ export class SafetyValidator {
 	private async checkDiskSpace(): Promise<SafetyCheck> {
 		try {
 			// Get disk usage for current directory
-			const { stdout } = await execAsync(`df -BG "${this.repoRoot}" | tail -1`);
+			const { stdout: dfOutput } = await SafeExecutor.execute('df', ['-BG', this.repoRoot]);
+			const stdout = dfOutput.trim().split('\n').pop() ?? '';
 			const parts = stdout.trim().split(/\s+/);
 			const availableStr = parts[3]; // Available column
 			if (!availableStr) {
@@ -286,7 +285,7 @@ export class SafetyValidator {
 	async getGitState(): Promise<GitState> {
 		try {
 			// Check if working tree is clean
-			const { stdout: statusOutput } = await execAsync('git status --porcelain', {
+			const { stdout: statusOutput } = await SafeExecutor.execute('git', ['status', '--porcelain'], {
 				cwd: this.repoRoot
 			});
 			const uncommittedChanges = statusOutput
@@ -295,13 +294,13 @@ export class SafetyValidator {
 				.filter((line) => line).length;
 
 			// Get current branch
-			const { stdout: branchOutput } = await execAsync('git branch --show-current', {
+			const { stdout: branchOutput } = await SafeExecutor.execute('git', ['branch', '--show-current'], {
 				cwd: this.repoRoot
 			});
 			const currentBranch = branchOutput.trim();
 
 			// Get existing worktrees
-			const { stdout: worktreeOutput } = await execAsync('git worktree list --porcelain', {
+			const { stdout: worktreeOutput } = await SafeExecutor.execute('git', ['worktree', 'list', '--porcelain'], {
 				cwd: this.repoRoot
 			});
 			const existingWorktrees = this.parseWorktreePaths(worktreeOutput);
@@ -309,7 +308,7 @@ export class SafetyValidator {
 			// Check if main branch is up to date (basic check)
 			let mainBranchUpToDate = true;
 			try {
-				await execAsync('git fetch origin main:main', {
+				await SafeExecutor.execute('git', ['fetch', 'origin', 'main:main'], {
 					cwd: this.repoRoot
 				});
 			} catch {
@@ -345,7 +344,7 @@ export class SafetyValidator {
 		let dockerRunning = false;
 		let dockerVersion: string | undefined;
 		try {
-			const { stdout } = await execAsync('docker version --format "{{.Server.Version}}"');
+			const { stdout } = await SafeExecutor.execute('docker', ['version', '--format', '{{.Server.Version}}']);
 			dockerVersion = stdout.trim();
 			dockerRunning = true;
 		} catch {
@@ -355,7 +354,8 @@ export class SafetyValidator {
 		// Get available disk space (simplified, just check current directory)
 		let availableDiskGb = 0;
 		try {
-			const { stdout } = await execAsync(`df -BG "${this.repoRoot}" | tail -1`);
+			const { stdout: dfOutput } = await SafeExecutor.execute('df', ['-BG', this.repoRoot]);
+			const stdout = dfOutput.trim().split('\n').pop() ?? '';
 			const parts = stdout.trim().split(/\s+/);
 			const availableStr = parts[3];
 			if (availableStr) {

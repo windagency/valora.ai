@@ -51,6 +51,7 @@
 	"devDependencies": {
 		"@windagency/valora-plugin-api": "workspace:*",
 		"esbuild": "^0.28.0",
-		"openai": "^4.67.0"
+		"openai": "^4.67.0",
+		"testcontainers": "^12.0.4"
 	}
 }

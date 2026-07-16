@@ -1,0 +1,238 @@
+/**
+ * ConfigLoader — provider baseUrl scheme/host safety.
+ *
+ * Once a provider `baseUrl` override clears round-13's workspace-trust gate
+ * (or comes from an already-trusted global config, or an env var — none of
+ * which is itself scheme/host-validated), nothing stopped it from pointing
+ * at a cloud-metadata endpoint, a private/link-local address, or a non-http
+ * scheme — and every provider sends the real API key as a plaintext
+ * Authorization header to whatever `baseUrl` names. This must be checked
+ * regardless of trust level: a trusted-but-compromised config, a malicious
+ * plugin, or a misconfigured env var can all set `baseUrl` just as easily as
+ * an untrusted project config can. `local`/`ollama` are exempted since their
+ * whole purpose is talking to a local endpoint by default.
+ */
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
+
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+const mockIsWorkspaceTrusted = vi.fn(() => true);
+vi.mock('security/workspace-trust.service', () => ({
+	isWorkspaceTrusted: (...args: unknown[]) => mockIsWorkspaceTrusted(...args)
+}));
+
+import { ConfigLoader } from './loader';
+
+// `process.chdir()` is unsupported in Node worker threads (e.g. Stryker's dry-run test
+// execution) — probe once at module load so this chdir-dependent describe block skips
+// gracefully in that environment instead of crashing the whole run, while still executing
+// normally under regular Vitest/CI (which uses forks, not worker threads).
+let chdirSupported = true;
+try {
+	const cwd = process.cwd();
+	process.chdir(cwd);
+} catch {
+	chdirSupported = false;
+}
+
+describe.skipIf(!chdirSupported)('ConfigLoader — provider baseUrl scheme/host safety', () => {
+	let projectDir: string;
+	let originalCwd: string;
+	let savedGlobalConfigDir: string | undefined;
+	let savedLocalBaseUrl: string | undefined;
+
+	beforeEach(() => {
+		originalCwd = process.cwd();
+		projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'valora-baseurl-safety-'));
+		fs.mkdirSync(path.join(projectDir, '.valora'));
+		process.chdir(projectDir);
+
+		savedGlobalConfigDir = process.env['VALORA_GLOBAL_CONFIG_DIR'];
+		process.env['VALORA_GLOBAL_CONFIG_DIR'] = path.join(projectDir, '.nonexistent-global');
+
+		// This devcontainer sets a real LOCAL_BASE_URL env var for normal
+		// day-to-day use — the env layer is merged AFTER project config, so it
+		// would otherwise silently override every "local" provider assertion
+		// below regardless of what these tests write to project config.
+		savedLocalBaseUrl = process.env['LOCAL_BASE_URL'];
+		delete process.env['LOCAL_BASE_URL'];
+
+		mockIsWorkspaceTrusted.mockReset();
+		mockIsWorkspaceTrusted.mockReturnValue(true);
+	});
+
+	afterEach(() => {
+		process.chdir(originalCwd);
+		fs.rmSync(projectDir, { force: true, recursive: true });
+		if (savedGlobalConfigDir === undefined) delete process.env['VALORA_GLOBAL_CONFIG_DIR'];
+		else process.env['VALORA_GLOBAL_CONFIG_DIR'] = savedGlobalConfigDir;
+		if (savedLocalBaseUrl === undefined) delete process.env['LOCAL_BASE_URL'];
+		else process.env['LOCAL_BASE_URL'] = savedLocalBaseUrl;
+	});
+
+	function writeProjectConfig(content: Record<string, unknown>): void {
+		fs.writeFileSync(path.join(projectDir, '.valora', 'config.json'), JSON.stringify(content));
+	}
+
+	function makeLoader(): ConfigLoader {
+		return new ConfigLoader(path.join(projectDir, '.nonexistent-package-config.json'));
+	}
+
+	it('strips a cloud-metadata-endpoint baseUrl even from a fully trusted config', async () => {
+		writeProjectConfig({ providers: { xai: { baseUrl: 'http://169.254.169.254/latest/meta-data' } } });
+
+		const config = await makeLoader().load();
+
+		expect(config.providers['xai']?.baseUrl).toBeUndefined();
+	});
+
+	it('strips an IPv6 loopback baseUrl (e.g. targeting a locally-bound service) for a non-local provider', async () => {
+		writeProjectConfig({ providers: { xai: { baseUrl: 'http://[::1]:6379/' } } });
+
+		const config = await makeLoader().load();
+
+		expect(config.providers['xai']?.baseUrl).toBeUndefined();
+	});
+
+	it('strips an IPv4-mapped-IPv6 metadata-endpoint baseUrl even though Node normalizes it to hex-group form, not dotted-decimal', async () => {
+		// Node's URL parser always normalizes ::ffff:169.254.169.254 to
+		// ::ffff:a9fe:a9fe (hex groups) — a regex matching only the
+		// dotted-decimal form never fires against real URL.hostname output.
+		writeProjectConfig({ providers: { xai: { baseUrl: 'http://[::ffff:169.254.169.254]/latest/meta-data' } } });
+
+		const config = await makeLoader().load();
+
+		expect(config.providers['xai']?.baseUrl).toBeUndefined();
+	});
+
+	it('strips a NAT64/SIIT well-known-prefix (RFC 6052) baseUrl embedding a metadata-endpoint address', async () => {
+		// 64:ff9b::/96 embeds an IPv4 address in its low 32 bits, the same
+		// technique as the ::ffff: IPv4-mapped form above, just a different
+		// well-known prefix — Node normalizes it to hex-group form here too.
+		writeProjectConfig({ providers: { xai: { baseUrl: 'http://[64:ff9b::169.254.169.254]/latest/meta-data' } } });
+
+		const config = await makeLoader().load();
+
+		expect(config.providers['xai']?.baseUrl).toBeUndefined();
+	});
+
+	it('strips a private-network (RFC1918) baseUrl for a non-local provider', async () => {
+		writeProjectConfig({ providers: { moonshot: { baseUrl: 'https://10.0.0.5/v1' } } });
+
+		const config = await makeLoader().load();
+
+		expect(config.providers['moonshot']?.baseUrl).toBeUndefined();
+	});
+
+	it('strips a CGNAT (RFC 6598, 100.64.0.0/10) baseUrl — shared ISP-internal address space, not publicly routable', async () => {
+		writeProjectConfig({ providers: { xai: { baseUrl: 'http://100.64.0.1/v1' } } });
+
+		const config = await makeLoader().load();
+
+		expect(config.providers['xai']?.baseUrl).toBeUndefined();
+	});
+
+	it('does not strip a public address merely because its first octet is 100 but falls outside the CGNAT second-octet range', async () => {
+		writeProjectConfig({ providers: { xai: { baseUrl: 'https://100.200.0.1/v1' } } });
+
+		const config = await makeLoader().load();
+
+		expect(config.providers['xai']?.baseUrl).toBe('https://100.200.0.1/v1');
+	});
+
+	it('deliberately does not strip a TEST-NET (RFC 5737) or multicast address — no real internal infrastructure lives there, unlike RFC1918/loopback/link-local/CGNAT', async () => {
+		writeProjectConfig({
+			providers: {
+				anthropic: { baseUrl: 'https://192.0.2.1/v1' }, // TEST-NET-1, RFC 5737
+				xai: { baseUrl: 'https://224.0.0.1/v1' } // multicast
+			}
+		});
+
+		const config = await makeLoader().load();
+
+		expect(config.providers['anthropic']?.baseUrl).toBe('https://192.0.2.1/v1');
+		expect(config.providers['xai']?.baseUrl).toBe('https://224.0.0.1/v1');
+	});
+
+	it("strips a loopback baseUrl given in decimal, octal, or short-dotted-quad form — Node's URL parser normalizes all of these to standard dotted-decimal before this check ever runs", async () => {
+		// e.g. http://2130706433/ (decimal), http://0177.0.0.1/ (octal), http://127.1/
+		// (short form) all normalize to 127.0.0.1 via URL.hostname — verified directly
+		// against Node's URL implementation, not assumed.
+		writeProjectConfig({ providers: { xai: { baseUrl: 'http://2130706433/v1' } } });
+
+		const config = await makeLoader().load();
+
+		expect(config.providers['xai']?.baseUrl).toBeUndefined();
+	});
+
+	it('strips a file:// scheme baseUrl for any provider', async () => {
+		writeProjectConfig({ providers: { xai: { baseUrl: 'file:///etc/passwd' } } });
+
+		const config = await makeLoader().load();
+
+		expect(config.providers['xai']?.baseUrl).toBeUndefined();
+	});
+
+	it('still allows a genuine internet-facing https baseUrl override', async () => {
+		writeProjectConfig({ providers: { xai: { baseUrl: 'https://self-hosted-proxy.example.com/v1' } } });
+
+		const config = await makeLoader().load();
+
+		expect(config.providers['xai']?.baseUrl).toBe('https://self-hosted-proxy.example.com/v1');
+	});
+
+	it('still allows a localhost baseUrl for the local provider — its whole purpose is talking to a local endpoint', async () => {
+		writeProjectConfig({ providers: { local: { baseUrl: 'http://localhost:11434/v1' } } });
+
+		const config = await makeLoader().load();
+
+		expect(config.providers['local']?.baseUrl).toBe('http://localhost:11434/v1');
+	});
+
+	it('still allows a localhost baseUrl for the ollama provider — same local-first exemption', async () => {
+		writeProjectConfig({ providers: { ollama: { baseUrl: 'http://127.0.0.1:11434' } } });
+
+		const config = await makeLoader().load();
+
+		expect(config.providers['ollama']?.baseUrl).toBe('http://127.0.0.1:11434');
+	});
+});
+
+describe('ConfigLoader.loadFromPath — same baseUrl safety as load()', () => {
+	let tmpDir: string;
+
+	beforeEach(() => {
+		tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'valora-loadfrompath-safety-'));
+	});
+
+	afterEach(() => {
+		fs.rmSync(tmpDir, { force: true, recursive: true });
+	});
+
+	function writeConfigFile(content: Record<string, unknown>): string {
+		const filePath = path.join(tmpDir, 'config.json');
+		fs.writeFileSync(filePath, JSON.stringify(content));
+		return filePath;
+	}
+
+	it('strips a private-network baseUrl the same way load() does — loadFromPath must not bypass sanitizeProviderBaseUrls', async () => {
+		const filePath = writeConfigFile({ defaults: {}, providers: { moonshot: { baseUrl: 'https://10.0.0.5/v1' } } });
+
+		const config = await new ConfigLoader('/nonexistent-package-config.json').loadFromPath(filePath);
+
+		expect(config.providers['moonshot']?.baseUrl).toBeUndefined();
+	});
+
+	it('still allows a genuine internet-facing https baseUrl override via loadFromPath', async () => {
+		const filePath = writeConfigFile({
+			defaults: {},
+			providers: { xai: { baseUrl: 'https://self-hosted-proxy.example.com/v1' } }
+		});
+
+		const config = await new ConfigLoader('/nonexistent-package-config.json').loadFromPath(filePath);
+
+		expect(config.providers['xai']?.baseUrl).toBe('https://self-hosted-proxy.example.com/v1');
+	});
+});

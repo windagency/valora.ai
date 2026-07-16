@@ -100,8 +100,7 @@ describe('Security Validation Tests', () => {
 
 			maliciousInputs.forEach((input) => {
 				const result = validator.validate(input);
-				// These may pass validation but should be flagged for manual review
-				expect(result).toBeDefined();
+				expect(result.valid).toBe(false);
 			});
 		});
 	});
@@ -211,31 +210,18 @@ describe('Security Validation Tests', () => {
 
 			traversalAttempts.forEach((attempt) => {
 				const result = validator.validate(attempt);
-				// Should detect and potentially reject suspicious paths
-				expect(result).toBeDefined();
+				expect(result.valid).toBe(false);
 			});
 		});
 
 		it('should validate file paths securely', () => {
 			const suspiciousPaths = ['../../../config.json', '/etc/ai/config.json', '~root/.valora/config.json'];
+			const allowedRoot = tempDir;
 
-			// Simulate insecure file loading
-			const loadConfig = (filePath: string) => {
-				if (filePath.includes('..') || filePath.startsWith('/') || filePath.startsWith('~')) {
-					throw new Error('Suspicious path detected');
-				}
-				return { loaded: true };
-			};
-
-			suspiciousPaths.forEach((path) => {
-				let threw = false;
-				try {
-					loadConfig(path);
-				} catch (error) {
-					threw = true;
-					expect((error as Error).message).toBe('Suspicious path detected');
-				}
-				expect(threw).toBe(true);
+			suspiciousPaths.forEach((suspiciousPath) => {
+				expect(() => InputValidator.validatePath(suspiciousPath, allowedRoot)).toThrow(
+					/outside allowed directory|directory traversal/
+				);
 			});
 		});
 	});
@@ -250,40 +236,49 @@ describe('Security Validation Tests', () => {
 				'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9'
 			];
 
-			const invalidKeys = [
+			// `InputValidator.validate()` checks for malicious patterns, size, and depth —
+			// it does not validate API-key shape/format. Most "invalid format" keys below
+			// are simply not well-formed keys, not malicious input, so `validate()` correctly
+			// leaves them `valid: true`; only the XSS-embedding key contains a detectable
+			// malicious pattern and should be rejected.
+			const invalidButNotMalicious = [
 				'short',
 				'invalid-format-123',
 				'sk-', // Too short
 				'sk-1234567890abcdef', // Too short for expected format
 				'', // Empty
-				'   ', // Whitespace only
-				'sk-1234567890abcdef<script>alert("xss")</script>' // XSS in key
+				'   ' // Whitespace only
 			];
+			const maliciousKey = 'sk-1234567890abcdef<script>alert("xss")</script>'; // XSS in key
 
 			validKeys.forEach((key) => {
 				const result = validator.validate(key);
 				expect(result.valid).toBe(true);
 			});
 
-			invalidKeys.forEach((key) => {
+			invalidButNotMalicious.forEach((key) => {
 				const result = validator.validate(key);
-				// May still be valid but should be flagged
-				expect(result).toBeDefined();
+				expect(result.valid).toBe(true);
 			});
+
+			expect(validator.validate(maliciousKey).valid).toBe(false);
 		});
 
 		it('should prevent unauthorized access attempts', async () => {
-			// Test with mock authentication
-			const authAttempts = [
-				{ token: 'invalid-token', user: 'admin' },
+			// `validateInput` checks structure/malicious patterns, not authentication — a
+			// syntactically well-formed but semantically wrong credential (attempt #1) is
+			// correctly `valid: true` here; authentication itself is a separate concern.
+			// Only attempts embedding a malicious pattern (path traversal, XSS) should fail.
+			const nonMaliciousAttempt = { token: 'invalid-token', user: 'admin' };
+			const maliciousAttempts = [
 				{ token: 'any-token', user: '../../../etc/passwd' },
 				{ token: '<script>evil()</script>', user: 'admin' }
 			];
 
-			for (const attempt of authAttempts) {
-				const result = validateInput(attempt);
-				// Should validate structure but may not authenticate
-				expect(result).toBeDefined();
+			expect(validateInput(nonMaliciousAttempt).valid).toBe(true);
+
+			for (const attempt of maliciousAttempts) {
+				expect(validateInput(attempt).valid).toBe(false);
 			}
 		});
 	});

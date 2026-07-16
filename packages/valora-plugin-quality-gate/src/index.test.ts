@@ -81,7 +81,10 @@ describe('audit scan — exit codes', () => {
 	it('exits 2 and logs an error when an integer flag is not a number', async () => {
 		const { exitCode, logger } = await runScan([path.join(FIXTURES, 'violations'), '--depth=abc']);
 		expect(exitCode).toBe(2);
-		expect(logger.error).toHaveBeenCalled();
+		expect(logger.error).toHaveBeenCalledWith(
+			'Audit scan failed',
+			expect.objectContaining({ message: 'Flag --depth must be an integer, got: abc' })
+		);
 	});
 });
 

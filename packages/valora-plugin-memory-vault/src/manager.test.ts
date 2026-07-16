@@ -2,12 +2,17 @@
  * Unit tests for MemoryManager
  */
 
-import { beforeEach, describe, expect, it } from 'vitest';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import type { MemoryCategory, MemoryEntry, MemoryStoreFile } from '@windagency/valora-plugin-api';
 
 import { MemoryManager } from './manager';
 import type { MemoryStore } from './store';
+import { resetSigningKeyPathForTests, setSigningKeyPathForTests, verifyProvenance } from './vault/provenance';
 
 function makeEntry(overrides: Partial<MemoryEntry> = {}): MemoryEntry {
 	const now = new Date(Date.now() - 1000).toISOString(); // 1 second ago — has a small, non-zero age
@@ -95,10 +100,18 @@ function makeInMemoryStore(): MemoryStore {
 describe('MemoryManager', () => {
 	let store: MemoryStore;
 	let manager: MemoryManager;
+	let signingKeyDir: string;
 
 	beforeEach(() => {
 		store = makeInMemoryStore();
 		manager = new MemoryManager(store);
+		signingKeyDir = mkdtempSync(join(tmpdir(), 'valora-vault-signing-'));
+		setSigningKeyPathForTests(join(signingKeyDir, 'vault-signing.key'));
+	});
+
+	afterEach(() => {
+		resetSigningKeyPathForTests();
+		rmSync(signingKeyDir, { recursive: true, force: true });
 	});
 
 	describe('create()', () => {
@@ -124,6 +137,20 @@ describe('MemoryManager', () => {
 			// Entry is persisted in the store
 			const stored = await store.getEntries('episodic');
 			expect(stored.some((e) => e.id === entry.id)).toBe(true);
+		});
+
+		it('stamps a provenance signature that verifies against the created entry', async () => {
+			const entry = await manager.create('episodic', {
+				content: 'Hello memory',
+				tags: ['hello'],
+				source: { command: 'test' },
+				confidence: 'observed',
+				agentRole: 'lead',
+				sessionId: 'sess-1'
+			});
+
+			expect(entry.provenanceSignature).toMatch(/^[0-9a-f]{64}$/);
+			expect(verifyProvenance(entry.content, entry.agentRole, entry.createdAt, entry.provenanceSignature)).toBe(true);
 		});
 
 		it('gives 2× halfLife when isError=true', async () => {
@@ -216,6 +243,26 @@ describe('MemoryManager', () => {
 			const updated = stored.find((e) => e.id === entry.id);
 			expect(updated?.accessCount).toBe(1);
 		});
+
+		it('excludes entries whose provenance signature failed verification', async () => {
+			const untrusted = makeEntry({ id: 'mem-untrustedtest', trusted: false });
+			const trusted = makeEntry({ id: 'mem-trustedtest01', trusted: true });
+			await store.appendEntry('episodic', untrusted);
+			await store.appendEntry('episodic', trusted);
+
+			const results = await manager.query({ strengthen: false });
+			const ids = results.map((r) => r.entry.id);
+			expect(ids).not.toContain(untrusted.id);
+			expect(ids).toContain(trusted.id);
+		});
+
+		it('does not exclude entries with trusted === undefined (legacy/unsigned entries)', async () => {
+			const legacy = makeEntry({ id: 'mem-legacytest01' });
+			await store.appendEntry('episodic', legacy);
+
+			const results = await manager.query({ strengthen: false });
+			expect(results.map((r) => r.entry.id)).toContain(legacy.id);
+		});
 	});
 
 	describe('invalidateByPaths()', () => {
@@ -286,6 +333,20 @@ describe('MemoryManager', () => {
 			const source = episodics.find((e) => e.id === episodic.id);
 			expect(source?.confidence).toBe('stale');
 			expect(source?.supersededBy).toBe(promoted.id);
+		});
+
+		it('refuses to promote an episodic entry whose provenance signature failed verification', async () => {
+			const untrusted = makeEntry({
+				id: 'mem-untrustedpromote',
+				category: 'episodic',
+				tags: ['ts'],
+				trusted: false
+			});
+			await store.appendEntry('episodic', untrusted);
+
+			await expect(manager.promote(untrusted.id, 'Laundered content', ['consolidated'])).rejects.toThrow(
+				/untrusted|provenance/i
+			);
 		});
 	});
 

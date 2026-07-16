@@ -10,9 +10,18 @@ function allPluginNames(): string[] {
 	return readdirSync(PACKAGES_DIR, { withFileTypes: true })
 		.filter((d) => d.isDirectory() && d.name.startsWith('valora-plugin-'))
 		.map((d) => {
-			const raw = readFileSync(join(PACKAGES_DIR, d.name, 'valora-plugin.json'), 'utf-8');
-			return (JSON.parse(raw) as { name: string }).name;
-		});
+			try {
+				const raw = readFileSync(join(PACKAGES_DIR, d.name, 'valora-plugin.json'), 'utf-8');
+				return (JSON.parse(raw) as { name: string }).name;
+			} catch {
+				// Not every "valora-plugin-*" package directory is a loadable plugin — e.g.
+				// valora-plugin-api is the shared SDK/types package, not a plugin instance,
+				// and has no manifest. Production plugin discovery (plugin-loader.service.ts)
+				// already skips unreadable/missing manifests the same way.
+				return null;
+			}
+		})
+		.filter((name): name is string => name !== null);
 }
 
 describe('activity taxonomy', () => {

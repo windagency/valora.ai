@@ -5,6 +5,8 @@
  * due to insufficient or invalid input data.
  */
 
+import type { ExecutedToolCall } from 'executor/validators/types';
+
 import { getValidator, hasValidator } from 'executor/validators/registry';
 import { getColorAdapter } from 'output/color-adapter.interface';
 import { getConsoleOutput } from 'output/console-output';
@@ -77,10 +79,14 @@ export class StageValidationService {
 	 * Registry validators (Track-Two) run first; if they fail the result is
 	 * returned immediately without running the legacy built-in validators.
 	 */
-	validate(stageName: string, outputs: Record<string, unknown>): StageValidationResult {
+	validate(
+		stageName: string,
+		outputs: Record<string, unknown>,
+		executedToolCalls: ExecutedToolCall[] = []
+	): StageValidationResult {
 		const registryValidator = getValidator(stageName);
 		if (registryValidator) {
-			const result = registryValidator.validate(outputs, { stageName });
+			const result = registryValidator.validate(outputs, { executedToolCalls, stageName });
 			if (!result.passed) {
 				return {
 					isValid: false,

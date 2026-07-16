@@ -6,7 +6,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import type { MemoryEntry } from '@windagency/valora-plugin-api';
 
-import { VaultStore } from './vault-store';
+import { addRecord, createEmptyIndex } from './vault-index';
+import { collectVaultCandidates, VaultStore } from './vault-store';
 
 function makeEntry(overrides: Partial<MemoryEntry> = {}): MemoryEntry {
 	const now = new Date().toISOString();
@@ -165,6 +166,21 @@ describe('VaultStore', () => {
 			await store.setLastConsolidatedAt('2026-05-01T12:00:00.000Z');
 			const stragglers = fs.readdirSync(tmpDir).filter((f) => f.endsWith('.tmp'));
 			expect(stragglers).toEqual([]);
+		});
+
+		it('falls back to a fresh timestamp instead of propagating a wrong-typed meta.json field', async () => {
+			// Hand-crafted/corrupted meta.json — lastWrittenAt is a number, not a
+			// string, and lastConsolidatedAt is an object. A bare `as
+			// Record<string, VaultMeta>` type assertion would propagate both
+			// wrong-typed values straight through to callers with no guard.
+			fs.writeFileSync(
+				path.join(tmpDir, 'meta.json'),
+				JSON.stringify({ episodic: { lastConsolidatedAt: { not: 'a string' }, lastWrittenAt: 12345 } })
+			);
+			const fresh = new VaultStore(tmpDir);
+			const meta = await fresh.getMetadata('episodic');
+			expect(typeof meta.lastWrittenAt).toBe('string');
+			expect(meta.lastConsolidatedAt).toBeUndefined();
 		});
 	});
 
@@ -377,5 +393,35 @@ describe('VaultStore', () => {
 			expect(outA.some((e) => e.kind === 'co_accessed' && e.toId === 'mem-coLiveB')).toBe(true);
 			expect(index.inEdges.get('mem-coLiveB')?.has('mem-coLiveA')).toBe(true);
 		});
+	});
+});
+
+describe('collectVaultCandidates (semantic-recall seed filtering)', () => {
+	it('excludes entries whose provenance signature failed verification', () => {
+		const index = createEmptyIndex();
+		addRecord(index, {
+			entry: makeEntry({ id: 'mem-untrusted', trusted: false }),
+			links: [],
+			mdPath: '/tmp/mem-untrusted.md'
+		});
+		addRecord(index, {
+			entry: makeEntry({ id: 'mem-trusted', trusted: true }),
+			links: [],
+			mdPath: '/tmp/mem-trusted.md'
+		});
+
+		const candidates = collectVaultCandidates(index, {}, 0);
+
+		expect(candidates).toContain('mem-trusted');
+		expect(candidates).not.toContain('mem-untrusted');
+	});
+
+	it('does not exclude entries with trusted === undefined (legacy/unsigned entries)', () => {
+		const index = createEmptyIndex();
+		addRecord(index, { entry: makeEntry({ id: 'mem-legacy' }), links: [], mdPath: '/tmp/mem-legacy.md' });
+
+		const candidates = collectVaultCandidates(index, {}, 0);
+
+		expect(candidates).toContain('mem-legacy');
 	});
 });

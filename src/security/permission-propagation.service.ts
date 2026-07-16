@@ -1,4 +1,8 @@
+import * as path from 'node:path';
+
 import type { AgentConstraints } from 'types/agent.types';
+
+import { resolveRealPathBestEffort } from 'utils/real-path';
 
 export interface EffectivePermissions {
 	delegationDepth: number;
@@ -32,10 +36,27 @@ export class PermissionPropagationService {
 
 	/**
 	 * Returns true if the given file path falls under any forbidden path prefix.
+	 *
+	 * Both sides are resolved to their real (symlink-free, `..`-collapsed) form
+	 * before comparing — a lexical-only comparison can be defeated by an
+	 * unnormalized ".." segment, or by a mismatch between a caller's
+	 * already-symlink-resolved path and a `forbidden_paths` entry configured
+	 * using an unresolved symlink pointing at the same real location.
+	 *
+	 * A relative `forbidden_paths` entry (the form real agent personas actually
+	 * use, e.g. `.valora/`, `data/`) is resolved against `baseDir` — pass the
+	 * caller's actual working directory (which can legitimately differ from
+	 * `process.cwd()`, e.g. in exploration contexts) rather than relying on the
+	 * default.
 	 */
-	isForbidden(filePath: string, forbiddenPaths: string[]): boolean {
+	isForbidden(filePath: string, forbiddenPaths: string[], baseDir: string = process.cwd()): boolean {
 		if (forbiddenPaths.length === 0) return false;
-		return forbiddenPaths.some((forbidden) => filePath === forbidden || filePath.startsWith(forbidden + '/'));
+		const resolvedFilePath = resolveRealPathBestEffort(filePath);
+		return forbiddenPaths.some((forbidden) => {
+			const absoluteForbidden = path.isAbsolute(forbidden) ? forbidden : path.join(baseDir, forbidden);
+			const resolvedForbidden = resolveRealPathBestEffort(absoluteForbidden);
+			return resolvedFilePath === resolvedForbidden || resolvedFilePath.startsWith(resolvedForbidden + path.sep);
+		});
 	}
 
 	/**

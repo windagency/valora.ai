@@ -102,6 +102,22 @@ export function getRuntimeDataDir(): string {
 }
 
 /**
+ * Resolve the project root to check `isWorkspaceTrusted()` against: the
+ * nearest ancestor containing `.valora/`, or `process.cwd()` if none exists.
+ * Single source of truth for every `isWorkspaceTrusted()` caller — before
+ * this existed, `hook-execution.service.ts` walked up to find the `.valora/`
+ * ancestor while other consumers used raw `process.cwd()` with no walk-up,
+ * so running `valora` from a subdirectory of an already-trusted project
+ * would silently deny trust for the consumers that didn't walk up. Fails
+ * closed either way (never grants trust it shouldn't), but was a real,
+ * confusing functional inconsistency across consumers of the same primitive.
+ */
+export function getWorkspaceTrustCheckRoot(): string {
+	const projectConfigDir = getProjectConfigDir();
+	return projectConfigDir ? path.dirname(projectConfigDir) : process.cwd();
+}
+
+/**
  * Get the package's built-in plugins directory.
  */
 export function getPackagePluginsDir(): string {

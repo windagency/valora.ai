@@ -478,6 +478,19 @@ describe('Circular Dependencies', () => {
 			// for external tool execution, but not on other presentation layers.
 			// MCP contains both server (presentation) and client (infrastructure) code.
 			// This is validated at a finer granularity by other tests.
+			//
+			// Note: this deliberately checks only `cli..`, not `ui..` — executor
+			// legitimately depends on `ui/prompt-adapter.interface.ts` for
+			// interactive escalation/tool-approval prompts (a sanctioned
+			// cross-cutting concern, not a layering violation).
+			noClasses()
+				.that()
+				.resideInAnyPackage('executor..')
+				.should()
+				.dependOnClassesThat()
+				.resideInAnyPackage('cli..')
+				.because('Application layer (executor) must not depend on the CLI presentation layer')
+				.check(srcProject.allClasses());
 		});
 	});
 });

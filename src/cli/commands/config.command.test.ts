@@ -20,21 +20,34 @@ vi.mock('config/loader', () => ({
 
 vi.mock('output/color-adapter.interface', () => ({
 	getColorAdapter: vi.fn(() => ({
+		green: (s: string) => s,
 		red: (s: string) => s
 	}))
 }));
 
+const mockGetWorkspaceTrustCheckRoot = vi.fn(() => process.cwd());
 vi.mock('utils/paths', () => ({
 	getRuntimeDataDir: vi.fn(() => '/mock/runtime'),
-	getGlobalConfigDir: vi.fn(() => '/mock/global')
+	getGlobalConfigDir: vi.fn(() => '/mock/global'),
+	getWorkspaceTrustCheckRoot: (...args: unknown[]) => mockGetWorkspaceTrustCheckRoot(...args)
 }));
 
 vi.mock('utils/error-handler', () => ({
 	formatError: vi.fn((e: Error) => e.message)
 }));
 
+const mockTrustWorkspace = vi.fn();
+const mockRevokeWorkspaceTrust = vi.fn();
+const mockIsWorkspaceTrusted = vi.fn();
+vi.mock('security/workspace-trust.service', () => ({
+	isWorkspaceTrusted: (...args: unknown[]) => mockIsWorkspaceTrusted(...args),
+	revokeWorkspaceTrust: (...args: unknown[]) => mockRevokeWorkspaceTrust(...args),
+	trustWorkspace: (...args: unknown[]) => mockTrustWorkspace(...args)
+}));
+
 import * as path from 'node:path';
 import { createContainer, initializePlugins } from 'di/container';
+import { getConfigLoader } from 'config/loader';
 import { SetupWizard } from 'config/wizard';
 import { configureConfigCommand } from './config';
 
@@ -105,5 +118,158 @@ describe('config setup', () => {
 
 		consoleErrorSpy.mockRestore();
 		exitSpy.mockRestore();
+	});
+});
+
+describe('config trust', () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+		mockGetWorkspaceTrustCheckRoot.mockReturnValue(process.cwd());
+	});
+
+	it('trusts the current working directory', async () => {
+		const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+
+		await runCommand(makeProgram(), ['config', 'trust']);
+
+		expect(mockTrustWorkspace).toHaveBeenCalledWith(process.cwd());
+		expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining(process.cwd()));
+
+		consoleLogSpy.mockRestore();
+	});
+
+	it('revokes trust for the current working directory', async () => {
+		const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+
+		await runCommand(makeProgram(), ['config', 'untrust']);
+
+		expect(mockRevokeWorkspaceTrust).toHaveBeenCalledWith(process.cwd());
+		expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining(process.cwd()));
+
+		consoleLogSpy.mockRestore();
+	});
+
+	it('reports trust status for the current working directory', async () => {
+		mockIsWorkspaceTrusted.mockReturnValue(true);
+		const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+
+		await runCommand(makeProgram(), ['config', 'trust-status']);
+
+		expect(mockIsWorkspaceTrusted).toHaveBeenCalledWith(process.cwd());
+		expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('Trusted'));
+
+		consoleLogSpy.mockRestore();
+	});
+
+	it('reports not-trusted status when the directory has never been trusted', async () => {
+		mockIsWorkspaceTrusted.mockReturnValue(false);
+		const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+
+		await runCommand(makeProgram(), ['config', 'trust-status']);
+
+		expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('Not trusted'));
+
+		consoleLogSpy.mockRestore();
+	});
+
+	it('calls trustWorkspace with the resolved trust-check root, not raw cwd', async () => {
+		// Every other isWorkspaceTrusted() consumer (hook-execution.service.ts,
+		// project-guidance-loader.ts, lsp-language-registry.ts) resolves via
+		// getWorkspaceTrustCheckRoot()'s walk-up to the nearest .valora/
+		// ancestor. These CLI commands used raw process.cwd() instead — from a
+		// subdirectory, `trust` under-trusts (fails safe, just confusing), but
+		// `untrust` is the dangerous direction: it revokes a key that was never
+		// in the store, a silent no-op, while every enforcement point still
+		// reports the ancestor root as trusted.
+		const ancestorRoot = '/repo/root';
+		mockGetWorkspaceTrustCheckRoot.mockReturnValue(ancestorRoot);
+		const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+
+		await runCommand(makeProgram(), ['config', 'trust']);
+
+		expect(mockTrustWorkspace).toHaveBeenCalledWith(ancestorRoot);
+		expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining(ancestorRoot));
+
+		consoleLogSpy.mockRestore();
+	});
+
+	it('calls revokeWorkspaceTrust with the resolved trust-check root, not raw cwd', async () => {
+		const ancestorRoot = '/repo/root';
+		mockGetWorkspaceTrustCheckRoot.mockReturnValue(ancestorRoot);
+		const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+
+		await runCommand(makeProgram(), ['config', 'untrust']);
+
+		expect(mockRevokeWorkspaceTrust).toHaveBeenCalledWith(ancestorRoot);
+		expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining(ancestorRoot));
+
+		consoleLogSpy.mockRestore();
+	});
+
+	it('calls isWorkspaceTrusted with the resolved trust-check root, not raw cwd', async () => {
+		const ancestorRoot = '/repo/root';
+		mockGetWorkspaceTrustCheckRoot.mockReturnValue(ancestorRoot);
+		mockIsWorkspaceTrusted.mockReturnValue(true);
+		const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+
+		await runCommand(makeProgram(), ['config', 'trust-status']);
+
+		expect(mockIsWorkspaceTrusted).toHaveBeenCalledWith(ancestorRoot);
+		expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining(ancestorRoot));
+
+		consoleLogSpy.mockRestore();
+	});
+});
+
+describe('config show', () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+	});
+
+	it('prints the loaded configuration as sanitized JSON, redacting API keys', async () => {
+		const fakeConfig = { providers: { anthropic: { apiKey: 'sk-ant-super-secret-value' } } };
+		vi.mocked(getConfigLoader).mockReturnValue({ load: vi.fn().mockResolvedValue(fakeConfig) } as never);
+		const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+
+		await runCommand(makeProgram(), ['config', 'show']);
+
+		const printed = consoleLogSpy.mock.calls.map((call) => call.join(' ')).join('\n');
+		expect(printed).not.toContain('sk-ant-super-secret-value');
+		expect(printed).toContain('anthropic');
+
+		consoleLogSpy.mockRestore();
+	});
+
+	it('exits with an error when the config fails to load', async () => {
+		vi.mocked(getConfigLoader).mockReturnValue({
+			load: vi.fn().mockRejectedValue(new Error('disk read failure'))
+		} as never);
+		const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never);
+		const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+		await runCommand(makeProgram(), ['config', 'show']);
+
+		expect(consoleErrorSpy).toHaveBeenCalledWith(expect.anything(), expect.stringContaining('disk read failure'));
+		expect(exitSpy).toHaveBeenCalledWith(1);
+
+		consoleErrorSpy.mockRestore();
+		exitSpy.mockRestore();
+	});
+});
+
+describe('config path', () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+	});
+
+	it('prints the resolved configuration file path', async () => {
+		vi.mocked(getConfigLoader).mockReturnValue({ getConfigPath: () => '/resolved/config.json' } as never);
+		const consoleInfoSpy = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+
+		await runCommand(makeProgram(), ['config', 'path']);
+
+		expect(consoleInfoSpy).toHaveBeenCalledWith('/resolved/config.json');
+
+		consoleInfoSpy.mockRestore();
 	});
 });

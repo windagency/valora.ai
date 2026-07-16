@@ -7,11 +7,12 @@ import type { UpdateCheckState } from './throttle';
 
 function makeState(overrides: Partial<UpdateCheckState> = {}): UpdateCheckState {
 	return {
-		schemaVersion: 1,
+		schemaVersion: 2,
 		lastCheckAt: new Date(0).toISOString(),
 		lastSuccessAt: null,
 		latestVersion: '2.6.0',
 		latestVersionFetchedAt: null,
+		plugins: {},
 		remindedForVersion: null,
 		installedVersionAtCheck: null,
 		...overrides

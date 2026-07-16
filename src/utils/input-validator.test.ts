@@ -5,7 +5,11 @@
  * against oversized payloads, deep nesting, and malformed data.
  */
 
-import { beforeEach, describe, expect, it } from 'vitest';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
+
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
 	InputValidator,
 	InputValidatorOptions,
@@ -27,7 +31,7 @@ describe('InputValidator', () => {
 		it('should use default limits when none provided', () => {
 			const validator = new InputValidator();
 
-			expect(validator).toBeDefined();
+			expect(validator).toBeInstanceOf(InputValidator);
 		});
 
 		it('should merge custom limits with defaults', () => {
@@ -38,7 +42,7 @@ describe('InputValidator', () => {
 
 			const validator = new InputValidator(customLimits);
 
-			expect(validator).toBeDefined();
+			expect(validator).toBeInstanceOf(InputValidator);
 		});
 	});
 
@@ -99,12 +103,12 @@ describe('InputValidator', () => {
 			expect(result.errors.some((error) => /String length \d+ exceeds limit/.test(error))).toBe(true);
 		});
 
-		it('should check for malicious patterns in strings', () => {
+		it('rejects strings containing malicious patterns', () => {
 			const maliciousString = 'rm -rf / && echo hacked';
 			const result = validator.validate(maliciousString);
 
-			// Should have warnings about malicious patterns
-			expect(result.warnings.length).toBeGreaterThan(0);
+			expect(result.valid).toBe(false);
+			expect(result.errors.some((error) => /malicious pattern/.test(error))).toBe(true);
 		});
 	});
 
@@ -387,7 +391,7 @@ describe('Security-focused validation', () => {
 		expect(result.errors.some((error) => /Array length \d+ exceeds limit/.test(error))).toBe(true);
 	});
 
-	it('should detect malicious command injection patterns', () => {
+	it('rejects malicious command injection patterns', () => {
 		const maliciousInput = {
 			command: 'ls -la && rm -rf /',
 			path: '../../../etc/passwd',
@@ -396,8 +400,8 @@ describe('Security-focused validation', () => {
 
 		const result = validator.validate(maliciousInput);
 
-		// Should have warnings about malicious patterns
-		expect(result.warnings.length).toBeGreaterThan(0);
+		expect(result.valid).toBe(false);
+		expect(result.errors.length).toBeGreaterThan(0);
 	});
 });
 
@@ -459,5 +463,39 @@ describe('Forbidden Path Validation', () => {
 			expect(() => validateNotForbiddenPath('src/index.ts', 'write to')).not.toThrow();
 			expect(() => validateNotForbiddenPath('knowledge-base/docs.md', 'modify')).not.toThrow();
 		});
+	});
+});
+
+describe('validatePath', () => {
+	let rootDir: string;
+
+	beforeEach(() => {
+		rootDir = fs.mkdtempSync(path.join(os.tmpdir(), 'valora-validate-path-'));
+	});
+
+	afterEach(() => {
+		fs.rmSync(rootDir, { recursive: true, force: true });
+	});
+
+	it('allows a path genuinely inside the allowed root', () => {
+		const target = path.join(rootDir, 'nested', 'file.json');
+		expect(InputValidator.validatePath(target, rootDir)).toBe(target);
+	});
+
+	it('rejects a sibling directory whose name is merely prefixed by the allowed root — bare startsWith wrongly admits it with no trailing-separator boundary', () => {
+		// A root of "<rootDir>" must not admit "<rootDir>-evil/...": the string
+		// "<rootDir>-evil" starts with the literal characters of "<rootDir>"
+		// even though it is a completely unrelated sibling directory.
+		const siblingDir = `${rootDir}-evil`;
+		fs.mkdirSync(siblingDir, { recursive: true });
+		const target = path.join(siblingDir, 'secret.json');
+
+		expect(() => InputValidator.validatePath(target, rootDir)).toThrow(/outside allowed directory/);
+
+		fs.rmSync(siblingDir, { recursive: true, force: true });
+	});
+
+	it('allows the allowed root itself with no trailing separator', () => {
+		expect(InputValidator.validatePath(rootDir, rootDir)).toBe(rootDir);
 	});
 });

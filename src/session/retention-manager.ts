@@ -212,22 +212,26 @@ export class SessionRetentionManager extends BaseRetentionManager<
 
 		if (currentSize <= maxSizeBytes) return sessionFiles;
 
-		// Sort by age (oldest first) and remove until under limit
+		// sessionFiles is sorted most-recently-updated first (see
+		// analyzeSessionDirectory). Accumulate a running total starting from
+		// zero and keep sessions while they still fit the budget — this keeps
+		// the most recent sessions and deletes the oldest overflow, matching
+		// age/count-based cleanup's own "keep recent, drop old" semantics.
 		const { toDelete, toKeep } = sessionFiles.reduce<{
-			currentSize: number;
+			cumulativeSize: number;
 			toDelete: SessionFileInfo[];
 			toKeep: SessionFileInfo[];
 		}>(
 			(acc, file) => {
-				if (acc.currentSize <= maxSizeBytes) {
+				if (acc.cumulativeSize + file.size <= maxSizeBytes) {
 					acc.toKeep.push(file);
+					acc.cumulativeSize += file.size;
 				} else {
 					acc.toDelete.push(file);
-					acc.currentSize -= file.size;
 				}
 				return acc;
 			},
-			{ currentSize, toDelete: [], toKeep: [] }
+			{ cumulativeSize: 0, toDelete: [], toKeep: [] }
 		);
 
 		const deleteResults = await Promise.allSettled(

@@ -1,9 +1,11 @@
 import fs from 'node:fs/promises';
 import { getSecurityAuditExporter } from 'security/audit-exporter';
+import { getCommandGuard } from 'security/command-guard';
 
 import type { CommandAdapter } from 'cli/command-adapter.interface';
 
 import { getColorAdapter } from 'output/color-adapter.interface';
+import { InputValidator } from 'utils/input-validator';
 
 export function configureSecurityCommand(program: CommandAdapter): void {
 	const color = getColorAdapter();
@@ -19,10 +21,38 @@ export function configureSecurityCommand(program: CommandAdapter): void {
 			const json = JSON.stringify(report, null, 2);
 
 			if (options.out) {
-				await fs.writeFile(options.out, json, 'utf-8');
-				console.log(color.green(`Security audit exported to ${options.out} (${report.totalEvents} events)`));
+				// --out previously wrote with zero path validation — an agent
+				// that can run this command could clobber vault-signing.key/
+				// trusted-workspaces.json/mcp-baselines.json/security-audit.jsonl
+				// themselves, the exact files this security infrastructure is
+				// meant to protect from tampering. cwd-containment alone isn't
+				// enough: .valora/security-audit.jsonl sits INSIDE a project's
+				// own cwd, so the protected-basename check must run separately.
+				let validatedPath: string;
+				try {
+					validatedPath = InputValidator.validatePath(options.out, process.cwd());
+				} catch (error) {
+					console.error(color.red('Invalid --out path:'), (error as Error).message);
+					process.exit(1);
+					return;
+				}
+				if (getCommandGuard().isProtectedInfrastructureTarget(validatedPath)) {
+					console.error(color.red('Invalid --out path:'), 'targets a protected security-infrastructure file');
+					process.exit(1);
+					return;
+				}
+				await fs.writeFile(validatedPath, json, 'utf-8');
+				console.log(color.green(`Security audit exported to ${validatedPath} (${report.totalEvents} events)`));
 			} else {
 				console.log(json);
+			}
+
+			if (!report.chainVerified) {
+				console.log(
+					color.red(
+						'WARNING: audit log hash chain verification failed — a prior entry may have been deleted, reordered, or edited.'
+					)
+				);
 			}
 		});
 }

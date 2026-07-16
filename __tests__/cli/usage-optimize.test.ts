@@ -74,7 +74,11 @@ describe('OptimizeScanner', () => {
 
 			const findings = scanner.scan();
 			const f = findings.find((x) => x.detectorId === 'unknown-model-pricing');
-			expect(f).toBeDefined();
+			expect(f).toMatchObject({
+				detectorId: 'unknown-model-pricing',
+				title: 'Unknown model pricing — actual costs may be under-reported',
+				urgency: 'medium'
+			});
 		});
 
 		it('does not fire when all records have known model pricing', () => {
@@ -104,7 +108,10 @@ describe('OptimizeScanner', () => {
 				);
 			}
 			const findings = scanner.scan();
-			expect(findings.find((x) => x.detectorId === 'under-utilised-cache')).toBeDefined();
+			expect(findings.find((x) => x.detectorId === 'under-utilised-cache')).toMatchObject({
+				detectorId: 'under-utilised-cache',
+				title: 'Under-utilised prompt cache for command "review-code"'
+			});
 		});
 
 		it('does not fire for a command that repeats but already has good cache savings', () => {
@@ -132,7 +139,11 @@ describe('OptimizeScanner', () => {
 
 			const findings = scanner.scan();
 			const f = findings.find((x) => x.detectorId === 'high-iteration-command');
-			expect(f).toBeDefined();
+			expect(f).toMatchObject({
+				detectorId: 'high-iteration-command',
+				title: 'High stage iteration count for command "slow-cmd"',
+				urgency: 'medium'
+			});
 			expect(f!.details).toContain('slow-cmd');
 		});
 
@@ -150,7 +161,10 @@ describe('OptimizeScanner', () => {
 				);
 			}
 			const findings = scanner.scan();
-			expect(findings.find((x) => x.detectorId === 'progressive-disclosure-thrash')).toBeDefined();
+			expect(findings.find((x) => x.detectorId === 'progressive-disclosure-thrash')).toMatchObject({
+				detectorId: 'progressive-disclosure-thrash',
+				title: 'Progressive-disclosure thrash in command "analyze"'
+			});
 		});
 
 		it('does not fire when context savings are sufficient', () => {
@@ -220,7 +234,10 @@ describe('OptimizeScanner', () => {
 			for (let i = 0; i < 4; i++) await mcpAuditLogger.logToolCall('my-server', 'search', false, 50, 'timeout');
 
 			const findings = scanner.scan();
-			expect(findings.find((x) => x.detectorId === 'flaky-mcp-tool')).toBeDefined();
+			expect(findings.find((x) => x.detectorId === 'flaky-mcp-tool')).toMatchObject({
+				detectorId: 'flaky-mcp-tool',
+				title: 'Flaky MCP tool: "search" on server "my-server"'
+			});
 		});
 
 		it('does not fire when the tool has fewer than 10 calls', async () => {

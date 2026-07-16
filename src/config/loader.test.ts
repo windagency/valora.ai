@@ -162,7 +162,7 @@ describe('ConfigLoader', () => {
 
 			const config = await loader.load();
 
-			expect(config.defaults).toBeDefined();
+			expect(config.defaults.log_level).toBe(DEFAULT_CONFIG.defaults.log_level);
 			expect(config.providers).toBeDefined();
 			expect(mockReadJSON).not.toHaveBeenCalled();
 		});
@@ -233,7 +233,7 @@ describe('ConfigLoader', () => {
 
 			await loader.save(config);
 
-			expect(mockEnsureDir).toHaveBeenCalled();
+			expect(mockEnsureDir).toHaveBeenCalledWith(tempDir);
 			expect(mockWriteJSON).toHaveBeenCalledWith(path.join(tempDir, 'config.json'), config);
 		});
 
@@ -271,8 +271,7 @@ describe('ConfigLoader', () => {
 			await loader.load();
 
 			const raw = loader.getRaw();
-			expect(raw).toBeDefined();
-			expect(typeof raw).toBe('object');
+			expect(raw).toEqual({ obsidian: { vaultDir: '/test-vault' } });
 		});
 
 		it('preserves top-level plugin keys that CONFIG_SCHEMA strips', async () => {
@@ -291,8 +290,8 @@ describe('ConfigLoader', () => {
 			// Trigger reload — but getRaw() should be null again between reload and re-load
 			// (reload calls load() immediately so it re-populates; just verify it survives round-trip)
 			const reloaded = await loader.reload();
-			expect(reloaded).toBeDefined();
-			expect(loader.getRaw()).toBeDefined();
+			expect(reloaded.defaults.log_level).toBe(DEFAULT_CONFIG.defaults.log_level);
+			expect(loader.getRaw()).toEqual({});
 		});
 	});
 

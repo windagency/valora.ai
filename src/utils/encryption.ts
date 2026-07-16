@@ -13,6 +13,13 @@
  */
 
 import * as crypto from 'crypto';
+import * as fs from 'fs';
+import * as path from 'path';
+
+import { getRuntimeDataDir } from 'utils/paths';
+
+/** Filename for the persisted, randomly-generated fallback master key (see getMasterKey()). */
+const FALLBACK_KEY_FILENAME = 'encryption-fallback-key';
 
 /**
  * Extended cipher interface with GCM-specific methods
@@ -258,17 +265,41 @@ export class EncryptionUtil {
 			return this.masterKey;
 		}
 
-		// Fallback: derive from machine-specific data (not secure for production!)
-		const machineId = process.env['COMPUTERNAME'] ?? process.env['HOSTNAME'] ?? 'localhost';
-		const appId = 'ai-orchestrator-session-encryption';
-		const combined = `${machineId}:${appId}:${Date.now()}`;
-
-		// Use PBKDF2 to derive a consistent key from machine data
-		this.masterKey = crypto
-			.pbkdf2Sync(combined, 'ai-orchestrator-salt', 10000, this.options.keyLength, 'sha256')
-			.toString('hex');
-
+		this.masterKey = this.loadOrCreatePersistedFallbackKey();
 		return this.masterKey;
+	}
+
+	/**
+	 * Load a previously-persisted random fallback key, or generate and persist
+	 * a new one. A persisted random key is both stable across process restarts
+	 * (data encrypted under a prior run stays decryptable) and not guessable
+	 * from public machine information (hostname, etc.) — unlike the previous
+	 * approach of deriving from `${machineId}:${appId}:${Date.now()}`, which
+	 * was neither: the timestamp made it unstable across restarts, without
+	 * ever making it any less derivable from public machine data.
+	 */
+	private loadOrCreatePersistedFallbackKey(): string {
+		const keyPath = path.join(getRuntimeDataDir(), FALLBACK_KEY_FILENAME);
+
+		try {
+			const existing = fs.readFileSync(keyPath, 'utf8').trim();
+			if (existing.length >= 32) return existing;
+		} catch {
+			// No key persisted yet (or unreadable/corrupt) — generate a new one below.
+		}
+
+		const generated = crypto.randomBytes(this.options.keyLength).toString('hex');
+		try {
+			fs.mkdirSync(path.dirname(keyPath), { recursive: true });
+			fs.writeFileSync(keyPath, generated, { encoding: 'utf8', mode: 0o600 });
+		} catch {
+			// Persisting failed (e.g. read-only filesystem) — the generated key
+			// still works for this process's lifetime, it just won't survive a
+			// restart. Not re-thrown: a persistence failure here must not break
+			// encryption itself.
+		}
+
+		return generated;
 	}
 
 	/**

@@ -127,6 +127,27 @@ export class WorktreeManager {
 		}
 	}
 
+	/**
+	 * List local branch names starting with `prefix` (e.g. `exploration/exp-abc`
+	 * matches `exploration/exp-abc-1`, `exploration/exp-abc-2`, ...). `prefix`
+	 * must be a literal, already-validated branch-name-shaped string — this
+	 * method appends the `*` glob itself and passes the pattern to `git
+	 * branch --list` via array-form exec (no shell), so untrusted input in
+	 * `prefix` cannot smuggle shell metacharacters or its own glob syntax.
+	 */
+	async listBranchesByPrefix(prefix: string): Promise<string[]> {
+		InputValidator.validateBranchName(prefix);
+
+		const result = await SafeExecutor.executeGit(['branch', '--list', `${prefix}*`], {
+			cwd: this.repoRoot
+		});
+
+		return result.stdout
+			.split('\n')
+			.map((line) => line.replace(/^\*?\s+/, '').trim())
+			.filter(Boolean);
+	}
+
 	async listWorktrees(): Promise<WorktreeInfo[]> {
 		try {
 			const result = await SafeExecutor.executeGit(['worktree', 'list', '--porcelain'], {

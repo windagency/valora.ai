@@ -18,8 +18,9 @@ vi.mock('output/logger', () => ({
 	}))
 }));
 
+const mockRegisterPluginDir = vi.fn();
 vi.mock('utils/resource-resolver', () => ({
-	getResourceResolver: vi.fn(() => ({ registerPluginDir: vi.fn() }))
+	getResourceResolver: () => ({ registerPluginDir: mockRegisterPluginDir })
 }));
 
 function writeJson(filePath: string, data: unknown): void {
@@ -100,6 +101,28 @@ describe('PluginLoaderService — agent-only bundles', () => {
 		writeFile(path.join(tmpDir, 'agents', 'platform-engineer.md'), '---\nrole: platform-engineer\n---\ntest');
 
 		const plugins = loader.loadAll({ enabled: ['other-plugin'] });
+
+		expect(plugins).toHaveLength(0);
+	});
+
+	it('registers each loaded plugin directory with the ResourceResolver', () => {
+		mockRegisterPluginDir.mockClear();
+		writeJson(path.join(tmpDir, 'valora-plugin.json'), {
+			name: 'valora-plugin-secops',
+			version: '1.0.0',
+			contributes: ['agents']
+		});
+		writeFile(path.join(tmpDir, 'agents', 'secops-engineer.md'), '---\nrole: secops-engineer\n---\ntest');
+
+		loader.loadAll();
+
+		expect(mockRegisterPluginDir).toHaveBeenCalledWith(tmpDir);
+	});
+
+	it('excludes a plugin with a malformed manifest from loadAll() (not just catalogAll())', () => {
+		fs.writeFileSync(path.join(tmpDir, 'valora-plugin.json'), '{ "broken": true }');
+
+		const plugins = loader.loadAll();
 
 		expect(plugins).toHaveLength(0);
 	});
@@ -414,6 +437,56 @@ describe('PluginLoaderService — permission/contribute mismatch warnings', () =
 		loader.loadAll();
 
 		expect(mockWarn).toHaveBeenCalledWith(expect.stringContaining('mcp-connect'), expect.anything());
+	});
+});
+
+describe('PluginLoaderService — hooks.json loading', () => {
+	let tmpDir: string;
+	let loader: PluginLoaderService;
+
+	beforeEach(() => {
+		tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'valora-hooks-test-'));
+		loader = new PluginLoaderService({
+			discoverWithSource: () => [{ dir: tmpDir, location: 'built-in' as const }]
+		} as never);
+	});
+
+	afterEach(() => {
+		fs.rmSync(tmpDir, { recursive: true, force: true });
+	});
+
+	it('loads real hook definitions from hooks.json when the plugin has shell-hooks permission', () => {
+		writeJson(path.join(tmpDir, 'valora-plugin.json'), {
+			name: 'valora-plugin-rtk',
+			version: '1.0.0',
+			contributes: ['hooks'],
+			permissions: ['shell-hooks']
+		});
+		writeJson(path.join(tmpDir, 'hooks.json'), {
+			hooks: { PreToolUse: [{ matcher: '^rtk$', hooks: [{ type: 'command', command: 'rtk' }] }] }
+		});
+
+		const plugins = loader.loadAll();
+
+		expect(plugins).toHaveLength(1);
+		expect(plugins[0].hooks?.PreToolUse).toHaveLength(1);
+		expect(plugins[0].hooks?.PreToolUse?.[0]?.matcher).toBe('^rtk$');
+		expect(plugins[0].hooks?.PreToolUse?.[0]?.hooks[0]?.command).toBe('rtk');
+	});
+
+	it('loads the plugin without hooks when hooks.json is malformed, rather than failing the whole plugin', () => {
+		writeJson(path.join(tmpDir, 'valora-plugin.json'), {
+			name: 'valora-plugin-rtk',
+			version: '1.0.0',
+			contributes: ['hooks'],
+			permissions: ['shell-hooks']
+		});
+		writeJson(path.join(tmpDir, 'hooks.json'), { hooks: { PreToolUse: 'not-an-array' } });
+
+		const plugins = loader.loadAll();
+
+		expect(plugins).toHaveLength(1);
+		expect(plugins[0].hooks).toBeUndefined();
 	});
 });
 

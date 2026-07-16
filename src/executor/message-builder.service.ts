@@ -191,6 +191,14 @@ You MUST include this JSON block at the END of your response, after all other co
 	}
 
 	/**
+	 * Append human-provided guidance (from an escalation "modify" decision) to an
+	 * already-built user message, for re-running a stage with corrective direction.
+	 */
+	appendGuidance(userMessage: string, guidance: string): string {
+		return `${userMessage}\n\n## Additional Guidance (from human reviewer)\n\n${guidance}`;
+	}
+
+	/**
 	 * Build user message with resolved inputs
 	 * Formats file contents in a clear, readable way for the LLM
 	 */

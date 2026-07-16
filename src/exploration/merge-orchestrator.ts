@@ -1,21 +1,26 @@
 /**
  * Merge Orchestrator - Smart merge strategies for exploration results
  *
- * Handles merging winning exploration branches back to main codebase
+ * Handles merging winning exploration branches back to main codebase.
+ *
+ * Every git/gh invocation uses SafeExecutor.execute (spawn with an argument
+ * array, no shell) rather than shell-string interpolation — `target_branch`,
+ * commit messages, and conflicted file paths all originate from tool-call
+ * arguments or a merge conflict's crafted filename, none of it sanitized for
+ * shell metacharacters. `target_branch` is additionally validated as a
+ * well-formed git ref before use, as defense-in-depth beyond array-form alone.
  */
-
-import { exec } from 'child_process';
-import { promisify } from 'util';
 
 import type { Exploration, WorktreeExploration } from 'types/exploration.types';
 
 import { getLogger } from 'output/logger';
 import { formatErrorMessage } from 'utils/error-handler';
+import { InputValidator } from 'utils/input-validator';
+import { type ExecResult, SafeExecutor } from 'utils/safe-exec';
 
 import { ExplorationStateManager } from './exploration-state';
 import { WorktreeManager } from './worktree-manager';
 
-const execAsync = promisify(exec);
 const logger = getLogger();
 
 export interface ConflictInfo {
@@ -92,6 +97,16 @@ export class MergeOrchestrator {
 		this.worktreeManager = new WorktreeManager(this.repoRoot);
 	}
 
+	/** Run a git command with argv passed literally — never through a shell. */
+	private async runGit(args: string[]): Promise<ExecResult> {
+		return SafeExecutor.execute('git', args, { cwd: this.repoRoot });
+	}
+
+	/** Run a gh command with argv passed literally — never through a shell. */
+	private async runGh(args: string[]): Promise<ExecResult> {
+		return SafeExecutor.execute('gh', args, { cwd: this.repoRoot });
+	}
+
 	/**
 	 * Merge an exploration worktree back to target branch
 	 */
@@ -107,6 +122,10 @@ export class MergeOrchestrator {
 		logger.info(`Strategy: ${mergeOptions.strategy}`);
 
 		try {
+			if (mergeOptions.target_branch) {
+				InputValidator.validateGitRef(mergeOptions.target_branch);
+			}
+
 			const { exploration, worktree } = await this.loadAndValidateExploration(
 				explorationId,
 				worktreeIndex,
@@ -374,14 +393,14 @@ export class MergeOrchestrator {
 
 		// Check if branch exists
 		try {
-			await execAsync(`git rev-parse --verify ${worktree.branch_name}`, { cwd: this.repoRoot });
+			await this.runGit(['rev-parse', '--verify', worktree.branch_name]);
 		} catch {
 			errors.push(`Branch does not exist: ${worktree.branch_name}`);
 		}
 
 		// Check working tree is clean (in main repo)
 		try {
-			const { stdout } = await execAsync('git status --porcelain', { cwd: this.repoRoot });
+			const { stdout } = await this.runGit(['status', '--porcelain']);
 			if (stdout.trim()) {
 				errors.push('Working tree has uncommitted changes. Commit or stash before merging.');
 			}
@@ -392,7 +411,7 @@ export class MergeOrchestrator {
 		// Check target branch exists
 		if (options.target_branch) {
 			try {
-				await execAsync(`git rev-parse --verify ${options.target_branch}`, { cwd: this.repoRoot });
+				await this.runGit(['rev-parse', '--verify', options.target_branch]);
 			} catch {
 				errors.push(`Target branch does not exist: ${options.target_branch}`);
 			}
@@ -459,7 +478,7 @@ export class MergeOrchestrator {
 	): Promise<Partial<MergeResult>> {
 		try {
 			// Try merge
-			const { stderr, stdout } = await execAsync(`git merge --no-ff ${sourceBranch}`, { cwd: this.repoRoot });
+			const { stderr, stdout } = await this.runGit(['merge', '--no-ff', sourceBranch]);
 
 			// Check for conflicts
 			if (stderr.includes('CONFLICT') || stdout.includes('CONFLICT')) {
@@ -472,10 +491,8 @@ export class MergeOrchestrator {
 			}
 
 			// Get merge commit info
-			const { stdout: commitHash } = await execAsync('git rev-parse HEAD', { cwd: this.repoRoot });
-			const { stdout: statsOutput } = await execAsync(`git diff --stat ${sourceBranch}~1 ${sourceBranch}`, {
-				cwd: this.repoRoot
-			});
+			const { stdout: commitHash } = await this.runGit(['rev-parse', 'HEAD']);
+			const { stdout: statsOutput } = await this.runGit(['diff', '--stat', `${sourceBranch}~1`, sourceBranch]);
 
 			const filesChanged = this.parseGitStats(statsOutput);
 
@@ -511,12 +528,10 @@ export class MergeOrchestrator {
 	): Promise<Partial<MergeResult>> {
 		try {
 			// Squash merge
-			await execAsync(`git merge --squash ${sourceBranch}`, { cwd: this.repoRoot });
+			await this.runGit(['merge', '--squash', sourceBranch]);
 
 			// Check for conflicts
-			const { stdout: statusOutput } = await execAsync('git status --porcelain', {
-				cwd: this.repoRoot
-			});
+			const { stdout: statusOutput } = await this.runGit(['status', '--porcelain']);
 
 			if (statusOutput.includes('U ')) {
 				// Unmerged files (conflicts)
@@ -533,9 +548,9 @@ export class MergeOrchestrator {
 				options.commit_message ?? `Merge exploration: ${sourceBranch}\n\n🤖 Squash merged exploration branch`;
 
 			// Commit
-			await execAsync(`git commit -m "${commitMessage}"`, { cwd: this.repoRoot });
+			await this.runGit(['commit', '-m', commitMessage]);
 
-			const { stdout: commitHash } = await execAsync('git rev-parse HEAD', { cwd: this.repoRoot });
+			const { stdout: commitHash } = await this.runGit(['rev-parse', 'HEAD']);
 
 			return {
 				...result,
@@ -566,16 +581,16 @@ export class MergeOrchestrator {
 	): Promise<Partial<MergeResult>> {
 		try {
 			// Checkout source branch temporarily
-			await execAsync(`git checkout ${sourceBranch}`, { cwd: this.repoRoot });
+			await this.runGit(['checkout', sourceBranch]);
 
 			// Rebase onto target
-			await execAsync(`git rebase ${targetBranch}`, { cwd: this.repoRoot });
+			await this.runGit(['rebase', targetBranch]);
 
 			// Checkout target and fast-forward
-			await execAsync(`git checkout ${targetBranch}`, { cwd: this.repoRoot });
-			await execAsync(`git merge --ff-only ${sourceBranch}`, { cwd: this.repoRoot });
+			await this.runGit(['checkout', targetBranch]);
+			await this.runGit(['merge', '--ff-only', sourceBranch]);
 
-			const { stdout: commitHash } = await execAsync('git rev-parse HEAD', { cwd: this.repoRoot });
+			const { stdout: commitHash } = await this.runGit(['rev-parse', 'HEAD']);
 
 			return {
 				...result,
@@ -585,7 +600,7 @@ export class MergeOrchestrator {
 		} catch (error: unknown) {
 			// Abort rebase if failed
 			try {
-				await execAsync('git rebase --abort', { cwd: this.repoRoot });
+				await this.runGit(['rebase', '--abort']);
 			} catch {
 				// Ignore
 			}
@@ -610,7 +625,7 @@ export class MergeOrchestrator {
 		const conflicts: ConflictInfo[] = [];
 
 		try {
-			const { stdout } = await execAsync('git status --porcelain', { cwd: this.repoRoot });
+			const { stdout } = await this.runGit(['status', '--porcelain']);
 			const lines = stdout.split('\n').filter((line) => line.trim());
 
 			for (const line of lines) {
@@ -643,8 +658,15 @@ export class MergeOrchestrator {
 			try {
 				// Simple strategy: take 'ours' (target branch) for now
 				// In a real implementation, this could be much smarter
-				await execAsync(`git checkout --ours "${conflict.file_path}"`, { cwd: this.repoRoot });
-				await execAsync(`git add "${conflict.file_path}"`, { cwd: this.repoRoot });
+				//
+				// conflict.file_path is parsed from an untrusted exploration
+				// branch's own `git status --porcelain` output — an
+				// option-shaped path (e.g. `--upload-pack=...`) would
+				// otherwise be parsed by git as a FLAG, not a literal path,
+				// even as a single argv element. `--` forces git to treat
+				// everything after it as a positional path.
+				await this.runGit(['checkout', '--ours', '--', conflict.file_path]);
+				await this.runGit(['add', '--', conflict.file_path]);
 
 				conflict.resolved = true;
 				conflict.resolution_strategy = 'ours';
@@ -666,7 +688,7 @@ export class MergeOrchestrator {
 		const commitMessage =
 			options.commit_message ?? `Merge exploration: ${worktree.branch_name}\n\n🤖 Auto-resolved conflicts`;
 
-		await execAsync(`git commit -m "${commitMessage}"`, { cwd: this.repoRoot });
+		await this.runGit(['commit', '-m', commitMessage]);
 		logger.info('Merge completed');
 	}
 
@@ -675,7 +697,7 @@ export class MergeOrchestrator {
 	 */
 	private async abortMerge(): Promise<void> {
 		try {
-			await execAsync('git merge --abort', { cwd: this.repoRoot });
+			await this.runGit(['merge', '--abort']);
 			logger.info('Merge aborted');
 		} catch (error) {
 			logger.warn(`Failed to abort merge: ${getErrorMessage(error)}`);
@@ -689,7 +711,7 @@ export class MergeOrchestrator {
 		const timestamp = new Date().toISOString().replace(/[:.]/g, '-').substring(0, 19);
 		const backupName = `backup/${targetBranch}-${timestamp}`;
 
-		await execAsync(`git branch ${backupName} ${targetBranch}`, { cwd: this.repoRoot });
+		await this.runGit(['branch', backupName, targetBranch]);
 		return backupName;
 	}
 
@@ -697,7 +719,7 @@ export class MergeOrchestrator {
 	 * Get current branch
 	 */
 	private async getCurrentBranch(): Promise<string> {
-		const { stdout } = await execAsync('git branch --show-current', { cwd: this.repoRoot });
+		const { stdout } = await this.runGit(['branch', '--show-current']);
 		return stdout.trim();
 	}
 
@@ -705,7 +727,7 @@ export class MergeOrchestrator {
 	 * Checkout branch
 	 */
 	private async checkoutBranch(branch: string): Promise<void> {
-		await execAsync(`git checkout ${branch}`, { cwd: this.repoRoot });
+		await this.runGit(['checkout', branch]);
 		logger.debug(`Checked out branch: ${branch}`);
 	}
 
@@ -718,10 +740,18 @@ export class MergeOrchestrator {
 			options.pr_body ?? `🤖 Auto-generated PR from exploration\n\nMerging ${sourceBranch} → ${targetBranch}`;
 
 		try {
-			const { stdout } = await execAsync(
-				`gh pr create --base ${targetBranch} --head ${sourceBranch} --title "${title}" --body "${body}"`,
-				{ cwd: this.repoRoot }
-			);
+			const { stdout } = await this.runGh([
+				'pr',
+				'create',
+				'--base',
+				targetBranch,
+				'--head',
+				sourceBranch,
+				'--title',
+				title,
+				'--body',
+				body
+			]);
 
 			// Extract PR URL from output
 			const urlMatch = stdout.match(/https:\/\/github\.com\/.+\/pull\/\d+/);
@@ -748,7 +778,7 @@ export class MergeOrchestrator {
 	 */
 	private async countCommits(branch: string): Promise<number> {
 		try {
-			const { stdout } = await execAsync(`git rev-list --count HEAD..${branch}`, { cwd: this.repoRoot });
+			const { stdout } = await this.runGit(['rev-list', '--count', `HEAD..${branch}`]);
 			return parseInt(stdout.trim());
 		} catch {
 			return 0;
@@ -792,9 +822,7 @@ export class MergeOrchestrator {
 
 		// Try merge with --no-commit to preview
 		try {
-			await execAsync(`git merge --no-commit --no-ff ${worktree.branch_name}`, {
-				cwd: this.repoRoot
-			});
+			await this.runGit(['merge', '--no-commit', '--no-ff', worktree.branch_name]);
 
 			const conflicts = await this.detectConflicts();
 			const commits = await this.countCommits(worktree.branch_name);

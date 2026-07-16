@@ -12,7 +12,7 @@ import type { AgentRole, CommandResult, PromptsPipeline } from 'types/command.ty
 import { getConfigLoader } from 'config/loader';
 import { AgentLoader } from 'executor/agent-loader';
 import { ExecutionContext, type SessionInfo } from 'executor/execution-context';
-import { CommandExecutionStrategyFactory } from 'executor/execution-strategy';
+import { CommandExecutionStrategyFactory, registerPluginAgentDirs } from 'executor/execution-strategy';
 import { getLogger } from 'output/logger';
 import { getProcessingFeedback } from 'output/processing-feedback';
 import { SessionContextManager } from 'session/context';
@@ -386,7 +386,7 @@ export class ExecutionCoordinator {
 		// When an mcp_* tool is called, the MCPToolHandler connects on demand.
 
 		// Create execution context and execute
-		const executionContext = this.createExecutionContext(
+		const executionContext = await this.createExecutionContext(
 			commandName,
 			resolvedCommand,
 			options,
@@ -668,15 +668,23 @@ export class ExecutionCoordinator {
 	 * Filters session context to only include keys referenced by the pipeline
 	 * Initializes with stage outputs from previous commands in the session
 	 */
-	private createExecutionContext(
+	private async createExecutionContext(
 		commandName: string,
 		resolvedCommand: ResolvedCommand,
 		options: CommandExecutionOptions,
 		sessionManager: SessionContextManager,
 		effectiveAgent: AgentRole,
 		sessionInfo?: SessionInfo
-	): ExecutionContext {
+	): Promise<ExecutionContext> {
 		const logger = getLogger();
+
+		// Load the resolved agent's declared constraints (forbidden_paths,
+		// requires_approval_for) so they actually reach effectiveConstraints
+		// instead of silently defaulting to empty. Plugin agent dirs must be
+		// registered first since persona files (e.g. secops-engineer.md) can
+		// live under a plugin's agents/ directory.
+		await registerPluginAgentDirs(this.agentLoader);
+		const agent = await this.agentLoader.loadAgent(effectiveAgent);
 
 		// Get full context for extracting internal data
 		const fullContext = sessionManager.getAllContext();
@@ -708,6 +716,7 @@ export class ExecutionCoordinator {
 		}
 
 		return new ExecutionContext({
+			agentConstraints: agent.constraints ?? {},
 			agentRole: effectiveAgent,
 			allowedTools: resolvedCommand.command['allowed-tools'],
 			args: options.args,
