@@ -1,152 +1,194 @@
 [
 	{
-		"contributes": ["code"],
+		"contributes": [
+			"code"
+		],
 		"description": "Compression strategies for Python tooling: python, pytest, pip, pip3, cargo, ruff (6 strategies).",
-		"integrity": "sha256-HALkv9+UYX0PYmcxiKpHlFlg4CRPFHTJQ91ao4Cmh80=",
+		"integrity": "sha256-TB38nsKi4qJLS9k/ryL9LZMpR0HVXs9XxgKd6oJHDpM=",
 		"name": "valora-plugin-compression-python",
 		"package": "@windagency/valora-plugin-compression-python",
 		"path": "../../packages/valora-plugin-compression-python",
 		"version": "1.0.0"
 	},
 	{
-		"contributes": ["code"],
+		"contributes": [
+			"code"
+		],
 		"description": "Compression strategies for the TypeScript/JavaScript ecosystem: tsc, eslint, jest, vitest, pnpm, npm, npx, yarn, prettier, bun, bunx, biome (12 strategies).",
-		"integrity": "sha256-hJxmPtVAic5asAG6QUyeNrXzdNazX6kTU1uUm6MJimk=",
+		"integrity": "sha256-7Z0Upa3J7l/NJQCbu4IpJTZxbGWQ/ebG1fCehQZkF04=",
 		"name": "valora-plugin-compression-typescript",
 		"package": "@windagency/valora-plugin-compression-typescript",
 		"path": "../../packages/valora-plugin-compression-typescript",
 		"version": "1.0.0"
 	},
 	{
-		"contributes": ["code"],
+		"contributes": [
+			"code"
+		],
 		"description": "Compression strategies for universal CLI tools: git, grep, rg, docker, make, ls, find, tree, cat, diff, curl, wget, jq, yq, tail, journalctl, gh (17 strategies).",
-		"integrity": "sha256-W9pNPxEmFsYITNYyu0mGJpVlJe85BAHEfbs49zy352M=",
+		"integrity": "sha256-AptbazEh+cuqNqKaD7iOnhXIlnZLmHeqbB1LCvMm36s=",
 		"name": "valora-plugin-compression-universal",
 		"package": "@windagency/valora-plugin-compression-universal",
 		"path": "../../packages/valora-plugin-compression-universal",
 		"version": "1.0.0"
 	},
 	{
-		"contributes": ["agents"],
+		"contributes": [
+			"agents"
+		],
 		"description": "UI/UX Designer agent for user experience, accessibility, and interface design workflows.",
-		"integrity": "sha256-aih3B5GSh1u1hcWR1JGfoJ7tfSMt0BK8KyF2yINlphQ=",
+		"integrity": "sha256-lZks1oqxfzUiXD5F2YCFvgvXJIG9ZNH/XtoDaqpnZfc=",
 		"name": "valora-plugin-design",
 		"package": "@windagency/valora-plugin-design",
 		"path": "../../packages/valora-plugin-design",
 		"version": "1.0.0"
 	},
 	{
-		"contributes": ["commands"],
+		"contributes": [
+			"commands"
+		],
 		"description": "Documentation generation commands (generate-docs, generate-all-documentation). Depends on the lead agent contributed by valora-plugin-engineering.",
-		"integrity": "sha256-vWHUe6/Q2hnWleynUeb9iul0r8wEH67Y9bRUNrjBFdg=",
+		"integrity": "sha256-4XcMAvw6tSoUlGlz1Hzdu03pFe/+fp9mbyY0xkwL8VA=",
 		"name": "valora-plugin-docs",
 		"package": "@windagency/valora-plugin-docs",
 		"path": "../../packages/valora-plugin-docs",
 		"version": "1.0.1"
 	},
 	{
-		"contributes": ["agents", "commands"],
+		"contributes": [
+			"agents",
+			"commands"
+		],
 		"description": "Lead engineer agent and core engineering workflow commands (commit, create-pr, gather-knowledge, plan, plan-architecture, plan-implementation, review-code, review-functional, review-plan, validate-parallel, validate-plan).",
-		"integrity": "sha256-iDp75OXraq5LVCQp/djEq8CIkArsCaMDFlGXtubWIvg=",
+		"integrity": "sha256-H2hkuy/oH4wknOziFkyWEmf8Wrys9MF67AF+PeMQbxY=",
 		"name": "valora-plugin-engineering",
 		"package": "@windagency/valora-plugin-engineering",
 		"path": "../../packages/valora-plugin-engineering",
 		"version": "1.0.1"
 	},
 	{
-		"contributes": ["agents", "commands"],
+		"contributes": [
+			"agents",
+			"commands"
+		],
 		"description": "TypeScript software engineer agent family (base, backend, frontend, frontend-react) and the implement command with dynamic agent selection.",
-		"integrity": "sha256-M53HnCuXOMy17BHpTXatpYhgLiq225shPsZq1iVFeJs=",
+		"integrity": "sha256-wBweOzwSPMJmNwAwtMeEcCTni5wJQp5woT2SDNUuPRA=",
 		"name": "valora-plugin-implement",
 		"package": "@windagency/valora-plugin-implement",
 		"path": "../../packages/valora-plugin-implement",
 		"version": "1.0.1"
 	},
 	{
-		"contributes": ["code"],
+		"contributes": [
+			"code"
+		],
 		"description": "Bundled vault memory backend — biologically-inspired decay, graph retrieval, cosine + Jaccard consolidation. The default memory.provider.",
-		"integrity": "sha256-x6slEuEyi3kSabWToAlB5UfH8PgxGhy+YKRPCJOflHw=",
+		"integrity": "sha256-dAuWU/7YkChtD15mtRR7ycKyq/FqCWPqIglQxtG/qCQ=",
 		"name": "valora-plugin-memory-vault",
 		"package": "@windagency/valora-plugin-memory-vault",
 		"path": "../../packages/valora-plugin-memory-vault",
 		"version": "1.0.0"
 	},
 	{
-		"contributes": ["code"],
+		"contributes": [
+			"code"
+		],
 		"description": "Bridges the Valora memory vault to Obsidian — sets up vault config and opens it.",
-		"integrity": "sha256-GTPW+JjnO55SzgQNILK5HA0i7G7y31PzKB0leReM5mY=",
+		"integrity": "sha256-6rZsQFXhSlbdfy3OMGOxKTJBevU2ybObSq6OYU6Fty8=",
 		"name": "valora-plugin-obsidian",
 		"package": "@windagency/valora-plugin-obsidian",
 		"path": "../../packages/valora-plugin-obsidian",
 		"version": "1.0.0"
 	},
 	{
-		"contributes": ["code"],
+		"contributes": [
+			"code"
+		],
 		"description": "Self-managed Ollama provider — downloads the Ollama binary on first use and runs it locally. Supports any model available via ollama pull.",
-		"integrity": "sha256-Fk4zEyFHWLmRUCnvfeqJe2k413/IVDSd1iiZaiYD3WE=",
+		"integrity": "sha256-GWTNKq85uP7T7DpTS03+DCnzjAOcomPT0Ki7l3ammdo=",
 		"name": "valora-plugin-ollama",
 		"package": "@windagency/valora-plugin-ollama",
 		"path": "../../packages/valora-plugin-ollama",
 		"version": "1.0.0"
 	},
 	{
-		"contributes": ["code"],
+		"contributes": [
+			"code"
+		],
 		"description": "OpenRouter provider — connects to openrouter.ai for unified access to models via an OpenAI-compatible API. Requires OPENROUTER_API_KEY.",
-		"integrity": "sha256-jW849pZy49Fx8H5CYfq5qAdPMYAemDhdMMWpl1HKFM8=",
+		"integrity": "sha256-YVfWzmXco3bGs/9bZZoggp9C042SRrI2zgCyc2hbTJY=",
 		"name": "valora-plugin-openrouter",
 		"package": "@windagency/valora-plugin-openrouter",
 		"path": "../../packages/valora-plugin-openrouter",
 		"version": "1.0.0"
 	},
 	{
-		"contributes": ["agents"],
+		"contributes": [
+			"agents"
+		],
 		"description": "Platform Engineer agent for cloud-native architecture, Kubernetes, CI/CD, and infrastructure reliability.",
-		"integrity": "sha256-9y5WS9qTzlwJKs91jz8Pn1Er170HJ6twnor2iFyR4NQ=",
+		"integrity": "sha256-7ncBRjYa5RNW1WVnEXhS4hQxVIT+DuGkfnNFyeaB/wU=",
 		"name": "valora-plugin-platform",
 		"package": "@windagency/valora-plugin-platform",
 		"path": "../../packages/valora-plugin-platform",
 		"version": "1.0.0"
 	},
 	{
-		"contributes": ["agents", "commands"],
+		"contributes": [
+			"agents",
+			"commands"
+		],
 		"description": "Product Manager agent and product-discovery workflow commands (create-prd, refine-specs, refine-task, create-backlog, fetch-task, feedback).",
-		"integrity": "sha256-Wdg2sVuxUjm4ny1cMmkkY4rTRKmUa8tc50X21pcmurM=",
+		"integrity": "sha256-ydRmnH4A5KbE1qGgryCw07mNLYP1yM48mHmzmaF+yCA=",
 		"name": "valora-plugin-product",
 		"package": "@windagency/valora-plugin-product",
 		"path": "../../packages/valora-plugin-product",
 		"version": "1.0.1"
 	},
 	{
-		"contributes": ["agents", "commands"],
+		"contributes": [
+			"agents",
+			"commands"
+		],
 		"description": "QA Engineer agent and test-execution workflow commands (test, validate-coverage, pre-check).",
-		"integrity": "sha256-1TshSCpQldwvYVziGKyeTjXLRO1y3HnBpLAtq1W5Z2w=",
+		"integrity": "sha256-6h4Q1Pz4QChj+ReQNL5CIPUkEwTuP2WjSv2j97WIo4c=",
 		"name": "valora-plugin-qa",
 		"package": "@windagency/valora-plugin-qa",
 		"path": "../../packages/valora-plugin-qa",
 		"version": "1.0.1"
 	},
 	{
-		"contributes": ["code", "agents", "commands", "prompts"],
+		"contributes": [
+			"code",
+			"agents",
+			"commands",
+			"prompts"
+		],
 		"description": "Asserter agent and assert command (static pre-testing quality gate) plus audit scan — detects N×M concern accumulation across sibling directories.",
-		"integrity": "sha256-WpuoxZeni3CwI6SNnteCZKO0D35eH4LJjbF3EDPAa4o=",
+		"integrity": "sha256-K2zL7x1rHq25PkCgITgavXABe7SB7iIUervNtZRT01c=",
 		"name": "valora-plugin-quality-gate",
 		"package": "@windagency/valora-plugin-quality-gate",
 		"path": "../../packages/valora-plugin-quality-gate",
 		"version": "1.0.1"
 	},
 	{
-		"contributes": ["hooks", "code"],
+		"contributes": [
+			"hooks",
+			"code"
+		],
 		"description": "RTK (Rust Token Killer) integration for Valora — transparently prepends rtk to known-noisy CLI tools, reducing LLM token consumption by 60–90%.",
-		"integrity": "sha256-ctIADjjQbb/c7W+Hu5HonyokQot+KXYhlsNdby1/zgc=",
+		"integrity": "sha256-pBIa76sX3660EB4zJ9zdpknRhWoBZjqvV4IT2XEpIcg=",
 		"name": "valora-plugin-rtk",
 		"package": "@windagency/valora-plugin-rtk",
 		"path": "../../packages/valora-plugin-rtk",
 		"version": "1.0.0"
 	},
 	{
-		"contributes": ["agents"],
+		"contributes": [
+			"agents"
+		],
 		"description": "Security Operations Engineer agent for threat detection, vulnerability management, and incident response.",
-		"integrity": "sha256-UFi6R8QsLbymGKU0knlXib41IReBUxUw3F14i+0QskE=",
+		"integrity": "sha256-Zq9iRYD7kYTvEpENPAYskDJL2rkB8pnnKvFLUuI/UoQ=",
 		"name": "valora-plugin-secops",
 		"package": "@windagency/valora-plugin-secops",
 		"path": "../../packages/valora-plugin-secops",
@@ -155,7 +197,7 @@
 	{
 		"contributes": [],
 		"description": "Pure-leaf runtime utilities shared across Valora plugins.",
-		"integrity": "sha256-jNIZFhEuRktjqYaQ+BwEHCTjL4ADohgIFd7GUqWNiTs=",
+		"integrity": "sha256-HUGn1PQsnYYLos85Fk1cLcg/gk6+BHNx3Ci/MoTZYAM=",
 		"name": "valora-runtime",
 		"package": "@windagency/valora-runtime",
 		"path": "../../packages/valora-runtime",
