@@ -83,7 +83,7 @@
 			"code"
 		],
 		"description": "Bundled vault memory backend — biologically-inspired decay, graph retrieval, cosine + Jaccard consolidation. The default memory.provider.",
-		"integrity": "sha256-dAuWU/7YkChtD15mtRR7ycKyq/FqCWPqIglQxtG/qCQ=",
+		"integrity": "sha256-sMDfu80QTqVsS+XrjCJtUC04hwzwbuvClhqVL6tgVr0=",
 		"name": "valora-plugin-memory-vault",
 		"package": "@windagency/valora-plugin-memory-vault",
 		"path": "../../packages/valora-plugin-memory-vault",
@@ -192,15 +192,6 @@
 		"name": "valora-plugin-secops",
 		"package": "@windagency/valora-plugin-secops",
 		"path": "../../packages/valora-plugin-secops",
-		"version": "1.0.0"
-	},
-	{
-		"contributes": [],
-		"description": "Pure-leaf runtime utilities shared across Valora plugins.",
-		"integrity": "sha256-HUGn1PQsnYYLos85Fk1cLcg/gk6+BHNx3Ci/MoTZYAM=",
-		"name": "valora-runtime",
-		"package": "@windagency/valora-runtime",
-		"path": "../../packages/valora-runtime",
 		"version": "1.0.0"
 	}
 ]

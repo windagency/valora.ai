@@ -5,6 +5,5 @@
 	"engines": { "valora": ">=0.1.0" },
 	"contributes": ["code"],
 	"permissions": ["code-exec", "fs-read", "fs-write"],
-	"codeEntrypoint": "dist/index.js",
-	"requires": ["valora-runtime"]
+	"codeEntrypoint": "dist/index.js"
 }

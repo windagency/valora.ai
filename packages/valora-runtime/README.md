@@ -2,21 +2,12 @@
 
 Pure-leaf runtime utilities shared across Valora plugins. Has no host dependencies — safe to consume from any plugin package without pulling in config loading, logger bootstrapping, or other host internals.
 
-This package is itself a built-in Valora plugin (`valora-plugin.json` included) and is declared as a dependency via the `requires` field in other plugins' manifests. When you list it in `requires`, the host wires a `node_modules` symlink so your code can import it directly without any npm install step.
+This is a normal published npm package, not a discoverable Valora plugin — it has no `valora-plugin.json` and cannot be listed in another plugin's `requires`. Add it to your plugin's `dependencies` like any other npm package.
 
 ## Installation
 
 ```bash
 pnpm add @windagency/valora-runtime
-```
-
-Or, in your plugin manifest:
-
-```json
-{
-	"name": "my-plugin",
-	"requires": ["valora-runtime"]
-}
 ```
 
 ---

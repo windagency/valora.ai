@@ -1,6 +1,6 @@
 {
 	"name": "@windagency/valora-runtime",
-	"version": "1.0.0",
+	"version": "1.1.0",
 	"description": "Pure-leaf runtime utilities shared across Valora packages: path resolution, ID generation, minimal error and logger types. Has no host dependencies — safe to consume from any plugin package.",
 	"keywords": [
 		"valora",
@@ -34,12 +34,16 @@
 	"scripts": {
 		"build": "tsc -b",
 		"clean": "rm -rf ./dist",
+		"fingerprint:update": "tsx ../../scripts/update-runtime-fingerprint.ts",
 		"lint": "eslint --color",
 		"lint:fix": "eslint --color --fix",
 		"test": "vitest run"
 	},
 	"files": [
-		"dist",
-		"valora-plugin.json"
-	]
+		"dist"
+	],
+	"apiFingerprints": {
+		"1.0.0": "01df0f8cfa80c69d79c897b14f5ef2b020be327a2c355fe6b624ccbc64b9110d",
+		"1.1.0": "01df0f8cfa80c69d79c897b14f5ef2b020be327a2c355fe6b624ccbc64b9110d"
+	}
 }

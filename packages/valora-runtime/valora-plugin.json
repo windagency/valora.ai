@@ -1,6 +1,0 @@
-{
-	"name": "valora-runtime",
-	"version": "1.0.0",
-	"description": "Pure-leaf runtime utilities shared across Valora plugins.",
-	"engines": { "valora": ">=0.1.0" }
-}

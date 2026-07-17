@@ -74,7 +74,7 @@ Every plugin must have a `valora-plugin.json` at its root. This is the only mand
 	"engines": { "valora": ">=0.1.0" },
 	"contributes": ["code", "commands"],
 	"permissions": ["code-exec"],
-	"requires": ["valora-runtime"],
+	"requires": ["some-other-plugin"],
 	"codeEntrypoint": "dist/index.js"
 }
 ```
@@ -88,19 +88,19 @@ Every plugin must have a `valora-plugin.json` at its root. This is the only mand
 
 ### Optional fields
 
-| Field            | Type          | Notes                                                                                                                    |
-| ---------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `description`    | string        | Shown in `valora plugin list`.                                                                                           |
-| `engines.valora` | semver range  | e.g. `">=0.1.0"`. Plugins that don't satisfy the host version are skipped.                                               |
-| `homepage`       | URL           | Shown in `valora plugin info`.                                                                                           |
-| `contributes`    | string[]      | Declares what this plugin provides. See [Contribution types](#contribution-types-reference).                             |
-| `permissions`    | string[]      | Gates that unlock the corresponding contribution. See below.                                                             |
-| `requires`       | string[]      | Plugin names that must be loaded first. The host wires `node_modules` symlinks so code can `import` them.                |
-| `requiresBinary` | object[]      | External binaries the plugin needs. See [Binary requirements](#binary-requirements).                                     |
-| `codeEntrypoint` | relative path | Entry module for code plugins, e.g. `"dist/index.js"`.                                                                   |
-| `cli`            | object[]      | Declares `{ name, description }` entries for `valora --help` (informational; actual registration happens in `register`). |
-| `overrides`      | string[]      | Names of built-in providers or backends this plugin replaces.                                                            |
-| `validators`     | object[]      | `{ module, stage }` pairs for pre-commit/pre-publish validators.                                                         |
+| Field            | Type          | Notes                                                                                                                                                                                                                  |
+| ---------------- | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `description`    | string        | Shown in `valora plugin list`.                                                                                                                                                                                         |
+| `engines.valora` | semver range  | e.g. `">=0.1.0"`. Plugins that don't satisfy the host version are skipped.                                                                                                                                             |
+| `homepage`       | URL           | Shown in `valora plugin info`.                                                                                                                                                                                         |
+| `contributes`    | string[]      | Declares what this plugin provides. See [Contribution types](#contribution-types-reference).                                                                                                                           |
+| `permissions`    | string[]      | Gates that unlock the corresponding contribution. See below.                                                                                                                                                           |
+| `requires`       | string[]      | Names of other _plugins_ that must be loaded first. The host wires `node_modules` symlinks so code can `import` them. Not for ordinary npm packages such as `@windagency/valora-runtime` — those go in `dependencies`. |
+| `requiresBinary` | object[]      | External binaries the plugin needs. See [Binary requirements](#binary-requirements).                                                                                                                                   |
+| `codeEntrypoint` | relative path | Entry module for code plugins, e.g. `"dist/index.js"`.                                                                                                                                                                 |
+| `cli`            | object[]      | Declares `{ name, description }` entries for `valora --help` (informational; actual registration happens in `register`).                                                                                               |
+| `overrides`      | string[]      | Names of built-in providers or backends this plugin replaces.                                                                                                                                                          |
+| `validators`     | object[]      | `{ module, stage }` pairs for pre-commit/pre-publish validators.                                                                                                                                                       |
 
 ### Permissions
 
@@ -202,7 +202,7 @@ my-plugin/
 }
 ```
 
-`valora-plugin-api` is a `devDependency` — it ships no runtime code. If you also use `valora-runtime`, add it to `dependencies` (or to `requires` in the manifest to get it wired without installing it separately).
+`valora-plugin-api` is a `devDependency` — it ships no runtime code. If you also use `valora-runtime`, add `@windagency/valora-runtime` to `dependencies` as a normal npm package — it is not a discoverable plugin, so it cannot be listed in `requires`.
 
 ### `src/index.ts`
 
@@ -633,19 +633,21 @@ The module is resolved relative to the plugin directory. Each validator module m
 
 ## Plugin dependencies
 
-Use `requires` to declare that your plugin needs another plugin to be loaded first:
+Use `requires` to declare that your plugin needs another _plugin_ to be loaded first:
 
 ```json
 {
 	"name": "my-plugin",
-	"requires": ["valora-runtime"]
+	"requires": ["some-other-plugin"]
 }
 ```
 
 The host:
 
 1. Topologically sorts plugins by their `requires` graph before activation, so dependencies activate first.
-2. Creates a `node_modules/@windagency/<depName>` symlink inside your plugin directory at load time, so your code can `import '@windagency/valora-runtime'` without an explicit `npm install`.
+2. Creates a `node_modules/@windagency/<depName>` symlink inside your plugin directory at load time, so your code can `import '@windagency/<depName>'` without an explicit `npm install`.
+
+This only resolves other discoverable _plugins_ (directories with their own `valora-plugin.json`). Ordinary npm packages — including `@windagency/valora-runtime` — are not discoverable this way; declare them in your own `package.json` `dependencies` instead.
 
 Circular dependencies are detected and logged as a warning; affected plugins are still loaded in an undefined order.
 
@@ -711,7 +713,7 @@ The single package a code plugin installs. Type-only — adds nothing to bundle 
 
 Pure-leaf utilities: error classes (`BaseError`, `ProviderError`), ID generators, `getLogger()`, path helpers (`getRuntimeDataDir()`, `getGlobalConfigDir()`), and safe process execution (`SafeExecutor`, `RetryExecutor`).
 
-Has no host dependencies — safe to import from any plugin. Declare it in `requires` in your manifest to get it wired without a separate npm install.
+Has no host dependencies — safe to import from any plugin. It is a normal published npm package, not a discoverable plugin: add `@windagency/valora-runtime` to your plugin's `dependencies`, not to `requires` in the manifest.
 
 → See the [full reference](../packages/valora-runtime/README.md).
 

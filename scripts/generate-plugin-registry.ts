@@ -35,6 +35,12 @@ interface RegistryEntry {
 const entries: RegistryEntry[] = [];
 
 for (const dirName of readdirSync(packagesDir)) {
+	// Only `valora-plugin-*` directories are discoverable plugins (see
+	// PluginDiscoveryService / ADR-012). Shared internal libraries such as
+	// `valora-runtime` must never be swept into the installable registry even
+	// if a stray manifest reappears.
+	if (!dirName.startsWith('valora-plugin-')) continue;
+
 	const packageDir = join(packagesDir, dirName);
 	const manifestPath = join(packageDir, 'valora-plugin.json');
 	if (!existsSync(manifestPath)) continue;
