@@ -11,7 +11,7 @@ vi.mock('fs', () => ({
 	rmSync: vi.fn()
 }));
 
-const { computeIntegrity } = await import('./compute-registry-integrity.ts');
+const { computeIntegrity, PublishedWithoutRegistryUrlError } = await import('./compute-registry-integrity.ts');
 
 const FAKE_BYTES = Buffer.from('tarball-bytes');
 const EXPECTED_HASH = `sha256-${createHash('sha256').update(FAKE_BYTES).digest('base64')}`;
@@ -73,6 +73,12 @@ describe('computeIntegrity', () => {
 		it('refuses to fall back to a local pnpm pack', async () => {
 			await expect(computeIntegrity(PACKAGE_DIR, PACKAGE_NAME, VERSION)).rejects.toThrow(
 				/already published.*VALORA_NPM_REGISTRY_URL/is
+			);
+		});
+
+		it('throws a PublishedWithoutRegistryUrlError so callers can distinguish it from a per-package pack failure', async () => {
+			await expect(computeIntegrity(PACKAGE_DIR, PACKAGE_NAME, VERSION)).rejects.toBeInstanceOf(
+				PublishedWithoutRegistryUrlError
 			);
 		});
 

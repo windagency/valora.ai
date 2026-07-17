@@ -7,6 +7,15 @@ import { join } from 'path';
 const DEFAULT_REGISTRY = 'https://registry.npmjs.org';
 
 /**
+ * Thrown when a package is already published but `registryUrl` wasn't given —
+ * a systemic misconfiguration (the caller forgot `VALORA_NPM_REGISTRY_URL`)
+ * that affects every already-published package, not a per-package problem.
+ * Callers iterating many packages must let this propagate and abort, rather
+ * than catching it the same way as a genuine single-package pack failure.
+ */
+export class PublishedWithoutRegistryUrlError extends Error {}
+
+/**
  * A local `pnpm pack` is never byte-identical to what actually gets served —
  * pnpm/npm publish rewrites JSON field order and gzip metadata. If the
  * package is already live at this version, silently packing it locally would
@@ -48,7 +57,7 @@ export async function computeIntegrity(
 	registryUrl?: string
 ): Promise<string> {
 	if (!registryUrl && (await isAlreadyPublished(packageName, version))) {
-		throw new Error(
+		throw new PublishedWithoutRegistryUrlError(
 			`${packageName}@${version} is already published to the npm registry. ` +
 				'Computing its integrity from a local pnpm pack would not match the published tarball bytes. ' +
 				`Set VALORA_NPM_REGISTRY_URL (e.g. ${DEFAULT_REGISTRY}) and re-run.`
