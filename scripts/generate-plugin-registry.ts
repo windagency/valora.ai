@@ -13,6 +13,9 @@ const outputPath = join(repoRoot, 'data', 'plugins', 'registry.json');
 // When set, integrity is computed by downloading from the live registry (matches
 // exactly what the installer downloads). Required when pnpm publish rewrites JSON
 // field order — otherwise pnpm pack locally and npm pack from registry diverge.
+// computeIntegrity() itself refuses to fall back to a local pack for a package
+// that's already published, so an operator can't forget to set this and silently
+// commit a hash the installer will never match.
 const registryUrl = process.env['VALORA_NPM_REGISTRY_URL'];
 
 interface PluginManifest {
@@ -54,10 +57,11 @@ for (const dirName of readdirSync(packagesDir)) {
 	}
 
 	const packageName = `@windagency/${dirName}`;
+	const version = manifest.version ?? '0.0.0';
 
 	let integrity: string;
 	try {
-		integrity = computeIntegrity(packageDir, packageName, registryUrl);
+		integrity = await computeIntegrity(packageDir, packageName, version, registryUrl);
 	} catch (err) {
 		console.warn(`Skipping ${dirName}: failed to compute integrity (${(err as Error).message})`);
 		continue;
@@ -71,7 +75,7 @@ for (const dirName of readdirSync(packagesDir)) {
 		package: packageName,
 		// Relative to the registry file so it resolves correctly regardless of CWD
 		path: relative(dirname(outputPath), packageDir),
-		version: manifest.version ?? '0.0.0'
+		version
 	});
 }
 
