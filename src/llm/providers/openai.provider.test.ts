@@ -127,6 +127,19 @@ describe('OpenAIProvider', () => {
 			});
 		});
 
+		it('omits temperature and top_p for a reasoning model even when the caller sets them', async () => {
+			mockCreate.mockResolvedValueOnce({
+				choices: [{ finish_reason: 'stop', message: { content: 'Hi', tool_calls: undefined } }],
+				model: 'o3',
+				usage: { completion_tokens: 5, prompt_tokens: 10, total_tokens: 15 }
+			});
+
+			await provider.complete({ ...options, model: 'o3', temperature: 0.7, top_p: 0.9 });
+
+			expect(mockCreate.mock.calls[0][0].temperature).toBeUndefined();
+			expect(mockCreate.mock.calls[0][0].top_p).toBeUndefined();
+		});
+
 		it('parses tool call arguments from a successful response', async () => {
 			mockCreate.mockResolvedValueOnce({
 				choices: [

@@ -30,7 +30,7 @@ import { getProviderRegistry } from 'llm/registry';
 import { createErrorContext, ProviderError, withCircuitBreaker, withRetry } from 'utils/error-handler';
 import { checkRateLimit, getRateLimitStatus } from 'utils/rate-limiter';
 
-import { OPENAI_DESCRIPTOR } from './openai.models';
+import { OPENAI_DESCRIPTOR, REASONING_CONTROLLED_MODELS } from './openai.models';
 
 export class OpenAIProvider extends BaseLLMProvider implements BatchableProvider {
 	name = BuiltinProviders.OPENAI;
@@ -61,6 +61,8 @@ export class OpenAIProvider extends BaseLLMProvider implements BatchableProvider
 
 		const operation = async (): Promise<LLMCompletionResult> => {
 			const client = this.getClient();
+			const model = options.model ?? this.getDefaultModel() ?? 'gpt-5';
+			const { temperature, topP } = this.resolveSamplingParams(model, options);
 
 			const response = await client.chat.completions.create({
 				max_tokens: options.max_tokens,
@@ -68,9 +70,9 @@ export class OpenAIProvider extends BaseLLMProvider implements BatchableProvider
 					content: m.content,
 					role: m.role as 'assistant' | 'system' | 'user'
 				})),
-				model: options.model ?? this.getDefaultModel() ?? 'gpt-5',
+				model,
 				stop: options.stop,
-				temperature: options.temperature,
+				temperature,
 				tools: options.tools
 					? options.tools.map((tool) => ({
 							function: {
@@ -81,7 +83,7 @@ export class OpenAIProvider extends BaseLLMProvider implements BatchableProvider
 							type: 'function' as const
 						}))
 					: undefined,
-				top_p: options.top_p
+				top_p: topP
 			});
 
 			const choice = response.choices[0];
@@ -151,6 +153,8 @@ export class OpenAIProvider extends BaseLLMProvider implements BatchableProvider
 	async streamComplete(options: LLMCompletionOptions, onChunk: (chunk: string) => void): Promise<LLMCompletionResult> {
 		try {
 			const client = this.getClient();
+			const model = options.model ?? this.getDefaultModel() ?? 'gpt-5';
+			const { temperature, topP } = this.resolveSamplingParams(model, options);
 
 			const stream = await client.chat.completions.create({
 				max_tokens: options.max_tokens,
@@ -158,11 +162,11 @@ export class OpenAIProvider extends BaseLLMProvider implements BatchableProvider
 					content: m.content,
 					role: m.role as 'assistant' | 'system' | 'user'
 				})),
-				model: options.model ?? this.getDefaultModel() ?? 'gpt-5',
+				model,
 				stop: options.stop,
 				stream: true,
-				temperature: options.temperature,
-				top_p: options.top_p
+				temperature,
+				top_p: topP
 			});
 
 			return await this.processStream(stream, onChunk);
@@ -268,6 +272,21 @@ export class OpenAIProvider extends BaseLLMProvider implements BatchableProvider
 		return this.client;
 	}
 
+	/**
+	 * Resolve `temperature`/`top_p` to send, or `undefined` to omit them entirely.
+	 * Reasoning-controlled models (see REASONING_CONTROLLED_MODELS) reject both as
+	 * unsupported parameters.
+	 */
+	private resolveSamplingParams(
+		model: string,
+		options: Pick<LLMCompletionOptions, 'temperature' | 'top_p'>
+	): { temperature: number | undefined; topP: number | undefined } {
+		if (REASONING_CONTROLLED_MODELS.has(model)) {
+			return { temperature: undefined, topP: undefined };
+		}
+		return { temperature: options.temperature, topP: options.top_p };
+	}
+
 	// ─── BatchableProvider implementation ────────────────────────────────────
 
 	async cancelBatch(batchId: string): Promise<void> {
@@ -286,30 +305,35 @@ export class OpenAIProvider extends BaseLLMProvider implements BatchableProvider
 		const client = this.getClient();
 		const defaultModel = this.getDefaultModel() ?? 'gpt-5';
 
-		const formatted = requests.map((req) => ({
-			customId: req.id,
-			params: {
-				max_tokens: req.options.max_tokens,
-				messages: req.options.messages.map((m) => ({
-					content: m.content,
-					role: m.role as 'assistant' | 'system' | 'user'
-				})),
-				model: req.options.model ?? defaultModel,
-				stop: req.options.stop,
-				temperature: req.options.temperature,
-				tools: req.options.tools
-					? req.options.tools.map((tool) => ({
-							function: {
-								description: tool.description,
-								name: tool.name,
-								parameters: tool.parameters
-							},
-							type: 'function' as const
-						}))
-					: undefined,
-				top_p: req.options.top_p
-			} as OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming
-		}));
+		const formatted = requests.map((req) => {
+			const model = req.options.model ?? defaultModel;
+			const { temperature, topP } = this.resolveSamplingParams(model, req.options);
+
+			return {
+				customId: req.id,
+				params: {
+					max_tokens: req.options.max_tokens,
+					messages: req.options.messages.map((m) => ({
+						content: m.content,
+						role: m.role as 'assistant' | 'system' | 'user'
+					})),
+					model,
+					stop: req.options.stop,
+					temperature,
+					tools: req.options.tools
+						? req.options.tools.map((tool) => ({
+								function: {
+									description: tool.description,
+									name: tool.name,
+									parameters: tool.parameters
+								},
+								type: 'function' as const
+							}))
+						: undefined,
+					top_p: topP
+				} as OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming
+			};
+		});
 
 		return submitOpenAIBatch(client, formatted, this.name, generateLocalId());
 	}

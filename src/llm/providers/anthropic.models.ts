@@ -110,3 +110,14 @@ export const ANTHROPIC_DESCRIPTOR: ProviderDescriptor = {
 };
 
 export const ANTHROPIC_PROVIDER_KEY = BuiltinProviders.ANTHROPIC;
+
+/** modelModes entries using effort-based reasoning control rather than a sampling temperature. */
+const EFFORT_MODES = new Set(['fast', 'high effort', 'low effort', 'max effort', 'medium effort', 'xhigh effort']);
+
+/**
+ * Models that select reasoning depth via the `effort` mode instead of `temperature`.
+ * The Anthropic API rejects `temperature` as deprecated for these models.
+ */
+export const EFFORT_CONTROLLED_MODELS: ReadonlySet<string> = new Set(
+	ANTHROPIC_DESCRIPTOR.modelModes.filter((mm) => EFFORT_MODES.has(mm.mode)).map((mm) => mm.model)
+);

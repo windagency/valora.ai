@@ -78,3 +78,11 @@ export const OPENAI_DESCRIPTOR: ProviderDescriptor = {
 	},
 	requiresApiKey: true
 };
+
+/**
+ * Models that select reasoning depth via the `reasoning_effort`-style mode instead of
+ * `temperature`/`top_p`. The OpenAI API rejects both as unsupported for these models.
+ */
+export const REASONING_CONTROLLED_MODELS: ReadonlySet<string> = new Set(
+	OPENAI_DESCRIPTOR.modelModes.filter((mm) => mm.mode.includes('reasoning')).map((mm) => mm.model)
+);

@@ -23,7 +23,7 @@ import { getLogger } from 'output/logger';
 import { createErrorContext, ProviderError, withRetry } from 'utils/error-handler';
 import { checkRateLimit, getRateLimitStatus } from 'utils/rate-limiter';
 
-import { XAI_DESCRIPTOR } from './xai.models';
+import { REASONING_CONTROLLED_MODELS, XAI_DESCRIPTOR } from './xai.models';
 
 const DEFAULT_XAI_BASE_URL = 'https://api.x.ai/v1';
 
@@ -55,6 +55,8 @@ export class XAIProvider extends BaseLLMProvider {
 
 		const operation = async (): Promise<LLMCompletionResult> => {
 			const client = this.getClient();
+			const model = options.model ?? this.getDefaultModel() ?? ModelName.GROK_4_3;
+			const { temperature, topP } = this.resolveSamplingParams(model, options);
 
 			const response = await client.chat.completions.create({
 				max_tokens: options.max_tokens,
@@ -62,9 +64,9 @@ export class XAIProvider extends BaseLLMProvider {
 					content: m.content,
 					role: m.role as 'assistant' | 'system' | 'user'
 				})),
-				model: options.model ?? this.getDefaultModel() ?? ModelName.GROK_4_3,
+				model,
 				stop: options.stop,
-				temperature: options.temperature,
+				temperature,
 				tools: options.tools
 					? options.tools.map((tool) => ({
 							function: {
@@ -75,7 +77,7 @@ export class XAIProvider extends BaseLLMProvider {
 							type: 'function' as const
 						}))
 					: undefined,
-				top_p: options.top_p
+				top_p: topP
 			});
 
 			const choice = response.choices[0];
@@ -139,6 +141,8 @@ export class XAIProvider extends BaseLLMProvider {
 	async streamComplete(options: LLMCompletionOptions, onChunk: (chunk: string) => void): Promise<LLMCompletionResult> {
 		try {
 			const client = this.getClient();
+			const model = options.model ?? this.getDefaultModel() ?? ModelName.GROK_4_3;
+			const { temperature, topP } = this.resolveSamplingParams(model, options);
 
 			const stream = await client.chat.completions.create({
 				max_tokens: options.max_tokens,
@@ -146,11 +150,11 @@ export class XAIProvider extends BaseLLMProvider {
 					content: m.content,
 					role: m.role as 'assistant' | 'system' | 'user'
 				})),
-				model: options.model ?? this.getDefaultModel() ?? ModelName.GROK_4_3,
+				model,
 				stop: options.stop,
 				stream: true,
-				temperature: options.temperature,
-				top_p: options.top_p
+				temperature,
+				top_p: topP
 			});
 
 			return await this.processStream(stream, onChunk);
@@ -235,6 +239,21 @@ export class XAIProvider extends BaseLLMProvider {
 			role: 'assistant',
 			usage: streamUsage
 		};
+	}
+
+	/**
+	 * Resolve `temperature`/`top_p` to send, or `undefined` to omit them entirely.
+	 * Reasoning-controlled models (see REASONING_CONTROLLED_MODELS) reject both as
+	 * unsupported parameters.
+	 */
+	private resolveSamplingParams(
+		model: string,
+		options: Pick<LLMCompletionOptions, 'temperature' | 'top_p'>
+	): { temperature: number | undefined; topP: number | undefined } {
+		if (REASONING_CONTROLLED_MODELS.has(model)) {
+			return { temperature: undefined, topP: undefined };
+		}
+		return { temperature: options.temperature, topP: options.top_p };
 	}
 }
 

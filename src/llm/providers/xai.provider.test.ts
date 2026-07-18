@@ -97,6 +97,31 @@ describe('XAIProvider', () => {
 			});
 		});
 
+		it('omits temperature and top_p for the reasoning model even when the caller sets them', async () => {
+			mockCreate.mockResolvedValueOnce({
+				choices: [{ finish_reason: 'stop', message: { content: 'Hi', tool_calls: undefined } }],
+				model: 'grok-4.20-0309-reasoning',
+				usage: { completion_tokens: 5, prompt_tokens: 10, total_tokens: 15 }
+			});
+
+			await provider.complete({ ...options, model: 'grok-4.20-0309-reasoning', temperature: 0.7, top_p: 0.9 });
+
+			expect(mockCreate.mock.calls[0][0].temperature).toBeUndefined();
+			expect(mockCreate.mock.calls[0][0].top_p).toBeUndefined();
+		});
+
+		it('still sends the caller-provided temperature for the non-reasoning model', async () => {
+			mockCreate.mockResolvedValueOnce({
+				choices: [{ finish_reason: 'stop', message: { content: 'Hi', tool_calls: undefined } }],
+				model: 'grok-4.20-0309-non-reasoning',
+				usage: { completion_tokens: 5, prompt_tokens: 10, total_tokens: 15 }
+			});
+
+			await provider.complete({ ...options, model: 'grok-4.20-0309-non-reasoning', temperature: 0.7 });
+
+			expect(mockCreate.mock.calls[0][0]).toMatchObject({ temperature: 0.7 });
+		});
+
 		it('parses valid tool call arguments', async () => {
 			mockCreate.mockResolvedValueOnce({
 				choices: [

@@ -386,6 +386,32 @@ describe('AnthropicProvider — complete()/streamComplete() against an injected 
 			});
 		});
 
+		it('omits temperature for an effort-controlled model even when the caller sets one', async () => {
+			mockCreate.mockResolvedValueOnce({
+				content: [{ text: 'Hi', type: 'text' }],
+				model: 'claude-opus-4-8',
+				stop_reason: 'end_turn',
+				usage: { input_tokens: 10, output_tokens: 5 }
+			});
+
+			await provider.complete({ ...options, model: 'claude-opus-4.8', temperature: 0.7 });
+
+			expect(mockCreate.mock.calls[0][0].temperature).toBeUndefined();
+		});
+
+		it('still sends the caller-provided temperature for a classic (non-effort) model', async () => {
+			mockCreate.mockResolvedValueOnce({
+				content: [{ text: 'Hi', type: 'text' }],
+				model: 'claude-sonnet-4-5-20250929',
+				stop_reason: 'end_turn',
+				usage: { input_tokens: 10, output_tokens: 5 }
+			});
+
+			await provider.complete({ ...options, model: 'claude-sonnet-4.5', temperature: 0.7 });
+
+			expect(mockCreate.mock.calls[0][0]).toMatchObject({ temperature: 0.7 });
+		});
+
 		it('extracts tool_use blocks as tool_calls', async () => {
 			mockCreate.mockResolvedValueOnce({
 				content: [{ id: 'call_1', input: { city: 'Paris' }, name: 'get_weather', type: 'tool_use' }],

@@ -30,3 +30,12 @@ export const XAI_DESCRIPTOR: ProviderDescriptor = {
 	},
 	requiresApiKey: true
 };
+
+/**
+ * Models that select reasoning depth via a dedicated `reasoning` mode/model variant
+ * instead of `temperature`/`top_p`. The xAI API rejects both as unsupported for these
+ * models. Matched by exact mode equality (not substring) so `non-reasoning` doesn't match.
+ */
+export const REASONING_CONTROLLED_MODELS: ReadonlySet<string> = new Set(
+	XAI_DESCRIPTOR.modelModes.filter((mm) => mm.mode === 'reasoning').map((mm) => mm.model)
+);

@@ -36,7 +36,7 @@ import { createErrorContext, ProviderError, withCircuitBreaker, withRetry } from
 import { checkRateLimit, getRateLimitStatus } from 'utils/rate-limiter';
 import { estimateTokensFromText } from 'utils/token-estimator';
 
-import { ANTHROPIC_DESCRIPTOR } from './anthropic.models';
+import { ANTHROPIC_DESCRIPTOR, EFFORT_CONTROLLED_MODELS } from './anthropic.models';
 
 /** Minimum estimated tokens for a content block to be worth caching */
 const MIN_CACHEABLE_TOKENS = 1024;
@@ -133,8 +133,7 @@ export class AnthropicProvider extends BaseLLMProvider implements BatchableProvi
 				model: resolvedModel,
 				stop_sequences: options.stop,
 				system,
-				// Extended thinking requires temperature=1
-				temperature: options.requires_thinking_trace ? 1 : options.temperature,
+				temperature: this.resolveTemperature(options),
 				tools: formattedTools,
 				top_p: options.top_p
 			};
@@ -262,7 +261,7 @@ export class AnthropicProvider extends BaseLLMProvider implements BatchableProvi
 			model: resolvedModel,
 			stream: true,
 			system,
-			temperature: options.temperature,
+			temperature: this.resolveTemperature(options),
 			tools: options.tools?.map((tool) => ({
 				description: tool.description,
 				input_schema: tool.parameters as Anthropic.Tool.InputSchema,
@@ -704,6 +703,26 @@ export class AnthropicProvider extends BaseLLMProvider implements BatchableProvi
 		return resolveApiModelId(alias, useVertex);
 	}
 
+	/**
+	 * Resolve the `temperature` to send, or `undefined` to omit it entirely.
+	 * Effort-controlled models (see EFFORT_CONTROLLED_MODELS) reject `temperature`
+	 * as deprecated; extended thinking requires it fixed at 1.
+	 */
+	private resolveTemperature(
+		options: Pick<LLMCompletionOptions, 'model' | 'requires_thinking_trace' | 'temperature'>
+	): number | undefined {
+		if (options.requires_thinking_trace) {
+			return 1;
+		}
+
+		const alias = options.model ?? this.getDefaultModel() ?? 'claude-sonnet-4.6';
+		if (EFFORT_CONTROLLED_MODELS.has(alias)) {
+			return undefined;
+		}
+
+		return options.temperature;
+	}
+
 	// ─── BatchableProvider implementation ────────────────────────────────────
 
 	async cancelBatch(batchId: string): Promise<void> {
@@ -751,7 +770,7 @@ export class AnthropicProvider extends BaseLLMProvider implements BatchableProvi
 				model: resolvedModel,
 				stop_sequences: req.options.stop,
 				system,
-				temperature: req.options.temperature,
+				temperature: this.resolveTemperature(req.options),
 				tools: formattedTools,
 				top_p: req.options.top_p
 			};
