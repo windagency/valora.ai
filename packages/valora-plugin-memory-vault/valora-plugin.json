@@ -1,6 +1,6 @@
 {
 	"name": "valora-plugin-memory-vault",
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"description": "Bundled vault memory backend — biologically-inspired decay, graph retrieval, cosine + Jaccard consolidation. The default memory.provider.",
 	"engines": { "valora": ">=0.1.0" },
 	"contributes": ["code"],
