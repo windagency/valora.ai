@@ -11,14 +11,15 @@ vi.mock('fs', () => ({
 	rmSync: vi.fn()
 }));
 
-const { computeIntegrity, PublishedWithoutRegistryUrlError } = await import('./compute-registry-integrity.ts');
+const { computeIntegrity } = await import('./compute-registry-integrity.ts');
 
 const FAKE_BYTES = Buffer.from('tarball-bytes');
 const EXPECTED_HASH = `sha256-${createHash('sha256').update(FAKE_BYTES).digest('base64')}`;
 const PACKAGE_DIR = '/fake/pkg';
 const PACKAGE_NAME = '@windagency/valora-runtime';
 const VERSION = '1.0.0';
-const REGISTRY_URL = 'http://localhost:4873';
+const DEFAULT_REGISTRY = 'https://registry.npmjs.org';
+const PRIVATE_REGISTRY_URL = 'http://localhost:4873';
 
 function packumentResponse(init: { status?: number } = {}): Response {
 	const status = init.status ?? 200;
@@ -36,16 +37,42 @@ describe('computeIntegrity', () => {
 		>);
 		vi.mocked(readFileSync).mockReturnValue(FAKE_BYTES);
 		vi.mocked(rmSync).mockReturnValue(undefined);
-		// Default: package not found on the public registry, so the
-		// not-yet-published fallback path is exercised unless a test overrides this.
-		fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(packumentResponse({ status: 404 }));
+		fetchSpy = vi.spyOn(globalThis, 'fetch');
 	});
 
 	afterEach(() => {
 		fetchSpy.mockRestore();
 	});
 
-	describe('without a registry URL, package not yet published (local pnpm pack)', () => {
+	describe('no registryUrl given, package already published on the public registry', () => {
+		beforeEach(() => {
+			fetchSpy.mockResolvedValue(packumentResponse({ status: 200 }));
+		});
+
+		it('downloads via npm pack from the public registry automatically — no error, no manual override needed', async () => {
+			await expect(computeIntegrity(PACKAGE_DIR, PACKAGE_NAME, VERSION)).resolves.toBe(EXPECTED_HASH);
+		});
+
+		it('packs the exact published version, not whatever "latest" happens to point to', async () => {
+			await computeIntegrity(PACKAGE_DIR, PACKAGE_NAME, VERSION);
+			expect(vi.mocked(spawnSync)).toHaveBeenCalledWith(
+				'npm',
+				expect.arrayContaining(['pack', `${PACKAGE_NAME}@${VERSION}`, '--registry', DEFAULT_REGISTRY]),
+				expect.anything()
+			);
+		});
+
+		it('does not invoke pnpm pack', async () => {
+			await computeIntegrity(PACKAGE_DIR, PACKAGE_NAME, VERSION);
+			expect(vi.mocked(spawnSync)).not.toHaveBeenCalledWith('pnpm', expect.anything(), expect.anything());
+		});
+	});
+
+	describe('no registryUrl given, package not yet published anywhere (local pnpm pack)', () => {
+		beforeEach(() => {
+			fetchSpy.mockResolvedValue(packumentResponse({ status: 404 }));
+		});
+
 		it('invokes pnpm pack in the package directory', async () => {
 			await computeIntegrity(PACKAGE_DIR, PACKAGE_NAME, VERSION);
 			expect(vi.mocked(spawnSync)).toHaveBeenCalledWith(
@@ -65,51 +92,28 @@ describe('computeIntegrity', () => {
 		});
 	});
 
-	describe('without a registry URL, package already published', () => {
-		beforeEach(() => {
-			fetchSpy.mockResolvedValue(packumentResponse({ status: 200 }));
-		});
-
-		it('refuses to fall back to a local pnpm pack', async () => {
-			await expect(computeIntegrity(PACKAGE_DIR, PACKAGE_NAME, VERSION)).rejects.toThrow(
-				/already published.*VALORA_NPM_REGISTRY_URL/is
-			);
-		});
-
-		it('throws a PublishedWithoutRegistryUrlError so callers can distinguish it from a per-package pack failure', async () => {
-			await expect(computeIntegrity(PACKAGE_DIR, PACKAGE_NAME, VERSION)).rejects.toBeInstanceOf(
-				PublishedWithoutRegistryUrlError
-			);
-		});
-
-		it('never invokes pnpm pack', async () => {
-			await expect(computeIntegrity(PACKAGE_DIR, PACKAGE_NAME, VERSION)).rejects.toThrow();
-			expect(vi.mocked(spawnSync)).not.toHaveBeenCalled();
-		});
-	});
-
-	describe('with a registry URL (npm pack from published registry)', () => {
-		it('skips the already-published check entirely', async () => {
-			await computeIntegrity(PACKAGE_DIR, PACKAGE_NAME, VERSION, REGISTRY_URL);
+	describe('explicit registryUrl given (e.g. a private Verdaccio)', () => {
+		it('trusts the override and packs from it without checking the public registry first', async () => {
+			await computeIntegrity(PACKAGE_DIR, PACKAGE_NAME, VERSION, PRIVATE_REGISTRY_URL);
 			expect(fetchSpy).not.toHaveBeenCalled();
 		});
 
-		it('invokes npm pack with the package name and registry flag', async () => {
-			await computeIntegrity(PACKAGE_DIR, PACKAGE_NAME, VERSION, REGISTRY_URL);
+		it('invokes npm pack with the exact version and the given registry', async () => {
+			await computeIntegrity(PACKAGE_DIR, PACKAGE_NAME, VERSION, PRIVATE_REGISTRY_URL);
 			expect(vi.mocked(spawnSync)).toHaveBeenCalledWith(
 				'npm',
-				expect.arrayContaining(['pack', PACKAGE_NAME, '--registry', REGISTRY_URL]),
+				expect.arrayContaining(['pack', `${PACKAGE_NAME}@${VERSION}`, '--registry', PRIVATE_REGISTRY_URL]),
 				expect.anything()
 			);
 		});
 
 		it('does not invoke pnpm pack', async () => {
-			await computeIntegrity(PACKAGE_DIR, PACKAGE_NAME, VERSION, REGISTRY_URL);
+			await computeIntegrity(PACKAGE_DIR, PACKAGE_NAME, VERSION, PRIVATE_REGISTRY_URL);
 			expect(vi.mocked(spawnSync)).not.toHaveBeenCalledWith('pnpm', expect.anything(), expect.anything());
 		});
 
 		it('returns the SHA256 SRI of the downloaded tarball bytes', async () => {
-			expect(await computeIntegrity(PACKAGE_DIR, PACKAGE_NAME, VERSION, REGISTRY_URL)).toBe(EXPECTED_HASH);
+			expect(await computeIntegrity(PACKAGE_DIR, PACKAGE_NAME, VERSION, PRIVATE_REGISTRY_URL)).toBe(EXPECTED_HASH);
 		});
 	});
 
@@ -117,7 +121,7 @@ describe('computeIntegrity', () => {
 		vi.mocked(spawnSync).mockReturnValueOnce({ status: 1, stdout: '', stderr: 'error' } as ReturnType<
 			typeof spawnSync
 		>);
-		await expect(computeIntegrity(PACKAGE_DIR, PACKAGE_NAME, VERSION, REGISTRY_URL)).rejects.toThrow();
+		await expect(computeIntegrity(PACKAGE_DIR, PACKAGE_NAME, VERSION, PRIVATE_REGISTRY_URL)).rejects.toThrow();
 		expect(vi.mocked(rmSync)).toHaveBeenCalledWith('/tmp/valora-test-xyz', { force: true, recursive: true });
 	});
 });

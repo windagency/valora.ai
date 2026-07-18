@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 
 import { dirname, join, relative, resolve } from 'path';
 import { fileURLToPath } from 'url';
 
-import { computeIntegrity, PublishedWithoutRegistryUrlError } from './compute-registry-integrity.ts';
+import { computeIntegrity } from './compute-registry-integrity.ts';
 
 export interface RegistryEntry {
 	contributes: string[];
@@ -24,15 +24,9 @@ interface PluginManifest {
 
 /**
  * Builds registry entries for every discoverable `valora-plugin-*` package.
- *
- * A package whose integrity can't be safely computed for an ordinary reason
- * (unparsable manifest, local pack failure) is skipped with a warning — the
- * rest of the registry is still valid. But `PublishedWithoutRegistryUrlError`
- * means the operator forgot `VALORA_NPM_REGISTRY_URL` — a systemic
- * misconfiguration that would affect every already-published package, not
- * just this one — so it propagates and aborts the whole run instead of
- * silently shrinking the registry down to whatever packages happened to skip
- * cleanly.
+ * A package whose integrity can't be computed (unparsable manifest, pack
+ * failure) is skipped with a warning — the rest of the registry is still
+ * valid.
  */
 export async function buildRegistryEntries(packagesDir: string, registryUrl?: string): Promise<RegistryEntry[]> {
 	const entries: RegistryEntry[] = [];
@@ -63,7 +57,6 @@ export async function buildRegistryEntries(packagesDir: string, registryUrl?: st
 		try {
 			integrity = await computeIntegrity(packageDir, packageName, version, registryUrl);
 		} catch (err) {
-			if (err instanceof PublishedWithoutRegistryUrlError) throw err;
 			console.warn(`Skipping ${dirName}: failed to compute integrity (${(err as Error).message})`);
 			continue;
 		}
@@ -90,24 +83,13 @@ async function main(): Promise<void> {
 	const packagesDir = join(repoRoot, 'packages');
 	const outputPath = join(repoRoot, 'data', 'plugins', 'registry.json');
 
-	// When set, integrity is computed by downloading from the live registry (matches
-	// exactly what the installer downloads). Required when pnpm publish rewrites JSON
-	// field order — otherwise pnpm pack locally and npm pack from registry diverge.
-	// computeIntegrity() itself refuses to fall back to a local pack for a package
-	// that's already published, so an operator can't forget to set this and silently
-	// commit a hash the installer will never match.
+	// computeIntegrity() already detects an already-published package and
+	// downloads its real tarball automatically — this only needs to be set to
+	// override which registry to use (e.g. a private Verdaccio instead of the
+	// public npm registry).
 	const registryUrl = process.env['VALORA_NPM_REGISTRY_URL'];
 
-	let entries: RegistryEntry[];
-	try {
-		entries = await buildRegistryEntries(packagesDir, registryUrl);
-	} catch (err) {
-		if (err instanceof PublishedWithoutRegistryUrlError) {
-			console.error(err.message);
-			process.exit(1);
-		}
-		throw err;
-	}
+	const entries = await buildRegistryEntries(packagesDir, registryUrl);
 
 	mkdirSync(dirname(outputPath), { recursive: true });
 	writeFileSync(outputPath, JSON.stringify(entries, null, '\t') + '\n');

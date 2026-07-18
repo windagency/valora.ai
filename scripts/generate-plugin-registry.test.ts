@@ -1,8 +1,6 @@
 import { existsSync, readdirSync, readFileSync } from 'fs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { PublishedWithoutRegistryUrlError } from './compute-registry-integrity.ts';
-
 vi.mock('fs', () => ({
 	existsSync: vi.fn(),
 	mkdirSync: vi.fn(),
@@ -11,8 +9,7 @@ vi.mock('fs', () => ({
 	writeFileSync: vi.fn()
 }));
 vi.mock('./compute-registry-integrity.ts', () => ({
-	computeIntegrity: vi.fn(),
-	PublishedWithoutRegistryUrlError: class PublishedWithoutRegistryUrlError extends Error {}
+	computeIntegrity: vi.fn()
 }));
 
 const { computeIntegrity } = await import('./compute-registry-integrity.ts');
@@ -57,9 +54,7 @@ describe('buildRegistryEntries', () => {
 		vi.mocked(readdirSync).mockReturnValue(['valora-plugin-broken', 'valora-plugin-a'] as unknown as ReturnType<
 			typeof readdirSync
 		>);
-		vi.mocked(readFileSync).mockImplementation((path) =>
-			String(path).includes('broken') ? 'not json' : manifest()
-		);
+		vi.mocked(readFileSync).mockImplementation((path) => (String(path).includes('broken') ? 'not json' : manifest()));
 		vi.mocked(computeIntegrity).mockResolvedValue('sha256-fake=');
 
 		const entries = await buildRegistryEntries(PACKAGES_DIR);
@@ -81,19 +76,5 @@ describe('buildRegistryEntries', () => {
 		const entries = await buildRegistryEntries(PACKAGES_DIR);
 
 		expect(entries.map((e) => e.name)).toEqual(['valora-plugin-b']);
-	});
-
-	it('aborts the whole run instead of writing a partial registry when a package is already published without a registry URL set', async () => {
-		vi.mocked(readdirSync).mockReturnValue(['valora-plugin-a', 'valora-plugin-b'] as unknown as ReturnType<
-			typeof readdirSync
-		>);
-		vi.mocked(readFileSync).mockImplementation(() => manifest());
-		vi.mocked(computeIntegrity).mockImplementation((_dir, packageName: string) =>
-			packageName.endsWith('valora-plugin-a')
-				? Promise.reject(new PublishedWithoutRegistryUrlError('already published'))
-				: Promise.resolve('sha256-fake=')
-		);
-
-		await expect(buildRegistryEntries(PACKAGES_DIR)).rejects.toBeInstanceOf(PublishedWithoutRegistryUrlError);
 	});
 });
