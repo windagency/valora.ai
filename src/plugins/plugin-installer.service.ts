@@ -34,7 +34,7 @@ export class PluginInstallerService {
 	) {}
 
 	async install(pluginRef: string, scope: InstallScope, integrity?: string, version?: string): Promise<void> {
-		await this.installWithVisited(pluginRef, scope, new Set<string>(), integrity, version);
+		await this.installWithVisited(pluginRef, scope, new Set<string>(), integrity, version, false);
 	}
 
 	async installFromTarball(tgzPath: string, scope: InstallScope): Promise<void> {
@@ -137,7 +137,8 @@ export class PluginInstallerService {
 		scope: InstallScope,
 		visited: Set<string>,
 		integrity?: string,
-		version?: string
+		version?: string,
+		isDependency = true
 	): Promise<void> {
 		const packageName = resolvePackageName(pluginRef);
 		const shortName = shortNameFromPackage(packageName);
@@ -145,7 +146,12 @@ export class PluginInstallerService {
 		if (visited.has(shortName)) return;
 		visited.add(shortName);
 
-		if (this.isPluginInstalled(shortName)) return;
+		// Only a *dependency* pulled in transitively via `requires` should be
+		// skipped when already present elsewhere — the plugin the caller asked
+		// to install() is the explicit target (e.g. `valora plugin update`
+		// re-installing an already-installed plugin at a newer version) and must
+		// always be materialized, never silently no-op.
+		if (isDependency && this.isPluginInstalled(shortName)) return;
 
 		const localPath = resolveLocalPluginDir(shortName);
 		const targetDir = resolveTargetDir(scope, shortName);

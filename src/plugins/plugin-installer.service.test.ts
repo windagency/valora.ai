@@ -426,6 +426,20 @@ describe('PluginInstallerService', () => {
 			);
 		});
 
+		it('re-downloads an already-installed plugin when installing it directly (the update path)', async () => {
+			// `isPluginInstalled` exists to skip a *dependency* that's already present
+			// elsewhere (see 'dependency resolution' below) — it must not also skip the
+			// top-level plugin passed to install(), or `valora plugin update` silently
+			// no-ops: it reports success without ever re-downloading the new version.
+			const { getGlobalPluginsDir } = await import('utils/paths');
+			vi.mocked(getGlobalPluginsDir).mockReturnValue(tmpTarget);
+
+			const isInstalled = (name: string) => name === 'valora-plugin-rtk';
+			await new PluginInstallerService(makeMockRunner(), isInstalled).install('rtk', 'user', undefined, '2.0.0');
+
+			expect(vi.mocked(fetchPackageTarball)).toHaveBeenCalledWith('@windagency/valora-plugin-rtk', '2.0.0');
+		});
+
 		it('clears any pre-existing content (including a stale symlink) in the target directory before extracting', async () => {
 			// installFromTarball() already clears targetDir before extracting;
 			// this path (npm-registry/local-dev install) didn't, so a symlink
