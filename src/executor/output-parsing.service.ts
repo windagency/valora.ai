@@ -12,6 +12,7 @@
  */
 
 import { getLogger } from 'output/logger';
+import { findMatchingBracketEnd } from 'utils/balanced-json';
 import { escapeRegExp } from 'utils/safe-regex';
 
 type Logger = ReturnType<typeof getLogger>;
@@ -475,24 +476,25 @@ export class OutputParsingService {
 	}
 
 	/**
-	 * Find JSON object in content
+	 * Find JSON object in content. Uses balanced-brace scanning from the first `{` rather
+	 * than a greedy regex to the last `}` in the content — the latter over-captures any
+	 * trailing prose that happens to contain a stray `}` (e.g. a mention of another JSON
+	 * snippet after the real block).
 	 */
 	private findJsonObject(content: string): null | string {
-		const jsonMatch = content.match(/\{[\s\S]*\}/);
-
-		if (jsonMatch) {
-			this.logger.debug(`Found JSON object of length: ${jsonMatch[0].length}`);
-			return jsonMatch[0];
-		}
-
 		const openBraceIndex = content.indexOf('{');
-		if (openBraceIndex !== -1) {
-			const partialJson = content.slice(openBraceIndex);
-			this.logger.warn(`No closing brace found, attempting extraction from partial JSON (${partialJson.length} chars)`);
-			return partialJson;
+		if (openBraceIndex === -1) return null;
+
+		const closeBraceIndex = findMatchingBracketEnd(content, openBraceIndex);
+		if (closeBraceIndex !== null) {
+			const jsonCandidate = content.slice(openBraceIndex, closeBraceIndex + 1);
+			this.logger.debug(`Found JSON object of length: ${jsonCandidate.length}`);
+			return jsonCandidate;
 		}
 
-		return null;
+		const partialJson = content.slice(openBraceIndex);
+		this.logger.warn(`No closing brace found, attempting extraction from partial JSON (${partialJson.length} chars)`);
+		return partialJson;
 	}
 
 	/**
@@ -564,13 +566,27 @@ export class OutputParsingService {
 		if (afterColon.startsWith('"')) {
 			return this.extractStringValue(outputName, afterColon);
 		}
-		if (afterColon.startsWith('{')) {
-			return this.extractJsonValue(afterColon, /^\{[\s\S]*?\}(?=\s*[,}])/);
-		}
-		if (afterColon.startsWith('[')) {
-			return this.extractJsonValue(afterColon, /^\[[\s\S]*?\](?=\s*[,}])/);
+		if (afterColon.startsWith('{') || afterColon.startsWith('[')) {
+			return this.extractBalancedJsonValue(afterColon);
 		}
 		return this.extractJsonValue(afterColon, /^(true|false|null|\d+\.?\d*)(?=\s*[,}])/);
+	}
+
+	/**
+	 * Extract an object or array value by balanced-bracket scanning rather than a
+	 * non-greedy regex, which truncates at the first inner closing bracket of any
+	 * nested value (e.g. `{"a": {"b": 1}, "c": 2}` truncates to `{"a": {"b": 1}`,
+	 * an unbalanced fragment that fails to parse).
+	 */
+	private extractBalancedJsonValue(afterColon: string): unknown {
+		const end = findMatchingBracketEnd(afterColon, 0);
+		if (end === null) return undefined;
+
+		try {
+			return JSON.parse(afterColon.slice(0, end + 1));
+		} catch {
+			return undefined;
+		}
 	}
 
 	/**

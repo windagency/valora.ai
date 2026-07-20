@@ -14,18 +14,15 @@ import {
 	type EscalationRiskLevel,
 	type EscalationSignal
 } from 'types/escalation.types';
+import { findEnclosingBraceStart, findMatchingBracketEnd } from 'utils/balanced-json';
 
 /**
- * Regex pattern to match the _escalation JSON block in LLM responses
- * Matches both fenced code blocks and raw JSON objects containing _escalation
+ * Matches the `"_escalation":` key, wherever it appears — fenced, raw, or preceded
+ * by unrelated prose. Used only to locate candidate anchor points; the actual object
+ * boundaries are found by balanced-brace scanning from each anchor (see
+ * `extractRawEscalationJson`), not by this regex.
  */
-const ESCALATION_BLOCK_PATTERN =
-	/```(?:json)?\s*\n?\s*(\{[\s\S]*?"_escalation"[\s\S]*?\})\s*\n?```|(\{[\s\S]*?"_escalation"[\s\S]*?\})/;
-
-/**
- * Alternative pattern for standalone _escalation object
- */
-const ESCALATION_OBJECT_PATTERN = /"_escalation"\s*:\s*(\{[\s\S]*?\})\s*\}?\s*$/;
+const ESCALATION_KEY_PATTERN = /"_escalation"\s*:/g;
 
 export class EscalationDetectionService {
 	private readonly config: EscalationConfig;
@@ -53,10 +50,12 @@ export class EscalationDetectionService {
 		});
 
 		try {
-			// Try to find escalation block using various patterns
-			const signal = this.extractEscalationSignal(content);
+			// Locate the _escalation object by balanced-brace scan (handles nesting depth,
+			// fence preambles, and braces inside free-text field values — see extractRawEscalationJson).
+			const raw = this.extractRawEscalationJson(content);
+			const signal = raw ? this.parseEscalationJson(raw.json) : null;
 
-			if (!signal) {
+			if (!signal || !raw) {
 				this.logger.debug('No escalation signal found in response');
 				return {
 					cleanedContent: content,
@@ -65,7 +64,7 @@ export class EscalationDetectionService {
 			}
 
 			// Remove the escalation block from content
-			const cleanedContent = this.removeEscalationBlock(content);
+			const cleanedContent = this.removeEscalationBlock(content, raw);
 
 			this.logger.debug('Extracted escalation signal', {
 				confidence: signal.confidence,
@@ -185,39 +184,62 @@ export class EscalationDetectionService {
 	}
 
 	/**
-	 * Extract escalation signal from content
+	 * Locate the `_escalation` JSON object in content by balanced-brace scanning rather than
+	 * regex truncation. For each `"_escalation":` key occurrence (scanned from the last — the
+	 * protocol requires the block at the END of the response — since prose could mention the
+	 * phrase earlier), walks backward to the enclosing `{` and forward to its matching `}`,
+	 * skipping over string-literal contents so braces inside `reasoning`/`proposed_action` text
+	 * don't miscount depth. This is robust to nesting depth and to unrelated preamble text
+	 * appearing before the JSON inside a fenced block.
 	 */
-	private extractEscalationSignal(content: string): EscalationSignal | null {
-		// Try full block pattern first (including wrapper object)
-		const blockMatch = content.match(ESCALATION_BLOCK_PATTERN);
-
-		if (blockMatch) {
-			const jsonStr = blockMatch[1] ?? blockMatch[2];
-			if (jsonStr) {
-				return this.parseEscalationJson(jsonStr);
-			}
+	private extractRawEscalationJson(content: string): null | { end: number; json: string; start: number } {
+		const keyMatches: Array<{ keyEnd: number; keyStart: number }> = [];
+		let keyMatch: null | RegExpExecArray;
+		ESCALATION_KEY_PATTERN.lastIndex = 0;
+		while ((keyMatch = ESCALATION_KEY_PATTERN.exec(content)) !== null) {
+			keyMatches.push({ keyEnd: keyMatch.index + keyMatch[0].length, keyStart: keyMatch.index });
 		}
 
-		// Try standalone _escalation object pattern
-		const objectMatch = content.match(ESCALATION_OBJECT_PATTERN);
+		// Scanned from the last occurrence — the protocol requires the block at the END of the response.
+		for (let i = keyMatches.length - 1; i >= 0; i--) {
+			const match = keyMatches[i];
+			if (!match) continue;
 
-		if (objectMatch) {
-			return this.parseEscalationJson(`{"_escalation": ${objectMatch[1]}}`);
-		}
+			// Prefer the wrapping object (`{"_escalation": {...}}`) if one encloses this key...
+			const wrapped = this.tryExtractBalancedJson(content, findEnclosingBraceStart(content, match.keyStart));
+			if (wrapped) return wrapped;
 
-		// Try to find any JSON block containing _escalation
-		const jsonBlocks = this.findJsonBlocks(content);
-
-		for (const block of jsonBlocks) {
-			if (block.includes('_escalation')) {
-				const signal = this.parseEscalationJson(block);
-				if (signal) {
-					return signal;
-				}
-			}
+			// ...otherwise fall back to a standalone `"_escalation": {...}` with no wrapper at all.
+			const standalone = this.tryExtractBalancedJson(content, this.findValueBraceStart(content, match.keyEnd));
+			if (standalone) return standalone;
 		}
 
 		return null;
+	}
+
+	/** Extracts and validates a balanced JSON object starting at `start`, or null if unparseable. */
+	private tryExtractBalancedJson(
+		content: string,
+		start: null | number
+	): null | { end: number; json: string; start: number } {
+		if (start === null) return null;
+		const end = findMatchingBracketEnd(content, start);
+		if (end === null) return null;
+
+		const json = content.slice(start, end + 1);
+		try {
+			JSON.parse(json);
+		} catch {
+			return null;
+		}
+		return { end, json, start };
+	}
+
+	/** Finds the `{` immediately following a `"_escalation":` key with no enclosing wrapper object. */
+	private findValueBraceStart(content: string, fromIndex: number): null | number {
+		let i = fromIndex;
+		while (i < content.length && /\s/.test(content[i] ?? '')) i++;
+		return content[i] === '{' ? i : null;
 	}
 
 	/**
@@ -274,45 +296,18 @@ export class EscalationDetectionService {
 	}
 
 	/**
-	 * Remove escalation block from content
+	 * Remove the located escalation JSON object from content by index (precise — no re-guessing
+	 * with regex), then strip any markdown fence left empty around it and collapse blank lines.
 	 */
-	private removeEscalationBlock(content: string): string {
-		// Remove fenced code block containing _escalation
-		let cleaned = content.replace(/```(?:json)?\s*\n?\s*\{[\s\S]*?"_escalation"[\s\S]*?\}\s*\n?```/g, '');
+	private removeEscalationBlock(content: string, raw: { end: number; start: number }): string {
+		let cleaned = content.slice(0, raw.start) + content.slice(raw.end + 1);
 
-		// Remove trailing raw JSON block with _escalation
-		cleaned = cleaned.replace(/\{[\s\S]*?"_escalation"[\s\S]*?\}\s*$/g, '');
+		// Strip a fence left empty (whitespace-only) by removing the JSON it wrapped
+		cleaned = cleaned.replace(/```(?:json)?\s*\n?\s*```/g, '');
 
-		// Clean up excess whitespace
 		cleaned = cleaned.replace(/\n{3,}/g, '\n\n').trim();
 
 		return cleaned;
-	}
-
-	/**
-	 * Find all JSON blocks in content
-	 */
-	private findJsonBlocks(content: string): string[] {
-		const blocks: string[] = [];
-
-		// Find fenced code blocks
-		const fencedPattern = /```(?:json)?\s*\n?([\s\S]*?)\n?```/g;
-		let match;
-
-		while ((match = fencedPattern.exec(content)) !== null) {
-			const innerContent = match[1];
-			if (innerContent?.trim().startsWith('{')) {
-				blocks.push(innerContent.trim());
-			}
-		}
-
-		// Find trailing JSON object
-		const trailingMatch = content.match(/\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}\s*$/);
-		if (trailingMatch) {
-			blocks.push(trailingMatch[0]);
-		}
-
-		return blocks;
 	}
 }
 

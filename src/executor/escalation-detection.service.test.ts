@@ -115,7 +115,7 @@ describe('EscalationDetectionService', () => {
 			expect(signal?.risk_level).toBe('medium');
 		});
 
-		it('KNOWN GAP: the third-tier findJsonBlocks() fallback is effectively unreachable for a realistic nested _escalation payload — a fenced block with an unexpected preamble line still falls through to the primary pattern\'s raw (non-fenced) alternative, which truncates on the first "}" it meets (the nested object\'s own close) and produces unparseable JSON, returning null before findJsonBlocks() is ever tried', () => {
+		it('extracts a nested _escalation payload even when the fenced block has an unexpected preamble line before the JSON', () => {
 			const content =
 				'Explanation without any braces here.\n\n' +
 				'```json\n' +
@@ -127,7 +127,42 @@ describe('EscalationDetectionService', () => {
 			const service = new EscalationDetectionService();
 			const { signal } = service.parseResponse(content);
 
-			expect(signal).toBeNull();
+			expect(signal?.requires_escalation).toBe(true);
+			expect(signal?.confidence).toBe(40);
+			expect(signal?.risk_level).toBe('high');
+		});
+
+		it('extracts the _escalation payload when reasoning text itself contains literal braces', () => {
+			const content = buildResponse({
+				confidence: 60,
+				proposed_action: 'Use the {token} substitution as configured.',
+				reasoning: 'The config uses a {placeholder} pattern that looks unusual.',
+				requires_escalation: false,
+				risk_level: 'low',
+				triggered_criteria: []
+			});
+
+			const service = new EscalationDetectionService();
+			const { signal } = service.parseResponse(content);
+
+			expect(signal?.confidence).toBe(60);
+			expect(signal?.reasoning).toContain('{placeholder}');
+		});
+
+		it('prefers the last _escalation block when the word appears earlier in the prose', () => {
+			const content =
+				'This stage does not need to touch the "_escalation" mechanism.\n\n' +
+				buildResponse({
+					confidence: 77,
+					requires_escalation: false,
+					risk_level: 'low',
+					triggered_criteria: []
+				});
+
+			const service = new EscalationDetectionService();
+			const { signal } = service.parseResponse(content);
+
+			expect(signal?.confidence).toBe(77);
 		});
 	});
 
