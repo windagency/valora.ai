@@ -65,11 +65,11 @@
 	{
 		"contributes": ["code"],
 		"description": "Bundled vault memory backend — biologically-inspired decay, graph retrieval, cosine + Jaccard consolidation. The default memory.provider.",
-		"integrity": "sha256-TAgrxwQjMpIEBGeAACsvxxfcMvSGeNSZStENsUOPg3I=",
+		"integrity": "sha256-zehYtwINknN4BaDKqEsvQCLkd+aH3COw0OLPGausjqI=",
 		"name": "valora-plugin-memory-vault",
 		"package": "@windagency/valora-plugin-memory-vault",
 		"path": "../../packages/valora-plugin-memory-vault",
-		"version": "1.0.2"
+		"version": "1.0.3"
 	},
 	{
 		"contributes": ["code"],
