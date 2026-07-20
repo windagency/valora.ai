@@ -1,11 +1,6 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 
 import { EphemeralMemoryProvider } from './ephemeral';
-
-const warnSpy = vi.fn();
-vi.mock('output/logger', () => ({
-	getLogger: vi.fn(() => ({ warn: warnSpy, info: vi.fn(), debug: vi.fn(), error: vi.fn() }))
-}));
 
 function makeCreateOptions(overrides: Partial<Parameters<EphemeralMemoryProvider['create']>[1]> = {}) {
 	return {
@@ -23,28 +18,7 @@ describe('EphemeralMemoryProvider', () => {
 	let provider: EphemeralMemoryProvider;
 
 	beforeEach(() => {
-		vi.clearAllMocks();
 		provider = new EphemeralMemoryProvider();
-	});
-
-	describe('instantiation', () => {
-		it('logs a one-time warning on construction', async () => {
-			vi.resetModules();
-			const { EphemeralMemoryProvider: Fresh } = await import('./ephemeral');
-			vi.clearAllMocks();
-			new Fresh();
-			expect(warnSpy).toHaveBeenCalledOnce();
-			expect(warnSpy.mock.calls[0]![0]).toContain('ephemeral');
-		});
-
-		it('does not log again on subsequent instantiations within the same process', async () => {
-			vi.resetModules();
-			const { EphemeralMemoryProvider: Fresh } = await import('./ephemeral');
-			vi.clearAllMocks();
-			new Fresh();
-			new Fresh();
-			expect(warnSpy).toHaveBeenCalledTimes(1);
-		});
 	});
 
 	describe('create', () => {

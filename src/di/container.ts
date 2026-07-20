@@ -9,7 +9,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CodePluginModule } from 'plugins/plugin-api.types';
 
 import { readFileSync } from 'fs';
-import { MemoryProviderConflictError } from 'memory/registry';
+import { getMemoryRegistry, MemoryProviderConflictError } from 'memory/registry';
 import { preloadConflictResolutions, resolveProviderConflict } from 'plugins/conflict-resolver';
 import { createPluginAPI, type PluginLifecycleRegistry } from 'plugins/plugin-api.factory';
 import { checkPluginContentDrift } from 'plugins/plugin-installer.service';
@@ -273,35 +273,45 @@ export async function initializePlugins(container: DIContainer): Promise<void> {
 	const lifecycleRegistries = new Map<string, PluginLifecycleRegistry>();
 	container.register(SERVICE_IDENTIFIERS.PLUGIN_LIFECYCLE_REGISTRIES, lifecycleRegistries);
 
-	if (plugins.length === 0) return;
+	if (plugins.length > 0) {
+		await preloadConflictResolutions();
 
-	await preloadConflictResolutions();
+		const agentLoader = container.resolve<AgentLoader>(SERVICE_IDENTIFIERS.AGENT_LOADER);
+		const commandLoader = container.resolve<CommandLoader>(SERVICE_IDENTIFIERS.COMMAND_LOADER);
+		const promptLoader = container.resolve<PromptLoader>(SERVICE_IDENTIFIERS.PROMPT_LOADER);
+		const hookService = getHookExecutionService();
 
-	const agentLoader = container.resolve<AgentLoader>(SERVICE_IDENTIFIERS.AGENT_LOADER);
-	const commandLoader = container.resolve<CommandLoader>(SERVICE_IDENTIFIERS.COMMAND_LOADER);
-	const promptLoader = container.resolve<PromptLoader>(SERVICE_IDENTIFIERS.PROMPT_LOADER);
-	const hookService = getHookExecutionService();
+		const activatePlugin = async (plugin: LoadedPlugin): Promise<void> => {
+			if (plugin.agentsDir) agentLoader.registerPluginDir(plugin.agentsDir);
+			if (plugin.commandsDir) commandLoader.registerPluginDir(plugin.commandsDir, plugin.manifest.name);
+			if (plugin.promptsDir) promptLoader.registerPluginPromptsDir(plugin.promptsDir);
 
-	const activatePlugin = async (plugin: LoadedPlugin): Promise<void> => {
-		if (plugin.agentsDir) agentLoader.registerPluginDir(plugin.agentsDir);
-		if (plugin.commandsDir) commandLoader.registerPluginDir(plugin.commandsDir, plugin.manifest.name);
-		if (plugin.promptsDir) promptLoader.registerPluginPromptsDir(plugin.promptsDir);
+			if (hasPluginContentDriftedSinceInstall(plugin)) return;
 
-		if (hasPluginContentDriftedSinceInstall(plugin)) return;
+			if (plugin.hooks) hookService.registerPluginHooks(plugin.hooks);
+			if (plugin.mcpsFile) registerPluginMcpsFile(plugin.mcpsFile);
+			if (plugin.codeEntrypoint) await loadCodePlugin(container, plugin, lifecycleRegistries);
+			if (plugin.validatorModules) await loadPluginValidators(plugin);
+		};
 
-		if (plugin.hooks) hookService.registerPluginHooks(plugin.hooks);
-		if (plugin.mcpsFile) registerPluginMcpsFile(plugin.mcpsFile);
-		if (plugin.codeEntrypoint) await loadCodePlugin(container, plugin, lifecycleRegistries);
-		if (plugin.validatorModules) await loadPluginValidators(plugin);
-	};
+		for (const plugin of plugins) {
+			await activatePlugin(plugin);
+		}
 
-	for (const plugin of plugins) {
-		await activatePlugin(plugin);
+		await dispatchActivateHooks(lifecycleRegistries);
 	}
 
-	await dispatchActivateHooks(lifecycleRegistries);
+	warnIfStillUsingEphemeralMemory();
 }
 
+/**
+ * `bootstrapMemoryFromConfig()` activates the ephemeral provider as a default
+ * before any plugin has loaded — a memory plugin (e.g.
+ * valora-plugin-memory-vault) may still override it moments later via
+ * `api.memory.activate()`. Only warn here, once all plugins have finished
+ * loading, so the message reflects the FINAL active provider rather than the
+ * bootstrap default that's about to be superseded.
+ */
 export function registerPluginMcpsFile(mcpsFile: string): void {
 	try {
 		const raw = readFileSync(mcpsFile, 'utf-8');
@@ -335,6 +345,14 @@ async function dispatchActivateHooks(registries: Map<string, PluginLifecycleRegi
 				});
 			}
 		}
+	}
+}
+
+function warnIfStillUsingEphemeralMemory(): void {
+	if (getMemoryRegistry().getActiveName() === 'ephemeral') {
+		getLogger().warn(
+			'Using ephemeral memory — entries will not persist across sessions. Install valora-plugin-memory-vault for persistence.'
+		);
 	}
 }
 

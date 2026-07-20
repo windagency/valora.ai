@@ -3,8 +3,14 @@
  * memory plugin (e.g. `valora-plugin-memory-vault`) is installed.
  *
  * All entries are held in a plain `Map` and are lost when the process exits.
- * A warning is logged on construction so operators are aware that persistence
- * is absent.
+ *
+ * This is bootstrapped as the default active provider before any plugin has
+ * loaded (see `memory/bootstrap.ts`), so warning here on construction would
+ * fire even when a plugin is about to activate a persistent provider a few
+ * lines later — misleadingly telling the operator persistence is absent when
+ * it's about to be available. `di/container.ts`'s `initializePlugins()` warns
+ * instead, once, after all plugins have finished loading and the FINAL active
+ * provider is known.
  */
 
 import type {
@@ -21,12 +27,10 @@ import type {
 	PurgeResult
 } from 'types/memory.types';
 
-import { getLogger } from 'output/logger';
 import { generateMemoryId } from 'utils/id-generator';
 
 const CATEGORIES: MemoryCategory[] = ['decisions', 'episodic', 'semantic'];
 
-let warnedOnce = false;
 const CAPABILITIES: MemoryCapability[] = [];
 
 type CategoryStore = Map<string, MemoryEntry>;
@@ -36,12 +40,6 @@ export class EphemeralMemoryProvider implements MemoryProvider {
 
 	constructor() {
 		this.store = new Map<MemoryCategory, CategoryStore>(CATEGORIES.map((c) => [c, new Map<string, MemoryEntry>()]));
-		if (!warnedOnce) {
-			warnedOnce = true;
-			getLogger().warn(
-				'Using ephemeral memory — entries will not persist across sessions. Install valora-plugin-memory-vault for persistence.'
-			);
-		}
 	}
 
 	create(category: MemoryCategory, options: MemoryCreateOptions): Promise<MemoryEntry> {
