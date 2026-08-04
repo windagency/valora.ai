@@ -10,7 +10,7 @@ allowed-tools:
   - codebase_search
   - grep
   - run_terminal_cmd
-model: claude-haiku-4.5
+model: qwen3:4b
 agent: product-manager
 prompts:
   pipeline:

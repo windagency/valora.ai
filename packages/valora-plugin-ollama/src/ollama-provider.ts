@@ -18,7 +18,7 @@ export interface OllamaManagers {
 }
 
 const DEFAULT_OLLAMA_HOST = 'http://localhost:11434';
-const DEFAULT_MODEL = 'llama3.1';
+const DEFAULT_MODEL = 'qwen3:8b';
 const DEFAULT_EMBED_MODEL = 'nomic-embed-text';
 
 export class OllamaProvider implements LLMProvider {
@@ -85,7 +85,7 @@ export class OllamaProvider implements LLMProvider {
 	}
 
 	getAlternativeModels(): string[] {
-		return ['llama3.1', 'mistral', 'codellama', 'phi3', 'qwen2'];
+		return ['llama3.1', 'mistral', 'codellama', 'phi3', 'qwen2', 'phi4-mini', 'qwen3:4b', 'qwen3:8b'];
 	}
 
 	isConfigured(): boolean {

@@ -57,6 +57,14 @@ describe('OllamaProvider', () => {
 		expect(provider.getAlternativeModels()).toContain('llama3.1');
 	});
 
+	it('getAlternativeModels() includes the current agentic model set (qwen3, phi4-mini)', () => {
+		const provider = new OllamaProvider({}, doubles);
+		const alternatives = provider.getAlternativeModels();
+		expect(alternatives).toContain('qwen3:8b');
+		expect(alternatives).toContain('qwen3:4b');
+		expect(alternatives).toContain('phi4-mini');
+	});
+
 	it('complete() calls assertInstalled, ensureRunning, and ensureModel before LLM call', async () => {
 		const provider = new OllamaProvider({ model: 'llama3.1' }, doubles);
 
@@ -82,7 +90,7 @@ describe('OllamaProvider', () => {
 
 			await provider.complete({ messages: [{ content: 'Hi', role: 'user' }] });
 
-			expect(mockModelManager.ensureModel).toHaveBeenCalledWith(expect.any(String), 'llama3.1');
+			expect(mockModelManager.ensureModel).toHaveBeenCalledWith(expect.any(String), 'qwen3:8b');
 		});
 
 		it('uses default host when config.ollama_host is not a string', async () => {

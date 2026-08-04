@@ -11,7 +11,7 @@ allowed-tools:
   - codebase_search
   - grep
   - run_terminal_cmd
-model: claude-opus-4.8
+model: claude-sonnet-5
 agent: lead
 prompts:
   pipeline:
@@ -460,7 +460,7 @@ Writes to custom directory.
 | **Est. duration**    | ~14 min            | ~8 min                     |
 | **Time saved**       | Baseline           | 5-7 min                    |
 | **Caching**          | 1 hour TTL         | 2 hour TTL + aggressive    |
-| **Model**            | claude-haiku-4.5   | claude-sonnet-4.5          |
+| **Model**            | claude-haiku-4.5   | claude-sonnet-5            |
 | **Skip review**      | No                 | Yes (--skip-review)        |
 | **Security context** | No                 | Yes (--security-context)   |
 
@@ -554,7 +554,7 @@ Writes to custom directory.
 
 **Model selection**:
 
-- Uses claude-sonnet-4.5 for orchestration (faster reasoning)
+- Uses claude-sonnet-5 for orchestration (faster reasoning, preserves the parallel time-savings this command is optimised for)
 - Subprocesses inherit model or use domain-optimal
 
 **Resource usage**:

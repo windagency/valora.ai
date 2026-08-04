@@ -83,6 +83,30 @@ describe('valora-plugin-ollama register()', () => {
 		expect(modes.some((m) => m.model === 'llama3.1')).toBe(true);
 	});
 
+	it('passes a descriptor whose modelModes includes entries for the current agentic model set', () => {
+		const api = makeApi();
+		register(api);
+		const modes = api.capturedDescriptor?.modelModes ?? [];
+		expect(modes.some((m) => m.model === 'qwen3:8b')).toBe(true);
+		expect(modes.some((m) => m.model === 'qwen3:4b')).toBe(true);
+		expect(modes.some((m) => m.model === 'phi4-mini')).toBe(true);
+	});
+
+	it('passes a descriptor with defaultModel "qwen3:8b"', () => {
+		const api = makeApi();
+		register(api);
+		expect(api.capturedDescriptor?.defaultModel).toBe('qwen3:8b');
+	});
+
+	it('passes a descriptor whose contextWindows includes correct sizes for the current agentic model set', () => {
+		const api = makeApi();
+		register(api);
+		const contextWindows = api.capturedDescriptor?.contextWindows ?? {};
+		expect(contextWindows['qwen3:8b']).toBe(32_768);
+		expect(contextWindows['qwen3:4b']).toBe(32_768);
+		expect(contextWindows['phi4-mini']).toBe(128_000);
+	});
+
 	it('registers a deactivate hook via api.lifecycle.onDeactivate()', () => {
 		const api = makeApi();
 		register(api);

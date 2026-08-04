@@ -18,7 +18,7 @@ allowed-tools:
   - mcp_deep_research
   # MCP: GitHub repository context
   - mcp_github
-model: claude-haiku-4.5
+model: claude-sonnet-5
 agent: lead
 prompts:
   pipeline:

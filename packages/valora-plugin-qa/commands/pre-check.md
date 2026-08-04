@@ -9,7 +9,7 @@ allowed-tools:
   - list_dir
   - glob_file_search
   - run_terminal_cmd
-model: claude-haiku-4.5
+model: phi4-mini
 agent: qa
 prompts:
   pipeline:

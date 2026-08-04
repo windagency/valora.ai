@@ -25,7 +25,7 @@ The plugin depends on the `ollama` binary. On first run Valora prompts before ru
 
 | Env var                | Effect                                                        |
 | ---------------------- | ------------------------------------------------------------- |
-| `OLLAMA_DEFAULT_MODEL` | Default model when none is specified. Defaults to `llama3.1`. |
+| `OLLAMA_DEFAULT_MODEL` | Default model when none is specified. Defaults to `qwen3:8b`. |
 
 The plugin requires no API key. `peerDependencies` includes `openai@^4.67.0` — Valora's host already provides this.
 

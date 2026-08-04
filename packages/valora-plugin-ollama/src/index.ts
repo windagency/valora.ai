@@ -12,8 +12,17 @@ export function register(api: PluginAPI): void {
 
 	api.providers.register('ollama', (config) => new OllamaProvider(config, { binary, model, process: processManager }), {
 		configSchema: undefined,
-		contextWindows: { codellama: 16_384, 'llama3.1': 128_000, mistral: 32_768, phi3: 128_000, qwen2: 32_768 },
-		defaultModel: 'llama3.1',
+		contextWindows: {
+			codellama: 16_384,
+			'llama3.1': 128_000,
+			mistral: 32_768,
+			phi3: 128_000,
+			'phi4-mini': 128_000,
+			qwen2: 32_768,
+			'qwen3:4b': 32_768,
+			'qwen3:8b': 32_768
+		},
+		defaultModel: 'qwen3:8b',
 		description: 'Self-managed Ollama provider — runs models locally via the Ollama binary',
 		envVars: { model: 'OLLAMA_DEFAULT_MODEL' },
 		helpText: 'Use any model available via ollama pull. No API key required.',
@@ -23,7 +32,10 @@ export function register(api: PluginAPI): void {
 			{ mode: 'default', model: 'mistral' },
 			{ mode: 'default', model: 'codellama' },
 			{ mode: 'default', model: 'phi3' },
-			{ mode: 'default', model: 'qwen2' }
+			{ mode: 'default', model: 'qwen2' },
+			{ mode: 'default', model: 'phi4-mini' },
+			{ mode: 'default', model: 'qwen3:4b' },
+			{ mode: 'default', model: 'qwen3:8b' }
 		],
 		modelPrefix: 'ollama:',
 		requiresApiKey: false

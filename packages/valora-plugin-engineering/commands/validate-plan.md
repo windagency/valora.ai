@@ -9,7 +9,7 @@ allowed-tools:
   - list_dir
   - glob_file_search
   - run_terminal_cmd # Required for modern CLI tools (jq, yq, rg, fd)
-model: claude-sonnet-5
+model: qwen3:8b
 agent: lead
 prompts:
   pipeline:
@@ -360,7 +360,7 @@ Plan is incomplete. Regenerate:
 
 ## Notes
 
-- Runs in ~2 minutes (vs 14 min for full review)
+- Runs in ~2 minutes once the local model (qwen3:8b) is warm (vs 14 min for full review); first invocation may take longer while Ollama pulls the model
 - Catches 60-70% of issues that cause review iterations
 - Auto-fix mode adds TODO placeholders for manual completion
 - Strict mode useful for production-critical plans

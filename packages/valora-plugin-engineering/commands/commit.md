@@ -13,7 +13,7 @@ allowed-tools:
   - web_search
   # MCP: GitHub for issue/ticket linking
   - mcp_github
-model: claude-haiku-4.5
+model: qwen3:8b
 agent: lead
 prompts:
   pipeline:
@@ -694,7 +694,7 @@ Before finalizing commits, verify:
 
 ## Performance Considerations
 
-- **Fast operations** - Analysis and commit creation should take < 5 seconds
+- **Fast operations** - Analysis and commit creation should complete within a few seconds once the local model (qwen3:8b) is warm; first invocation may take longer while Ollama pulls the model
 - **Large changesets** - Split into logical commits automatically
 - **Hook timeouts** - Pre-commit hooks should complete within 30 seconds
 - **Diff analysis** - Optimize file reading for large diffs (> 10 files)

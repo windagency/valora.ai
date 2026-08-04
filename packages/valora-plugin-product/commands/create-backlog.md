@@ -308,7 +308,7 @@ After successful execution, display handoff summary to user:
 
 **Token Optimization**:
 
-- Uses **claude-haiku-4.5** for cost efficiency
+- Uses **gpt-5.5** for product judgment (requirement decomposition, task sizing)
 - Detailed instructions delegated to prompts (not command body)
 - Stage caching reduces re-computation on retries
 
