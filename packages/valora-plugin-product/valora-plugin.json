@@ -1,6 +1,6 @@
 {
 	"name": "valora-plugin-product",
-	"version": "1.0.1",
+	"version": "1.0.2",
 	"description": "Product Manager agent and product-discovery workflow commands (create-prd, refine-specs, refine-task, create-backlog, fetch-task, feedback).",
 	"engines": { "valora": ">=0.1.0" },
 	"contributes": ["agents", "commands"]

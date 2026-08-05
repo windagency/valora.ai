@@ -1,6 +1,6 @@
 {
 	"name": "@windagency/valora-plugin-qa",
-	"version": "1.0.1",
+	"version": "1.0.2",
 	"description": "QA agent and testing workflow commands for Valora (test, validate-coverage, pre-check).",
 	"keywords": [
 		"valora",

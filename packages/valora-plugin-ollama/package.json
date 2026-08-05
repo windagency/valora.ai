@@ -1,6 +1,6 @@
 {
 	"name": "@windagency/valora-plugin-ollama",
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"description": "Self-managed Ollama provider plugin for Valora — manages the Ollama binary and server process, supports any model available via ollama pull.",
 	"keywords": [
 		"valora",
