@@ -1,595 +1,944 @@
-<p align="center">
-  <img src="https://img.shields.io/badge/VALORA-6366f1?style=for-the-badge&logo=openai&logoColor=white" alt="VALORA" />
-</p>
-
-<h1 align="center">VALORA</h1>
+# VALORA
 
 <p align="center">
-  <strong>The future of software development is not about replacing developers, but amplifying their capabilities with intelligent AI collaboration.</strong>
+  <strong>The control layer for AI-assisted software development.</strong>
 </p>
 
 <p align="center">
-  <a href="#-features">Features</a> •
-  <a href="#-quick-start">Quick Start</a> •
-  <a href="#-architecture">Architecture</a> •
-  <a href="#-commands">Commands</a> •
-  <a href="#-documentation">Documentation</a>
+  AI can write code.<br>
+  <strong>VALORA helps you make sure the right code gets planned, built, tested, reviewed, and delivered.</strong>
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-2.5.0-blue?style=flat-square" alt="Version" />
+  <img src="https://img.shields.io/badge/version-3.0.10-blue?style=flat-square" alt="Version" />
   <img src="https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen?style=flat-square&logo=node.js" alt="Node" />
   <img src="https://img.shields.io/badge/typescript-5.x-3178c6?style=flat-square&logo=typescript" alt="TypeScript" />
   <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="License" />
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Anthropic-Claude-d97706?style=flat-square" alt="Anthropic" />
-  <img src="https://img.shields.io/badge/OpenAI-GPT--5-412991?style=flat-square" alt="OpenAI" />
-  <img src="https://img.shields.io/badge/Google-Gemini-4285f4?style=flat-square" alt="Google" />
-  <img src="https://img.shields.io/badge/Cursor-MCP-000000?style=flat-square" alt="Cursor" />
-  <img src="https://img.shields.io/badge/Local-LLM-34d399?style=flat-square" alt="Local" />
+  <strong>Open Source</strong> ·
+  <strong>Multi-Agent</strong> ·
+  <strong>Multi-Model</strong> ·
+  <strong>MCP</strong> ·
+  <strong>Local Models</strong> ·
+  <strong>Security-First</strong>
 </p>
 
----
+## ⚡ TL;DR
 
-## 🏛️ About VALORA
+**VALORA is an open-source AI development orchestrator.**
 
-**VALORA (Versatile Agent Logic for Orchestrated Response Architecture)** is a next-generation TypeScript-based platform designed to orchestrate a sophisticated network of AI agents to automate the complete software development lifecycle. By moving beyond simple "code generation", VALORA manages the delicate interplay between requirements, architecture, and deployment. VALORA provides intelligent automation while maintaining human oversight.
+It coordinates specialised AI agents across a structured software-development lifecycle — from requirements and architecture through implementation, testing, security, review, and delivery.
 
-<details>
-<summary><strong>Why VALORA?</strong> — design rationale</summary>
+Instead of asking a single AI agent to do everything:
 
-**Intelligent Orchestration**: VALORA coordinates **11 specialised AI agents**, from **@lead** technical oversight to **@secops-engineer** compliance, ensuring the right expert is assigned to every task.
-
-**Three-Tier Flexibility**: The engine adapts to your resources, offering **MCP Sampling**, **Guided Completion**, or **API Fallback** modes.
-
-**Phased Governance**: Every project follows a rigorous **8-phase lifecycle**, moving from initialisation and planning through implementation to validation and PR creation.
-
-**Strategic Optimisation**: To balance depth and speed, VALORA assigns specific LLMs (like **GPT-5** for planning or **Claude Haiku** for validation) based on the task's complexity.
-
-> VALORA is not a replacement for the developer; it is the high-fidelity instrument through which the developer conducts a full symphony of AI agents.
-
-</details>
-
-## ✨ Features
-
-<table width="100%">
-<tr valign="top">
-<td width="50%">
-
-### 🤖 Multi-Agent Collaboration
-
-**11 specialised AI agents** with distinct expertise:
-
-- **@lead** — Technical oversight & architecture
-- **@product-manager** — Requirements & prioritisation
-- **@software-engineer-\*** — Implementation specialists
-- **@platform-engineer** — Infrastructure & DevOps
-- **@qa** — Testing & quality assurance
-- **@secops-engineer** — Security & compliance
-- **@ui-ux-designer** — Design & accessibility
-
-</td>
-<td width="50%">
-
-### ⚡ Three-Tier Execution
-
-Flexible execution modes for every use case:
-
-| Tier | Mode              | Cost        |
-| ---- | ----------------- | ----------- |
-| 1    | MCP Sampling      | Free\*      |
-| 2    | Guided Completion | Free        |
-| 3    | API Fallback      | Pay-per-use |
-| 3    | Local Models      | Free\*\*    |
-
-_\*When available in Cursor_
-_\*\*Requires a running local model server (e.g. Ollama)_
-
-**Zero configuration required** — works immediately with your Cursor subscription.
-
-</td>
-</tr>
-<tr valign="top">
-<td width="50%">
-
-### 💎 Model Optimisation
-
-Strategic AI model assignment for cost efficiency:
-
-| Model              | Use Case                |
-| ------------------ | ----------------------- |
-| **GPT-5 Thinking** | Deep analysis, planning |
-| **Claude Sonnet**  | Implementation, reviews |
-| **Claude Haiku**   | Fast tasks, validation  |
-
-**31% strategic • 31% execution • 38% fast**
-
-</td>
-<td width="50%">
-
-### 🔒 Security & Compliance
-
-Enterprise-grade security controls:
-
-- **Credential Guard** — Env var redaction, output scanning, sensitive file blocking
-- **Command Guard** — Blocks exfiltration, network, eval, and remote access patterns
-- **Prompt Injection Detection** — Risk-scored scanning of tool results with quarantine/redaction
-- **MCP Hardening** — Tool definition validation, tool-set drift detection, approval workflows
-- **Supply Chain Hardening** — Frozen lockfile, blocked install scripts, vulnerability overrides
-- **Audit Logging** — Complete operation trail with security event tracking
-
-</td>
-</tr>
-<tr valign="top">
-<td width="50%">
-
-### 🧩 Plugin System
-
-Extend Valora with **self-contained plugin directories**:
-
-| Contribution    | What it adds                                        |
-| --------------- | --------------------------------------------------- |
-| `agents`        | New AI personas                                     |
-| `commands`      | New CLI verbs (auto-exposed as MCP tools)           |
-| `hooks`         | PreToolUse / PostToolUse shell scripts              |
-| `prompts`       | Reusable pipeline stages                            |
-| `templates`     | PR, PRD, and plan scaffolds                         |
-| `agent-context` | Markdown injected into agent system prompts         |
-| `code`          | TypeScript modules registered via `PluginAPI` hooks |
-
-Plugins are discovered from four locations (later takes precedence): `data/plugins/` (built-in), `~/.valora/plugins/` (user), `.valora/plugins/` (project), `node_modules/@windagency/valora-plugin-*` (npm). Install an official plugin with `valora plugin add <name>` and add its short name to `plugins.enabled` in `.valora/config.json`. No restart required. See [Plugins guide](./documentation/user-guide/plugins.md).
-
-To **create** a plugin — from a minimal data plugin to a full code plugin with LLM providers, memory backends, and CLI subcommands — see the [Plugin Authoring Guide](./documentation/developer-guide/plugin-authoring.md).
-
-35 built-in compression strategies ship as three **code plugins** and are the canonical example of the `code` contribution type. See [Strategies by plugin](./documentation/architecture/session-optimization.md#strategies-by-plugin) for the full list.
-
-</td>
-<td width="50%">
-
-### 🔌 External MCP Integration
-
-Connect to **15 external MCP servers** with user approval:
-
-| Category       | Servers                                   |
-| -------------- | ----------------------------------------- |
-| Browser/Test   | Playwright, Chrome DevTools, BrowserStack |
-| Design         | Figma, Storybook                          |
-| Development    | GitHub, Serena, Context7                  |
-| Infrastructure | Terraform, Firebase, Google Cloud         |
-| Data           | MongoDB, Elastic                          |
-| Observability  | Grafana, DeepResearch                     |
-
-</td>
-</tr>
-<tr valign="top">
-<td width="50%">
-
-### 🌳 Worktree Dashboard & Statistics
-
-Live visibility into parallel explorations:
-
-- **Worktree Diagram Panel** — Real-time tree view of git worktrees in the `valora dash` dashboard
-- **Exploration Status** — Colour-coded branches with status icons (▶ running, ✓ completed, ✗ failed)
-- **Session-Exploration Linking** — Explorations create linked sessions; the dashboard shows exploration details (task, worktrees, status) in the session details view
-- **Worktree Usage Stats** — Per-session tracking of worktree creation, concurrency, and duration
-
-```plaintext
-┌─ Git Worktrees (3) ──────────┐
-│ ● main  abc1234              │
-│ ├── exploration/exp-abc-jwt  │
-│ │   def5678  ▶ RUNNING       │
-│ └── feature/new-api          │
-│     ghi9012                  │
-└──────────────────────────────┘
+```text
+                ┌───────────┐       ┌───────────┐       ┌───────────┐       ┌───────────┐       ┌───────────┐
+YOUR IDEA  ──▶  │   PLAN    │  ──▶  │   BUILD   │  ──▶  │  VERIFY   │  ──▶  │  REVIEW   │  ──▶  │  DELIVER  │
+                └───────────┘       └───────────┘       └───────────┘       └───────────┘       └───────────┘
 ```
 
-</td>
-</tr>
-</table>
+**VALORA gives AI a software-engineering process.**
 
----
+## Why VALORA?
 
-## 🚀 Quick Start
+AI has changed how quickly software can be generated.  
+But software engineering is more than generating code.  
+A production change also requires:
 
-### Prerequisites
+- understanding requirements
+- making architectural decisions
+- managing context
+- choosing the right implementation strategy
+- writing code
+- testing behaviour
+- reviewing changes
+- checking security
+- managing dependencies
+- maintaining project knowledge
+- knowing when a human should intervene
 
-- Node.js 18+
+The problem is no longer simply:
 
-### Installation
+> **“Can AI write the code?”**
+
+The more important questions are:
+
+> **What should it build?**
+
+> **How should it build it?**
+
+> **How do we verify what it did?**
+
+> **How do we keep it within safe boundaries?**
+
+> **How does it learn from previous work?**
+
+> **How do humans remain in control?**
+
+VALORA is an attempt to answer those questions.
+
+## 🧠 AI as an engineering team
+
+VALORA doesn't treat AI as one giant autonomous agent.  
+It coordinates specialised roles.
+
+```text
+┌─────────┐    ┌───────────┐    ┌───────────┐    ┌─────────┐    ┌──────────┐    ┌────────┐    ┌─────────┐
+│ PRODUCT │───▶│ LEAD      │───▶│ SOFTWARE  │───▶│ QUALITY │───▶│ SECURITY │───▶│ REVIEW │───▶│ PULL    │
+│ MANAGER │    │ ARCHITECT │    │ ENGINEERS │    │         │    │          │    │        │    │ REQUEST │
+└─────────┘    └───────────┘    └───────────┘    └─────────┘    └──────────┘    └────────┘    └─────────┘
+```
+
+Different responsibilities can use different agents, tools, models and context.
+
+The objective is not to create **one smarter agent**.
+
+It's to create a **better engineering system**.
+
+## 🎬 See VALORA in action
+
+<p align="center">
+  <!-- Replace with the strongest 20–40 second product demonstration -->
+  <img src="public/logo-animation-horizontal-sdr.gif" lt="VALORA orchestrating an AI software development workflow">
+</p>
+
+### From an idea to an engineered change
+
+For example:
 
 ```bash
-# Install globally
-pnpm add -g @windagency/valora          # pnpm
-yarn global add @windagency/valora      # yarn
-npm install -g @windagency/valora       # npm
-
-# Verify installation
-valora --version
-# Should output: 2.5.0
+valora plan "Add OAuth authentication to my application"
 ```
 
-### Project Setup
+VALORA can turn that request into a structured workflow involving:
 
-Initialise VALORA in your project:
+```text
+Requirements ──▶ Architecture ──▶ Implementation ──▶ Testing ──▶ Security ──▶ Review ──▶ Pull Request
+```
+
+The workflow can be fully guided, partially autonomous, or integrated with external AI clients and tools.
+
+## 🚀 Get started
+
+### 1. Install
+
+```bash
+npm install -g @windagency/valora
+```
+
+Or with pnpm:
+
+```bash
+pnpm add -g @windagency/valora
+```
+
+### 2. Initialise your project
 
 ```bash
 cd your-project
-valora init         # Minimal setup (.valora/config.json)
-valora init --full  # Full setup with override directories
+valora init
+valora plugin add engineering
+valora plugin add quality-gate
+valora plugin add qa
+# Use `valora plugin available` to see any other relevant available plugins
 ```
 
-### Your First Command
+### 3. Plan a change
 
 ```bash
-# Create an implementation plan
-valora plan "Add user authentication with OAuth"
+valora plan "Add OAuth authentication"
 ```
 
-The engine will:
+VALORA analyses the project, gathers relevant context and creates a structured plan.
 
-1. Select the appropriate agent (`@lead`)
-2. Gather codebase context
-3. Generate a detailed implementation plan
-4. Provide step-by-step guidance
-
-### Zero-Config Usage with Cursor subscription
-
-No API keys? No problem. The engine works immediately using **Guided Completion Mode**:
+### 4. Continue through the workflow
 
 ```bash
-valora plan "Add dark mode toggle"
-# → Generates structured prompt for Cursor AI
-# → Uses your Cursor subscription (free)
-```
-
-### Optional: API Configuration
-
-For fully autonomous execution with cloud providers:
-
-```bash
-valora config setup --quick
-
-# Or set environment variables
-export ANTHROPIC_API_KEY=sk-ant-...
-export OPENAI_API_KEY=sk-...
-```
-
-### Optional: Local Models (No API Key)
-
-Run fully offline with Ollama or any OpenAI-compatible server:
-
-```bash
-# Install and start Ollama
-ollama pull llama3.1
-ollama serve
-
-# Use it directly
-valora plan "Add auth" --provider local --model llama3.1
-
-# Or configure as default
-export LOCAL_BASE_URL=http://localhost:11434/v1
-export LOCAL_DEFAULT_MODEL=llama3.1
-```
-
----
-
-## 🏗️ Architecture
-
-```plaintext
-┌─────────────────────────────────────────────────────────────────────────┐
-│                                 VALORA                                  │
-├─────────────────────────────────────────────────────────────────────────┤
-│                                                                         │
-│   ┌─────────────┐  ┌──────────────┐  ┌─────────────┐  ┌─────────────┐   │
-│   │ CLI Layer   │  │ Orchestrator │  │ Agent Layer │  │ LLM Layer   │   │
-│   │             │──│              │──│             │──│             │   │
-│   │ • Commands  │  │ • Pipeline   │  │ • Registry  │  │ • Anthropic │   │
-│   │ • Wizard    │  │ • Executor   │  │ • Selection │  │ • OpenAI    │   │
-│   │ • Output    │  │ • Context    │  │ • Loading   │  │ • Google    │   │
-│   │             │  │              │  │             │  │ • Local     │   │
-│   └─────────────┘  └──────────────┘  └─────────────┘  └─────────────┘   │
-│                                                                         │
-│   ┌─────────────┐  ┌──────────────┐  ┌─────────────┐  ┌─────────────┐   │
-│   │ Session     │  │ Config       │  │ MCP         │  │ Services    │   │
-│   │             │  │              │  │             │  │             │   │
-│   │ • State     │  │ • Loader     │  │ • Server    │  │ • Logging   │   │
-│   │ • Context   │  │ • Schema     │  │ • Tools     │  │ • Cleanup   │   │
-│   │ • History   │  │ • Providers  │  │ • Prompts   │  │ • Utils     │   │
-│   └─────────────┘  └──────────────┘  └─────────────┘  └─────────────┘   │
-│                                                                         │
-└─────────────────────────────────────────────────────────────────────────┘
-```
-
-### Key Design Principles
-
-| Principle         | Implementation                                      |
-| ----------------- | --------------------------------------------------- |
-| **Modularity**    | Loosely coupled components with clear interfaces    |
-| **Extensibility** | Plugin architecture for agents, commands, providers |
-| **Testability**   | Comprehensive test suites (unit, integration, e2e)  |
-| **Observability** | Structured logging and session tracking             |
-| **Resilience**    | Graceful fallbacks and error recovery               |
-
----
-
-## 📋 Commands
-
-### Complete Command Reference
-
-| Command             | Agent            | Description                                          |
-| ------------------- | ---------------- | ---------------------------------------------------- |
-| `refine-specs`      | @product-manager | Collaboratively refine specifications                |
-| `create-prd`        | @product-manager | Generate Product Requirements Document               |
-| `create-backlog`    | @product-manager | Decompose PRD into tasks                             |
-| `fetch-task`        | @product-manager | Retrieve next priority task                          |
-| `refine-task`       | @product-manager | Clarify task requirements                            |
-| `gather-knowledge`  | @lead            | Analyse codebase context                             |
-| `plan`              | @lead            | Create implementation plan                           |
-| `review-plan`       | @lead            | Validate plan quality                                |
-| `implement`         | Dynamic          | Execute code changes                                 |
-| `assert`            | @asserter        | Validate implementation                              |
-| `test`              | @qa              | Execute test suites                                  |
-| `review-code`       | @lead            | Code quality review                                  |
-| `review-functional` | @lead            | Functional review                                    |
-| `commit`            | @lead            | Create conventional commits                          |
-| `create-pr`         | @lead            | Generate pull request                                |
-| `feedback`          | @product-manager | Capture outcomes                                     |
-| `consolidate`       | @lead            | Consolidate and prune memory stores _(experimental)_ |
-| `update`            | —                | Install the latest version of Valora                 |
-
-### Command Categories
-
-```plaintext
-┌─────────────────────┐  ┌─────────────────────┐  ┌─────────────────────┐
-│ Planning            │  │ Implementation      │  │ Delivery            │
-├─────────────────────┤  ├─────────────────────┤  ├─────────────────────┤
-│ • refine-specs      │  │ • implement         │  │ • commit            │
-│ • create-prd        │  │ • assert            │  │ • create-pr         │
-│ • plan              │  │ • test              │  │ • feedback          │
-│ • review-plan       │  │ • review-code       │  │                     │
-│ • gather-knowledge  │  │ • review-functional │  │                     │
-└─────────────────────┘  └─────────────────────┘  └─────────────────────┘
-```
-
----
-
-## 📚 Documentation
-
-<table width="100%">
-<tr valign="top">
-<td align="center" width="33%">
-<h3>👤 User Guide</h3>
-<p>Getting started, workflows,<br>and daily usage</p>
-<a href="./documentation/user-guide/README.md">
-<img src="https://img.shields.io/badge/Read-User%20Guide-6366f1?style=for-the-badge" alt="User Guide" />
-</a>
-</td>
-<td align="center" width="33%">
-<h3>💻 Developer Guide</h3>
-<p>Architecture, codebase,<br>and contributions</p>
-<a href="./documentation/developer-guide/README.md">
-<img src="https://img.shields.io/badge/Read-Developer%20Guide-10b981?style=for-the-badge" alt="Developer Guide" />
-</a>
-</td>
-<td align="center" width="33%">
-<h3>🏛️ Architecture</h3>
-<p>System design<br>and decisions</p>
-<a href="./documentation/architecture/README.md">
-<img src="https://img.shields.io/badge/Read-Architecture-f59e0b?style=for-the-badge" alt="Architecture" />
-</a>
-</td>
-</tr>
-</table>
-
-### Documentation Structure
-
-```plaintext
-documentation/
-├── README.md                    # Documentation entry point
-├── user-guide/                  # For users
-│   ├── quick-start.md           # 5-minute getting started
-│   ├── workflows.md             # Common patterns
-│   └── commands.md              # Command reference
-├── developer-guide/             # For developers
-│   ├── setup.md                 # Development environment
-│   ├── codebase.md              # Code structure
-│   └── contributing.md          # How to contribute
-├── architecture/                # For architects
-│   ├── system-architecture.md   # C4 diagrams
-│   ├── components.md            # Component design
-│   └── data-flow.md             # Data flow patterns
-└── adr/                         # Decision records
-    ├── 001-multi-agent-architecture.md
-    ├── ...
-    ├── 008-pretooluse-cli-enforcement.md
-    └── 009-supply-chain-hardening.md
-```
-
----
-
-## 🎯 Use Cases
-
-### New Feature Development
-
-```bash
-valora refine-specs "User authentication with OAuth"
-valora create-prd
-valora create-backlog
-valora fetch-task && valora plan
 valora implement
-valora review-code && valora commit
+```
+
+Then validate:
+
+```bash
+valora assert
+```
+
+Test:
+
+```bash
+valora test --type=all
+```
+
+Review:
+
+```bash
+valora review-code
+```
+
+And create the pull request:
+
+```bash
 valora create-pr
 ```
 
-### Bug Fix Workflow
+You can use the full workflow or invoke individual stages.
 
-```bash
-valora plan "Fix: Login timeout issue"
-valora implement
-valora test --type=all
-valora commit --scope=fix
+## 🏗️ The VALORA architecture
+
+VALORA sits between the developer, the development workflow, AI agents, models, tools, and the codebase.
+
+It is **not an LLM wrapper**.
+
+The model is one replaceable component of a larger orchestration system.
+
+### Conceptual Flow
+
+```text
+                 ┌─────────────┐
+                 │  DEVELOPER  │
+                 └──────┬──────┘
+                        │
+                        ▼
+             ┌────────────────────┐
+             │       VALORA       │
+             │    ORCHESTRATOR    │
+             └──────────┬─────────┘
+                        │
+      ┌─────────────────┼─────────────────┐
+      ▼                 ▼                 ▼
+   AGENTS            CONTEXT            MEMORY
+      │                 │                 │
+      └─────────────────┼─────────────────┘
+                        ▼
+             ┌─────────────────────┐
+             │     GOVERNANCE      │
+             │     & EXECUTION     │
+             └──────────┬──────────┘
+                        │
+             ┌──────────┴──────────┐
+             ▼                     ▼
+           MODELS                TOOLS
+             │                     │
+             └──────────┬──────────┘
+                        ▼
+                 ┌────────────┐
+                 │  CODEBASE  │
+                 └────────────┘
 ```
 
-### Code Review
+### The principle
+
+**VALORA orchestrates the engineering process.**
+
+Models provide intelligence.  
+Agents provide specialised roles.  
+Tools provide capabilities.  
+Memory provides continuity.  
+Governance provides boundaries.  
+The codebase remains the source of truth.
+
+```mermaid
+flowchart TB
+    DEV["DEVELOPER<br/><br/>CLI · Dashboard<br/>Clients · MCP"]
+
+    subgraph V["VALORA"]
+        direction TB
+
+        ORCH["ORCHESTRATOR<br/><br/>Workflow Execution<br/>Agent Selection<br/>Phase Management<br/>Context Orchestration<br/>Session Management<br/>Execution Strategy"]
+
+        subgraph CORE["CORE INTELLIGENCE"]
+
+            AGENTS["<br/>AGENT SYSTEM<br/><br/>Product · Architecture<br/>Engineering · Platform<br/>QA · Security · UI/UX"]
+
+            CONTEXT["CONTEXT<br/>& CODE INTELLIGENCE<br/><br/>AST · Symbols · LSP<br/>Context Filtering<br/>Optimisation"]
+
+            MEMORY["<br/>MEMORY<br/><br/>Project Knowledge<br/>Episodic · Semantic<br/>Plugins"]
+        end
+
+        GOV["GOVERNANCE & EXECUTION<br/><br/>Planning · Implementation<br/>Assertion · Testing · Review<br/>Security · Quality Gates<br/>Approval · Audit · Recovery"]
+
+        ORCH --> AGENTS
+        ORCH --> CONTEXT
+        ORCH --> MEMORY
+
+        AGENTS --> GOV
+        CONTEXT --> GOV
+        MEMORY --> GOV
+    end
+
+    subgraph EXT["EXTERNAL CAPABILITIES"]
+
+        MODELS["MODEL LAYER<br/><br/>Cloud · Local<br/>Compatible APIs<br/>Multiple Providers & Models"]
+
+        TOOLS["TOOL LAYER<br/><br/>MCP<br/>Development · Design<br/>Infrastructure<br/>Data · Observability"]
+    end
+
+    CODE["CODEBASE<br/><br/>Git · Worktrees · Files<br/>Tests · CI/CD"]
+
+    DEV --> ORCH
+
+    ORCH --> MODELS
+    ORCH --> TOOLS
+
+    MODELS --> CODE
+    TOOLS --> CODE
+
+    style V fill:#111827,stroke:#6366f1,stroke-width:2px
+    style CORE fill:#1f2937,stroke:#4b5563,stroke-width:1px
+    style EXT fill:#111827,stroke:#4b5563,stroke-width:1px
+
+    style DEV fill:#312e81,stroke:#818cf8,stroke-width:2px
+    style ORCH fill:#3730a3,stroke:#a5b4fc,stroke-width:2px
+    style GOV fill:#312e81,stroke:#818cf8,stroke-width:2px
+
+    style AGENTS fill:#1e293b,stroke:#60a5fa,stroke-width:1px
+    style CONTEXT fill:#1e293b,stroke:#60a5fa,stroke-width:1px
+    style MEMORY fill:#1e293b,stroke:#60a5fa,stroke-width:1px
+
+    style MODELS fill:#172554,stroke:#60a5fa,stroke-width:1px
+    style TOOLS fill:#172554,stroke:#60a5fa,stroke-width:1px
+
+    style CODE fill:#064e3b,stroke:#34d399,stroke-width:2px
+```
+
+## 🧩 Core capabilities
+
+### Multi-agent orchestration
+
+VALORA coordinates specialised agents instead of relying on a single general-purpose agent.  
+Examples include:
+
+- Product management
+- Architecture
+- Software engineering
+- Platform engineering
+- Quality assurance
+- Security
+- UI/UX
+
+Each role can have its own instructions, tools, context and execution strategy.
+
+### 🔄 Structured software lifecycle
+
+VALORA provides an explicit development workflow:
+
+```text
+ Specification
+      ↓
+     PRD
+      ↓
+   Backlog
+      ↓
+   Planning
+      ↓
+Implementation
+      ↓
+  Assertion
+      ↓
+   Testing
+      ↓
+   Review
+      ↓
+   Commit
+      ↓
+ Pull Request
+```
+
+This creates a repeatable process instead of a sequence of disconnected AI conversations.
+
+## 🛡️ Security & governance
+
+Giving an AI agent access to your development environment introduces a new security boundary.  
+VALORA is designed around that reality.
+
+### Credential protection
+
+- Environment-variable redaction
+- Sensitive-file protection
+- Output scanning
+
+### Command protection
+
+- Dangerous-command detection
+- Network and exfiltration controls
+- Remote-access restrictions
+- Evaluation safeguards
+
+### Prompt-injection protection
+
+- Tool-result scanning
+- Risk assessment
+- Quarantine and redaction
+
+### MCP security
+
+- Tool-definition validation
+- Tool-set drift detection
+- Approval workflows
+
+### Supply-chain protection
+
+- Frozen lockfiles
+- Blocked install scripts
+- Vulnerability controls
+
+### Auditability
+
+- Structured execution logs
+- Security events
+- Session history
+
+> **More AI autonomy requires more control, not less.**
+
+## 👤 Humans remain in control
+
+VALORA is designed around **human-AI collaboration**.
+
+You control:
+
+- what gets built
+- what gets changed
+- which agents participate
+- which models are used
+- what tools are available
+- when approval is required
+- what ultimately reaches your repository
+
+AI can accelerate engineering.
+
+**It does not have to own the engineering process.**
+
+## ⚡ Multiple execution strategies
+
+Different environments require different levels of autonomy.  
+VALORA supports several execution approaches.
+
+```text
+                         VALORA
+                            │
+          ┌─────────────────┼─────────────────┐
+          │                 │                 │
+          ▼                 ▼                 ▼
+     MCP Sampling     Guided Execution    API Execution
+          │                 │                 │
+          │                 │                 └──── Cloud APIs
+          │                 │
+          │                 └───────────────────── Human-controlled
+          │
+          └────────────────────────────────────── MCP-capable clients
+
+                            +
+
+                       LOCAL MODELS
+                            │
+                            ▼
+                  Local / OpenAI-compatible
+                         endpoints
+```
+
+You can start with a highly supervised workflow and introduce more autonomy as confidence grows.
+
+## 🧠 Model independence
+
+VALORA does not depend on a single AI provider.  
+The model layer is intentionally replaceable.
+
+```text
+                    ┌─────────────────┐
+                    │     VALORA      │
+                    └────────┬────────┘
+                             │
+                             ▼
+                    ┌─────────────────┐
+                    │  MODEL ROUTING  │
+                    └────────┬────────┘
+                             │
+            ┌────────────────┼────────────────┐
+            │                │                │
+            ▼                ▼                ▼
+       Cloud models    Local models    Compatible APIs
+            │                │                │
+       ┌────┼────┐           │          ┌─────┼─────┐
+       │    │    │           │          │     │     │
+    Provider A  B  C     Local LLMs    Endpoint X  Y  Z
+```
+
+Supported providers and execution environments include:
+
+- Anthropic
+- OpenAI
+- Google
+- xAI
+- Local models
+- OpenAI-compatible endpoints
+
+The architecture is designed so that models can change without rebuilding the entire engineering workflow.
+
+> **Models will change quickly. Your engineering process shouldn't have to.**
+
+## 🔌 MCP & external tools
+
+AI agents become considerably more useful when they can interact with the systems surrounding the codebase.  
+VALORA supports MCP-based integrations with external tools.
+
+Examples include:
+
+| Category          | Examples                                    |
+| ----------------- | ------------------------------------------- |
+| Development       | GitHub · Serena · Context7                  |
+| Browser & testing | Playwright · Chrome DevTools · BrowserStack |
+| Design            | Figma · Storybook                           |
+| Infrastructure    | Terraform · Firebase · Google Cloud         |
+| Data              | MongoDB · Elastic                           |
+| Observability     | Grafana                                     |
+| Research          | DeepResearch                                |
+
+Tools are exposed through explicit capabilities and approval boundaries.
+
+## 🧠 Context engineering
+
+Giving an agent more context is not necessarily better.  
+Large amounts of irrelevant context can increase:
+
+- token usage
+- latency
+- cost
+- noise
+- hallucination risk
+- decision complexity
+
+VALORA therefore includes infrastructure for **relevant context selection**.
+
+### Code intelligence
+
+- AST parsing
+- Symbol indexing
+- Relevant-code extraction
+- LSP integration
+- Diagnostics
+
+### Context optimisation
+
+- Content-aware filtering
+- History pruning
+- Tool-result deduplication
+- Context compression
+
+The objective is simple:
+
+> **Give the agent the information it needs — not everything that exists.**
+
+## 🧠 Persistent project memory
+
+Long-running software projects need continuity.  
+VALORA can maintain project-level knowledge across sessions.
+
+Memory can include:
+
+- architectural decisions
+- observations
+- patterns
+- previous outcomes
+- project knowledge
+- reusable context
+
+The memory architecture is designed to be extensible through plugins.  
+The goal isn't to remember everything.
+
+It's to remember **what matters**.
+
+## 🌳 Parallel development with Git worktrees
+
+AI development often involves exploring multiple possible solutions.  
+VALORA integrates Git worktrees so those explorations can remain isolated.
+
+```text
+                         main
+                          │
+            ┌─────────────┼─────────────┐
+            │             │             │
+            ▼             ▼             ▼
+       auth-experiment  api-v2     payment-refactor
+            │             │             │
+            ▼             ▼             ▼
+         running       complete       failed
+```
+
+This allows agents to explore without turning the main working tree into an uncontrolled experiment.
+
+## 🧩 Plugins
+
+VALORA is designed to be extended without modifying its core.  
+Plugins can provide:
+
+```text
+Agents
+Commands
+Hooks
+Prompts
+Templates
+Context
+TypeScript modules
+LLM providers
+Memory backends
+Compression strategies
+```
+
+A plugin can live at different levels:
+
+```text
+Built-in
+   │
+   ├── User
+   │
+   ├── Project
+   │
+   └── Package
+```
+
+This allows teams to adapt VALORA to their own engineering processes.
+
+## 🛠️ CLI workflow
+
+VALORA exposes individual lifecycle stages as commands.
+
+### Requirements
+
+```bash
+valora refine-specs "Add user authentication"
+```
+
+### Product specification
+
+```bash
+valora create-prd
+```
+
+### Backlog
+
+```bash
+valora create-backlog
+```
+
+### Task selection
+
+```bash
+valora fetch-task
+```
+
+### Planning
+
+```bash
+valora plan
+```
+
+### Implementation
+
+```bash
+valora implement
+```
+
+### Validation
+
+```bash
+valora assert
+```
+
+### Testing
+
+```bash
+valora test --type=all
+```
+
+### Code review
+
+```bash
+valora review-code
+```
+
+### Commit
+
+```bash
+valora commit
+```
+
+### Pull request
+
+```bash
+valora create-pr
+```
+
+You can run the complete lifecycle or use individual commands independently.
+
+## 🎯 What can you use VALORA for?
+
+Feature development:
+
+```bash
+valora plan "Add OAuth authentication"
+```
+
+Bug investigation:
+
+```bash
+valora plan "Investigate intermittent login failures"
+```
+
+Refactoring:
+
+```bash
+valora plan "Refactor the payment service"
+```
+
+Security review:
 
 ```bash
 valora review-code --focus=security
+```
+
+Testing:
+
+```bash
+valora test --type=all
+```
+
+Accessibility:
+
+```bash
 valora review-functional --check-a11y=true
 ```
 
----
+Architecture:
 
-## 🔧 Project Structure
-
-```plaintext
-valora/                          # npm package root
-├── bin/                         # CLI entry points
-│   ├── valora.js                # Main CLI
-│   └── mcp.js                   # MCP server
-├── src/                         # TypeScript source
-│   ├── ast/                     # AST-based code intelligence (tree-sitter parsing, symbol index)
-│   ├── cli/                     # Command-line interface
-│   ├── config/                  # Configuration management
-│   ├── executor/                # Pipeline execution
-│   ├── llm/                     # LLM provider integrations
-│   ├── lsp/                     # LSP integration (language server protocol client)
-│   ├── memory/                  # MemoryProvider registry + bootstrap glue (the bundled vault lives in packages/valora-plugin-memory-vault/; ADR-016 — replaceable via plugin)
-│   ├── mcp/                     # MCP server implementation
-│   ├── security/                # Agentic AI security (credential, command, injection guards)
-│   ├── session/                 # Session management
-│   │   └── worktree-stats-tracker.ts  # Worktree usage statistics
-│   ├── ui/                      # Terminal UI (dashboard, panels)
-│   ├── utils/                   # Utilities & path resolution
-│   └── ...
-├── data/                        # Built-in resources (shipped with package)
-│   ├── agents/                  # Agent definitions (11 agents)
-│   ├── commands/                # Command specifications (25 commands)
-│   ├── prompts/                 # Structured prompts by phase
-│   ├── templates/               # Document templates
-│   ├── hooks/                   # Hook scripts
-│   ├── config.default.json      # Default configuration
-│   ├── hooks.default.json       # Default hooks config
-│   └── external-mcp.default.json # External MCP server registry
-├── dist/                        # Compiled output (gitignored)
-├── __tests__/                   # Test suites
-├── documentation/               # Comprehensive docs
-└── package.json
+```bash
+valora plan "Design a scalable event-driven architecture"
 ```
 
-### Project-Level Overrides (`.valora/`)
+Local AI development:
 
-When installed in a project, VALORA supports a `.valora/` directory for local overrides:
-
-```plaintext
-.valora/                         # Project-specific configuration
-├── config.json                  # Project settings (overrides defaults)
-├── agents/                      # Custom/override agent definitions
-├── commands/                    # Custom/override command specs
-├── prompts/                     # Custom/override prompts
-├── templates/                   # Custom/override templates
-├── sessions/                    # Session state (gitignored)
-├── logs/                        # Execution logs (gitignored)
-├── index/                       # Codebase symbol index (gitignored)
-├── memory/                      # Agent memory vault (gitignored — ADR-013; layout owned by the active memory plugin per ADR-016)
-│   ├── version                  #   Vault schema version stamp
-│   ├── meta.json                #   Last-written / last-consolidated timestamps
-│   ├── episodic/<id>.md         #   7-day half-life events and observations
-│   ├── semantic/<id>.md         #   30-day half-life patterns and insights
-│   ├── decisions/<id>.md        #   21-day half-life architectural decisions
-│   ├── embeddings.bin           #   Packed Float32Array of all embedding vectors
-│   ├── embeddings.index.json    #   id → byte-offset index pinned to model + dim
-│   └── _legacy/                 #   Archived JSON files from auto-migration
-└── cache/                       # Cache data (gitignored)
+```bash
+valora plan "Refactor the payment module" \
+  --provider local \
+  --model qwen3:8b
 ```
 
-Resources in `.valora/` take precedence over built-in `data/` resources.
+## 🆚 VALORA vs AI coding assistants
 
----
+VALORA isn't necessarily a replacement for your favourite AI coding assistant.  
+It addresses a different layer.
 
-## 🌟 Why VALORA?
+A coding assistant primarily helps you interact with AI while writing software.  
+VALORA focuses on the **engineering workflow around AI**.
 
-<table width="100%">
-<tr valign="top">
-<td>
+| Capability                    | Coding assistant | VALORA |
+| ----------------------------- | :--------------: | :----: |
+| Generate code                 |        ✓         |   ✓    |
+| Codebase understanding        |        ✓         |   ✓    |
+| Structured planning           |        —         |   ✓    |
+| Specialised engineering roles |        —         |   ✓    |
+| Multi-stage lifecycle         |        —         |   ✓    |
+| Quality gates                 |      varies      |   ✓    |
+| Security governance           |      varies      |   ✓    |
+| Persistent project knowledge  |      varies      |   ✓    |
+| Multiple model providers      |      varies      |   ✓    |
+| Local models                  |      varies      |   ✓    |
+| MCP integrations              |      varies      |   ✓    |
+| Extensible plugins            |      varies      |   ✓    |
+| Human-controlled workflows    |        ✓         |   ✓    |
 
-### Traditional Development
+### The short version
 
-- ❌ Context switching between tools
-- ❌ Manual documentation
-- ❌ Inconsistent code reviews
-- ❌ Repetitive commit messages
-- ❌ Time-consuming PR creation
+**Use your favourite AI coding tool.**
 
-</td>
-<td>
+Use VALORA when you want to add:
 
-### With AI Orchestration
+> **process + orchestration + specialised roles + governance + context + memory**
 
-- ✅ Unified workflow automation
-- ✅ Auto-generated documentation
-- ✅ Comprehensive AI-powered reviews
-- ✅ Intelligent commit messages
-- ✅ One-command PR creation
+around AI-assisted software development.
 
-</td>
-</tr>
-</table>
+## 🏆 Design philosophy
 
-### Innovation Highlights
+VALORA is built around a few principles.
 
-| Innovation                    | Impact                                                                                                                                                                       |
-| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Multi-Agent Orchestration** | Specialised agents produce expert-level output                                                                                                                               |
-| **Three-Tier Execution**      | Flexibility from free to fully automated                                                                                                                                     |
-| **Session Persistence**       | Context flows naturally between commands                                                                                                                                     |
-| **Dynamic Agent Selection**   | Right expert for every task                                                                                                                                                  |
-| **Quality Gates**             | Multiple checkpoints prevent technical debt                                                                                                                                  |
-| **Token Efficiency**          | Content-aware command filters, proactive history pruning, and tool-result deduplication reduce per-call token costs; savings surface in the `valora dash` Optimisation panel |
+### 1. AI should amplify engineers
 
----
+The goal is not to eliminate developers.  
+The goal is to make developers more capable.
 
-## 🛠️ Technology Stack
+### 2. Autonomy should be earned
 
-| Category              | Technologies                                     |
-| --------------------- | ------------------------------------------------ |
-| **Runtime**           | Node.js 18+, TypeScript 5.x                      |
-| **Package Manager**   | pnpm 10.x                                        |
-| **Build**             | tsc, tsc-alias                                   |
-| **Testing**           | Vitest, Playwright                               |
-| **LLM SDKs**          | @anthropic-ai/sdk, openai, @google/generative-ai |
-| **CLI UI**            | Ink (React), Chalk, Commander                    |
-| **Validation**        | Zod                                              |
-| **Code Intelligence** | web-tree-sitter                                  |
-| **MCP**               | @modelcontextprotocol/sdk                        |
+An agent should not receive unlimited capabilities simply because it can.
 
----
+### 3. Context should be intentional
 
-## 🛡️ Compliance
+More information does not automatically produce better decisions.
 
-Valora operates at the **Limited Risk** tier of the EU AI Act (Regulation (EU) 2024/1689).
+### 4. Models should be replaceable
 
-| Document                                                                        | Description                                                               |
-| ------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| [System Card](./documentation/architecture/system-card.md)                      | Technical documentation for auditors (Annex IV)                           |
-| [Instructions for Use](./documentation/user-guide/eu-ai-act-compliance.md)      | Intended purpose, out-of-scope domains, deployer obligations (Article 13) |
-| [GPAI Upstream Policy](./documentation/developer-guide/gpai-upstream-policy.md) | Upstream provider obligations (Article 25)                                |
-| [Memory Data Governance](./documentation/user-guide/memory-data-governance.md)  | What is stored, retention, and how to purge (Article 10)                  |
-| [SECURITY.md](./SECURITY.md)                                                    | Responsible disclosure and incident reporting                             |
+Today's best model may not be tomorrow's best model.  
+The architecture should survive that change.
 
-**Audit export:** `valora security audit-export --out audit.json`
+### 5. Security belongs in the workflow
+
+Security should not be an afterthought added after autonomous execution exists.
+
+### 6. Failure is information
+
+AI systems will make mistakes.  
+A useful engineering system should detect, contain and learn from those mistakes.
+
+### 7. Humans remain accountable
+
+Automation can execute.  
+Humans remain responsible for what gets shipped.
+
+## 📐 High-level architecture
+
+```text
+                              DEVELOPER
+                                  │
+                 ┌────────────────┼────────────────┐
+                 │                │                │
+                 ▼                ▼                ▼
+                CLI           Dashboard       AI Clients
+                 │                │                │
+                 └────────────────┼────────────────┘
+                                  │
+                                  ▼
+                        ┌───────────────────┐
+                        │       VALORA      │
+                        │    ORCHESTRATOR   │
+                        └─────────┬─────────┘
+                                  │
+          ┌───────────────────────┼────────────────────────┐
+          │                       │                        │
+          ▼                       ▼                        ▼
+          │                    CONTEXT                   MEMORY
+          │                       │                        │
+          │                   AST / LSP                 Project
+       AGENTS                  Symbols                 Knowledge
+          │                   Filtering                 History
+          │                  Optimisation              Decisions
+          │                       │                        │
+          └───────────────────────┬────────────────────────┘
+                                  │
+                                  ▼
+                           GOVERNANCE LAYER
+                                  │
+                  ┌───────────────┼───────────────┐
+                  │               │               │
+              Security      Quality Gates      Approval
+                  │               │               │
+                  └───────────────┼───────────────┘
+                                  │
+                  ┌───────────────┴───────────────┐
+                  │                               │
+                  ▼                               ▼
+             MODEL LAYER                      TOOL LAYER
+                  │                               │
+        ┌─────────┼─────────┐            ┌────────┼─────────┐
+        │         │         │            │        │         │
+      Cloud     Local   Compatible      MCP    GitHub    Tools
+      Models    Models    APIs        Servers
+                  │                               │
+                  └───────────────┬───────────────┘
+                                  │
+                                  ▼
+                              CODEBASE
+                                  │
+                         ┌────────┼────────┐
+                         │        │        │
+                        Git     Tests   Worktrees
+```
+
+## 📚 Documentation
+
+| Documentation                                          | Purpose                      |
+| ------------------------------------------------------ | ---------------------------- |
+| [Quick Start](documentation/user-guide/quick-start.md) | Get started quickly          |
+| [User Guide](documentation/user-guide/)                | Using VALORA                 |
+| [Commands](documentation/user-guide/commands.md)       | CLI reference                |
+| [Developer Guide](documentation/developer-guide/)      | Develop VALORA               |
+| [Architecture](documentation/architecture/)            | System architecture          |
+| [Plugin Guide](documentation/plugins/)                 | Build extensions             |
+| [Security](SECURITY.md)                                | Security model and reporting |
+
+## 🤝 Contributing
+
+VALORA is open source.  
+Contributions are welcome across the entire project:
+
+- Code
+- Documentation
+- Tests
+- Plugins
+- Ideas
+- Architecture
+- Bug reports
+- Security research
+- Experiments
+
+```bash
+git clone https://github.com/windagency/valora.ai.git
+
+cd valora.ai
+
+pnpm install
+
+pnpm test
+```
+
+Before contributing, please read the developer documentation and contribution guidelines.
+
+**The future of AI-assisted software development is still being invented.**  
+Help shape it.
+
+## ⭐ Support VALORA
+
+If you find VALORA useful:
+
+⭐ **Star the repository**  
+🐛 **Report a bug**  
+💡 **Open a discussion**  
+🔌 **Build a plugin**  
+🤝 **Contribute**  
+📣 **Tell another developer**
+
+Every contribution helps.
+
+## 🔭 What's next?
+
+VALORA is an evolving experiment in AI-assisted software engineering.
+
+Areas of ongoing exploration include:
+
+- Better agent coordination
+- Improved code intelligence
+- More efficient context management
+- Long-term project memory
+- Safer autonomous execution
+- Richer MCP integrations
+- Improved local-model support
+- More powerful plugins
+- Better observability
+- Human/AI collaboration patterns
+
+The objective isn't simply to make AI generate more code.  
+**It's to make AI-assisted software development more reliable, controllable, and scalable.**
+
+## 💬 The bigger idea
+
+> **AI can generate software.**
+>
+> The next challenge is engineering the system around it.
+
+VALORA explores what that system could look like.
 
 ---
 
 ## 📄 Licence
 
-MIT © Damien TIVELET
-
----
-
-<p align="center">
-  <a href="./documentation/user-guide/quick-start.md">Get Started</a> •
-  <a href="./documentation/developer-guide/contributing.md">Contribute</a> •
-  <a href="./documentation/architecture/README.md">Learn More</a>
-</p>
+MIT © Damien TIVELET  
+Open source · Built for developers · Designed for the AI era
